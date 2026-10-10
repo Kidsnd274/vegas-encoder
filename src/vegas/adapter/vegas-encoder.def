@@ -1,0 +1,7 @@
+LIBRARY vegas-encoder
+EXPORTS
+    DllGetClassObject   PRIVATE
+    DllCanUnloadNow     PRIVATE
+    DllInitClasses
+    DllRegisterServer   PRIVATE
+    DllUnregisterServer PRIVATE

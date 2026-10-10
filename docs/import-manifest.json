@@ -1,0 +1,119 @@
+{
+  "project": "Vegas Encoder",
+  "utc": "2026-10-10T13:55:56.510656+00:00",
+  "researchPath": "L:\\repos\\vegas-ffmpeg-frameserver",
+  "researchHead": "791baa32a3358d1b9c93bada45be2aeca07caf6b",
+  "uncommittedSource": true,
+  "productIdentities": {
+    "filter": "C509CFD5-E4EE-446C-888B-814BA0BD7B8D",
+    "type": "EBAD5C8D-4B9E-4F3F-8E44-22FC502CD5DD",
+    "hiddenPreset": "5AC92E42-F7BD-4E84-86E4-AA50E4CE449B",
+    "p010Preset": "3E941FE3-405A-4208-BA75-5C89DA7405AB",
+    "bgrPreset": "76831CEF-AE0F-45C1-B88B-2173F938E12B"
+  },
+  "inputs": [
+    {
+      "source": "src/sdk/sfio_abi.h",
+      "sha256": "A1CA4F59B9DD059A4340B26682B4E97462A3A9BCF80E3688ADB3221DDFB8BEC9",
+      "bytes": 17724
+    },
+    {
+      "source": "src/ffbridge/ffbridge.h",
+      "sha256": "7299CB640A8AFC54903107166E0D3070CEBC87956345B0A2D79646A4E029D6AF",
+      "bytes": 3833
+    },
+    {
+      "source": "src/ffbridge/plugin.cpp",
+      "sha256": "BC617B03A8C129DA6E509D4FC1E03B14CA5ED72A6D94D67CAE0EE2176BAE045E",
+      "bytes": 20926
+    },
+    {
+      "source": "src/ffbridge/render.cpp",
+      "sha256": "F23C69ADD77196D0AABB301F0F4A5B9D43F20BC0277075466382919CB052716D",
+      "bytes": 42640
+    },
+    {
+      "source": "src/ffbridge/diag.cpp",
+      "sha256": "230B22E1B0492D4491A50C5AE1B412EC0AA2E20607D5781FF45BDDC043F0ECED",
+      "bytes": 13844
+    },
+    {
+      "source": "src/ffbridge/encode.h",
+      "sha256": "F264CDDC9C34BF7BE327576C8BF85903BB2250D8E398BFAB99BC92D15E57F5CB",
+      "bytes": 1423
+    },
+    {
+      "source": "src/ffbridge/encode.cpp",
+      "sha256": "20102ACC8CFF1DF7E9AD378B35478626887BF7F0BEC2B521875A9D59CEC4091D",
+      "bytes": 17443
+    },
+    {
+      "source": "src/ffbridge/ffbridge.def",
+      "sha256": "D28DB7EB610841F389584917699C12CEB0B7754FB5DB6923BA1B80453E2ECE7F",
+      "bytes": 172
+    },
+    {
+      "source": "src/ffbridge/ffbridge.ini",
+      "sha256": "71C513C6353B2126DF69CE006E973EAF0E4472F18365BF7877A6F88D41795851",
+      "bytes": 1072
+    },
+    {
+      "source": "src/fiohost/fiohost.cpp",
+      "sha256": "F61E2473C8A013CD3288EEC1477645776DC68E984EEC29FA62F39247CCA56934",
+      "bytes": 10315
+    },
+    {
+      "source": "src/fiohost/fakehost.cpp",
+      "sha256": "3ACA0D2975E5E2AE57F92A8706300A8B1F00EFA2F35A9304C889AC37B6606EDF",
+      "bytes": 20530
+    },
+    {
+      "source": "src/fiohost/fakehost.h",
+      "sha256": "ABC548FB49075A694E31CAC9232A4BDC33EDDD6018AB88EF79F5342562E224DD",
+      "bytes": 1135
+    },
+    {
+      "source": "scripts/Make-BaselineMedia.py",
+      "sha256": "8C14C135AE1A22D3566C99E0AA27DD0740C2E3E869D56CDD2513301EBC7F15A4",
+      "bytes": 3855
+    },
+    {
+      "source": "scripts/Check-RawRender.py",
+      "sha256": "9CE9354EC8B5771F6BC4DE5B83623D6858B4E204BC0DEEFA9BCFFDCA15369D2F",
+      "bytes": 35161
+    },
+    {
+      "source": "scripts/Check-EncodedRender.py",
+      "sha256": "2742A85627B09457EB7E10ADE8C68E15EB292CD59BDCB33AEA573BCBFB0C9507",
+      "bytes": 9110
+    },
+    {
+      "source": "scripts/Test-Check-RawRender.py",
+      "sha256": "DFB92315D3878A7156FD6F05B556C38F14CC9D1A4084A2A67C74A7B7BEEDDDF9",
+      "bytes": 10875
+    },
+    {
+      "source": "docs/PRODUCT_FOUNDATION.md",
+      "sha256": "61F64B5A39B23A6960119E9BAD0EEE278D1B302E640B31CC108B9EC68B3E55CA",
+      "bytes": 13128
+    },
+    {
+      "source": "docs/VEGAS_ADAPTER_IMPLEMENTATION_PLAN.md",
+      "sha256": "6FF01D2CBA97B34F2A1E6402960D01701AB2C833CE53251B9CB0541410A2F9CD",
+      "bytes": 28943
+    },
+    {
+      "source": "docs/TARGET.md",
+      "sha256": "EAFB0322BA3EEC1258D6F324D6F2710AA4C48F2EA7203A9A85FAB6B85FCEE0F1",
+      "bytes": 3203
+    }
+  ],
+  "schemaCompatibility": "ffbridge-diag/1 retained; filenames/identities are Vegas Encoder",
+  "changes": [
+    "product identities and branding",
+    "module/include paths",
+    "host helpers extracted separately",
+    "engine diagnostics dependency separated",
+    "generated fake template and product scripts"
+  ]
+}

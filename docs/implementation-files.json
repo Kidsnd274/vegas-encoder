@@ -1,0 +1,142 @@
+[
+  {
+    "path": "config/vegas-encoder.ini",
+    "bytes": 1092,
+    "sha256": "B1878936BB48655CE7D97CF81C6C2D59225B9A8404A685A0AB4BB639E8AC4B56"
+  },
+  {
+    "path": "scripts/Check-EncodedRender.py",
+    "bytes": 9110,
+    "sha256": "2742A85627B09457EB7E10ADE8C68E15EB292CD59BDCB33AEA573BCBFB0C9507"
+  },
+  {
+    "path": "scripts/Check-RawRender.py",
+    "bytes": 35161,
+    "sha256": "9CE9354EC8B5771F6BC4DE5B83623D6858B4E204BC0DEEFA9BCFFDCA15369D2F"
+  },
+  {
+    "path": "scripts/Install-VegasEncoder.ps1",
+    "bytes": 12702,
+    "sha256": "EA27296BB8DC28195E615D69FE1870BE8183289002290DF660F9B7C016734946"
+  },
+  {
+    "path": "scripts/Make-BaselineMedia.py",
+    "bytes": 3855,
+    "sha256": "8C14C135AE1A22D3566C99E0AA27DD0740C2E3E869D56CDD2513301EBC7F15A4"
+  },
+  {
+    "path": "scripts/Make-HostTemplate.py",
+    "bytes": 1606,
+    "sha256": "5777CF1ECA5FB41549FC113B1F0791008A026B6887C3FA6647F25A0EB1583F71"
+  },
+  {
+    "path": "scripts/Test-Check-RawRender.py",
+    "bytes": 10867,
+    "sha256": "E926F1F9F5767823B3DDE0BA5CB3F435FC58AAEA1239622F72B49DCCDC04329E"
+  },
+  {
+    "path": "scripts/Test-Install.ps1",
+    "bytes": 6245,
+    "sha256": "E706FDE1B45DDA9231810369B31B77EA5991F18FA17E303ABC1E47355E6C4FB2"
+  },
+  {
+    "path": "scripts/Test-VegasEncoder.ps1",
+    "bytes": 11410,
+    "sha256": "C8D5140E1400D6147A79485C7E4FA10CB57E42D687FE0B2A148CCCF3971BD102"
+  },
+  {
+    "path": "scripts/build.cmd",
+    "bytes": 2352,
+    "sha256": "6BC6A82AC078F07161765B5EF9704121836E7A2D55C1937C153F847ED8CAD6F7"
+  },
+  {
+    "path": "src/engine/encode.cpp",
+    "bytes": 17482,
+    "sha256": "1EA3F55A1DCC48CB1B5DB9864917D24774575468188281AE95E7227E2B9468F3"
+  },
+  {
+    "path": "src/engine/encode.h",
+    "bytes": 1443,
+    "sha256": "7B345BFCDDF693772CA2B316E23D21919264995F3F1ECB77B36F2FD9E541A9D4"
+  },
+  {
+    "path": "src/support/diagnostics.cpp",
+    "bytes": 11427,
+    "sha256": "694571146A4E1858D31B721404446424FA91E9B54866DFF96E786A1036F96F52"
+  },
+  {
+    "path": "src/support/diagnostics.h",
+    "bytes": 924,
+    "sha256": "2D3510AD86B78F304DC8227FCBF82914BECA2E88726729E29ECDCE0024E7FB96"
+  },
+  {
+    "path": "src/support/native_boundary.h",
+    "bytes": 1249,
+    "sha256": "5ED20E721E2AD4702735ABF1414BD423E6A20689BC5F1713A498C772C629A72A"
+  },
+  {
+    "path": "src/vegas/abi/sfio_abi.h",
+    "bytes": 17724,
+    "sha256": "A1CA4F59B9DD059A4340B26682B4E97462A3A9BCF80E3688ADB3221DDFB8BEC9"
+  },
+  {
+    "path": "src/vegas/adapter/plugin.cpp",
+    "bytes": 24307,
+    "sha256": "0D91A484C580B29125E321BE90A25C1B2B9E6EA08F4423955ED25CB895FC1FD5"
+  },
+  {
+    "path": "src/vegas/adapter/render.cpp",
+    "bytes": 44501,
+    "sha256": "E74391A30224C30DBE4CE10663A0CED822704F22A9D0A9245B51C06DF8090F18"
+  },
+  {
+    "path": "src/vegas/adapter/vegas-encoder.def",
+    "bytes": 177,
+    "sha256": "986C5192803FDD789BB2C8D30CBA49568931455ADEA5596B4E681E128F447144"
+  },
+  {
+    "path": "src/vegas/adapter/vegas_encoder.h",
+    "bytes": 2624,
+    "sha256": "6E85BCE65F045E7E7E707A74438CB51F93746B4188507FC6E973275CC5C6C390"
+  },
+  {
+    "path": "src/vegas/host/frame_lease.h",
+    "bytes": 1482,
+    "sha256": "7ED944F33BCE0815B5F9BADD227FCDA6901DE17458A28F43A635AF86F8FC25A2"
+  },
+  {
+    "path": "src/vegas/host/template.cpp",
+    "bytes": 6419,
+    "sha256": "1DB8D36DA37583E7835609CCF401F619FE4631A92C67CB67C52F072D025D357B"
+  },
+  {
+    "path": "src/vegas/host/template.h",
+    "bytes": 1805,
+    "sha256": "91A5FD0C5633068F7488043294D7E5D46EE7E69D90988142C8F176B4B2666982"
+  },
+  {
+    "path": "tests/fiohost/fakehost.cpp",
+    "bytes": 20530,
+    "sha256": "3ACA0D2975E5E2AE57F92A8706300A8B1F00EFA2F35A9304C889AC37B6606EDF"
+  },
+  {
+    "path": "tests/fiohost/fakehost.h",
+    "bytes": 1148,
+    "sha256": "B450173EFEE724B23AEE6D083B2EECF76B0F1E1DF9413EDEDE26EC256E5AAF79"
+  },
+  {
+    "path": "tests/fiohost/fiohost.cpp",
+    "bytes": 10328,
+    "sha256": "75115900C0A11B7D36CBAC5EF8C8E6B07C4E4BC6636E38B6806EC89BBC441B8E"
+  },
+  {
+    "path": "tests/host/host_helpers.cpp",
+    "bytes": 7389,
+    "sha256": "B7B3B1E68615DC171126E879E6E1757F969674D7062F30F392C614C1CBA69B34"
+  },
+  {
+    "path": "tests/host/native_boundary.cpp",
+    "bytes": 3295,
+    "sha256": "8006F01961566C0A95665EBFD7C59FCC92766FCFC699F9C97716C8FDF12CFB7A"
+  }
+]

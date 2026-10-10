@@ -1,0 +1,11 @@
+/build/
+/evidence/
+/.vs/
+__pycache__/
+*.pyc
+*.dll
+*.exe
+*.pdb
+*.obj
+*.lib
+*.dmp
