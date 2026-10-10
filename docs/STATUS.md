@@ -34,6 +34,10 @@ and ignored evidence. The source/research import is documented in [ORIGIN.md](..
 
 ## Limits
 
+The [adapter data-flow explanation](ADAPTER_DATA_FLOW.md) describes raw host
+media, the P010/FFV1/MKV stages, buffer ownership and input-format evidence limits.
+It adds documentation only; no real VEGAS test ran for this task.
+
 Fixed lossless MKV profile only. P010/square-pixel/supported constant rates, optional
 48 kHz float32 stereo. No general HDR/color/alpha, hardware encode, audio-only encode,
 arbitrary codec/container or VEGAS-version guarantee. Color metadata is not qualified.
