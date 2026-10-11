@@ -1,6 +1,6 @@
 # Vegas Encoder status
 
-Updated: 2026-10-10 (Asia/Singapore). Version: 0.1.0-dev.
+Updated: 2026-10-11 (Asia/Singapore). Version: 0.1.0-dev.
 
 ## Implemented baseline
 
@@ -55,6 +55,25 @@ No real VEGAS installation changed; installed ffbridge 0.2.0 remains the researc
 ## Source checkpoint
 
 The user requested local Git commits of current progress. The initial authored implementation is checkpointed; generated builds/media/evidence remain ignored. See [checkpoint note](experiments/2026-10-10-implementation-checkpoint.md). This does not change runtime qualification.
+
+## Product planning (2026-10-11)
+
+The product-layer plan and design exploration for review are in
+[product/README.md](product/README.md):
+
+- specification, architecture, recipe and command rules, FFmpeg integration, UI
+  behaviour, roadmap and research notes;
+- eight interactive HTML design directions with screenshots and a review.
+
+Supporting work:
+
+- 226 real FFmpeg 8.1.3 test muxes and FFmpeg help/probe captures, in ignored
+  `evidence/2026-10-11-product-design/`;
+- a prototype command compiler/validator used by the mockups.
+
+Documentation and mockups only: no product code, no Windows build, and **no real
+VEGAS test ran**. Gate state is unchanged. See the
+[experiment note](experiments/2026-10-11-product-design.md).
 
 ## Next task
 

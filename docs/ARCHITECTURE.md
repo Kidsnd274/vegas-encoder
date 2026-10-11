@@ -166,6 +166,12 @@ That supports the intended user flow, not the reconstructed native settings ABI.
 
 ## 6. Desktop app and VEGAS popup
 
+The product-layer proposal is in [product/README.md](product/README.md): features, Flutter
+architecture, the popup session protocol, recipes and command compilation, FFmpeg
+discovery, and eight reviewed UI directions. It is a proposal for review and does not
+change any gate below.
+
+
 The desktop app manages library presets and application preferences. The VEGAS
 popup selects a library recipe and edits the current template configuration.
 Both should use shared editor and validation logic.

@@ -1,0 +1,1704 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bars and Tone</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Vegas Encoder design direction 8: broadcast colour bars as live section status.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;500&family=Jost:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------------ tokens */
+:root {
+  --page: #1C1D20;
+  --canvas: #24262A; --panel: #2C2F34; --raised: #34383E; --raised-hi: #454A52;
+  --line: #3E4248; --line-strong: #555A62; --well: #1F2124; --titlebar: #1F2124;
+  --text: #E8E8E6; --muted: #A4A7AD; --ink: #17181B;
+  /* bar colours: fills exactly as briefed */
+  --yellow: #D8C21A; --cyan: #1FB5C1; --green: #2FA84F; --magenta: #B5389F;
+  --red: #C7372F; --blue: #2B4DC2; --white: #BFBFBF;
+  /* text tints of the bar colours, lifted for AA on panel/raised surfaces */
+  --t-yellow: #D8C21A; --t-cyan: #3EC3CE; --t-green: #52C46F; --t-magenta: #E68AD8;
+  --t-blue: #8FA6FF; --t-white: #D4D4D2;
+  --err: #F58C82; --warn: #F0B04E; --focus: #F4F4F2;
+  --ui: "Jost", "Futura", "Century Gothic", "Segoe UI", system-ui, sans-serif;
+  --mono: "Azeret Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --motion: 140ms;
+}
+@media (prefers-reduced-motion: reduce) { :root { --motion: 0ms; } }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--page); color: var(--text); }
+body { font: 400 14px/1.45 var(--ui); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ic { width: 16px; height: 16px; flex: none; display: inline-block; vertical-align: -3px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+code, .mono { font-family: var(--mono); font-size: 0.9em; }
+
+/* ------------------------------------------------------- direction header */
+.dh { max-width: 1488px; margin: 0 auto; padding: 0 24px 8px; }
+.dh-bars { display: grid; grid-template-columns: repeat(7, 1fr); height: 12px; }
+.dh-bars i:nth-child(1) { background: var(--yellow); } .dh-bars i:nth-child(2) { background: var(--cyan); }
+.dh-bars i:nth-child(3) { background: var(--green); } .dh-bars i:nth-child(4) { background: var(--magenta); }
+.dh-bars i:nth-child(5) { background: var(--red); } .dh-bars i:nth-child(6) { background: var(--blue); }
+.dh-bars i:nth-child(7) { background: var(--white); }
+.dh-grid { display: grid; grid-template-columns: 420px 1fr; gap: 48px; padding: 36px 0 0; }
+.dh h1 { font-size: 56px; line-height: 1; font-weight: 500; letter-spacing: -0.02em; margin: 0 0 12px; }
+.dh-sub { color: var(--muted); font-size: 16px; margin: 0; }
+.dh p { margin: 0 0 12px; max-width: 72ch; font-size: 15px; line-height: 1.55; }
+.dh p b { font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 18px 0 0; padding: 0; list-style: none; }
+.legend li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.legend .lg { width: 64px; height: 22px; position: relative; }
+.swatches { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; margin: 28px 0 0; padding: 0; list-style: none; }
+.swatches li { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.swatches i { display: block; height: 40px; border-radius: 3px; margin-bottom: 6px; border: 1px solid rgba(255,255,255,.08); }
+.swatches b { display: block; color: var(--text); font-weight: 500; font-size: 13px; }
+.dh-note { color: var(--muted); font-size: 13px; margin-top: 14px !important; }
+
+/* ------------------------------------------------------------- screen frames */
+main { padding: 0 24px 96px; }
+.screen { max-width: 1440px; margin: 64px auto 0; }
+.cap { display: flex; align-items: baseline; gap: 16px; margin: 0 0 14px; }
+.cap h2 { font-size: 20px; font-weight: 500; margin: 0; white-space: nowrap; }
+.cap p { margin: 0; color: var(--muted); font-size: 15px; }
+.fs { overflow-x: auto; padding-bottom: 6px; }
+.win { position: relative; background: var(--canvas); border: 1px solid #0D0E10; border-radius: 8px; overflow: hidden;
+  display: flex; flex-direction: column; box-shadow: 0 28px 64px -24px rgba(0,0,0,.7); }
+.win--desk { width: 1440px; height: 900px; }
+
+/* Windows 11 title bar */
+.tb { height: 40px; flex: none; display: flex; align-items: stretch; background: var(--titlebar); user-select: none; }
+.tb-app { display: flex; align-items: center; gap: 10px; padding: 0 14px 0 16px; font-size: 13px; color: var(--muted); }
+.tb-nav { display: flex; }
+.tb-nav button { all: unset; position: relative; display: flex; align-items: center; padding: 0 14px; font-size: 14px; color: var(--muted); cursor: pointer; }
+.tb-nav button[aria-current="page"] { color: var(--text); }
+.tb-nav button[aria-current="page"]::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; background: var(--text); }
+.tb-nav button:focus-visible { outline: 2px solid var(--focus); outline-offset: -4px; }
+.tb-sp { flex: 1; }
+.caps { display: flex; }
+.caps span { width: 46px; display: grid; place-items: center; color: var(--muted); }
+.caps span:last-child:hover { background: #C42B1C; color: #fff; }
+
+/* ------------------------------------------------- the bar strip (the hero) */
+.strip-host { position: relative; flex: none; }
+.strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); height: 46px; }
+.bar { all: unset; box-sizing: border-box; position: relative; min-width: 0; cursor: pointer;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 17px 18px; align-content: center; column-gap: 8px;
+  padding: 0 14px; background: var(--c); color: var(--on); transition: filter var(--motion); }
+.bar:hover { filter: brightness(1.08); }
+.bar:focus-visible { box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 4px #fff; }
+.bar-k { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.bar-k .ic { width: 14px; height: 14px; }
+.bar-n { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.bar-n .ic { width: 14px; height: 14px; }
+.bar-v { grid-column: 1 / -1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar--yellow { --c: var(--yellow); --on: var(--ink); }
+.bar--cyan { --c: var(--cyan); --on: var(--ink); }
+.bar--green { --c: var(--green); --on: var(--ink); }
+.bar--magenta { --c: var(--magenta); --on: #fff; }
+.bar--red { --c: var(--red); --on: #fff; }
+.bar--blue { --c: var(--blue); --on: #fff; }
+.bar--white { --c: var(--white); --on: var(--ink); }
+/* warning: a notch cut into the top edge */
+.bar.is-warn { clip-path: polygon(0 0, calc(50% - 8px) 0, 50% 8px, calc(50% + 8px) 0, 100% 0, 100% 100%, 0 100%); }
+/* error: the bar dims and hatches */
+.bar.is-error { color: var(--text);
+  background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--c) 46%, var(--canvas)) 0 7px, color-mix(in srgb, var(--c) 16%, var(--canvas)) 7px 14px); }
+.bar.is-error .bar-v, .bar.is-error .bar-k, .bar.is-error .bar-n { text-shadow: 0 1px 2px rgba(0,0,0,.65); }
+/* stream switched off: flat and dim, no hatch */
+.bar.is-off { background: color-mix(in srgb, var(--c) 22%, var(--canvas)); color: var(--muted); }
+/* the red bar is dark until something blocks a render */
+.bar.is-idle { background: #2F2727; color: var(--muted); box-shadow: inset 0 0 0 1px #4A3433; }
+.bar.is-lit { background: var(--red); color: #fff; }
+.menu { position: absolute; z-index: 30; background: var(--raised); border: 1px solid var(--line-strong); border-radius: 6px;
+  box-shadow: 0 16px 40px rgba(0,0,0,.5); padding: 6px; width: 360px; }
+.menu-h { font-size: 13px; color: var(--muted); padding: 6px 10px 4px; }
+.mi { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 18px 1fr; gap: 2px 10px; width: 100%; padding: 8px 10px; border-radius: 4px; cursor: pointer; }
+.mi:hover, .mi:focus-visible { background: var(--raised-hi); outline: none; }
+.mi .ic { margin-top: 2px; }
+.mi b { font-weight: 500; }
+.mi small { grid-column: 2; font-size: 13px; color: var(--muted); }
+.mi[aria-disabled="true"] { cursor: default; opacity: .55; }
+.mi[aria-disabled="true"]:hover { background: none; }
+
+/* --------------------------------------------------------- desktop layout */
+.desk { flex: 1; min-height: 0; display: grid; grid-template-columns: 288px minmax(0, 1fr); }
+.lib { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+
+/* library */
+.lib-h { padding: 16px 16px 8px; display: flex; flex-direction: column; gap: 10px; }
+.lib-t { display: flex; align-items: center; justify-content: space-between; }
+.lib-t h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.search { position: relative; }
+.search .ic { position: absolute; left: 10px; top: 8px; color: var(--muted); }
+.search input { width: 100%; padding-left: 32px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { all: unset; box-sizing: border-box; height: 28px; padding: 0 11px; display: inline-flex; align-items: center; border-radius: 14px;
+  border: 1px solid var(--line-strong); font-size: 13px; color: var(--muted); cursor: pointer; }
+.chip:hover { color: var(--text); }
+.chip[aria-pressed="true"] { background: var(--text); color: var(--ink); border-color: var(--text); }
+.lib-list { flex: 1; min-height: 0; overflow: auto; padding: 4px 8px 16px; }
+.lib-g { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); padding: 12px 10px 6px; font-weight: 500; }
+.li { all: unset; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; width: 100%;
+  padding: 8px 10px 9px 9px; border-radius: 4px; cursor: pointer; border-left: 3px solid transparent; }
+.li:hover { background: #33363C; }
+.li:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.li[aria-current="true"] { background: var(--raised); border-left-color: var(--text); }
+.li-n { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.li-m { display: flex; gap: 6px; color: var(--muted); align-items: center; }
+.li-m .ic { width: 14px; height: 14px; }
+.li-s { grid-column: 1 / -1; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.li-p { grid-column: 1 / -1; font-size: 13px; color: var(--err); display: flex; gap: 7px; align-items: center; margin-top: 3px; }
+.li-p.is-warn { color: var(--warn); }
+.hatch { width: 12px; height: 12px; flex: none; border: 1px solid currentColor;
+  background: repeating-linear-gradient(-45deg, currentColor 0 1.5px, transparent 1.5px 4px); }
+.lib-empty { padding: 16px 10px; color: var(--muted); }
+.lib-empty p { margin: 0 0 10px; }
+.lib-f { border-top: 1px solid var(--line); padding: 10px 16px; font-size: 13px; color: var(--muted); }
+
+/* slate */
+.slate { flex: none; padding: 18px 28px 0; }
+.slate-top { display: flex; align-items: flex-start; gap: 20px; }
+.slate-name { min-width: 0; display: flex; align-items: baseline; gap: 12px; }
+.slate-title { font-size: 34px; line-height: 42px; font-weight: 500; letter-spacing: -0.012em; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tag { font-size: 13px; font-weight: 500; padding: 1px 8px; border-radius: 3px; border: 1px solid var(--line-strong); color: var(--text); white-space: nowrap; }
+.slate-acts { margin-left: auto; display: flex; gap: 8px; align-items: center; padding-top: 5px; flex: none; }
+.vsep { width: 1px; height: 22px; background: var(--line-strong); margin: 0 4px; }
+.slate-notes { margin: 2px 0 0; color: var(--muted); max-width: 80ch; }
+.slate-note { margin: 8px 0 0; display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text); }
+.slate-cells { display: grid; grid-template-columns: repeat(var(--n, 6), auto); justify-content: start; margin: 14px 0 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.slate-cells > div { padding: 8px 22px 9px; border-left: 1px solid var(--line); min-width: 0; }
+.slate-cells > div:first-child { border-left: 0; padding-left: 0; }
+.slate-cells dt { font-size: 12px; color: var(--muted); }
+.slate-cells dd { margin: 1px 0 0; font-size: 15px; white-space: nowrap; }
+.est-bar { display: flex; height: 4px; width: 140px; margin-top: 5px; background: var(--raised); }
+.est-bar i { display: block; height: 100%; }
+
+/* editor area */
+.ed-scroll { flex: 1; min-height: 0; overflow: auto; padding: 18px 28px 28px; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 26px; min-width: 0; }
+.sec { --c: var(--text); border-left: 3px solid var(--c); padding: 0 0 2px 16px; min-width: 0; }
+.sec--yellow { --c: var(--yellow); --tc: var(--t-yellow); } .sec--cyan { --c: var(--cyan); --tc: var(--t-cyan); }
+.sec--green { --c: var(--green); --tc: var(--t-green); } .sec--magenta { --c: var(--magenta); --tc: var(--t-magenta); }
+.sec--white { --c: var(--white); --tc: var(--t-white); }
+.sec.has-error { border-left-color: transparent; border-image: repeating-linear-gradient(-45deg, var(--c) 0 4px, transparent 4px 8px) 0 0 0 3; }
+.sec-h { display: flex; align-items: center; gap: 12px; min-height: 30px; margin-bottom: 6px; }
+.sec-h h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.005em; }
+.sec-sum { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.sec-st { display: inline-flex; gap: 5px; align-items: center; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.sec-st.is-error { color: var(--err); } .sec-st.is-warn { color: var(--warn); }
+.sec-end { margin-left: auto; display: flex; align-items: center; gap: 10px; flex: none; }
+.sec-off { color: var(--muted); padding: 4px 0 8px; margin: 0; }
+
+.row { display: grid; grid-template-columns: 112px minmax(0, 1fr) 28px; gap: 0 12px; align-items: start; padding: 5px 0; }
+.row-l { padding-top: 6px; color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 7px; min-width: 0; }
+.row-l label, .row-l span.lb { color: inherit; }
+.mod { width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex: none; }
+.row-c { min-width: 0; }
+.row-r { padding-top: 2px; }
+.row-sub { color: var(--muted); font-size: 13px; margin-top: 5px; }
+.row-sub b { color: var(--text); font-weight: 500; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.pair .row { grid-template-columns: 76px minmax(0, 1fr) 28px; }
+.static { display: inline-flex; align-items: center; min-height: 32px; }
+.xa-note { display: inline-flex; gap: 6px; align-items: center; color: var(--t-yellow); font-size: 13px; margin-top: 5px; }
+
+/* inline messages */
+.msg { display: grid; grid-template-columns: 16px 1fr; gap: 8px; margin-top: 7px; font-size: 13px; line-height: 1.45; }
+.msg .ic { margin-top: 1px; }
+.msg--error { color: var(--err); } .msg--warn { color: var(--warn); } .msg--info { color: var(--muted); }
+.msg-fix { color: var(--text); display: block; }
+
+/* controls */
+.sel { appearance: none; -webkit-appearance: none; width: 100%; height: 32px; padding: 0 32px 0 10px; border-radius: 4px; cursor: pointer;
+  background: var(--raised) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23A4A7AD' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 9px center / 14px;
+  border: 1px solid var(--line-strong); color: var(--text); }
+.sel option, .sel optgroup { background: #2C2F34; color: var(--text); }
+.inp { height: 32px; padding: 0 10px; border-radius: 4px; border: 1px solid var(--line-strong); background: var(--well); color: var(--text); min-width: 0; }
+.inp::placeholder { color: #8A8E95; }
+.inp--mono { font-family: var(--mono); font-size: 12.5px; width: 100%; }
+.inp--num { width: 64px; text-align: right; padding-right: 6px; }
+.unit { color: var(--muted); font-size: 13px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-strong); border-radius: 4px; overflow: hidden; background: var(--canvas); max-width: 100%; }
+.seg button { all: unset; box-sizing: border-box; height: 30px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  color: var(--muted); font-size: 13px; border-left: 1px solid var(--line); white-space: nowrap; }
+.seg button:first-child { border-left: 0; }
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--raised-hi); color: var(--text); box-shadow: inset 0 -2px 0 var(--c, var(--text)); }
+.seg button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.seg button .ic { width: 14px; height: 14px; }
+.seg .g-no { color: var(--err); } .seg .g-warn { color: var(--warn); }
+.seg--mode button { height: 32px; padding: 0 14px; font-size: 14px; }
+.seg--mode button[aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--text); }
+.btn { height: 32px; padding: 0 14px; border-radius: 4px; border: 1px solid var(--line-strong); background: transparent; color: var(--text);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-weight: 500; white-space: nowrap; }
+.btn:hover { background: #3A3E44; }
+.btn--pri { background: var(--text); color: var(--ink); border-color: var(--text); }
+.btn--pri:hover { background: #FFFFFF; }
+.btn[disabled] { opacity: .42; cursor: not-allowed; background: transparent; }
+.btn--pri[disabled] { background: var(--text); }
+.btn--sm { height: 28px; padding: 0 10px; font-size: 13px; }
+.ib { all: unset; box-sizing: border-box; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 4px; color: var(--muted); cursor: pointer; }
+.ib:hover { background: #3A3E44; color: var(--text); }
+.ib:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+.lnk { all: unset; color: var(--text); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; cursor: pointer; font-weight: 500; }
+.lnk:hover { text-decoration-color: var(--text); }
+.lnk:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.switch input { appearance: none; -webkit-appearance: none; margin: 0; width: 34px; height: 18px; border-radius: 9px; background: #4A4F57; position: relative; cursor: pointer; transition: background var(--motion); }
+.switch input::after { content: ""; position: absolute; left: 3px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--text); transition: transform var(--motion); }
+.switch input:checked { background: var(--c, var(--text)); }
+.switch input:checked::after { transform: translateX(16px); background: var(--ink); }
+.switch input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* sliders */
+.q { --p: 50%; }
+.q-top { display: flex; align-items: center; gap: 8px; }
+.q-unit { font-weight: 600; font-size: 14px; }
+.q-mean { color: var(--text); font-size: 14px; margin-left: 4px; }
+.q-ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+.rng { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 22px; background: transparent; margin: 0; cursor: pointer; }
+.rng::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--c) 0 var(--p), #4A4F57 var(--p) 100%); }
+.rng::-moz-range-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--c) 0 var(--p), #4A4F57 var(--p) 100%); }
+.rng::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--text); margin-top: -7px; border: 3px solid var(--canvas); box-shadow: 0 0 0 1px var(--text); }
+.rng::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--text); border: 3px solid var(--canvas); box-shadow: 0 0 0 1px var(--text); }
+.rng:focus-visible { outline: none; }
+.rng:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--focus); }
+.rng:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--focus); }
+.q-marks { position: relative; height: 54px; margin-top: 2px; }
+.qm { all: unset; position: absolute; left: calc(9px + (100% - 18px) * var(--x) / 100); transform: translateX(-50%); font-size: 12px; line-height: 16px; color: var(--muted); white-space: nowrap; cursor: pointer; padding-top: 6px; }
+.qm::before { content: ""; position: absolute; left: 50%; top: 0; width: 1px; height: 4px; background: #6A6E75; }
+.qm.r0 { top: 0; } .qm.r1 { top: 18px; } .qm.r2 { top: 36px; }
+.qm.r1::before, .qm.r2::before { background: linear-gradient(#6A6E75 0 4px, transparent 4px); } .qm.r1::before { top: -18px; height: 22px; } .qm.r2::before { top: -36px; height: 40px; }
+.qm.al-l { transform: none; } .qm.al-l::before { left: 0; }
+.qm.al-r { transform: translateX(-100%); } .qm.al-r::before { left: auto; right: 0; }
+.qm:hover, .qm.is-on { color: var(--text); }
+.qm:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-radius: 2px; }
+.sp-ticks { position: relative; height: 6px; }
+.sp-ticks i { position: absolute; top: 0; width: 1px; height: 5px; background: #6A6E75; left: calc(9px + (100% - 18px) * var(--x) / 100); }
+.sp-ticks i.is-def { height: 7px; background: var(--text); }
+.bitrate { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.bitrate label { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.quick .chip { height: 26px; }
+
+details.allopt summary { cursor: pointer; color: var(--text); list-style: none; display: inline-flex; gap: 6px; align-items: center; min-height: 32px; }
+details.allopt summary::-webkit-details-marker { display: none; }
+details.allopt summary .ic { transition: transform var(--motion); }
+details.allopt[open] summary .ic { transform: rotate(180deg); }
+.optgrid { display: grid; grid-template-columns: auto auto 1fr; gap: 3px 14px; font-size: 13px; margin: 4px 0 4px; }
+.optgrid code { color: var(--tc); }
+.optgrid span { color: var(--muted); }
+
+/* dock: live command + checks */
+.dock { flex: none; height: 214px; display: grid; grid-template-columns: minmax(0, 1fr) 400px; border-top: 1px solid var(--line); background: var(--panel); }
+.dock[hidden] { display: none; }
+.dock-cmd { --c: var(--yellow); border-left: 3px solid var(--yellow); padding: 10px 18px 12px 18px; display: flex; flex-direction: column; min-width: 0; min-height: 0; margin-left: 28px; }
+.dock-h { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; min-height: 30px; }
+.dock-h h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.dock-h .sec-sum { flex: 1; }
+.cmd { margin: 0; flex: 1; min-height: 0; overflow: auto; background: var(--well); border-radius: 4px; padding: 9px 12px;
+  font: 400 12.5px/19px var(--mono); white-space: pre-wrap; word-break: break-all; color: var(--text); }
+.cmd .cl { padding-left: 2.2ch; text-indent: -2.2ch; }
+.cmd.is-flat .cl { display: inline; padding: 0; text-indent: 0; }
+.tk--exe, .tk--global, .cont { color: var(--muted); }
+.tk--input { color: var(--t-white); }
+.tk--map, .tk--output { color: var(--text); }
+.tk--video { color: var(--t-cyan); } .tk--audio { color: var(--t-green); } .tk--mux { color: var(--t-magenta); } .tk--extra { color: var(--t-yellow); }
+.tk[data-focus] { cursor: pointer; border-radius: 2px; }
+.tk[data-focus]:hover { background: rgba(255,255,255,.08); }
+.tk-chip { all: unset; font: inherit; cursor: pointer; color: var(--t-white); background: #34373C; box-shadow: inset 0 0 0 1px #6A6E75; border-radius: 3px; padding: 0 6px; text-indent: 0; }
+.tk-chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.dock-chk { border-left: 1px solid var(--line); padding: 10px 20px 12px; overflow: auto; min-height: 0; }
+.chk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.chk { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 16px 1fr; gap: 2px 9px; width: 100%; padding: 6px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.chk:hover { background: #33363C; }
+.chk:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.chk .ic { margin-top: 1px; }
+.chk--error .ic { color: var(--err); } .chk--warn .ic { color: var(--warn); } .chk--info .ic { color: var(--muted); }
+.chk-t { color: var(--text); }
+.chk-w { grid-column: 2; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 10px; height: 10px; flex: none; }
+.sw--yellow { background: var(--yellow); } .sw--cyan { background: var(--cyan); } .sw--green { background: var(--green); }
+.sw--magenta { background: var(--magenta); } .sw--white { background: var(--white); } .sw--blue { background: var(--blue); }
+.chk-ok { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+.toast { position: absolute; z-index: 40; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--text); color: var(--ink);
+  padding: 9px 16px; border-radius: 4px; font-weight: 500; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+
+/* command mode */
+.cm { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 32px; align-items: start; }
+.cm-main { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.ed { position: relative; background: var(--well); border-radius: 4px; margin-top: 4px; }
+.ed:focus-within { box-shadow: 0 0 0 2px var(--focus); }
+.ed-hl, .ed-ta { margin: 0; padding: 12px 16px 12px 50px; font: 400 13px/22px var(--mono); white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere; font-variant-ligatures: none; letter-spacing: 0; }
+.ed-hl { color: var(--text); min-height: 110px; }
+.ed-ta { position: absolute; inset: 0; width: 100%; height: 100%; resize: none; border: 0; background: transparent; color: transparent; caret-color: var(--text); overflow: hidden; outline: none; }
+.ed-ta::selection { background: rgba(216, 194, 26, .32); color: transparent; }
+.ln { position: relative; }
+.ln::before { content: attr(data-n); position: absolute; left: -38px; width: 22px; text-align: right; color: #8E9299; }
+.k-exe { color: var(--muted); } .k-val { color: var(--text); } .k-mac { color: var(--t-white); }
+.k-opt.k-g { color: #C9CACC; } .k-opt.k-v { color: var(--t-cyan); } .k-opt.k-a { color: var(--t-green); } .k-opt.k-m { color: var(--t-magenta); }
+.k-chip { color: #fff; background: #3A3D42; box-shadow: 0 0 0 1px #7A7E85; border-radius: 3px; }
+.l-error { text-decoration: underline wavy var(--err); text-decoration-skip-ink: none; text-underline-offset: 4px; }
+.l-warn { text-decoration: underline wavy var(--warn); text-decoration-skip-ink: none; text-underline-offset: 4px; }
+.l-hint { text-decoration: underline dotted #8E9299; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.l-pt { position: relative; } .l-pt::after { content: ""; position: absolute; left: -1px; top: 1px; width: 2px; height: 20px; background: var(--err); }
+.ac { position: absolute; z-index: 20; width: 420px; background: var(--raised); border: 1px solid var(--line-strong); border-radius: 6px; box-shadow: 0 16px 40px rgba(0,0,0,.5); padding: 4px; font-size: 13px; }
+.ac-h { padding: 6px 10px 6px; color: var(--muted); }
+.ac-h code { color: var(--t-cyan); }
+.ac-i { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 112px 1fr auto; gap: 10px; width: 100%; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+.ac-i code { color: var(--text); font-size: 12.5px; }
+.ac-i span { color: var(--muted); } .ac-i em { font-style: normal; font-size: 12px; color: var(--muted); }
+.ac-i[aria-selected="true"] { background: var(--raised-hi); box-shadow: inset 3px 0 0 var(--yellow); }
+.ac-i[aria-selected="true"] span { color: var(--text); }
+.ac-f { border-top: 1px solid var(--line); margin-top: 4px; padding: 6px 10px 4px; color: var(--muted); font-size: 12px; }
+.diag { margin-top: 12px; }
+.dg-list { list-style: none; margin: 0; padding: 0; }
+.dg { display: grid; grid-template-columns: 16px 58px 1fr auto; gap: 10px; align-items: start; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.dg .ic { margin-top: 1px; } .dg--error .ic { color: var(--err); } .dg--warn .ic { color: var(--warn); } .dg--hint .ic { color: var(--muted); }
+.dg-pos { color: var(--muted); } .dg-t b { font-weight: 500; }
+.res { margin-top: 12px; max-height: 220px; }
+.swn { border-top: 1px solid var(--line); padding-top: 14px; }
+.swn h3 { margin: 0 0 10px; font-size: 16px; font-weight: 600; }
+.swn dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 0 0 14px; }
+.swn dt { font-weight: 500; margin-bottom: 3px; display: flex; align-items: center; gap: 7px; }
+.swn dd { margin: 0; color: var(--muted); font-size: 13px; }
+.cm-rail { background: var(--panel); border-radius: 4px; padding: 14px 16px; }
+.cm-rail h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.mac-l { list-style: none; margin: 8px 0 0; padding: 0; }
+.mac-i { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 96px 1fr; gap: 10px; width: 100%; padding: 6px 6px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.mac-i:hover { background: #393D43; } .mac-i:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.mac-i code { color: var(--t-white); font-size: 12.5px; padding-top: 1px; }
+.mac-i code.req { color: #fff; } .mac-i code.req span { background: #3A3D42; box-shadow: 0 0 0 1px #7A7E85; border-radius: 3px; padding: 0 3px; }
+.mac-i > span { color: var(--muted); } .mac-i b { color: var(--text); font-weight: 500; }
+.mac-i[aria-disabled="true"] { cursor: default; }
+.banner { display: flex; gap: 10px; align-items: center; padding: 10px 14px; margin-bottom: 18px; background: var(--panel); border-left: 3px solid var(--yellow); }
+.banner .btn { margin-left: auto; }
+.ask { padding: 4px 0 4px 16px; } .ask h3 { margin: 0 0 6px; font-size: 18px; font-weight: 600; } .ask p { color: var(--muted); margin: 0 0 14px; } .ask div { display: flex; gap: 8px; }
+
+/* VEGAS popup over a dimmed Custom Settings dialog */
+.vg { position: relative; width: 1280px; height: 820px; background: #2B2D31; border: 1px solid #111; color: #E3E4E6; font: 13px/1.45 "Segoe UI", "Noto Sans", system-ui, sans-serif; overflow: hidden; border-radius: 8px; }
+.vg-t { height: 32px; display: flex; align-items: center; padding: 0 12px; background: #232427; border-bottom: 1px solid #111; color: #A3A6AB; font-size: 12px; }
+.vg-b { padding: 16px 18px; display: grid; grid-template-columns: 96px 1fr; gap: 10px 10px; align-items: center; }
+.vg-f { height: 26px; background: #1F2023; border: 1px solid #4A4D52; padding: 3px 8px; }
+.vg-tabs { grid-column: 1 / -1; display: flex; gap: 2px; border-bottom: 1px solid #4A4D52; margin-top: 6px; }
+.vg-tabs span { padding: 6px 14px; color: #A3A6AB; } .vg-tabs span.on { color: #E3E4E6; background: #333539; border: 1px solid #4A4D52; border-bottom: 0; }
+.vg-page { grid-column: 1 / -1; height: 560px; background: #333539; border: 1px solid #4A4D52; border-top: 0; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.vg-page i { display: block; height: 12px; background: #44474C; border-radius: 2px; }
+.vg-ft { position: absolute; right: 18px; bottom: 14px; display: flex; gap: 8px; }
+.vg-ft span { min-width: 84px; height: 28px; border: 1px solid #4A4D52; background: #44474C; display: grid; place-items: center; }
+.vg-dim { position: absolute; inset: 0; background: rgba(8, 8, 10, .62); }
+.win--pop { position: absolute; left: 80px; top: 40px; width: 1120px; height: 740px; font-size: 14px; }
+.win--pop .tb { height: 32px; }
+.win--pop .caps span { width: 46px; }
+.win--pop .strip { height: 42px; }
+.win--pop .bar { grid-template-rows: 16px 17px; padding: 0 12px; }
+.pop-head { flex: none; position: relative; padding: 12px 24px 0; }
+.pop-name { display: flex; align-items: flex-start; gap: 16px; }
+.pop-name label { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.name-inp { font: 500 26px/34px var(--ui); letter-spacing: -0.01em; color: var(--text); background: transparent; border: 0; border-bottom: 1px solid transparent; padding: 0; width: 100%; max-width: 560px; }
+.name-inp:hover { border-bottom-color: var(--line-strong); }
+.name-inp:focus-visible { outline: none; border-bottom-color: var(--focus); }
+.name-hint { font-size: 12px; color: var(--muted); }
+.origin { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
+.origin .sp { flex: 1; }
+.origin b { font-weight: 500; }
+.newer { display: inline-flex; align-items: center; gap: 8px; padding: 3px 4px 3px 10px; border: 1px solid var(--line-strong); border-radius: 4px; }
+.newer i { width: 8px; height: 8px; border-radius: 50%; background: var(--text); }
+.chg-l { display: flex; gap: 6px 18px; flex-wrap: wrap; margin: 6px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+.chg-l b { color: var(--text); font-weight: 500; }
+.win--pop .slate-cells { margin-top: 10px; }
+.win--pop .slate-cells > div { padding: 6px 18px 7px; }
+.win--pop .slate-cells dd { font-size: 14px; }
+.win--pop .ed-scroll { padding: 14px 24px 20px; }
+.win--pop .row { grid-template-columns: 100px minmax(0, 1fr) 28px; }
+.win--pop .pair .row { grid-template-columns: 70px minmax(0, 1fr) 28px; }
+.win--pop .cols { gap: 26px; }
+.win--pop .dock { height: 150px; grid-template-columns: minmax(0, 1fr) 340px; }
+.win--pop .dock-cmd { margin-left: 24px; padding-top: 6px; }
+.win--pop .dock-chk { padding-top: 6px; }
+.win--pop .dock-h { margin-bottom: 4px; }
+.fly { position: absolute; z-index: 25; right: 24px; top: 100px; width: 640px; background: var(--raised); border: 1px solid var(--line-strong); border-radius: 6px; box-shadow: 0 18px 48px rgba(0,0,0,.55); padding: 16px 18px; }
+.fly h3 { margin: 0 0 2px; font-size: 17px; font-weight: 600; }
+.fly > p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.fly-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.fly h4 { margin: 0 0 6px; font-size: 13px; font-weight: 500; }
+.fly h4 small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
+.df { list-style: none; margin: 0; padding: 0; }
+.df li { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.df .v { color: var(--muted); } .df .v b { color: var(--text); font-weight: 500; }
+.fly-note { display: flex; gap: 8px; align-items: center; margin: 12px 0 0; font-size: 13px; color: var(--muted); }
+.fly-acts { display: flex; gap: 8px; margin-top: 14px; }
+.fly-acts .btn:last-child { margin-left: auto; }
+.pop-menu { right: 24px; top: 52px; width: 400px; max-height: 470px; overflow: auto; }
+.undo { flex: none; display: flex; align-items: center; gap: 12px; padding: 8px 24px; background: var(--text); color: var(--ink); font-weight: 500; }
+.undo .btn { color: var(--ink); border-color: #8E9299; } .undo .btn:hover { background: #fff; }
+.undo .ib { color: var(--ink); margin-left: auto; } .undo .ib:hover { background: #fff; color: var(--ink); }
+.pop-f { flex: none; height: 58px; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-top: 1px solid var(--line); background: var(--titlebar); }
+.pop-f p { margin: 0; color: var(--muted); font-size: 13px; flex: 1; }
+.pop-f .why { color: var(--err); font-size: 13px; }
+
+/* FFmpeg page */
+.ff { flex: 1; min-height: 0; display: grid; grid-template-columns: 392px minmax(0, 1fr); }
+.ff-list { background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.ff-list .lib-h { padding-bottom: 12px; }
+.ff-acts { display: flex; gap: 8px; }
+.insts { flex: 1; overflow: auto; padding: 0 8px 12px; }
+.inst { all: unset; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; width: 100%; padding: 12px 12px 13px 11px; border-radius: 4px; border-left: 3px solid transparent; cursor: pointer; margin-bottom: 4px; }
+.inst:hover { background: #33363C; }
+.inst:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.inst[aria-current="true"] { background: var(--raised); border-left-color: var(--blue); }
+.inst b { font-weight: 500; font-size: 15px; }
+.inst span { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+.inst .tag { grid-column: 2; grid-row: 1; align-self: start; }
+.tag--def { background: var(--blue); border-color: var(--blue); color: #fff; }
+.inst .warnl { color: var(--warn); display: flex; gap: 7px; align-items: center; margin-top: 4px; }
+.ff-d { overflow: auto; min-height: 0; padding: 22px 28px 28px; }
+.ff-top { display: flex; align-items: center; gap: 14px; }
+.ff-top h2 { margin: 0; font-size: 30px; font-weight: 500; letter-spacing: -0.01em; }
+.ff-top .slate-acts { padding-top: 0; }
+.path { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--muted); min-width: 0; }
+.path span { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cap-h { display: flex; align-items: center; gap: 14px; margin: 22px 0 12px; }
+.cap-h h3 { margin: 0; font-size: 18px; font-weight: 600; }
+.cap-h .search { width: 220px; margin-left: auto; }
+.capcols { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+.capcols .col { gap: 18px; }
+.cg h4 { margin: 0 0 2px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.cr { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 1px 10px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; align-items: start; }
+.cr .ic { margin-top: 2px; }
+.cr .nm { font-size: 14px; } .cr .nm code { color: var(--muted); margin-left: 6px; font-size: 12px; }
+.cr .st { white-space: nowrap; font-weight: 500; }
+.cr .rs { grid-column: 2 / -1; color: var(--muted); }
+.cr.is-ok .ic, .cr.is-ok .st { color: var(--text); }
+.cr.is-missing .ic, .cr.is-missing .st { color: var(--muted); }
+.cr.is-failed .ic, .cr.is-failed .st { color: var(--err); }
+.cr details { grid-column: 2 / -1; } .cr summary { cursor: pointer; color: var(--text); width: max-content; }
+.cr pre { margin: 6px 0 2px; padding: 8px 10px; background: var(--well); border-radius: 4px; font: 12px/18px var(--mono); color: var(--err); white-space: pre-wrap; word-break: break-all; }
+.hwnote { font-size: 13px; color: var(--muted); }
+
+@media (max-width: 1500px) { .dh-grid { grid-template-columns: 1fr; gap: 20px; } }
+</style>
+</head>
+<body>
+
+<header class="dh" aria-labelledby="dh-title">
+  <div class="dh-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="dh-grid">
+    <div>
+      <h1 id="dh-title">Bars and Tone</h1>
+      <p class="dh-sub">Direction 8 for Vegas Encoder. Broadcast identity as status.</p>
+    </div>
+    <div>
+      <p><b>Idea.</b> Colour bars and a reference tone are how broadcast checks that video and audio arrive intact. Here the bar colours become the editor’s sections: video is cyan, audio green, container magenta and the command yellow. Every section carries a thin edge in its colour, and the command preview uses the same colours for the arguments each section produces.</p>
+      <p><b>Memorable thing.</b> The bar strip under the title bar is live section status. Each bar names its section and current setting; click one to jump there. Red stays dark until something would stop a render, blue is the FFmpeg in use, and white is what VEGAS delivers.</p>
+      <ul class="legend" aria-label="How to read the strip" id="legend"></ul>
+    </div>
+  </div>
+  <ul class="swatches" aria-label="Tokens" id="swatches"></ul>
+  <p class="dh-note">Contrast: the brief’s muted grey #9A9DA3 measures 4.34:1 on raised panels, so it is lifted to #A4A7AD (4.89:1). Bar fills keep the brief’s values; red, magenta, green and blue text uses lighter tints (error #F58C82, 5.0:1 on raised). Mockup only: nothing here ran in VEGAS.</p>
+</header>
+
+<main>
+  <section class="screen" id="s1" aria-labelledby="s1-cap">
+    <div class="cap"><h2 id="s1-cap">S1 Presets and Guided editor</h2><p>Pick a preset and shape video, audio and container separately while the strip, command and size update live.</p></div>
+    <div class="fs"><div class="win win--desk" id="s1-win"></div></div>
+  </section>
+  <section class="screen" id="s2" aria-labelledby="s2-cap">
+    <div class="cap"><h2 id="s2-cap">S2 Command mode</h2><p>Write the whole FFmpeg command with locked pipes, macros, live lint and suggestions from the selected FFmpeg.</p></div>
+    <div class="fs"><div class="win win--desk" id="s2-win"></div></div>
+  </section>
+  <section class="screen" id="s3" aria-labelledby="s3-cap">
+    <div class="cap"><h2 id="s3-cap">S3 VEGAS popup</h2><p>Opened from Custom Settings in VEGAS: tweak one render template, see where it came from, then apply and go back to render.</p></div>
+    <div class="fs"><div class="vg" aria-hidden="false">
+      <div class="vg-t">Custom Settings</div>
+      <div class="vg-b" aria-hidden="true"><span>Template:</span><div class="vg-f">YouTube 4K upload (Lakeside)</div><span>Description:</span><div class="vg-f">Vegas Encoder</div>
+        <div class="vg-tabs"><span class="on">Vegas Encoder</span><span>Project</span></div>
+        <div class="vg-page"><i style="width:40%"></i><i style="width:62%"></i><i style="width:55%"></i><i style="width:30%"></i></div></div>
+      <div class="vg-ft" aria-hidden="true"><span>OK</span><span>Cancel</span></div>
+      <div class="vg-dim"></div>
+      <div class="win win--pop" id="s3-win" role="dialog" aria-label="Edit render template"></div>
+    </div></div>
+  </section>
+  <section class="screen" id="s4" aria-labelledby="s4-cap">
+    <div class="cap"><h2 id="s4-cap">S4 FFmpeg</h2><p>Which FFmpeg renders use, and what each one can actually do on this PC. Here the strip reports capability instead of a preset.</p></div>
+    <div class="fs"><div class="win win--desk" id="s4-win"></div></div>
+  </section>
+</main>
+
+<script src="../shared/avoptions.js"></script>
+<script src="../shared/model.js"></script>
+<script>
+(function () {
+'use strict';
+const VE = window.VE;
+const AV = (window.VE_AVOPTIONS && window.VE_AVOPTIONS.encoders) || {};
+const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ------------------------------------------------------------- utilities */
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const getp = (o, p) => p.split('.').reduce((x, k) => (x == null ? undefined : x[k]), o);
+const setp = (o, p, v) => { const ks = p.split('.'); const last = ks.pop(); ks.reduce((x, k) => x[k], o)[last] = v; };
+const same = (a, b) => JSON.stringify(a == null ? null : a) === JSON.stringify(b == null ? null : b);
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+const svg = (d) => '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true" focusable="false">' + d + '</svg>';
+const S = 'fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"';
+const ICON = {
+  star: svg('<path d="M8 1.9l1.85 3.85 4.2.55-3.07 2.93.77 4.17L8 11.4l-3.75 2 .77-4.17L1.95 6.3l4.2-.55z" fill="currentColor"/>'),
+  lock: svg('<rect x="3.5" y="7" width="9" height="6.5" rx="1" ' + S + '/><path d="M5.6 7V5.2a2.4 2.4 0 014.8 0V7" ' + S + '/>'),
+  term: svg('<path d="M2.8 4.5L6.2 8l-3.4 3.5M8.2 12h5" ' + S + '/>'),
+  error: svg('<circle cx="8" cy="8" r="6.2" ' + S + '/><path d="M8 4.7v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.2" r="1" fill="currentColor"/>'),
+  warn: svg('<path d="M8 2.3l6.1 10.9H1.9z" ' + S + '/><path d="M8 6.4v3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.4" r=".95" fill="currentColor"/>'),
+  info: svg('<circle cx="8" cy="8" r="6.2" ' + S + '/><path d="M8 7.3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.9" r="1" fill="currentColor"/>'),
+  hint: svg('<circle cx="8" cy="8" r="2.2" fill="currentColor"/>'),
+  check: svg('<path d="M3 8.6l3.1 3L13 4.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'),
+  x: svg('<path d="M4 4l8 8M12 4l-8 8" ' + S + '/>'),
+  slash: svg('<circle cx="8" cy="8" r="6" ' + S + '/><path d="M3.9 12.1l8.2-8.2" ' + S + '/>'),
+  chev: svg('<path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'),
+  copy: svg('<rect x="5.2" y="5.2" width="8.3" height="8.3" rx="1.2" ' + S + '/><path d="M3 10.6V3.8c0-.5.3-.8.8-.8h6.8" ' + S + '/>'),
+  reset: svg('<path d="M3.3 6.4A4.9 4.9 0 113.2 9.6" ' + S + '/><path d="M2.8 3v3.5h3.5" ' + S + '/>'),
+  search: svg('<circle cx="7" cy="7" r="4.3" ' + S + '/><path d="M10.3 10.3l3.4 3.4" ' + S + '/>'),
+  plus: svg('<path d="M8 3v10M3 8h10" ' + S + '/>'),
+  folder: svg('<path d="M2 4.5c0-.6.4-1 1-1h3.2l1.4 1.5H13c.6 0 1 .4 1 1V12c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" ' + S + '/>'),
+  refresh: svg('<path d="M13 4.5V7.8H9.7" ' + S + '/><path d="M12.7 7.6A5 5 0 103.4 10" ' + S + '/>'),
+  chip: svg('<rect x="4" y="4" width="8" height="8" rx="1" ' + S + '/><path d="M6 1.8V4M10 1.8V4M6 12v2.2M10 12v2.2M1.8 6H4M1.8 10H4M12 6h2.2M12 10h2.2" ' + S + '/>'),
+  undo: svg('<path d="M5.5 3.5L2.5 6.5l3 3" ' + S + '/><path d="M2.8 6.5H10a3.5 3.5 0 010 7H7" ' + S + '/>'),
+  open: svg('<path d="M9 2.8h4.2V7M13 3L7.5 8.5M11.5 9.5v3.2c0 .5-.3.8-.8.8H3.3c-.5 0-.8-.3-.8-.8V5.3c0-.5.3-.8.8-.8h3.2" ' + S + '/>'),
+  min: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" stroke="currentColor" stroke-width="1"/></svg>',
+  max: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1.2" fill="none" stroke="currentColor" stroke-width="1"/></svg>',
+  close: '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" stroke-width="1"/></svg>',
+};
+const APP_GLYPH = '<svg width="16" height="16" viewBox="0 0 14 14" aria-hidden="true">' +
+  ['#D8C21A', '#1FB5C1', '#2FA84F', '#B5389F', '#C7372F', '#2B4DC2', '#BFBFBF'].map((c, i) => '<rect x="' + (i * 2) + '" y="1" width="2" height="12" fill="' + c + '"/>').join('') + '</svg>';
+
+/* ------------------------------------------------------- direction tokens */
+const BAR = {
+  command: { label: 'Command', color: 'yellow' },
+  video: { label: 'Video', color: 'cyan' },
+  audio: { label: 'Audio', color: 'green' },
+  container: { label: 'Container', color: 'magenta' },
+  errors: { label: 'Errors', color: 'red' },
+  ffmpeg: { label: 'FFmpeg', color: 'blue' },
+  vegas: { label: 'From VEGAS', color: 'white' },
+};
+const BAR_ORDER = ['command', 'video', 'audio', 'container', 'errors', 'ffmpeg', 'vegas'];
+// Speed lists the model stores slowest-first; the slider always puts "Faster encode" on the left.
+const SLOW_FIRST = { libsvtav1: true, 'libvpx-vp9': true, hevc_qsv: true, h264_amf: true };
+const QUNIT = { '-crf': 'CRF', '-cq': 'CQ', '-global_quality': 'Quality', '-qp_i': 'QP' };
+const X265_TUNE = { grain: 'Keeps film grain instead of smoothing it away', animation: 'Flat colour and hard edges, as in cartoons',
+  fastdecode: 'Easier to play back on slow devices', zerolatency: 'No frame delay; for live streaming',
+  psnr: 'Optimises for the PSNR metric; for testing only', ssim: 'Optimises for the SSIM metric; for testing only' };
+const X264_TUNE = { film: 'Live action', animation: 'Flat colour and hard edges', grain: 'Keeps film grain', stillimage: 'Slideshows and still frames',
+  fastdecode: 'Easier to play back on slow devices', zerolatency: 'No frame delay; for live streaming' };
+
+/* ------------------------------------------------------------ model glue */
+function secOf(field) {
+  if (!field) return 'command';
+  if (field === 'streams' || field.indexOf('video') === 0) return 'video';
+  if (field.indexOf('audio') === 0) return 'audio';
+  if (field.indexOf('container') === 0) return 'container';
+  return 'command';
+}
+function runChecks(ed) {
+  const msgs = VE.validate(ed.recipe, ed.installId, ed.ctx).map((m) => Object.assign({}, m, { sec: secOf(m.field) }));
+  const by = {};
+  ['command', 'video', 'audio', 'container'].forEach((k) => { by[k] = { errors: 0, warns: 0 }; });
+  msgs.forEach((m) => { if (m.level === 'error') by[m.sec].errors++; else if (m.level === 'warn') by[m.sec].warns++; });
+  ed.msgs = msgs; ed.by = by;
+  ed.errors = msgs.filter((m) => m.level === 'error');
+  ed.warns = msgs.filter((m) => m.level === 'warn');
+}
+function tplEncoders(tpl) {
+  const v = (tpl.match(/-c(?:odec)?:v\s+(\S+)/) || [])[1];
+  const a = (tpl.match(/-c(?:odec)?:a\s+(\S+)/) || [])[1];
+  return { v, a };
+}
+function qUnit(enc) { return enc.quality ? (QUNIT[enc.quality.flag] || enc.quality.flag.replace(/^-/, '')) : ''; }
+function qualityShort(r) {
+  const res = VE.resolved(r), v = r.video, enc = res.enc;
+  switch (res.mode) {
+    case 'crf': case 'cq': return qUnit(enc) + ' ' + res.quality;
+    case 'abr': return VE.fmt.rate(v.bitrateK) + ' average';
+    case 'cbr': return VE.fmt.rate(v.bitrateK) + ' constant';
+    case 'cqp': return 'QP ' + (v.qp != null ? v.qp : enc.qp.def);
+    case 'profile': return enc.profileQuality.names[res.profile];
+    default: return 'lossless';
+  }
+}
+function videoShort(r) {
+  if (!r.video.enabled) return 'Off';
+  const res = VE.resolved(r);
+  if (res.mode === 'profile') return res.enc.codec + ' ' + qualityShort(r);
+  if (res.mode === 'lossless') return res.enc.label + ' lossless';
+  return res.enc.label + ' ' + qualityShort(r);
+}
+function audioShort(r) {
+  if (!r.audio.enabled) return 'No audio';
+  const s = VE.summary(r);
+  return s.audioQuality === 'Lossless' ? s.audio : s.audio + ' ' + s.audioQuality;
+}
+function presetSummary(p) {
+  const c = VE.containers[p.container.format];
+  if (p.command.mode === 'template') {
+    const e = tplEncoders(p.command.template);
+    return 'Command with ' + [e.v, e.a].filter(Boolean).join(' and ') + ', ' + c.label.replace(/ \(.*\)/, '');
+  }
+  return videoShort(p) + ', ' + audioShort(p) + ', ' + c.label.replace(/ \(.*\)/, '');
+}
+/** Availability problems for a library preset under one FFmpeg. */
+function presetProblem(p, installId) {
+  const inst = VE.installation(installId);
+  const ids = p.command.mode === 'template' ? Object.values(tplEncoders(p.command.template)).filter(Boolean)
+    : [p.video.enabled && p.video.encoder, p.audio.enabled && p.audio.encoder].filter(Boolean);
+  for (const id of ids) {
+    const av = inst.availability[id];
+    if (!av || av.state === 'ok') continue;
+    const name = (VE.videoEncoders[id] || VE.audioEncoders[id] || { label: id }).label;
+    if (av.state === 'missing') return { level: 'error', label: 'Not in this FFmpeg', tip: 'Needs ' + name + ': not in ' + inst.label + '. ' + av.reason };
+    return { level: 'error', label: 'Failed test on this PC', tip: name + ' failed its test encode on this PC. ' + av.reason };
+  }
+  return null;
+}
+function ctxShort(ctx) {
+  const v = ctx.video;
+  const p = v.height >= 2160 ? '2160p' : v.height + 'p';
+  return p + ', ' + VE.fmt.fps(v.fps).replace(' fps', '') + ' fps';
+}
+function fmtVal(path, val, r) {
+  if (val == null || val === '') return 'Default';
+  if (path === 'video.quality') return qUnit(VE.videoEncoders[r.video.encoder]) + ' ' + val;
+  if (/bitrateK|maxrateK/.test(path)) return VE.fmt.rate(val);
+  if (path === 'video.encoder') return (VE.videoEncoders[val] || {}).label || val;
+  if (path === 'audio.encoder') return (VE.audioEncoders[val] || {}).label || val;
+  if (path === 'video.depth') return val + '-bit';
+  if (path === 'video.gopSec') return val + ' s';
+  if (path === 'container.format') return VE.containers[val].label;
+  if (typeof val === 'boolean') return val ? 'On' : 'Off';
+  if (path === 'audio.sampleRate') return val === 'source' ? 'Same as project' : (val / 1000) + ' kHz';
+  if (path === 'audio.channels') return val === 'source' ? 'Same as project' : val;
+  return String(val);
+}
+
+/* --------------------------------------------------------------- editor */
+function makeEd(o) {
+  const ed = {
+    scope: o.scope, density: o.density || 'desk', recipe: VE.clone(o.recipe), base: VE.clone(o.base || o.recipe),
+    installId: o.installId, ctx: o.ctx, ui: { cmdFlat: false, inputsOpen: false, ac: null, caret: null, resolved: false, askSeed: false },
+  };
+  runChecks(ed);
+  return ed;
+}
+const isMod = (ed, f) => !same(getp(ed.recipe, f), getp(ed.base, f));
+const fieldMsgs = (ed, f) => ed.msgs.filter((m) => m.field === f);
+
+function msgsHTML(list) {
+  return list.map((m) => '<div class="msg msg--' + m.level + '" role="' + (m.level === 'error' ? 'alert' : 'note') + '">' +
+    ICON[m.level === 'error' ? 'error' : m.level === 'warn' ? 'warn' : 'info'] +
+    '<span>' + esc(m.text) + (m.fix ? '<span class="msg-fix">' + esc(m.fix) + '</span>' : '') + '</span></div>').join('');
+}
+function fid(ed, f) { return ed.scope + '-' + f.replace(/\W/g, '-'); }
+
+/** One labelled field row with modified dot and per-field reset. */
+function row(ed, o) {
+  const mod = o.f && isMod(ed, o.f);
+  const baseText = o.f ? fmtVal(o.f, getp(ed.base, o.f), ed.base) : '';
+  const lid = o.id || (o.f ? fid(ed, o.f) : '');
+  return '<div class="row" data-row="' + (o.f || '') + '">' +
+    '<div class="row-l">' + (o.group ? '<span class="lb" id="' + lid + '-l">' + esc(o.label) + '</span>' : '<label for="' + lid + '">' + esc(o.label) + '</label>') +
+    (mod ? '<span class="mod" role="img" aria-label="Changed from the preset" title="Changed from the preset"></span>' : '') + '</div>' +
+    '<div class="row-c">' + o.ctl + (o.sub ? '<div class="row-sub">' + o.sub + '</div>' : '') + (o.xa ? '<div class="xa-note">' + ICON.term + 'Set in Extra arguments</div>' : '') + msgsHTML(o.msgs || []) + '</div>' +
+    '<div class="row-r">' + (mod ? '<button type="button" class="ib" data-act="reset" data-f="' + o.f + '" data-fid="reset-' + o.f + '" aria-label="Reset ' + esc(o.label) + ' to ' + esc(baseText) + '" title="Reset to ' + esc(baseText) + '">' + ICON.reset + '</button>' : '') + '</div>' +
+    '</div>';
+}
+function seg(ed, f, items, cur, label, extraCls) {
+  return '<div class="seg ' + (extraCls || '') + '" role="group" aria-labelledby="' + fid(ed, f) + '-l">' + items.map((it) =>
+    '<button type="button" data-act="seg" data-f="' + f + '" data-v="' + esc(it.v) + '" data-t="' + (it.t || 'str') + '" data-fid="' + f + ':' + esc(it.v) + '" aria-pressed="' + same(String(it.v), String(cur)) + '"' +
+    (it.title ? ' title="' + esc(it.title) + '"' : '') + '>' + (it.glyph || '') + esc(it.label) + '</button>').join('') + '</div>';
+}
+function selectHTML(ed, f, opts, cur, t) {
+  const o = (x) => '<option value="' + esc(x.v) + '"' + (same(String(x.v), String(cur == null ? '' : cur)) ? ' selected' : '') + '>' + esc(x.label) + '</option>';
+  return '<select class="sel" id="' + fid(ed, f) + '" data-f="' + f + '" data-t="' + (t || 'str') + '" data-fid="' + f + '">' +
+    opts.map((x) => x.group ? '<optgroup label="' + esc(x.group) + '">' + x.items.map(o).join('') + '</optgroup>' : o(x)).join('') + '</select>';
+}
+function extraFlags(s) { return new Set(VE.tokenize(s || '').filter((x) => /^-[A-Za-z_]/.test(x))); }
+
+/** Labelled marks: right always means higher quality. */
+function meaning(marks, q, lowerBetter) {
+  if (!marks || !marks.length) return '';
+  const exact = marks.find((m) => m[0] === q);
+  if (exact) return exact[1];
+  const sorted = marks.slice().sort((a, b) => a[0] - b[0]);
+  let lo = null, hi = null;
+  sorted.forEach((m) => { if (m[0] < q) lo = m; if (m[0] > q && !hi) hi = m; });
+  const better = lowerBetter ? lo : hi, worse = lowerBetter ? hi : lo;
+  if (better && worse) return 'Between ' + worse[1].toLowerCase() + ' and ' + better[1].toLowerCase();
+  if (better) return 'Lower quality than ' + better[1].toLowerCase();
+  return 'Higher quality than ' + worse[1].toLowerCase();
+}
+function qualityHTML(ed, f, scale, value, unit) {
+  const lo = scale.min, hi = scale.max, rev = scale.lowerIsBetter !== false;
+  const pos = (q) => (rev ? (hi - q) : (q - lo)) / (hi - lo) * 100;
+  const sv = rev ? hi + lo - value : value;
+  const mean = meaning(scale.marks, value, rev);
+  const marks = (scale.marks || []).slice().sort((a, b) => pos(a[0]) - pos(b[0]));
+  const mk = marks.map((m, i) => {
+    const x = pos(m[0]);
+    return '<button type="button" class="qm r' + (marks.length > 4 ? i % 3 : i % 2) + (x > 93 ? ' al-r' : x < 7 ? ' al-l' : '') + (m[0] === value ? ' is-on' : '') + '" style="--x:' + x.toFixed(2) + '" data-act="setq" data-f="' + f + '" data-v="' + m[0] + '" data-fid="qm-' + f + '-' + m[0] + '" title="Set ' + unit + ' ' + m[0] + '">' + esc(m[1]) + '</button>';
+  }).join('');
+  return '<div class="q" style="--p:' + pos(value).toFixed(2) + '%">' +
+    '<div class="q-top"><span class="q-unit" aria-hidden="true">' + unit + '</span>' +
+    '<input class="inp inp--num" type="number" min="' + lo + '" max="' + hi + '" step="1" value="' + value + '" data-f="' + f + '" data-t="num" data-fid="num-' + f + '" aria-label="' + unit + ' value, ' + lo + ' to ' + hi + (rev ? ', lower is higher quality' : '') + '">' +
+    '<span class="q-mean" data-mean="' + f + '">' + esc(mean) + '</span></div>' +
+    '<div class="q-ends" aria-hidden="true"><span>Smaller file</span><span>Higher quality</span></div>' +
+    '<input type="range" class="rng" id="' + fid(ed, f) + '" min="' + lo + '" max="' + hi + '" step="1" value="' + sv + '" data-f="' + f + '" data-t="' + (rev ? 'rev' : 'num') + '" data-lo="' + lo + '" data-hi="' + hi + '" data-unit="' + unit + '" data-fid="rng-' + f + '" aria-valuetext="' + esc(unit + ' ' + value + (mean ? ', ' + mean : '')) + '">' +
+    (marks.length ? '<div class="q-marks">' + mk + '</div>' : '<div style="height:6px"></div>') + '</div>';
+}
+function speedHTML(ed, enc, cur) {
+  const sp = enc.speed, ordered = SLOW_FIRST[enc.id] ? sp.values.slice().reverse() : sp.values.slice();
+  const i = Math.max(0, ordered.indexOf(cur)), n = ordered.length - 1;
+  const name = (x) => sp.names ? x + ', ' + sp.names[x] : x;
+  const ticks = ordered.map((x, k) => '<i class="' + (x === sp.def ? 'is-def' : '') + '" style="--x:' + (k / n * 100).toFixed(2) + '"></i>').join('');
+  return '<div class="q" style="--p:' + (i / n * 100).toFixed(2) + '%">' +
+    '<div class="q-top"><span class="q-unit">' + esc(sp.flag) + '</span><span class="q-mean" data-mean="video.speed">' + esc(name(cur)) + (cur === sp.def ? ' (default)' : '') + '</span></div>' +
+    '<div class="q-ends" aria-hidden="true"><span>' + esc(sp.fastLabel) + '</span><span>' + esc(sp.slowLabel) + '</span></div>' +
+    '<input type="range" class="rng" id="' + fid(ed, 'video.speed') + '" min="0" max="' + n + '" step="1" value="' + i + '" data-f="video.speed" data-t="idx" data-list="' + esc(ordered.join('|')) + '" data-fid="rng-video.speed" aria-valuetext="' + esc(name(cur)) + '">' +
+    '<div class="sp-ticks" aria-hidden="true">' + ticks + '</div></div>';
+}
+
+function secWrap(ed, key, title, summary, body, end) {
+  const st = ed.by[key] || { errors: 0, warns: 0 };
+  const chip = st.errors ? '<span class="sec-st is-error">' + ICON.error + plural(st.errors, 'error') + '</span>'
+    : st.warns ? '<span class="sec-st is-warn">' + ICON.warn + plural(st.warns, 'warning') + '</span>' : '';
+  return '<section class="sec sec--' + BAR[key].color + (st.errors ? ' has-error' : '') + '" id="' + ed.scope + '-sec-' + key + '" data-sec="' + key + '" aria-labelledby="' + ed.scope + '-h-' + key + '">' +
+    '<header class="sec-h"><h3 id="' + ed.scope + '-h-' + key + '" tabindex="-1">' + title + '</h3><span class="sec-sum">' + esc(summary) + '</span>' + chip +
+    '<span class="sec-end">' + (end || '') + '</span></header>' + body + '</section>';
+}
+
+function videoSec(ed) {
+  const r = ed.recipe, v = r.video, res = VE.resolved(r), enc = res.enc;
+  const xf = extraFlags(v.extra);
+  const toggle = '<label class="switch"><input type="checkbox" data-f="video.enabled" data-t="bool" data-fid="video.enabled"' + (v.enabled ? ' checked' : '') + '> <span>On</span></label>';
+  if (!v.enabled) return secWrap(ed, 'video', 'Video', 'Off', '<p class="sec-off">Video is off.</p>' + msgsHTML(fieldMsgs(ed, 'video').concat(fieldMsgs(ed, 'streams'))), toggle);
+  const inst = VE.installation(ed.installId);
+  const encOpts = VE.videoOrder.map((g) => ({ group: g.group, items: g.ids.map((id) => {
+    const e = VE.videoEncoders[id], av = inst.availability[id] || { state: 'missing' };
+    return { v: id, label: e.label + (e.hw ? ' (' + e.hw + ')' : '') + (av.state === 'missing' ? ', not in this FFmpeg' : av.state === 'failed' ? ', failed test on this PC' : '') };
+  }) }));
+  const rows = [];
+  rows.push(row(ed, { f: 'video.encoder', label: 'Encoder', ctl: selectHTML(ed, 'video.encoder', encOpts, v.encoder), sub: esc(enc.blurb), msgs: fieldMsgs(ed, 'video.encoder').concat(fieldMsgs(ed, 'video')) }));
+  if (enc.modes.length > 1) {
+    rows.push(row(ed, { f: 'video.mode', label: 'Rate control', group: true, ctl: seg(ed, 'video.mode', enc.modes.map((m) => ({ v: m, label: VE.rateModes[m].short, title: VE.rateModes[m].label + '. ' + VE.rateModes[m].blurb })), res.mode),
+      sub: esc(VE.rateModes[res.mode].blurb), msgs: fieldMsgs(ed, 'video.mode') }));
+  }
+  if (res.mode === 'crf' || res.mode === 'cq') {
+    const unit = qUnit(enc);
+    rows.push(row(ed, { f: 'video.quality', label: 'Quality', ctl: qualityHTML(ed, 'video.quality', enc.quality, res.quality, unit), xa: xf.has(enc.quality.flag) }));
+  } else if (res.mode === 'cqp') {
+    rows.push(row(ed, { f: 'video.qp', label: 'Quantizer', ctl: qualityHTML(ed, 'video.qp', { min: enc.qp.min, max: enc.qp.max, lowerIsBetter: true, marks: [] }, v.qp != null ? v.qp : enc.qp.def, 'QP'), xa: xf.has('-qp') }));
+  } else if (res.mode === 'abr' || res.mode === 'cbr') {
+    const peak = res.mode === 'abr';
+    const ctl = '<div class="bitrate"><label>' + (peak ? 'Average' : 'Bitrate') + ' <input class="inp inp--num" type="number" min="0.5" max="400" step="0.5" id="' + fid(ed, 'video.bitrateK') + '" value="' + (v.bitrateK / 1000) + '" data-f="video.bitrateK" data-t="mbps" data-fid="video.bitrateK"> <span class="unit">Mb/s</span></label>' +
+      (peak ? '<label>Peak <input class="inp inp--num" type="number" min="0" max="400" step="0.5" value="' + (v.maxrateK ? v.maxrateK / 1000 : '') + '" placeholder="None" data-f="video.maxrateK" data-t="mbpsn" data-fid="video.maxrateK"> <span class="unit">Mb/s</span></label>' : '') + '</div>' +
+      '<div class="quick" role="group" aria-label="Common bitrates">' + [6, 8, 12, 20, 35, 50].map((x) => '<button type="button" class="chip" data-act="seg" data-f="video.bitrateK" data-v="' + (x * 1000) + '" data-t="num" data-fid="qb-' + x + '" aria-pressed="' + (v.bitrateK === x * 1000) + '">' + x + ' Mb/s</button>').join('') + '</div>';
+    const desc = peak ? VE.fmt.rate(v.bitrateK) + ' average' + (v.maxrateK ? ', ' + VE.fmt.rate(v.maxrateK) + ' peak' : ', no peak limit') : VE.fmt.rate(v.bitrateK) + ', held constant';
+    rows.push(row(ed, { f: 'video.bitrateK', label: 'Bitrate', ctl: ctl, sub: esc(desc), xa: xf.has('-b:v') }));
+  } else if (res.mode === 'profile') {
+    const pq = enc.profileQuality;
+    const fps = VE.fmt.fps(ed.ctx.video.fps);
+    const mbps = Math.round(pq.mbps1080[res.profile] * (ed.ctx.video.width * ed.ctx.video.height / 2073600) * (ed.ctx.video.fps[0] / ed.ctx.video.fps[1] / 29.97));
+    rows.push(row(ed, { f: 'video.profile', label: 'Profile', group: true, ctl: seg(ed, 'video.profile', pq.values.map((x) => ({ v: x, label: pq.names[x] })), res.profile),
+      sub: 'About <b>' + mbps + ' Mb/s</b> at ' + ed.ctx.video.width + '×' + ed.ctx.video.height + ', ' + fps + '. The profile fixes the data rate.' }));
+  } else {
+    rows.push(row(ed, { label: 'Quality', id: fid(ed, 'video.lossless'), ctl: '<span class="static">Lossless</span>', sub: 'FFV1 keeps every pixel VEGAS delivers. There is nothing to tune.' }));
+  }
+  if (enc.speed) rows.push(row(ed, { f: 'video.speed', label: 'Speed', ctl: speedHTML(ed, enc, res.speed), xa: xf.has(enc.speed.flag) }));
+  const pair = [];
+  if (enc.tune) pair.push(row(ed, { f: 'video.tune', label: 'Tune', ctl: selectHTML(ed, 'video.tune', [{ v: '', label: enc.tune.def ? 'Default (' + enc.tune.def + ')' : 'None' }].concat(enc.tune.values.map((x) => ({ v: x, label: x }))), v.tune, 'strn'), xa: xf.has('-tune') }));
+  if (enc.profile && res.mode !== 'profile') pair.push(row(ed, { f: 'video.profile', label: 'Profile', ctl: selectHTML(ed, 'video.profile', [{ v: '', label: 'Default (' + enc.profile.def + ')' }].concat(enc.profile.values.map((x) => ({ v: x, label: x }))), v.profile, 'strn'), xa: xf.has('-profile:v') }));
+  if (enc.multipass) pair.push(row(ed, { f: 'video.multipass', label: 'Multipass', ctl: selectHTML(ed, 'video.multipass', [{ v: '', label: 'Default (off)' }].concat(enc.multipass.values.map((x) => ({ v: x, label: { disabled: 'Off', qres: 'Quarter resolution', fullres: 'Full resolution' }[x] }))), v.multipass, 'strn') }));
+  const depths = Object.keys(enc.depths);
+  const depthCtl = depths.length > 1 ? seg(ed, 'video.depth', depths.map((d) => ({ v: d, label: d + '-bit', t: 'num' })), res.depth)
+    : '<span class="static">' + depths[0] + '-bit only</span>';
+  pair.push(row(ed, { f: 'video.depth', label: 'Bit depth', group: depths.length > 1, id: fid(ed, 'video.depth'), ctl: depthCtl, xa: xf.has('-pix_fmt') }));
+  if (!['profile', 'lossless'].includes(res.mode)) {
+    const fr = ed.ctx.video.fps[0] / ed.ctx.video.fps[1];
+    pair.push(row(ed, { f: 'video.gopSec', label: 'Keyframes', ctl: '<input class="inp inp--num" type="number" min="0.5" max="20" step="0.5" id="' + fid(ed, 'video.gopSec') + '" value="' + (v.gopSec || '') + '" data-f="video.gopSec" data-t="numn" data-fid="video.gopSec"> <span class="unit">s</span>',
+      sub: v.gopSec ? Math.round(v.gopSec * fr) + ' frames at ' + VE.fmt.fps(ed.ctx.video.fps) : 'Encoder decides', msgs: fieldMsgs(ed, 'video.gop'), xa: xf.has('-g') }));
+  }
+  pair.push(row(ed, { f: 'video.color', label: 'Colour tags', ctl: selectHTML(ed, 'video.color', [{ v: 'bt709', label: 'BT.709 (HD)' }, { v: '', label: 'Don’t tag' }], v.color, 'strn') }));
+  rows.push('<div class="pair">' + pair.join('') + '</div>');
+  // Depth/chroma messages span the full width under the pair.
+  const dm = fieldMsgs(ed, 'video.depth');
+  if (dm.length) rows.push('<div class="row"><div></div><div class="row-c">' + msgsHTML(dm) + '</div><div></div></div>');
+  const av = AV[enc.id];
+  const shown = ['crf', 'qp', 'preset', 'tune', 'profile', 'cq', 'rc', 'multipass', 'cpu-used', 'global_quality', 'quality'];
+  const opts = av ? av.options.filter((o) => !shown.includes(o.name)) : [];
+  rows.push(row(ed, { label: 'All options', id: fid(ed, 'video.all'), ctl: av
+    ? '<details class="allopt"><summary id="' + fid(ed, 'video.all') + '" data-fid="allopt-v">' + opts.length + ' more from FFmpeg 8.1 ' + ICON.chev + '</summary><div class="optgrid">' +
+      opts.slice(0, 8).map((o) => '<code>-' + esc(o.name) + '</code><span>' + esc(o.type) + (o.default != null ? ', default ' + esc(o.default) : '') + '</span><span>' + esc(o.desc) + '</span>').join('') + '</div><div class="row-sub">Showing 8. Search all options with Ctrl+F.</div></details>'
+    : '<span class="static unit">Not captured for this encoder</span>' }));
+  rows.push(row(ed, { f: 'video.extra', label: 'Extra arguments', ctl: '<input class="inp inp--mono" id="' + fid(ed, 'video.extra') + '" value="' + esc(v.extra) + '" placeholder="-bf 3 -refs 4" data-f="video.extra" data-t="str" data-fid="video.extra" spellcheck="false" autocomplete="off">',
+    sub: 'Added after the video options. An option typed here replaces the generated one with the same name.' }));
+  const sum = [enc.label, qualityShort(r), enc.speed ? (enc.speed.names ? enc.speed.names[res.speed] : res.speed) : null, res.depth + '-bit'].filter(Boolean).join(', ');
+  return secWrap(ed, 'video', 'Video', sum, rows.join(''), toggle);
+}
+
+function outputSec(ed) {
+  const r = ed.recipe, c = VE.containers[r.container.format], res = VE.resolved(r);
+  const items = Object.values(VE.containers).map((k) => {
+    const cv = r.video.enabled ? VE.compat.video[res.enc.family][k.id] : 'ok';
+    const ca = r.audio.enabled ? VE.compat.audio[res.aenc.family][k.id] : 'ok';
+    const worst = cv === 'no' || ca === 'no' ? 'no' : cv === 'warn' || ca === 'warn' ? 'warn' : 'ok';
+    const why = worst === 'no' ? 'Can’t hold ' + (cv === 'no' ? res.enc.codec : res.aenc.codec) : worst === 'warn' ? 'Muxes, but many players won’t open it' : k.blurb;
+    return { v: k.id, label: { mp4: 'MP4', mkv: 'MKV', mov: 'MOV', webm: 'WebM', mxf: 'MXF' }[k.id], title: k.label + '. ' + why, glyph: worst === 'no' ? '<span class="g-no">' + ICON.slash + '</span>' : worst === 'warn' ? '<span class="g-warn">' + ICON.warn + '</span>' : '' };
+  });
+  const rows = [];
+  rows.push(row(ed, { f: 'container.format', label: 'Container', group: true, ctl: seg(ed, 'container.format', items, r.container.format),
+    sub: esc(c.blurb) + ' Saves as <b>' + c.ext + '</b>.', msgs: fieldMsgs(ed, 'container').filter((m) => m.level !== 'info') }));
+  if (c.id === 'mp4') {
+    rows.push(row(ed, { f: 'container.faststart', label: 'Fast start', ctl: '<label class="switch"><input type="checkbox" id="' + fid(ed, 'container.faststart') + '" data-f="container.faststart" data-t="bool" data-fid="container.faststart"' + (r.container.faststart ? ' checked' : '') + '> <span>' + (r.container.faststart ? 'On' : 'Off') + '</span></label>',
+      msgs: fieldMsgs(ed, 'container').filter((m) => m.level === 'info') }));
+  }
+  return secWrap(ed, 'container', 'Output', c.label + (c.id === 'mp4' && r.container.faststart ? ' with fast start' : ''), rows.join(''));
+}
+
+function audioSec(ed) {
+  const r = ed.recipe, a = r.audio, res = VE.resolved(r), ae = res.aenc, inst = VE.installation(ed.installId);
+  const toggle = '<label class="switch"><input type="checkbox" data-f="audio.enabled" data-t="bool" data-fid="audio.enabled"' + (a.enabled ? ' checked' : '') + '> <span>On</span></label>';
+  if (!a.enabled) return secWrap(ed, 'audio', 'Audio', 'Off', '<p class="sec-off">Audio is off. The file will have no sound track.</p>', toggle);
+  const encOpts = VE.audioOrder.map((g) => ({ group: g.group, items: g.ids.map((id) => {
+    const e = VE.audioEncoders[id], av = inst.availability[id] || { state: 'missing' };
+    return { v: id, label: e.label + (av.state === 'missing' ? ', not in this FFmpeg' : av.state === 'failed' ? ', failed test on this PC' : '') };
+  }) }));
+  const rows = [];
+  rows.push(row(ed, { f: 'audio.encoder', label: 'Encoder', ctl: selectHTML(ed, 'audio.encoder', encOpts, a.encoder), sub: esc(ae.blurb), msgs: fieldMsgs(ed, 'audio.encoder') }));
+  if (ae.modes.length > 1) rows.push(row(ed, { f: 'audio.mode', label: 'Rate control', group: true, ctl: seg(ed, 'audio.mode', ae.modes.map((m) => ({ v: m, label: m === 'bitrate' ? 'Bitrate' : 'Variable quality' })), res.amode) }));
+  if (res.amode === 'bitrate') {
+    rows.push(row(ed, { f: 'audio.bitrateK', label: 'Bitrate', ctl: selectHTML(ed, 'audio.bitrateK', ae.bitrate.values.map((x) => ({ v: x, label: x + ' kb/s' + (x === ae.bitrate.def ? ' (default)' : '') })), a.bitrateK, 'num'), xa: extraFlags(a.extra).has('-b:a') }));
+  } else if (res.amode === 'vbr') {
+    const vb = ae.vbr;
+    rows.push(row(ed, { f: 'audio.vbr', label: 'Quality', ctl: qualityHTML(ed, 'audio.vbr', { min: vb.min, max: vb.max, lowerIsBetter: !!vb.lowerIsBetter, marks: [] }, a.vbr != null ? a.vbr : vb.def, vb.flag.replace(/^-/, '').toUpperCase()) }));
+  } else if (ae.level) {
+    rows.push(row(ed, { f: 'audio.level', label: 'Compression', ctl: selectHTML(ed, 'audio.level', Array.from({ length: ae.level.max - ae.level.min + 1 }, (_, i) => ({ v: i, label: 'Level ' + i + (i === ae.level.def ? ' (default)' : '') + (i === 0 ? ', fastest' : i === ae.level.max ? ', smallest' : '') })), a.level != null ? a.level : ae.level.def, 'num'),
+      sub: 'Lossless at every level. Higher levels take longer and save a little space.' }));
+  } else {
+    rows.push(row(ed, { label: 'Quality', id: fid(ed, 'audio.lossless'), ctl: '<span class="static">Lossless</span>' }));
+  }
+  const src = ed.ctx.audio;
+  rows.push(
+    row(ed, { f: 'audio.sampleRate', label: 'Sample rate', ctl: selectHTML(ed, 'audio.sampleRate', [{ v: 'source', label: 'Project (' + src.rate / 1000 + ' kHz)' }].concat(ae.rates.map((x) => ({ v: x, label: x / 1000 + ' kHz' }))), a.sampleRate, 'srate') }) +
+    row(ed, { f: 'audio.channels', label: 'Channels', ctl: selectHTML(ed, 'audio.channels', [{ v: 'source', label: 'Project (stereo)' }, { v: 'stereo', label: 'Stereo' }, { v: 'mono', label: 'Mono' }], a.channels) }));
+  const sr = fieldMsgs(ed, 'audio.sampleRate');
+  if (sr.length) rows.push('<div class="row"><div></div><div class="row-c">' + msgsHTML(sr) + '</div><div></div></div>');
+  rows.push(row(ed, { f: 'audio.extra', label: 'Extra arguments', ctl: '<input class="inp inp--mono" id="' + fid(ed, 'audio.extra') + '" value="' + esc(a.extra) + '" placeholder="-cutoff 20000" data-f="audio.extra" data-t="str" data-fid="audio.extra" spellcheck="false" autocomplete="off">' }));
+  return secWrap(ed, 'audio', 'Audio', audioShort(r), rows.join(''), toggle);
+}
+
+function vegasSec(ed) {
+  const v = ed.ctx.video, a = ed.ctx.audio;
+  const body = '<div class="row"><span class="row-l">Frames</span><div class="row-c"><span class="static">' + v.width + '×' + v.height + ', ' + VE.fmt.fps(v.fps) + ', 10-bit 4:2:0 (P010)</span></div><span></span></div>' +
+    '<div class="row"><span class="row-l">Sound</span><div class="row-c"><span class="static">' + a.rate / 1000 + ' kHz stereo, 32-bit float</span></div><span></span></div>' +
+    '<div class="row"><span class="row-l">Length</span><div class="row-c"><span class="static">' + VE.fmt.duration(ed.ctx.durationSec) + '</span><div class="row-sub">' +
+    (ed.density === 'desk' ? 'A sample used for the preview and size estimate. In VEGAS, the project decides these.' : 'VEGAS decides these from the project. Read-only.') + '</div></div><span></span></div>';
+  return secWrap(ed, 'vegas', 'From VEGAS', ed.density === 'desk' ? 'Sample project' : 'This project', body);
+}
+
+function guidedHTML(ed) {
+  return (ed.ui.switchedBack && ed.recipe.command.template ? '<div class="banner" role="status">' + ICON.term + '<span>Your command is saved. Renders use these settings until you switch back.</span><button type="button" class="btn btn--sm" data-act="keep-guided" data-fid="keep-guided">Dismiss</button></div>' : '') + '<div class="cols"><div class="col">' + videoSec(ed) + '</div><div class="col">' + outputSec(ed) + audioSec(ed) + (ed.density === 'desk' ? vegasSec(ed) : '') + '</div></div>';
+}
+
+/* ------------------------------------------------------ command preview */
+const FLAG_FIELD = { '-c:v': 'video.encoder', '-preset': 'video.speed', '-cpu-used': 'video.speed', '-quality': 'video.speed', '-crf': 'video.quality', '-cq': 'video.quality',
+  '-global_quality': 'video.quality', '-qp_i': 'video.quality', '-qp': 'video.qp', '-b:v': 'video.bitrateK', '-maxrate': 'video.maxrateK', '-minrate': 'video.bitrateK', '-bufsize': 'video.bitrateK',
+  '-rc': 'video.mode', '-tune': 'video.tune', '-profile:v': 'video.profile', '-pix_fmt': 'video.depth', '-g': 'video.gopSec', '-color_primaries': 'video.color', '-color_trc': 'video.color',
+  '-colorspace': 'video.color', '-color_range': 'video.color', '-multipass': 'video.multipass', '-c:a': 'audio.encoder', '-b:a': 'audio.bitrateK', '-ar': 'audio.sampleRate', '-ac': 'audio.channels',
+  '-compression_level': 'audio.level', '-movflags': 'container.faststart', '-f': 'container.format' };
+function cmdLines(tokens) {
+  const lines = []; let line = [], prev = null;
+  const brk = ['-c:v', '-c:a', '-x264-params', '-x265-params', '-svtav1-params', '-movflags'];
+  tokens.forEach((t, i) => {
+    let nb = false;
+    if (i > 0) {
+      if (t.role === 'input' && prev !== 'input') nb = true;
+      else if (t.role === 'map' && prev !== 'map') nb = true;
+      else if (t.role === 'mux' && prev !== 'mux') nb = true;
+      else if (t.role === 'output') nb = true;
+      else if (brk.includes(t.text) && line.length) nb = true;
+    }
+    if (nb && line.length) { lines.push(line); line = []; }
+    line.push(t); prev = t.role === 'extra' ? prev : t.role;
+  });
+  if (line.length) lines.push(line);
+  return lines;
+}
+const quoteArg = (a) => /[\s"]/.test(a) ? '"' + a.replace(/"/g, '\\"') + '"' : a;
+function cmdHTML(ed, tokens) {
+  let field = null, stream = null;
+  const tk = (t) => {
+    if (t.role === 'video' || t.role === 'audio') stream = t.role;
+    if (/^-/.test(t.text)) field = (t.role === 'video' || t.role === 'audio' || t.role === 'mux') ? (FLAG_FIELD[t.text] || null) : t.role === 'extra' && stream ? stream + '.extra' : null;
+    else if (t.role === 'extra' && stream && !field) field = stream + '.extra';
+    const f = t.role === 'input' || t.role === 'global' || t.role === 'exe' || t.role === 'output' || t.role === 'map' ? null : field;
+    return '<span class="tk tk--' + t.role + '"' + (f ? ' data-focus="' + f + '"' : '') + '>' + esc(quoteArg(t.text)) + '</span>';
+  };
+  const lines = cmdLines(tokens);
+  return lines.map((ln, i) => {
+    let inner;
+    if (ln[0].role === 'input' && !ed.ui.inputsOpen) {
+      if (i > 0 && lines[i - 1][0].role === 'input') return '';
+      inner = '<button type="button" class="tk-chip" data-act="inputs" data-fid="inputs-chip" aria-expanded="false" title="Pipes from VEGAS. Vegas Encoder owns these arguments.">VEGAS video + audio</button>';
+    } else inner = ln.map(tk).join(' ');
+    const last = i === lines.length - 1;
+    return '<div class="cl">' + inner + (last ? '' : '<span class="cont"> ^</span>') + '</div>';
+  }).join('');
+}
+function checksHTML(ed) {
+  const list = ed.msgs.slice().sort((a, b) => ({ error: 0, warn: 1, info: 2 }[a.level] - { error: 0, warn: 1, info: 2 }[b.level]));
+  if (!list.length) return '<p class="chk-ok">No problems found for this FFmpeg. FFmpeg still has the final say when the render starts.</p>';
+  return '<ul class="chk-list">' + list.map((m, i) => '<li><button type="button" class="chk chk--' + m.level + '" data-act="focus" data-field="' + (m.field || '') + '" data-sec="' + m.sec + '" data-fid="chk-' + i + '">' +
+    ICON[m.level === 'error' ? 'error' : m.level === 'warn' ? 'warn' : 'info'] + '<span class="chk-t">' + esc(m.text) + '</span>' +
+    '<span class="chk-w"><i class="sw sw--' + BAR[m.sec].color + '"></i>' + esc(VE.fieldLabels[m.field] || BAR[m.sec].label) + (m.fix ? '. ' + esc(m.fix) : '') + '</span></button></li>').join('') + '</ul>';
+}
+function dockHTML(ed) {
+  const tokens = VE.compile(ed.recipe, ed.ctx).tokens;
+  const n = ed.msgs.length, e = ed.errors.length, w = ed.warns.length;
+  return '<section class="dock-cmd sec--yellow" id="' + ed.scope + '-sec-command" aria-labelledby="' + ed.scope + '-h-command">' +
+    '<div class="dock-h"><h3 id="' + ed.scope + '-h-command" tabindex="-1">Command</h3><span class="sec-sum">Built from your Guided settings. Click an argument to find its control.</span>' +
+    '<div class="seg" role="group" aria-label="Command layout"><button type="button" data-act="flat" data-v="0" data-fid="flat0" aria-pressed="' + !ed.ui.cmdFlat + '">Grouped</button><button type="button" data-act="flat" data-v="1" data-fid="flat1" aria-pressed="' + ed.ui.cmdFlat + '">One line</button></div>' +
+    '<button type="button" class="btn btn--sm" data-act="copy" data-fid="copy" title="Copy command (Ctrl+Shift+C)">' + ICON.copy + 'Copy</button></div>' +
+    '<pre class="cmd' + (ed.ui.cmdFlat ? ' is-flat' : '') + '" aria-label="FFmpeg command">' + cmdHTML(ed, tokens) + '</pre></section>' +
+    '<section class="dock-chk" aria-labelledby="' + ed.scope + '-h-checks"><div class="dock-h"><h3 id="' + ed.scope + '-h-checks">Checks</h3><span class="sec-sum">' +
+    (e ? plural(e, 'error') + (w ? ', ' + plural(w, 'warning') : '') : w ? plural(w, 'warning') : n ? 'Notes only' : 'All clear') + '</span></div>' + checksHTML(ed) + '</section>';
+}
+
+/* ---------------------------------------------------------------- strip */
+function barHTML(b) {
+  const m = BAR[b.key];
+  const glyph = b.level === 'error' || b.level === 'lit' ? ICON.error : b.level === 'warn' ? ICON.warn : '';
+  const aria = m.label + '. ' + (b.note ? b.note + '. ' : '') + b.value + (b.menu ? '. Choose FFmpeg' : '. Go to section');
+  const act = b.menu ? 'data-act="ffmenu" aria-haspopup="menu" aria-expanded="' + (!!b.open) + '"' : 'data-act="jump" data-sec="' + b.key + '"';
+  return '<button type="button" class="bar bar--' + m.color + ' is-' + b.level + '" ' + act + ' data-fid="bar-' + b.key + '" aria-label="' + esc(aria) + '" title="' + esc(b.title || aria) + '">' +
+    '<span class="bar-k">' + m.label + (b.menu ? ICON.chev : '') + '</span>' + (b.note ? '<span class="bar-n">' + glyph + esc(b.note) + '</span>' : '<span></span>') +
+    '<span class="bar-v">' + esc(b.value) + '</span></button>';
+}
+function stripHTML(bars) { return '<nav class="strip" aria-label="Section status">' + bars.map(barHTML).join('') + '</nav>'; }
+function editorBars(ed, extra) {
+  const r = ed.recipe, tpl = r.command.mode === 'template', by = ed.by;
+  const lv = (b) => b.errors ? 'error' : b.warns ? 'warn' : 'ok';
+  const nt = (b) => b.errors ? plural(b.errors, 'error') : b.warns ? plural(b.warns, 'warning') : '';
+  const te = tpl ? tplEncoders(r.command.template) : {};
+  const c = VE.containers[r.container.format];
+  const inst = VE.installation(ed.installId);
+  const lines = tpl ? r.command.template.split('\n').length : 0;
+  const first = ed.errors[0];
+  return [
+    { key: 'command', value: tpl ? 'Your command, ' + plural(lines, 'line') : 'Built from Guided', level: lv(by.command), note: nt(by.command) },
+    { key: 'video', value: tpl ? (te.v || 'No video encoder') + ' in your command' : videoShort(r), level: !r.video.enabled ? 'off' : lv(by.video), note: nt(by.video) },
+    { key: 'audio', value: tpl ? (te.a || 'No audio') + ' in your command' : audioShort(r), level: !r.audio.enabled ? 'off' : lv(by.audio), note: nt(by.audio) },
+    { key: 'container', value: c.label.replace(/ \(.*\)/, '') + (c.id === 'mp4' && r.container.faststart && !tpl ? ', fast start' : '') + ', ' + c.ext, level: lv(by.container), note: nt(by.container) },
+    { key: 'errors', value: first ? (VE.fieldLabels[first.field] || BAR[first.sec].label) : 'Nothing blocking', level: first ? 'lit' : 'idle', note: first ? plural(ed.errors.length, 'error') : 'None' },
+    { key: 'ffmpeg', value: inst.label.replace(/^FFmpeg /, '') + (inst.isDefault ? ', default' : ''), level: 'ok', menu: true, open: extra && extra.menuOpen },
+    { key: 'vegas', value: ctxShort(ed.ctx) + (ed.density === 'desk' ? ', sample' : ''), level: 'ok' },
+  ];
+}
+function ffMenuHTML(installId) {
+  return '<div class="menu" role="menu" aria-label="Check against FFmpeg" style="right:calc(100% / 7 * 1);top:50px">' +
+    '<div class="menu-h">Check presets against</div>' + VE.installations.map((i) => {
+      const missing = Object.entries(i.availability).filter(([, a]) => a.state === 'missing').map(([k]) => k);
+      return '<button type="button" class="mi" role="menuitemradio" aria-checked="' + (i.id === installId) + '" data-act="inst" data-v="' + i.id + '" data-fid="mi-' + i.id + '">' +
+        (i.id === installId ? ICON.check : '<span></span>') + '<b>' + esc(i.label) + (i.isDefault ? ' (default)' : '') + '</b>' +
+        '<small>' + esc(i.license) + ', ' + esc(i.source.toLowerCase()) + '. ' + (missing.includes('libx264') ? 'No x264 or x265.' : 'x264, x265 and NVENC ready.') + '</small></button>';
+    }).join('') + '</div>';
+}
+
+/* ------------------------------------------------------------ title bar */
+function titleBar(active, title) {
+  const nav = ['Presets', 'FFmpeg', 'History', 'Settings'];
+  return '<div class="tb"><div class="tb-app">' + APP_GLYPH + '<span>' + esc(title || 'Vegas Encoder') + '</span></div>' +
+    (active ? '<nav class="tb-nav" aria-label="Pages">' + nav.map((n) => '<button type="button"' + (n === active ? ' aria-current="page"' : '') + '>' + n + '</button>').join('') + '</nav>' : '') +
+    '<div class="tb-sp"></div><div class="caps" aria-hidden="true"><span>' + ICON.min + '</span><span>' + ICON.max + '</span><span>' + ICON.close + '</span></div></div>';
+}
+
+/* ------------------------------------------------------- focus helpers */
+function keepFocus(host, fn) {
+  const a = document.activeElement;
+  const key = a && host.contains(a) ? a.getAttribute('data-fid') : null;
+  const sel = key && 'selectionStart' in a ? [a.selectionStart, a.selectionEnd] : null;
+  fn();
+  if (!key) return;
+  const n = host.querySelector('[data-fid="' + CSS.escape(key) + '"]');
+  if (n) { n.focus({ preventScroll: true }); if (sel && 'selectionStart' in n) { try { n.setSelectionRange(sel[0], sel[1]); } catch (e) { /* number inputs */ } } }
+}
+function toast(win, text) {
+  const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = text;
+  win.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+function copyText(text) { try { if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {}); } catch (e) { /* file:// may block */ } }
+
+/* ------------------------------------------------- field edit semantics */
+function applyField(ed, f, raw, t) {
+  let v = raw;
+  if (t === 'num') v = raw === '' ? null : Number(raw);
+  else if (t === 'numn') v = raw === '' || Number(raw) === 0 ? null : Number(raw);
+  else if (t === 'mbps') v = Math.max(100, Math.round(parseFloat(raw || '0') * 1000));
+  else if (t === 'mbpsn') v = raw === '' || Number(raw) === 0 ? null : Math.round(parseFloat(raw) * 1000);
+  else if (t === 'strn') v = raw === '' ? null : raw;
+  else if (t === 'srate') v = raw === 'source' ? 'source' : Number(raw);
+  const r = ed.recipe;
+  if (f === 'video.quality' || f === 'video.qp') {
+    const enc = VE.videoEncoders[r.video.encoder], sc = f === 'video.qp' ? enc.qp : enc.quality;
+    if (v == null || isNaN(v)) return; v = Math.min(sc.max, Math.max(sc.min, Math.round(v)));
+  }
+  setp(r, f, v);
+  if (f === 'video.encoder') {
+    const enc = VE.videoEncoders[v], vv = r.video;
+    if (!enc.modes.includes(vv.mode)) vv.mode = enc.modes[0];
+    vv.quality = null; vv.qp = null; vv.speed = null; vv.tune = null; vv.profile = null; vv.depth = null; vv.multipass = null;
+    if (!['profile', 'lossless'].includes(vv.mode) && !vv.gopSec) vv.gopSec = 2;
+  }
+  if (f === 'video.mode' && (v === 'abr' || v === 'cbr') && !r.video.bitrateK) r.video.bitrateK = 12000;
+  if (f === 'audio.encoder') {
+    const ae = VE.audioEncoders[v], a = r.audio;
+    if (!ae.modes.includes(a.mode)) a.mode = ae.modes[0];
+    if (ae.bitrate && !ae.bitrate.values.includes(a.bitrateK)) a.bitrateK = ae.bitrate.def;
+    a.vbr = null; a.level = null;
+    if (a.sampleRate !== 'source' && !ae.rates.includes(a.sampleRate)) a.sampleRate = 'source';
+  }
+}
+function resetField(ed, f) {
+  if (f === 'video.encoder') { ed.recipe.video = VE.clone(ed.base.video); return; }
+  if (f === 'audio.encoder') { ed.recipe.audio = VE.clone(ed.base.audio); return; }
+  setp(ed.recipe, f, VE.clone(getp(ed.base, f) == null ? null : getp(ed.base, f)));
+}
+function rangeValue(el) {
+  const t = el.dataset.t, n = Number(el.value);
+  if (t === 'rev') return Number(el.dataset.hi) + Number(el.dataset.lo) - n;
+  if (t === 'idx') return el.dataset.list.split('|')[n];
+  return n;
+}
+function focusField(host, ed, field, sec) {
+  let n = field ? host.querySelector('[data-fid="' + CSS.escape(field) + '"], #' + CSS.escape(fid(ed, field)) + ', [data-fid^="' + CSS.escape(field) + ':"][aria-pressed="true"], [data-fid="rng-' + CSS.escape(field) + '"]') : null;
+  if (!n && sec) n = host.querySelector('#' + ed.scope + '-h-' + sec);
+  if (!n) return;
+  n.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+  n.focus({ preventScroll: true });
+}
+
+/* ================================================================ screens */
+/** Desktop presets screen (S1 Guided, S2 Command): library, slate, editor, dock. */
+function DesktopPresets(scope, init) {
+  const win = document.getElementById(scope + '-win');
+  const scr = { scope, lib: VE.clone(VE.library), installId: init.installId, q: '', cat: 'all', menuOpen: false };
+  scr.preset = () => scr.lib.find((p) => p.id === scr.selId);
+  scr.load = (id) => {
+    scr.selId = id;
+    const p = scr.preset();
+    scr.ed = makeEd({ scope, recipe: p, base: p, installId: scr.installId, ctx: VE.sampleContext });
+  };
+  scr.load(init.presetId);
+  if (init.setup) init.setup(scr);
+  scr.dirty = () => VE.diff(scr.ed.base, scr.ed.recipe).length > 0;
+
+  win.innerHTML = titleBar('Presets') + '<div class="strip-host" id="' + scope + '-strip"></div>' +
+    '<div class="desk"><aside class="lib" id="' + scope + '-lib" aria-label="Preset library"></aside>' +
+    '<div class="main"><div class="slate" id="' + scope + '-slate"></div><div class="ed-scroll" id="' + scope + '-ed"></div><div class="dock" id="' + scope + '-dock"></div></div></div>';
+  const elStrip = $('#' + scope + '-strip'), elLib = $('#' + scope + '-lib'), elSlate = $('#' + scope + '-slate'), elEd = $('#' + scope + '-ed'), elDock = $('#' + scope + '-dock');
+
+  function libHTML() {
+    const q = scr.q.trim().toLowerCase();
+    const match = (p) => (scr.cat === 'all' || p.category === scr.cat) && (!q || [p.name, p.tags.join(' '), p.video.encoder, VE.videoEncoders[p.video.encoder].codec, p.audio.encoder, p.command.template].join(' ').toLowerCase().includes(q));
+    const order = Object.keys(VE.categories);
+    const sort = (a, b) => (b.favorite - a.favorite) || (order.indexOf(a.category) - order.indexOf(b.category)) || a.name.localeCompare(b.name);
+    const groups = [['Built-in', scr.lib.filter((p) => p.builtin && match(p)).sort(sort)], ['Mine', scr.lib.filter((p) => !p.builtin && match(p)).sort(sort)]];
+    const cats = [['all', 'All']].concat(Object.entries(VE.categories).map(([k, v]) => [k, v.label]));
+    const item = (p) => {
+      const prob = presetProblem(p, scr.installId);
+      const cur = p.id === scr.selId;
+      const r = cur ? scr.ed.recipe : p;
+      return '<button type="button" class="li" data-act="pick" data-v="' + p.id + '" data-fid="li-' + p.id + '" aria-current="' + cur + '"' + (prob ? ' title="' + esc(prob.tip) + '"' : '') + '>' +
+        '<span class="li-n">' + esc(p.name) + '</span><span class="li-m">' +
+        (p.favorite ? '<span title="Favorite" aria-label="Favorite">' + ICON.star + '</span>' : '') +
+        (p.command.mode === 'template' ? '<span title="Command mode" aria-label="Command mode">' + ICON.term + '</span>' : '') +
+        (p.builtin ? '<span title="Built-in, read-only" aria-label="Built-in">' + ICON.lock + '</span>' : '') + '</span>' +
+        '<span class="li-s">' + esc(presetSummary(r)) + '</span>' +
+        (prob ? '<span class="li-p"><i class="hatch" aria-hidden="true"></i>' + esc(prob.label) + '<span class="sr">. ' + esc(prob.tip) + '</span></span>' : '') + '</button>';
+    };
+    const total = groups[0][1].length + groups[1][1].length;
+    const bad = scr.lib.filter((p) => presetProblem(p, scr.installId)).length;
+    return '<div class="lib-h"><div class="lib-t"><h2>Presets</h2><button type="button" class="ib" aria-label="New preset" title="New preset">' + ICON.plus + '</button></div>' +
+      '<div class="search">' + ICON.search + '<input class="inp" type="search" placeholder="Search presets, codecs, tags" aria-label="Search presets" value="' + esc(scr.q) + '" data-act="libq" data-fid="libq"></div>' +
+      '<div class="chips" role="group" aria-label="Category">' + cats.map(([k, l]) => '<button type="button" class="chip" data-act="cat" data-v="' + k + '" data-fid="cat-' + k + '" aria-pressed="' + (scr.cat === k) + '">' + esc(l) + '</button>').join('') + '</div></div>' +
+      '<div class="lib-list">' + (total ? groups.filter((g) => g[1].length).map((g) => '<div class="lib-g"><span>' + g[0] + '</span><span>' + g[1].length + '</span></div>' + g[1].map(item).join('')).join('')
+        : '<div class="lib-empty"><p>No presets match “' + esc(scr.q) + '”.</p><button type="button" class="btn btn--sm">' + ICON.plus + 'New preset</button></div>') + '</div>' +
+      '<div class="lib-f">' + (bad ? plural(bad, 'preset') + ' can’t render with ' + esc(VE.installation(scr.installId).label) + '.' : 'Every preset can render with ' + esc(VE.installation(scr.installId).label) + '.') + '</div>';
+  }
+
+  function slateHTML() {
+    const ed = scr.ed, r = ed.recipe, p = scr.preset(), dirty = scr.dirty(), tpl = r.command.mode === 'template';
+    const est = VE.estimate(r, ed.ctx);
+    const tot = (est.videoKbps + est.audioKbps) || 1;
+    const estCell = est.custom ? '<dd>No estimate</dd>'
+      : '<dd>' + esc(est.label.replace(/ for .*/, '')) + '</dd><div class="est-bar" role="img" aria-label="Video ' + VE.fmt.rate(est.videoKbps) + ', audio ' + VE.fmt.rate(est.audioKbps) + '"><i style="width:' + (est.videoKbps / tot * 100) + '%;background:var(--cyan)"></i><i style="width:' + (est.audioKbps / tot * 100) + '%;background:var(--green)"></i></div>';
+    return '<div class="slate-top"><div class="slate-name"><h2 class="slate-title">' + esc(r.name) + '</h2>' + (dirty ? '<span class="tag">Edited</span>' : '') + '</div>' +
+      '<div class="slate-acts"><div class="seg seg--mode" role="group" aria-label="Editing mode">' +
+      '<button type="button" data-act="mode" data-v="structured" data-fid="mode-g" aria-pressed="' + !tpl + '" title="Ctrl+M">Guided</button>' +
+      '<button type="button" data-act="mode" data-v="template" data-fid="mode-c" aria-pressed="' + tpl + '" title="Ctrl+M">Command</button></div><span class="vsep"></span>' +
+      (dirty ? '<button type="button" class="btn" data-act="revert" data-fid="revert">Revert</button>' : '') +
+      '<button type="button" class="btn" data-act="duplicate" data-fid="dup">Duplicate</button>' +
+      '<button type="button" class="btn btn--pri" data-act="save" data-fid="save"' + (dirty ? '' : ' disabled') + ' title="Ctrl+S">' + (p.builtin ? 'Save as new preset' : 'Save preset') + '</button></div></div>' +
+      (r.notes ? '<p class="slate-notes">' + esc(r.notes) + '</p>' : '') +
+      (p.builtin && dirty ? '<p class="slate-note">' + ICON.lock + 'Built-in presets can’t be changed. Your changes will be saved as a new preset.</p>' : '') +
+      '<dl class="slate-cells" style="--n:6">' +
+      '<div><dt>Category</dt><dd>' + esc(VE.categories[r.category].label) + '</dd></div>' +
+      '<div><dt>Revision</dt><dd>' + r.revision + '</dd></div>' +
+      '<div><dt>Updated</dt><dd>' + esc(r.updated) + '</dd></div>' +
+      '<div><dt>Library</dt><dd>' + (p.builtin ? 'Built-in, read-only' : 'Mine') + '</dd></div>' +
+      '<div><dt>Preview with</dt><dd>' + ed.ctx.video.width + '×' + ed.ctx.video.height + ', ' + VE.fmt.fps(ed.ctx.video.fps) + ', ' + VE.fmt.duration(ed.ctx.durationSec) + '</dd></div>' +
+      '<div><dt>Estimated size</dt>' + estCell + '</div></dl>';
+  }
+
+  scr.render = (parts) => {
+    const all = !parts;
+    runChecks(scr.ed);
+    const ed = scr.ed;
+    const tpl = ed.recipe.command.mode === 'template';
+    keepFocus(win, () => {
+      elStrip.innerHTML = stripHTML(editorBars(ed, { menuOpen: scr.menuOpen })) + (scr.menuOpen ? ffMenuHTML(scr.installId) : '');
+      if (all || parts.lib) elLib.innerHTML = libHTML();
+      elSlate.innerHTML = slateHTML();
+      if (all || parts.main) elEd.innerHTML = tpl ? cmdModeHTML(ed) : guidedHTML(ed);
+      elDock.hidden = tpl;
+      if (!tpl) elDock.innerHTML = dockHTML(ed);
+    });
+    if (tpl && (all || parts.main)) syncCmdEditor(win, ed);
+  };
+  scr.live = () => { // during slider drags: everything except the editor body
+    runChecks(scr.ed);
+    keepFocus(win, () => {
+      elStrip.innerHTML = stripHTML(editorBars(scr.ed, { menuOpen: scr.menuOpen }));
+      elSlate.innerHTML = slateHTML();
+      if (scr.ed.recipe.command.mode !== 'template') elDock.innerHTML = dockHTML(scr.ed);
+      elLib.innerHTML = libHTML();
+    });
+  };
+
+  scr.setMode = (mode) => {
+    const r = scr.ed.recipe;
+    if (mode === r.command.mode) return;
+    if (mode === 'template') {
+      if (r.command.template && !scr.ed.ui.askSeed) { scr.ed.ui.askSeed = true; r.command.mode = 'template'; }
+      else { r.command.template = seedTemplate(r); r.command.mode = 'template'; }
+    } else { r.command.mode = 'structured'; scr.ed.ui.ac = null; scr.ed.ui.switchedBack = true; }
+    scr.render();
+  };
+
+  scr.menuActs = ['ffmenu', 'inst'];
+  scr.onAct = (act, t) => {
+    const ed = scr.ed, v = t.dataset.v;
+    switch (act) {
+      case 'pick': scr.load(v); scr.render(); break;
+      case 'cat': scr.cat = v; scr.render({ lib: 1 }); break;
+      case 'revert': ed.recipe = VE.clone(ed.base); ed.ui.askSeed = false; scr.render(); break;
+      case 'save': {
+        const p = scr.preset();
+        if (p.builtin) {
+          const n = VE.clone(ed.recipe); n.id = 'mine-' + Date.now(); n.builtin = false; n.name = p.name + ' (mine)'; n.revision = 1; n.updated = 'Just now'; n.favorite = false;
+          scr.lib.push(n); scr.load(n.id); scr.render(); toast(win, 'Saved as new preset “' + n.name + '”');
+        } else {
+          ed.recipe.revision += 1; ed.recipe.updated = 'Just now'; Object.assign(p, VE.clone(ed.recipe)); ed.base = VE.clone(ed.recipe); scr.render(); toast(win, 'Saved preset, revision ' + ed.recipe.revision);
+        }
+        break;
+      }
+      case 'duplicate': {
+        const n = VE.clone(ed.recipe); n.id = 'dup-' + Date.now(); n.builtin = false; n.name = ed.recipe.name + ' copy'; n.revision = 1; n.updated = 'Just now'; n.favorite = false;
+        scr.lib.push(n); scr.load(n.id); scr.render(); toast(win, 'Duplicated as “' + n.name + '”'); break;
+      }
+      case 'ffmenu': scr.menuOpen = !scr.menuOpen; scr.render({}); if (scr.menuOpen) { const mi = win.querySelector('.mi[aria-checked="true"]'); if (mi) mi.focus(); } break;
+      case 'inst': scr.installId = v; ed.installId = v; scr.menuOpen = false; scr.render({ main: 1, lib: 1 }); break;
+      default: return false;
+    }
+  };
+  scr.onInput = (t) => { if (t.dataset.act !== 'libq') return false; scr.q = t.value; keepFocus(win, () => { elLib.innerHTML = libHTML(); }); return true; };
+  bindEditorEvents(win, scr);
+  scr.render();
+  return scr;
+}
+
+function bindEditorEvents(win, scr) {
+  // ------------------------------------------------------------ events
+win.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-act], [data-focus]');
+  if (!t || !win.contains(t)) { if (scr.menuOpen && !e.target.closest('.menu')) { scr.menuOpen = false; scr.render({}); } return; }
+  if (t.hasAttribute('data-focus') && !t.dataset.act) { focusField(win, scr.ed, t.dataset.focus); return; }
+  const ed = scr.ed, act = t.dataset.act, v = t.dataset.v;
+  if (scr.menuOpen && !(scr.menuActs || []).includes(act)) scr.menuOpen = false;
+  if (scr.onAct && scr.onAct(act, t, e) !== false) return;
+  switch (act) {
+    case 'mode': scr.setMode(v); break;
+    case 'seg': applyField(ed, t.dataset.f, v, t.dataset.t); scr.render({ main: 1, lib: 1 }); break;
+    case 'setq': applyField(ed, t.dataset.f, v, 'num'); scr.render({ main: 1, lib: 1 }); break;
+    case 'reset': resetField(ed, t.dataset.f); scr.render({ main: 1, lib: 1 }); break;
+    case 'jump': focusField(win, ed, null, t.dataset.sec === 'errors' ? (ed.errors[0] && ed.errors[0].sec) : t.dataset.sec === 'vegas' && ed.density !== 'desk' ? null : t.dataset.sec);
+      if (t.dataset.sec === 'errors' && ed.errors[0]) focusField(win, ed, ed.errors[0].field, ed.errors[0].sec);
+      break;
+    case 'focus': focusField(win, ed, t.dataset.field, t.dataset.sec); break;
+    case 'inputs': ed.ui.inputsOpen = !ed.ui.inputsOpen; scr.render({}); break;
+    case 'flat': ed.ui.cmdFlat = v === '1'; scr.render({}); break;
+    case 'copy': copyText(VE.commandText(VE.compile(ed.recipe, ed.ctx).tokens, { multiline: true })); toast(win, 'Copied command'); break;
+    default: cmdClick(e, t, scr);
+  }
+});
+win.addEventListener('input', (e) => {
+  const t = e.target, ed = scr.ed;
+  if (scr.onInput && scr.onInput(t)) return;
+  if (t.classList.contains('rng')) {
+    const val = rangeValue(t);
+    setp(ed.recipe, t.dataset.f, val);
+    const box = t.closest('.q');
+    const pct = (Number(t.value) - Number(t.min)) / (Number(t.max) - Number(t.min)) * 100;
+    if (box) box.style.setProperty('--p', pct + '%');
+    const enc = VE.videoEncoders[ed.recipe.video.encoder];
+    const mean = box && box.querySelector('.q-mean');
+    if (t.dataset.t === 'rev' && mean) {
+      const sc = t.dataset.f === 'video.quality' ? enc.quality : null;
+      mean.textContent = sc ? meaning(sc.marks, val, true) : '';
+      const num = box.querySelector('.inp--num'); if (num) num.value = val;
+      t.setAttribute('aria-valuetext', t.dataset.unit + ' ' + val + (mean.textContent ? ', ' + mean.textContent : ''));
+      $$('.qm', box).forEach((m) => m.classList.toggle('is-on', Number(m.dataset.v) === val));
+    } else if (t.dataset.t === 'idx' && mean) {
+      const nm = enc.speed.names ? val + ', ' + enc.speed.names[val] : val;
+      mean.textContent = nm + (val === enc.speed.def ? ' (default)' : ''); t.setAttribute('aria-valuetext', nm);
+    }
+    scr.live();
+    return;
+  }
+  if (t.dataset.f && (t.type === 'text' || t.tagName === 'INPUT' && t.dataset.t === 'str')) { setp(ed.recipe, t.dataset.f, t.value); scr.live(); return; }
+  cmdInput(e, scr);
+});
+win.addEventListener('change', (e) => {
+  const t = e.target;
+  if (!t.dataset.f) return;
+  if (t.classList.contains('rng')) { scr.render({ main: 1, lib: 1 }); return; }
+  const val = t.type === 'checkbox' ? t.checked : t.value;
+  if (t.type === 'checkbox') setp(scr.ed.recipe, t.dataset.f, val); else applyField(scr.ed, t.dataset.f, val, t.dataset.t);
+  scr.render({ main: 1, lib: 1 });
+});
+win.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t.classList && t.classList.contains('rng') && (e.key === 'PageUp' || e.key === 'PageDown')) {
+    e.preventDefault();
+    t.value = Math.min(Number(t.max), Math.max(Number(t.min), Number(t.value) + (e.key === 'PageUp' ? 5 : -5)));
+    t.dispatchEvent(new Event('input', { bubbles: true })); t.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
+  if (e.key === 'Escape' && scr.menuOpen) { scr.menuOpen = false; scr.render({}); return; }
+  if (e.ctrlKey && (e.key === 'm' || e.key === 'M')) { e.preventDefault(); scr.setMode(scr.ed.recipe.command.mode === 'template' ? 'structured' : 'template'); return; }
+  if (e.ctrlKey && e.shiftKey && (e.key === 'C' || e.key === 'c')) { e.preventDefault(); copyText(VE.commandText(VE.compile(scr.ed.recipe, scr.ed.ctx).tokens, { multiline: true })); toast(win, 'Copied command'); return; }
+  cmdKey(e, scr);
+});
+}
+
+/** S3: the popup VEGAS opens from the native page to edit one render template. */
+function Popup() {
+  const scope = 's3', win = document.getElementById('s3-win');
+  const sess = VE.templateSession();
+  const scr = { scope, installId: 'gyan-8.1', menuOpen: false, upd: true, showCh: false, undo: null, confirm: false,
+    origin: VE.clone(sess.origin), libRec: VE.clone(sess.library), libRev: sess.libraryRevision, menuActs: ['loadmenu', 'savemenu'] };
+  scr.ed = makeEd({ scope, recipe: sess.recipe, base: sess.base, installId: scr.installId, ctx: VE.vegas, density: 'popup' });
+  scr.initial = VE.clone(sess.recipe);
+  win.innerHTML = titleBar(null, 'Vegas Encoder, editing a VEGAS render template').replace('<span>' + ICON.min + '</span><span>' + ICON.max + '</span>', '') +
+    '<div class="strip-host" id="s3-strip"></div><div class="pop-head" id="s3-slate"></div><div class="ed-scroll" id="s3-ed"></div><div class="dock" id="s3-dock"></div><div id="s3-undo"></div><footer class="pop-f" id="s3-foot"></footer>';
+  const el = (k) => document.getElementById('s3-' + k);
+  const diffText = (d, r) => '<li><span>' + esc(VE.fieldLabels[d.path] || d.path) + '</span><span class="v">' + esc(fmtVal(d.path, d.from, r)) + ' → <b>' + esc(fmtVal(d.path, d.to, r)) + '</b></span></li>';
+  const flyHTML = () => {
+    const ed = scr.ed, lib = VE.diff(ed.base, scr.libRec), mine = VE.diff(ed.base, ed.recipe);
+    const both = lib.filter((d) => mine.some((m) => m.path === d.path));
+    return '<div class="fly" role="dialog" aria-labelledby="s3-fly-h"><h3 id="s3-fly-h">Update from library</h3><p>“' + esc(scr.origin.name) + '” is at revision ' + scr.libRev + ' in your library. This template was made from revision ' + scr.origin.revision + '.</p>' +
+      '<div class="fly-cols"><div><h4>Changes in the library since revision ' + scr.origin.revision + '<small>What you get</small></h4><ul class="df">' + (lib.map((d) => diffText(d, scr.libRec)).join('') || '<li>None</li>') + '</ul></div>' +
+      '<div><h4>Your changes in this template<small>What you lose if you replace</small></h4><ul class="df">' + (mine.map((d) => diffText(d, ed.recipe)).join('') || '<li>None</li>') + '</ul></div></div>' +
+      '<p class="fly-note">' + ICON.info + (both.length ? esc(VE.fieldLabels[both[0].path]) + ' changed in both places, so you can only replace or cancel.' : 'No setting changed in both places, so you can take the library changes and keep yours.') + '</p>' +
+      '<div class="fly-acts"><button type="button" class="btn btn--pri" data-act="updtake" data-fid="updtake"' + (both.length ? ' disabled' : '') + '>Take library changes, keep mine</button>' +
+      '<button type="button" class="btn" data-act="updreplace" data-fid="updreplace">Replace with revision ' + scr.libRev + '</button><button type="button" class="btn" data-act="updcancel" data-fid="updcancel">Cancel</button></div></div>';
+  };
+  const menuHTML = () => {
+    if (scr.menuOpen === 'load') return '<div class="menu pop-menu" role="menu" aria-label="Load preset"><div class="menu-h">Replaces this template’s settings right away. You can undo.</div>' +
+      VE.library.map((p) => '<button type="button" class="mi" role="menuitem" data-act="loadpick" data-v="' + p.id + '" data-fid="lp-' + p.id + '">' + (p.id === scr.origin.id ? ICON.check : '<span></span>') + '<b>' + esc(p.name) + '</b><small>' + esc(presetSummary(p)) + '</small></button>').join('') + '</div>';
+    if (scr.menuOpen === 'save') {
+      const o = VE.library.find((p) => p.id === scr.origin.id), lock = !o || o.builtin;
+      return '<div class="menu pop-menu" role="menu" aria-label="Save to library" style="right:24px"><button type="button" class="mi" role="menuitem" data-act="savenew" data-fid="savenew"><span></span><b>Save as new preset…</b><small>Copies these settings into a new preset in Mine.</small></button>' +
+        '<button type="button" class="mi" role="menuitem" aria-disabled="' + lock + '" data-act="saveupd" data-fid="saveupd"><span></span><b>Update “' + esc(scr.origin.name) + '” (revision ' + scr.origin.revision + ' → ' + (scr.libRev + 1) + ')</b><small>' + (lock ? 'Built-in presets can’t be changed. Save as a new preset instead.' : 'Other templates keep their own copy until you update them.') + '</small></button></div>';
+    }
+    return '';
+  };
+  const headHTML = () => {
+    const ed = scr.ed, r = ed.recipe, v = ed.ctx.video, a = ed.ctx.audio, tpl = r.command.mode === 'template';
+    const mine = VE.diff(ed.base, r), est = VE.estimate(r, ed.ctx), newer = scr.libRev > scr.origin.revision;
+    return '<div class="pop-name"><label><span class="sr">Template name</span><input class="name-inp" value="' + esc(r.name) + '" data-act="name" data-fid="tname" aria-describedby="s3-hint"><span class="name-hint" id="s3-hint">Rename in VEGAS to change the saved template name.</span></label>' +
+      '<div class="slate-acts"><div class="seg seg--mode" role="group" aria-label="Editing mode"><button type="button" data-act="mode" data-v="structured" data-fid="mode-g" aria-pressed="' + !tpl + '">Guided</button><button type="button" data-act="mode" data-v="template" data-fid="mode-c" aria-pressed="' + tpl + '">Command</button></div><span class="vsep"></span>' +
+      '<button type="button" class="btn" data-act="loadmenu" data-fid="loadmenu" aria-haspopup="menu" aria-expanded="' + (scr.menuOpen === 'load') + '">Load preset' + ICON.chev + '</button>' +
+      '<button type="button" class="btn" data-act="savemenu" data-fid="savemenu" aria-haspopup="menu" aria-expanded="' + (scr.menuOpen === 'save') + '">Save to library' + ICON.chev + '</button></div></div>' +
+      '<div class="origin"><span>From preset <b>' + esc(scr.origin.name) + '</b>, revision ' + scr.origin.revision + '.</span>' +
+      (mine.length ? '<span>' + plural(mine.length, 'change') + ' in this template.</span><button type="button" class="lnk" data-act="showch" data-fid="showch" aria-expanded="' + scr.showCh + '">' + (scr.showCh ? 'Hide changes' : 'Show changes') + '</button>' : '<span>No changes in this template.</span>') +
+      '<button type="button" class="lnk" data-act="openapp" data-fid="openapp">Open in Vegas Encoder</button><span class="sp"></span>' +
+      (newer ? '<span class="newer"><i aria-hidden="true"></i>Library has revision ' + scr.libRev + '<button type="button" class="btn btn--sm" data-act="upd" data-fid="upd" aria-expanded="' + scr.upd + '">Update from library</button></span>' : '') + '</div>' +
+      (scr.showCh && mine.length ? '<ul class="chg-l">' + mine.map((d) => '<li>' + esc(VE.fieldLabels[d.path] || d.path) + ' <b>' + esc(fmtVal(d.path, d.from, r)) + ' → ' + esc(fmtVal(d.path, d.to, r)) + '</b></li>').join('') + '</ul>' : '') +
+      '<dl class="slate-cells" style="--n:6" aria-label="From VEGAS"><div><dt>Project</dt><dd>' + esc(ed.ctx.project) + '</dd></div><div><dt>Frames from VEGAS</dt><dd>' + v.width + '×' + v.height + ', ' + VE.fmt.fps(v.fps) + '</dd></div>' +
+      '<div><dt>Delivered as</dt><dd>10-bit 4:2:0 (P010)</dd></div><div><dt>Sound</dt><dd>' + a.rate / 1000 + ' kHz stereo, float</dd></div><div><dt>Length</dt><dd>' + VE.fmt.duration(ed.ctx.durationSec) + '</dd></div>' +
+      '<div><dt>Estimated size</dt><dd>' + esc(est.custom ? 'No estimate' : est.label.replace(/ for .*/, '')) + '</dd></div></dl>' + (scr.upd && newer ? flyHTML() : '') + menuHTML();
+  };
+  const footHTML = () => {
+    const e = scr.ed.errors.length;
+    if (scr.confirm) return '<p>Discard changes to this template?</p><button type="button" class="btn" data-act="keep" data-fid="keep">Keep editing</button><button type="button" class="btn btn--pri" data-act="discard" data-fid="discard">Discard</button>';
+    return '<p>Apply updates this render template. Save it in VEGAS to keep it for next time.</p>' + (e ? '<span class="why" id="s3-why">Fix ' + plural(e, 'error') + ' to apply.</span>' : '') +
+      '<button type="button" class="btn" data-act="cancel" data-fid="cancel" title="Esc">Cancel</button><button type="button" class="btn btn--pri" data-act="apply" data-fid="apply" title="Ctrl+Enter"' + (e ? ' disabled aria-describedby="s3-why"' : '') + '>Apply to template</button>';
+  };
+  scr.render = (parts) => {
+    runChecks(scr.ed);
+    const ed = scr.ed, tpl = ed.recipe.command.mode === 'template', all = !parts;
+    keepFocus(win, () => {
+      el('strip').innerHTML = stripHTML(editorBars(ed));
+      el('slate').innerHTML = headHTML();
+      if (all || parts.main) el('ed').innerHTML = tpl ? cmdModeHTML(ed) : guidedHTML(ed);
+      el('dock').hidden = tpl; if (!tpl) el('dock').innerHTML = dockHTML(ed);
+      el('undo').innerHTML = scr.undo ? '<div class="undo" role="status">' + esc(scr.undo.text) + '<button type="button" class="btn btn--sm" data-act="undo" data-fid="undo">Undo</button><button type="button" class="ib" data-act="undoclose" aria-label="Close">' + ICON.x + '</button></div>' : '';
+      el('foot').innerHTML = footHTML();
+    });
+    if (tpl && (all || parts.main)) syncCmdEditor(win, ed);
+  };
+  scr.live = () => { runChecks(scr.ed); keepFocus(win, () => { el('strip').innerHTML = stripHTML(editorBars(scr.ed)); el('slate').innerHTML = headHTML(); if (scr.ed.recipe.command.mode !== 'template') el('dock').innerHTML = dockHTML(scr.ed); el('foot').innerHTML = footHTML(); }); };
+  scr.setMode = (mode) => {
+    const r = scr.ed.recipe; if (mode === r.command.mode) return;
+    if (mode === 'template') { if (!r.command.template) r.command.template = seedTemplate(r); else scr.ed.ui.askSeed = true; r.command.mode = 'template'; }
+    else { r.command.mode = 'structured'; scr.ed.ui.ac = null; scr.ed.ui.switchedBack = true; }
+    scr.render();
+  };
+  const snap = () => ({ recipe: VE.clone(scr.ed.recipe), base: VE.clone(scr.ed.base), origin: VE.clone(scr.origin), libRec: VE.clone(scr.libRec), libRev: scr.libRev });
+  scr.onAct = (act, t) => {
+    const ed = scr.ed, v = t.dataset.v;
+    switch (act) {
+      case 'loadmenu': scr.menuOpen = scr.menuOpen === 'load' ? false : 'load'; scr.upd = false; scr.render({}); break;
+      case 'savemenu': scr.menuOpen = scr.menuOpen === 'save' ? false : 'save'; scr.upd = false; scr.render({}); break;
+      case 'loadpick': {
+        const p = VE.library.find((x) => x.id === v), prev = snap(), name = ed.recipe.name;
+        ed.recipe = VE.clone(p); ed.recipe.name = name; ed.base = VE.clone(p); ed.base.name = name;
+        scr.origin = { id: p.id, name: p.name, revision: p.revision }; scr.libRec = VE.clone(p); scr.libRev = p.revision;
+        scr.menuOpen = false; scr.undo = { text: 'Loaded “' + p.name + '”.', prev }; scr.render(); break;
+      }
+      case 'undo': { const s = scr.undo.prev; Object.assign(ed, { recipe: s.recipe, base: s.base }); Object.assign(scr, { origin: s.origin, libRec: s.libRec, libRev: s.libRev, undo: null }); scr.render(); break; }
+      case 'undoclose': scr.undo = null; scr.render({}); break;
+      case 'savenew': scr.menuOpen = false; scr.render({}); toast(win, 'Saved to library as “' + ed.recipe.name + '”'); break;
+      case 'saveupd': if (t.getAttribute('aria-disabled') === 'true') return; scr.menuOpen = false; scr.render({}); break;
+      case 'upd': scr.upd = !scr.upd; scr.menuOpen = false; scr.render({}); break;
+      case 'updcancel': scr.upd = false; scr.render({}); break;
+      case 'updtake': VE.diff(ed.base, scr.libRec).forEach((d) => setp(ed.recipe, d.path, VE.clone(d.to)));
+        ed.base = VE.clone(scr.libRec); ed.base.name = ed.recipe.name; scr.origin.revision = scr.libRev; scr.upd = false; scr.render(); toast(win, 'Took revision ' + scr.libRev + ' changes and kept yours'); break;
+      case 'updreplace': { const name = ed.recipe.name; ed.recipe = VE.clone(scr.libRec); ed.recipe.name = name; ed.base = VE.clone(ed.recipe); scr.origin.revision = scr.libRev; scr.upd = false; scr.render(); toast(win, 'Replaced with revision ' + scr.libRev); break; }
+      case 'showch': scr.showCh = !scr.showCh; scr.render({}); break;
+      case 'openapp': toast(win, 'Opens “' + scr.origin.name + '” in the Vegas Encoder app'); break;
+      case 'cancel': if (VE.diff(scr.initial, ed.recipe).length) { scr.confirm = true; scr.render({}); } else toast(win, 'Closed without changes'); break;
+      case 'keep': scr.confirm = false; scr.render({}); break;
+      case 'discard': ed.recipe = VE.clone(scr.initial); scr.confirm = false; scr.render(); toast(win, 'Discarded changes'); break;
+      case 'apply': scr.initial = VE.clone(ed.recipe); scr.render({}); toast(win, 'Applied to template. Save it in VEGAS to keep it.'); break;
+      default: return false;
+    }
+  };
+  scr.onInput = (t) => { if (t.dataset.act !== 'name') return false; scr.ed.recipe.name = t.value; return true; };
+  win.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'Enter' && !scr.ed.errors.length) { e.preventDefault(); scr.onAct('apply', e.target); }
+    else if (e.key === 'Escape' && (scr.upd || scr.menuOpen) && !e.target.classList.contains('ed-ta')) { scr.upd = false; scr.menuOpen = false; scr.render({}); }
+  });
+  bindEditorEvents(win, scr);
+  scr.render();
+  return scr;
+}
+
+/** S4: which FFmpeg is used and what it can actually do on this PC. */
+function FFmpegPage() {
+  const win = document.getElementById('s4-win');
+  const scr = { sel: 'gyan-8.1', def: 'gyan-8.1', filter: 'all', q: '', probed: {}, tested: null, testing: false };
+  const vids = VE.videoOrder.reduce((a, g) => a.concat(g.ids), []), auds = VE.audioOrder.reduce((a, g) => a.concat(g.ids), []);
+  const av = (inst, id) => inst.availability[id] || { state: 'missing', reason: 'Not listed by this FFmpeg.' };
+  const tally = (inst, ids) => ids.reduce((t, id) => { t[av(inst, id).state]++; return t; }, { ok: 0, failed: 0, missing: 0 });
+  const blocked = () => VE.library.filter((p) => presetProblem(p, scr.def));
+  win.innerHTML = titleBar('FFmpeg') + '<div class="strip-host" id="s4-strip"></div><div class="ff"><aside class="ff-list" id="s4-list" aria-label="FFmpeg installations"></aside><div class="ff-d" id="s4-d"></div></div>';
+  const bars = () => {
+    const inst = VE.installation(scr.sel), tv = tally(inst, vids), ta = tally(inst, auds), b = blocked();
+    const nt = (t) => t.failed ? plural(t.failed, 'failed test') : '';
+    return [
+      { key: 'command', value: 'Lint and suggestions use ' + inst.version, level: 'ok' },
+      { key: 'video', value: tv.ok + ' of ' + vids.length + ' encoders ready', level: tv.failed ? 'warn' : 'ok', note: nt(tv) },
+      { key: 'audio', value: ta.ok + ' of ' + auds.length + ' encoders ready', level: ta.failed ? 'warn' : 'ok', note: nt(ta) },
+      { key: 'container', value: '5 of 5 containers ready', level: 'ok' },
+      { key: 'errors', value: b.length ? 'Presets can’t render with the default' : 'Nothing blocks a render', level: b.length ? 'lit' : 'idle', note: b.length ? plural(b.length, 'preset') : 'None' },
+      { key: 'ffmpeg', value: inst.label.replace(/^FFmpeg /, '') + (inst.id === scr.def ? ', default' : ''), level: 'ok' },
+      { key: 'vegas', value: VE.vegas.host.replace(' (build 189)', ''), level: 'ok' },
+    ];
+  };
+  const listHTML = () => '<div class="lib-h"><div class="lib-t"><h2>FFmpeg on this PC</h2></div><div class="ff-acts"><button type="button" class="btn btn--sm" data-act="add" data-fid="add">' + ICON.plus + 'Add FFmpeg…</button>' +
+    '<button type="button" class="btn btn--sm" data-act="scan" data-fid="scan">' + ICON.refresh + 'Scan again</button></div></div><div class="insts">' + VE.installations.map((i) => {
+      const miss = vids.filter((id) => av(i, id).state === 'missing'), aff = VE.library.filter((p) => presetProblem(p, i.id));
+      return '<button type="button" class="inst" data-act="sel" data-v="' + i.id + '" data-fid="inst-' + i.id + '" aria-current="' + (i.id === scr.sel) + '"><b>' + esc(i.label) + '</b>' + (i.id === scr.def ? '<em class="tag tag--def" style="font-style:normal">Default</em>' : '') +
+        '<span>' + esc(i.build) + ', ' + esc(i.license) + '</span><span>' + esc(i.source) + '. Checked ' + esc((scr.probed[i.id] || i.probedAt).toLowerCase().replace(/^today/, 'today')) + ' in ' + (i.probeMs / 1000).toFixed(1) + ' s.</span>' +
+        (miss.length ? '<span class="warnl">' + ICON.warn + 'LGPL: no x264/x265. ' + plural(aff.length, 'preset') + ' need them.</span>' : '') + '</button>';
+    }).join('') + '</div><div class="lib-f">New renders use the default. Each FFmpeg is checked when added and whenever its file changes.</div>';
+  const rowHTML = (inst, id, enc) => {
+    const a = av(inst, id);
+    if (scr.filter === 'usable' && a.state !== 'ok') return '';
+    if (scr.filter === 'hw' && !enc.hw) return '';
+    if (scr.q && !(enc.label + ' ' + id + ' ' + enc.codec).toLowerCase().includes(scr.q.toLowerCase())) return '';
+    const st = { ok: 'Ready', missing: 'Not in this FFmpeg', failed: 'Failed test on this PC' }[a.state];
+    const rs = a.state === 'ok' ? (a.note ? 'Runs on ' + a.note + '.' : '') : a.reason;
+    return '<div class="cr is-' + a.state + '">' + ICON[a.state === 'ok' ? 'check' : a.state === 'failed' ? 'error' : 'slash'] + '<span class="nm">' + esc(enc.label) + '<code>' + esc(id) + '</code></span><span class="st">' + st + '</span>' +
+      (rs ? '<span class="rs">' + esc(rs) + '</span>' : '') + (a.detail ? '<details' + (id === 'hevc_qsv' ? ' open' : '') + '><summary data-fid="det-' + id + '">FFmpeg output</summary><pre>' + esc(a.detail) + '</pre></details>' : '') + '</div>';
+  };
+  const groupHTML = (inst, order, table, color, title) => '<section class="sec sec--' + color + '" aria-label="' + title + '"><div class="sec-h"><h3>' + title + '</h3></div><div class="col">' + order.map((g) => {
+    const rows = g.ids.map((id) => rowHTML(inst, id, table[id])).join('');
+    return rows ? '<div class="cg"><h4>' + esc(g.group) + '</h4>' + rows + '</div>' : '';
+  }).join('') + '</div></section>';
+  const detailHTML = () => {
+    const i = VE.installation(scr.sel), hw = vids.filter((id) => VE.videoEncoders[id].hw);
+    const hwRes = scr.testing ? 'Testing ' + hw.length + ' hardware encoders…' : scr.tested ? 'Tested just now: ' + hw.filter((id) => av(i, id).state === 'ok').length + ' ready, ' + hw.filter((id) => av(i, id).state === 'failed').length + ' failed.' : '';
+    const cont = { group: 'Containers', ids: Object.keys(VE.containers) };
+    const contRows = '<div class="cg">' + cont.ids.map((k) => '<div class="cr is-ok">' + ICON.check + '<span class="nm">' + esc(VE.containers[k].label) + '<code>' + VE.containers[k].muxer + '</code></span><span class="st">Ready</span></div>').join('') + '</div>';
+    return '<div class="ff-top"><h2>' + esc(i.label) + '</h2>' + (i.id === scr.def ? '<span class="tag tag--def">Default</span>' : '') + '<div class="slate-acts">' + (hwRes ? '<span class="hwnote" role="status">' + hwRes + '</span>' : '') +
+      (i.id === scr.def ? '' : '<button type="button" class="btn" data-act="def" data-fid="def">Make default</button>') + '<button type="button" class="btn" data-act="scan1" data-fid="scan1">' + ICON.refresh + 'Scan again</button>' +
+      '<button type="button" class="btn btn--pri" data-act="hwtest" data-fid="hwtest"' + (scr.testing ? ' disabled' : '') + '>' + ICON.chip + 'Test hardware encoders</button></div></div>' +
+      '<dl class="slate-cells" style="--n:6"><div><dt>Version</dt><dd>' + esc(i.version) + '</dd></div><div><dt>Build</dt><dd>' + esc(i.build) + '</dd></div><div><dt>License</dt><dd>' + esc(i.license) + (i.license.indexOf('LGPL') === 0 ? ': no x264/x265' : '') + '</dd></div>' +
+      '<div><dt>Source</dt><dd>' + esc(i.source) + '</dd></div><div><dt>Checked</dt><dd>' + esc(scr.probed[i.id] || i.probedAt) + ', took ' + (i.probeMs / 1000).toFixed(1) + ' s</dd></div><div><dt>ffprobe</dt><dd>Found next to ffmpeg.exe</dd></div></dl>' +
+      '<div class="path">Path <span title="' + esc(i.path) + '">' + esc(i.path) + '</span><button type="button" class="ib" data-act="copypath" aria-label="Copy path" title="Copy path">' + ICON.copy + '</button><span style="flex:none;color:var(--muted)">SHA-256 ' + esc(i.sha256) + '</span></div>' +
+      '<div class="cap-h"><h3>What this FFmpeg can do</h3><div class="seg" role="group" aria-label="Filter">' + [['all', 'All'], ['usable', 'Only usable'], ['hw', 'Hardware']].map(([k, l]) => '<button type="button" data-act="filter" data-v="' + k + '" data-fid="f-' + k + '" aria-pressed="' + (scr.filter === k) + '">' + l + '</button>').join('') + '</div>' +
+      '<div class="search">' + ICON.search + '<input class="inp" type="search" placeholder="Search encoders" aria-label="Search encoders" value="' + esc(scr.q) + '" data-act="capq" data-fid="capq"></div></div>' +
+      '<div class="capcols"><div class="col">' + groupHTML(i, VE.videoOrder, VE.videoEncoders, 'cyan', 'Video') + '</div><div class="col">' + groupHTML(i, VE.audioOrder, VE.audioEncoders, 'green', 'Audio') +
+      '<section class="sec sec--magenta" aria-label="Containers"><div class="sec-h"><h3>Containers</h3></div>' + contRows + '</section></div></div>';
+  };
+  scr.render = () => keepFocus(win, () => {
+    document.getElementById('s4-strip').innerHTML = stripHTML(bars()).replace(/data-act="jump"/g, 'data-act="s4jump"');
+    document.getElementById('s4-list').innerHTML = listHTML();
+    document.getElementById('s4-d').innerHTML = detailHTML();
+  });
+  win.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-act]'); if (!t) return;
+    const v = t.dataset.v, i = VE.installation(scr.sel);
+    switch (t.dataset.act) {
+      case 'sel': scr.sel = v; scr.render(); break;
+      case 'def': scr.def = scr.sel; scr.render(); toast(win, i.label + ' is now the default'); break;
+      case 'filter': scr.filter = v; scr.render(); break;
+      case 'scan': VE.installations.forEach((x) => { scr.probed[x.id] = 'Just now'; }); scr.render(); toast(win, 'Checked 3 installations'); break;
+      case 'scan1': scr.probed[scr.sel] = 'Just now'; scr.render(); break;
+      case 'hwtest': scr.testing = true; scr.render(); setTimeout(() => { scr.testing = false; scr.tested = true; scr.render(); }, reduced ? 0 : 900); break;
+      case 'copypath': copyText(i.path); toast(win, 'Copied path'); break;
+      case 'add': toast(win, 'Choose ffmpeg.exe. ffprobe.exe must be in the same folder.'); break;
+      case 's4jump': { const k = { video: 'Video', audio: 'Audio', container: 'Containers' }[t.dataset.sec]; const n = k && win.querySelector('[aria-label="' + k + '"]'); if (n) n.scrollIntoView({ block: 'start', behavior: reduced ? 'auto' : 'smooth' }); break; }
+    }
+  });
+  win.addEventListener('input', (e) => { if (e.target.dataset.act === 'capq') { scr.q = e.target.value; scr.render(); } });
+  scr.render();
+  return scr;
+}
+
+/** Guided → Command with no template yet: seed groups 5–9 from the compiled command. */
+function seedTemplate(r) {
+  const tmp = VE.clone(r); tmp.command = { mode: 'structured', template: '' };
+  const toks = VE.compile(tmp, VE.sampleContext).tokens;
+  const g = { map: [], video: [], audio: [], mux: [] }; let last = 'video';
+  toks.forEach((t) => {
+    if (t.role === 'map') g.map.push(t.text === '0:v:0' ? '{v}' : t.text === '1:a:0' ? '{a}' : t.text);
+    else if (t.role === 'video' || t.role === 'audio') { g[t.role].push(t.text); last = t.role; }
+    else if (t.role === 'extra') g[last].push(t.text);
+    else if (t.role === 'mux') g.mux.push(t.text);
+  });
+  const gi = g.video.indexOf('-g');
+  if (gi >= 0 && r.video.gopSec) g.video[gi + 1] = '{gop:' + r.video.gopSec + 's}';
+  const q = (a) => a.map(quoteArg).join(' ');
+  return ['ffmpeg {inputs}', '  ' + q(g.map), '  ' + q(g.video), g.audio.length ? '  ' + q(g.audio) : null, g.mux.length ? '  ' + q(g.mux) : null, '  {output}'].filter(Boolean).join('\n');
+}
+
+/* ------------------------------------------------------- command editor */
+function hlHTML(text, diags, caret) {
+  const n = text.length, cls = Array.from({ length: n }, () => []);
+  let stream = 'g';
+  VE.tokenizeWithRanges(text).forEach((t, i) => {
+    let c;
+    if (i === 0 && /^ffmpeg(\.exe)?$/i.test(t.text)) c = 'k-exe';
+    else if (t.text === '{inputs}' || t.text === '{output}') c = 'k-chip';
+    else if (/^\{[^}]+\}$/.test(t.text)) c = 'k-mac';
+    else if (/^-[A-Za-z_]/.test(t.text)) {
+      if (/^-(c|codec):v$|^-vcodec$/.test(t.text)) stream = 'v'; else if (/^-(c|codec):a$|^-acodec$/.test(t.text)) stream = 'a';
+      else if (/^-(f|movflags)$/.test(t.text)) stream = 'm'; else if (t.text === '-map') stream = 'g';
+      c = 'k-opt k-' + stream;
+    } else c = 'k-val';
+    for (let k = t.start; k < t.end; k++) cls[k].push(c);
+  });
+  const pts = {};
+  diags.forEach((d) => { if (d.end > d.start) { for (let k = d.start; k < d.end; k++) cls[k].push('l-' + d.level); } else (pts[d.start] = pts[d.start] || []).push(d.level); });
+  let html = '', line = '', ln = 1, cur = null, buf = '';
+  const flush = () => { if (buf) { line += cur ? '<span class="' + cur + '">' + esc(buf) + '</span>' : esc(buf); buf = ''; } };
+  const endLine = () => { flush(); html += '<div class="ln" data-n="' + ln + '">' + (line || '​') + '</div>'; line = ''; ln++; };
+  for (let k = 0; k <= n; k++) {
+    if (k === caret) { flush(); line += '<span class="caret-mk"></span>'; }
+    if (pts[k]) { flush(); line += pts[k].map((l) => '<span class="l-pt l-' + l + '"></span>').join(''); }
+    if (k === n) break;
+    if (text[k] === '\n') { endLine(); cur = null; continue; }
+    const c = cls[k].join(' ') || null;
+    if (c !== cur) { flush(); cur = c; }
+    buf += text[k];
+  }
+  endLine();
+  return html;
+}
+function computeAC(ed, text, caret, force) {
+  const partial = (text.slice(0, caret).match(/\S*$/) || [''])[0];
+  const r = VE.complete(text, caret);
+  let items = (r.items || []).filter((x) => r.kind !== 'value' || x.value !== partial);
+  const show = items.length && (force || r.kind === 'value' || (r.kind === 'option' && partial.indexOf('-') === 0));
+  ed.ui.ac = show ? { kind: r.kind, of: r.of, items: items.slice(0, 8), idx: 0, from: caret - partial.length, to: caret } : null;
+}
+function acHTML(ed) {
+  const a = ed.ui.ac, encV = tplEncoders(ed.recipe.command.template).v, inst = VE.installation(ed.installId);
+  const tune = encV === 'libx265' ? X265_TUNE : encV === 'libx264' ? X264_TUNE : {};
+  const head = a.kind === 'value' ? 'Values for <code>' + esc(a.of) + '</code>' + (encV && a.of !== '-c:v' && a.of !== '-c:a' ? ' in ' + esc(encV) : '') : 'Options for ' + esc(encV || 'FFmpeg');
+  return '<div class="ac" role="listbox" id="' + ed.scope + '-ac" aria-label="Suggestions">' + '<div class="ac-h">' + head + '</div>' + a.items.map((it, i) => {
+    let desc = it.desc || (a.of === '-tune' ? tune[it.value] : '') || '', meta = '';
+    if (a.kind === 'option') meta = [it.type, it.def != null && it.def !== '' ? 'default ' + it.def : ''].filter(Boolean).join(', ');
+    if (a.of === '-c:v' || a.of === '-c:a') { const s = (inst.availability[it.value] || { state: 'missing' }).state; meta = s === 'ok' ? 'Ready' : s === 'failed' ? 'Failed test on this PC' : 'Not in this FFmpeg'; }
+    return '<button type="button" class="ac-i" role="option" id="' + ed.scope + '-ac-' + i + '" aria-selected="' + (i === a.idx) + '" data-act="acpick" data-v="' + i + '" tabindex="-1"><code>' + esc(it.value) + '</code><span>' + esc(desc) + '</span><em>' + esc(meta) + '</em></button>';
+  }).join('') + '<div class="ac-f">Tab or Enter inserts. Esc closes. Ctrl+Space opens.</div></div>';
+}
+function diagHTML(diags, text) {
+  if (!diags.length) return '<p class="chk-ok">No problems found. FFmpeg still has the final say when the render starts.</p>';
+  const lc = (p) => text.slice(0, p).split('\n').length;
+  const L = { error: 'Error', warn: 'Warning', hint: 'Hint' };
+  return '<ul class="dg-list">' + diags.map((d) => '<li class="dg dg--' + d.level + '">' + ICON[d.level === 'hint' ? 'hint' : d.level] + '<span class="dg-pos">Line ' + lc(d.start) + '</span><span class="dg-t"><b>' + L[d.level] + '.</b> ' + esc(d.text) + '</span>' +
+    '<button type="button" class="lnk" data-act="goto" data-s="' + d.start + '" data-e="' + d.end + '">Go to</button></li>').join('') + '</ul>';
+}
+function cmdModeHTML(ed) {
+  const r = ed.recipe, inst = VE.installation(ed.installId);
+  if (ed.ui.askSeed) return '<section class="sec sec--yellow ask"><h3>This preset already has a command</h3><p>Use the command you saved, or replace it with one built from the current Guided settings.</p><div>' +
+    '<button type="button" class="btn btn--pri" data-act="seed-use" data-fid="seed-use">Use your saved command</button><button type="button" class="btn" data-act="seed-replace" data-fid="seed-rep">Replace it with the current settings</button></div></section>';
+  const s = VE.summary(r), res = VE.resolved(r);
+  const body = '<div class="ed" id="' + ed.scope + '-edbox"><pre class="ed-hl" aria-hidden="true"></pre><textarea class="ed-ta" data-fid="cmd" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="FFmpeg command" aria-autocomplete="list" aria-controls="' + ed.scope + '-ac" aria-describedby="' + ed.scope + '-diag">' + esc(r.command.template) + '</textarea><div class="ac-host"></div></div>' +
+    '<div class="diag" id="' + ed.scope + '-diag" aria-live="polite"></div><div class="res-host"></div>';
+  const end = '<label class="switch"><input type="checkbox" data-act="resolved" data-fid="resolved"' + (ed.ui.resolved ? ' checked' : '') + '> <span>Resolved command</span></label>';
+  const sw = '<section class="swn" aria-labelledby="' + ed.scope + '-swn"><h3 id="' + ed.scope + '-swn">Switching back to Guided</h3><dl>' +
+    '<div><dt><i class="sw sw--cyan"></i>Guided settings</dt><dd>Kept as they are: ' + esc([s.videoEncoder, qualityShort(r), res.speed, s.depth, audioShort(r), VE.containers[r.container.format].label.replace(/ \(.*\)/, '')].filter(Boolean).join(', ')) + '. Renders use them while Guided is on.</dd></div>' +
+    '<div><dt><i class="sw sw--yellow"></i>This command</dt><dd>Saved with the preset and used only while Command is on. Switch back any time.</dd></div>' +
+    '<div><dt>' + ICON.info + 'Not converted</dt><dd>Vegas Encoder doesn’t read a command back into Guided controls, so edits here never change them.</dd></div></dl>' +
+    '<button type="button" class="btn" data-act="mode" data-v="structured" data-fid="to-guided">Switch to Guided</button></section>';
+  const used = (m) => m.required && r.command.template.indexOf(m.name) >= 0;
+  const mac = '<aside class="cm-rail" aria-labelledby="' + ed.scope + '-mac"><h3 id="' + ed.scope + '-mac">Macros</h3><p class="row-sub" style="margin-top:2px">Click one to insert it at the cursor. Vegas Encoder fills them in at render time.</p><ul class="mac-l">' +
+    VE.macros.map((m) => '<li><button type="button" class="mac-i" data-act="mac" data-v="' + esc(m.name) + '" data-fid="mac-' + esc(m.name) + '"' + (used(m) ? ' aria-disabled="true" title="Already in your command"' : '') + '>' +
+      '<code class="' + (m.required ? 'req' : '') + '">' + (m.required ? '<span>' + esc(m.name) + '</span>' : esc(m.name)) + '</code><span>' + esc(m.desc) + (m.required ? ' <b>' + (used(m) ? 'Required, locked.' : 'Required.') + '</b>' : '') + '</span></button></li>').join('') + '</ul></aside>';
+  return '<div class="cm"><div class="cm-main">' + secWrap(ed, 'command', 'Command', 'Checked against ' + inst.label + ' as you type', body, end) + sw + '</div>' + mac + '</div>';
+}
+function syncCmdEditor(win, ed) {
+  const box = win.querySelector('#' + ed.scope + '-edbox'); if (!box) return;
+  const ta = box.querySelector('.ed-ta'), text = ed.recipe.command.template, diags = VE.lint(text, ed.installId);
+  box.querySelector('.ed-hl').innerHTML = hlHTML(text, diags, ed.ui.ac ? ed.ui.ac.to : -1);
+  win.querySelector('#' + ed.scope + '-diag').innerHTML = diagHTML(diags, text);
+  const host = box.querySelector('.ac-host');
+  host.innerHTML = ed.ui.ac ? acHTML(ed) : '';
+  ta.setAttribute('aria-expanded', String(!!ed.ui.ac));
+  if (ed.ui.ac) {
+    ta.setAttribute('aria-activedescendant', ed.scope + '-ac-' + ed.ui.ac.idx);
+    const mk = box.querySelector('.caret-mk'), ac = host.firstChild;
+    if (mk) { const b = box.getBoundingClientRect(), m = mk.getBoundingClientRect(); ac.style.left = Math.max(8, Math.min(m.left - b.left - 8, b.width - 428)) + 'px'; ac.style.top = (m.top - b.top + 24) + 'px'; }
+  } else ta.removeAttribute('aria-activedescendant');
+  const rh = win.querySelector('.res-host');
+  if (rh) rh.innerHTML = ed.ui.resolved ? '<pre class="cmd res" aria-label="Resolved command for the sample project">' + cmdHTML(ed, VE.compile(ed.recipe, ed.ctx).tokens) + '</pre>' : '';
+}
+function acAccept(win, ed, i) {
+  const a = ed.ui.ac, ta = win.querySelector('.ed-ta'); if (!a || !ta) return;
+  const it = a.items[i], t = ed.recipe.command.template;
+  const ins = it.value + (a.kind === 'option' ? ' ' : '');
+  ed.recipe.command.template = t.slice(0, a.from) + ins + t.slice(a.to);
+  ta.value = ed.recipe.command.template; ed.ui.ac = null;
+  const c = a.from + ins.length; ta.focus(); ta.setSelectionRange(c, c);
+}
+function cmdClick(e, t, scr) {
+  const ed = scr.ed, win = t.closest('.win'), ta = win.querySelector('.ed-ta');
+  switch (t.dataset.act) {
+    case 'acpick': acAccept(win, ed, Number(t.dataset.v)); scr.live(); syncCmdEditor(win, ed); break;
+    case 'mac': {
+      if (!ta || t.getAttribute('aria-disabled') === 'true') return;
+      const c = ed.ui.caret != null ? ed.ui.caret : ta.value.length, tx = ed.recipe.command.template, m = t.dataset.v;
+      const pad = c > 0 && !/\s/.test(tx[c - 1]) ? ' ' : '';
+      ed.recipe.command.template = tx.slice(0, c) + pad + m + tx.slice(c); ta.value = ed.recipe.command.template;
+      ed.ui.caret = c + pad.length + m.length; ta.focus(); ta.setSelectionRange(ed.ui.caret, ed.ui.caret); scr.live(); syncCmdEditor(win, ed); break;
+    }
+    case 'goto': if (ta) { ta.focus(); ta.setSelectionRange(Number(t.dataset.s), Number(t.dataset.e)); ed.ui.caret = Number(t.dataset.s); } break;
+    case 'resolved': ed.ui.resolved = t.checked; syncCmdEditor(win, ed); break;
+    case 'seed-use': ed.ui.askSeed = false; scr.render(); break;
+    case 'seed-replace': ed.ui.askSeed = false; ed.recipe.command.template = seedTemplate(Object.assign(VE.clone(ed.recipe), { command: { mode: 'structured', template: '' } })); scr.render(); break;
+    case 'keep-guided': ed.ui.switchedBack = false; scr.render(); break;
+  }
+}
+function cmdInput(e, scr) {
+  const ta = e.target; if (!ta.classList.contains('ed-ta')) return;
+  const ed = scr.ed; ed.recipe.command.template = ta.value; ed.ui.caret = ta.selectionStart;
+  computeAC(ed, ta.value, ta.selectionStart, false);
+  scr.live(); syncCmdEditor(ta.closest('.win'), ed);
+}
+function cmdKey(e, scr) {
+  const ta = e.target; if (!ta.classList || !ta.classList.contains('ed-ta')) return;
+  const ed = scr.ed, a = ed.ui.ac, win = ta.closest('.win');
+  if (e.ctrlKey && e.code === 'Space') { e.preventDefault(); computeAC(ed, ta.value, ta.selectionStart, true); syncCmdEditor(win, ed); return; }
+  if (!a) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); a.idx = (a.idx + (e.key === 'ArrowDown' ? 1 : -1) + a.items.length) % a.items.length; syncCmdEditor(win, ed); }
+  else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); acAccept(win, ed, a.idx); scr.live(); syncCmdEditor(win, ed); }
+  else if (e.key === 'Escape') { e.preventDefault(); ed.ui.ac = null; syncCmdEditor(win, ed); }
+}
+/** {inputs} and {output} are locked chips: edits inside are refused; deleting removes the whole chip. */
+document.addEventListener('beforeinput', (e) => {
+  const ta = e.target; if (!ta.classList || !ta.classList.contains('ed-ta')) return;
+  const text = ta.value, it = e.inputType || ''; let s = ta.selectionStart, en = ta.selectionEnd;
+  if (s === en) { if (it === 'deleteContentBackward') s--; else if (it === 'deleteContentForward') en++; }
+  const re = /\{inputs\}|\{output\}/g; let m;
+  while ((m = re.exec(text))) {
+    const a = m.index, b = a + m[0].length;
+    if (!(s < b && en > a)) continue;
+    if (it.indexOf('delete') === 0) { e.preventDefault(); const ns = Math.min(s, a), ne = Math.max(en, b); ta.value = text.slice(0, ns) + text.slice(ne); ta.setSelectionRange(ns, ns); ta.dispatchEvent(new Event('input', { bubbles: true })); return; }
+    if (s > a || en < b) { e.preventDefault(); return; }
+  }
+});
+document.addEventListener('selectionchange', () => { const a = document.activeElement; if (a && a.classList && a.classList.contains('ed-ta') && window.D8) Object.values(window.D8).forEach((x) => { if (x && x.ed && x.scope && a.closest('#' + x.scope + '-win')) x.ed.ui.caret = a.selectionStart; }); });
+
+/* --------------------------------------------------- direction header */
+function buildHeader() {
+  const lg = [
+    ['ok', 'cyan', 'Solid: fine'], ['warn', 'green', 'Notch: a warning'], ['error', 'magenta', 'Dimmed and hatched: an error'],
+    ['off', 'green', 'Flat and dim: stream off'], ['lit', 'red', 'Red lit: something blocks the render'],
+  ];
+  $('#legend').innerHTML = lg.map(([st, c, l]) => '<li><span class="lg bar bar--' + c + ' is-' + st + '" aria-hidden="true" style="cursor:default"></span>' + l + '</li>').join('');
+  const sw = [
+    ['Graphite', '#24262A', 'canvas'], ['Panel', '#2C2F34', 'library, dock'], ['Raised', '#34383E', 'fields'], ['Text', '#E8E8E6', 'body'], ['Muted', '#A4A7AD', 'labels (lifted)'],
+    ['Yellow', '#D8C21A', 'command'], ['Cyan', '#1FB5C1', 'video'], ['Green', '#2FA84F', 'audio'], ['Magenta', '#B5389F', 'container'],
+    ['Red', '#C7372F', 'errors only'], ['Blue', '#2B4DC2', 'FFmpeg in use'], ['White', '#BFBFBF', 'from VEGAS'],
+  ];
+  $('#swatches').innerHTML = sw.map(([n, h, r]) => '<li><i style="background:' + h + '"></i><b>' + n + '</b>' + h + '<br>' + r + '</li>').join('');
+}
+
+buildHeader();
+window.D8 = { s1: DesktopPresets('s1', { presetId: 'yt-h264', installId: 'btbn-lgpl-8.0' }) };
+window.D8.s2 = DesktopPresets('s2', { presetId: 'hdr-template', installId: 'gyan-8.1', setup: (scr) => {
+  // Mid-edit state: a mistyped preset, and the cursor just after "-tune " with suggestions open.
+  const r = scr.ed.recipe;
+  r.command.template = r.command.template.replace('-preset slow ', '-preset slowest ').replace('yuv420p10le\n', 'yuv420p10le -tune \n');
+  const caret = r.command.template.indexOf('-tune ') + 6;
+  scr.ed.ui.caret = caret; computeAC(scr.ed, r.command.template, caret, true);
+} });
+window.D8.s3 = Popup();
+window.D8.s4 = FFmpegPage();
+document.fonts && document.fonts.ready.then(() => syncCmdEditor(document.getElementById('s2-win'), window.D8.s2.ed));
+window.D8.helpers = { esc, ICON, VE, BAR, stripHTML, editorBars, guidedHTML, dockHTML, runChecks, makeEd, keepFocus, toast, copyText, titleBar, applyField, resetField, rangeValue, focusField, meaning, fid, msgsHTML, plural, quoteArg, cmdHTML, tplEncoders, presetSummary, presetProblem, ctxShort, fmtVal, seedTemplate, X265_TUNE, X264_TUNE, APP_GLYPH, $, $$ };
+})();
+</script>
+</body>
+</html>
