@@ -156,7 +156,10 @@ inline constexpr size_t media = 0x58;        // video: BITMAPINFOHEADER; audio: 
 
 struct ISfHostAllocator : IUnknown {
   virtual void* STDMETHODCALLTYPE Alloc(SIZE_T cb) = 0;  // [rt] slot 3
-  virtual void STDMETHODCALLTYPE Free(void* p) = 0;      // slot 4? (hypothesis)
+  // Configuration static check: sharedk 2026.0.3.189 RVA 0x315B20 passes p
+  // straight to the same UCRT free paired with Alloc's calloc. See
+  // docs/NATIVE_CONFIGURATION.md; other host builds remain unqualified.
+  virtual void STDMETHODCALLTYPE Free(void* p) = 0;      // slot 4, void return
 };
 
 // --- Plug-in discovery ------------------------------------------------------

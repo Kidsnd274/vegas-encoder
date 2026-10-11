@@ -8,6 +8,12 @@ next. [STATUS.md](STATUS.md) records what actually works today;
 [INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md) records native evidence. This document
 describes intended architecture, not additional runtime compatibility.
 
+The user will supply full app designs and detailed feature descriptions later.
+Current work stops after reliable native integration and a one-setting template
+save/restart/render proof. The broader product sections below are planning context,
+not authorization to implement the app shell, presets or full editor now. Follow
+[the design gate](DESIGN_GATE.md).
+
 ## 1. Goal and immediate focus
 
 Build the user's own encoding product, beginning with a reliable VEGAS Pro

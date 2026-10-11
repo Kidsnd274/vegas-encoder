@@ -14,10 +14,16 @@ struct RenderTestOptions {
   double deliveredFps = 0;     // 0 = template fps; mismatch regression (F-041)
   LONGLONG frames = 90;
   LONGLONG cancelAt = -1;  // progress slot 6 returns the actual F-045 cancel code
+  int progressFailureSlot = 0;  // 6/7 inject E_ACCESSDENIED, not user cancellation
+  LONGLONG progressFailureAt = 45;
+  int progressFailureCall = 1;  // which progress poll at that frame fails (e.g. Submit's poll)
+  bool progressFailureAfterAudioRead = false;  // gate on the read counter, independent of queue repolls
+  bool recover = false;  // stop only the first render; later renders must succeed in the same loaded DLL
   int renders = 1;
   std::wstring extension = L"ffdiag";
   bool videoOnly = false, expectFailure = false;
   LONG shortRead = 0;
+  LONG configurationProof = -1;  // -1 off; 0/1 edits the opt-in native page and reloads its saved bytes
 };
 
 // Replays the template calls VEGAS 2026 made before Create (F-036), then

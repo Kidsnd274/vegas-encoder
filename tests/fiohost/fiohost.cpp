@@ -129,7 +129,10 @@ int wmain(int argc, wchar_t** argv) {
     fprintf(stderr,
             "usage: fiohost <plugin.dll> <outdir> [--render <host-project.tpl>] [--preset N] [--size WxH]\n"
             "               [--fps F] [--delivered-fps F] [--frames N] [--cancel-at K] [--renders R]\n"
-            "               [--extension mkv|ffdiag] [--short-read N] [--video-only] [--expect-failure] [--no-wmi]\n");
+            "               [--extension mkv|ffdiag] [--short-read N] [--video-only] [--expect-failure] [--no-wmi]\n"
+            "               [--progress-failure-slot 6|7] [--progress-failure-at K] [--progress-failure-call N] [--recover]\n"
+            "               [--progress-failure-after-audio-read]\n"
+            "               [--configuration-proof 0|1] (opt-in proof DLL only)\n");
     return 2;
   }
   setvbuf(stdout, nullptr, _IONBF, 0);  // keep output if the plug-in hangs
@@ -151,8 +154,20 @@ int wmain(int argc, wchar_t** argv) {
     else if (a == L"--frames") render.frames = _wtoi64(v);
     else if (a == L"--cancel-at") render.cancelAt = _wtoi64(v);
     else if (a == L"--renders") render.renders = _wtoi(v);
+    else if (a == L"--progress-failure-slot") {
+      if (wcscmp(v, L"6") != 0 && wcscmp(v, L"7") != 0) return 2;
+      render.progressFailureSlot = _wtoi(v);
+    }
+    else if (a == L"--progress-failure-at") render.progressFailureAt = _wtoi64(v);
+    else if (a == L"--progress-failure-call") render.progressFailureCall = _wtoi(v);
+    else if (a == L"--progress-failure-after-audio-read") render.progressFailureAfterAudioRead = true, takesValue = false;
+    else if (a == L"--recover") render.recover = true, takesValue = false;
     else if (a == L"--extension") render.extension = v;
     else if (a == L"--short-read") render.shortRead = _wtol(v);
+    else if (a == L"--configuration-proof") {
+      if (wcscmp(v, L"0") != 0 && wcscmp(v, L"1") != 0) return 2;
+      render.configurationProof = _wtol(v);
+    }
     else if (a == L"--video-only") render.videoOnly = true, takesValue = false;
     else if (a == L"--expect-failure") render.expectFailure = true, takesValue = false;
     else if (a == L"--no-wmi") wmi = false, takesValue = false;
@@ -162,6 +177,11 @@ int wmain(int argc, wchar_t** argv) {
     }
     if (takesValue) i++;
   }
+
+  if (render.recover && render.renders < 2) return 2;
+  if (render.progressFailureSlot && (render.progressFailureAt < 0 || render.progressFailureAt > render.frames)) return 2;
+  if (render.progressFailureCall < 1 || render.progressFailureCall > 100) return 2;
+  if (render.progressFailureAfterAudioRead && (render.videoOnly || render.progressFailureAt >= render.frames)) return 2;
 
   if (wmi) WarmUpComRemoting();
   printf("loading %ls\n", argv[1]);

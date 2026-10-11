@@ -11,9 +11,12 @@ The first profile is P010 → lossless FFV1, with optional float32 stereo → PC
 in MKV. The raw diagnostic mode is a developer comparison tool.
 
 **Qualification:** builds and generated fake-host/FFmpeg checks are tracked in
-[STATUS.md](docs/STATUS.md). Vegas Encoder has not been installed or run in VEGAS.
-The predecessor's real-host result does not validate this newly built DLL. Saved
-recipe presets, property pages, desktop editor and rich popup UI remain later work.
+[STATUS.md](docs/STATUS.md). The installed candidate passes its first real VEGAS
+1080p/fractional renders and the temporary native page's on/off setting reaches
+Render. The current candidate also passes real cancellation and same-session
+recovery; controlled error recovery remains fake-host tested. The user deferred
+the real two-template/restart persistence test. The app design is on a separate
+branch; preset management, the desktop editor and rich popup UI follow its review.
 
 ## Build and validate
 
@@ -26,12 +29,15 @@ existing tool locations can be overridden; FFmpeg is user-supplied.
 cmd /d /c scripts\build.cmd
 .\build\host-tests\host-helpers.exe
 .\build\host-tests\native-boundary.exe
-python -I scripts\Test-Check-RawRender.py evidence\checker-selftest-new
-.\scripts\Test-VegasEncoder.ps1 -EvidenceDir evidence\proof-new -Include1080p
-.\scripts\Test-Install.ps1 -EvidenceDir evidence\install-smoke-new
+.\build\host-tests\native-configuration.exe
+python -I scripts\Test-Check-RawRender.py build\test-results\checker-new
+.\scripts\Test-VegasEncoder.ps1 -EvidenceDir build\test-results\encoder-new -Include1080p
+.\scripts\Test-Install.ps1 -EvidenceDir build\test-results\installer-new
 ```
 
-Use a fresh evidence directory each run. If needed, pass `-PythonPath` and
+Use a fresh test-output directory each run; `-EvidenceDir` is the runners' legacy
+parameter name for that folder. Routine development uses focused checks and short
+progress summaries; dated experiments/evidence archives are not required. If needed, pass `-PythonPath` and
 `-FFmpegPath` to Test-VegasEncoder. FFprobe must sit beside FFmpeg. The build script
 accepts the path to `vcvars64.bat` as its first argument, or the
 `VEGAS_ENCODER_VCVARS` environment variable, or an existing x64 developer prompt.

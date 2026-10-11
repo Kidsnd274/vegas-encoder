@@ -7,9 +7,9 @@ adapter. P010 is the video memory format used by the current encoded path;
 FFV1 is the compression applied afterward.
 
 This explanation describes the implemented baseline and imported research
-evidence. **The Vegas Encoder DLL has not been installed or run in VEGAS.**
-Real-host observations below belong to the predecessor research exporter,
-not qualification of this product. See [status](STATUS.md),
+evidence. **The installed Vegas Encoder DLL now passes one decoded real VEGAS render.**
+Earlier observations below retain their predecessor research scope; one successful
+product render does not qualify every path. See [status](STATUS.md),
 [integration evidence](INTEGRATION_CONTRACT.md) and [source origin](../ORIGIN.md).
 
 ```mermaid

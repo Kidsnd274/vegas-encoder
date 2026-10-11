@@ -4,6 +4,9 @@
 // F-038); unobserved methods return E_NOTIMPL and are logged so a capture
 // shows whether the host relies on them.
 #include "vegas_encoder.h"
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+#include "../configuration/proof_page.h"
+#endif
 
 #include <new>
 
@@ -378,16 +381,26 @@ class RenderClass final : public ISfRenderFileClass {
 
   HRESULT STDMETHODCALLTYPE GetPropertyPageCount(LONG* free, LONG* forSale, LONG* options) override {
     return NativeBoundary([&]() -> HRESULT {
-      if (free) *free = 0;
+      constexpr LONG count =
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+          1;
+#else
+          0;
+#endif
+      if (free) *free = count;
       if (forSale) *forSale = 0;
       if (options) *options = 0;
-      if (LogDetail("class.18")) BestEffortDiagnostic([&] { Log("GetPropertyPageCount -> 0, 0, 0"); });
+      if (LogDetail("class.18")) BestEffortDiagnostic([&] { Log("GetPropertyPageCount -> %ld, 0, 0", count); });
       return S_OK;
     });
   }
   HRESULT STDMETHODCALLTYPE GetPropertyPage(LONG index, IPropertyPage** page) override {
     return NativeBoundary([&]() -> HRESULT {
       if (page) *page = nullptr;
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+      if (!page) return E_POINTER;
+      if (index == 0) return configuration::CreateNativeProofPage(alloc_, page);
+#endif
       BestEffortDiagnostic([&] { Log("GetPropertyPage(%ld) -> E_INVALIDARG", index); });
       return E_INVALIDARG;
     });

@@ -10,22 +10,32 @@ if defined VE_BUILD_VCVARS (
 )
 set "VE_BUILD_ROOT=%~dp0.."
 set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\vegas-encoder"
+set "VE_BUILD_PROOF_FLAGS="
+set "VE_BUILD_PROOF_SOURCES="
+set "VE_BUILD_PROOF_OBJECTS="
+if "%~2"=="configuration-proof" (
+  set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\configuration-proof\vegas-encoder"
+  set "VE_BUILD_PROOF_FLAGS=/DVEGAS_ENCODER_CONFIGURATION_PROOF"
+  set VE_BUILD_PROOF_SOURCES="%VE_BUILD_ROOT%\src\vegas\configuration\template_draft.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\proof_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp"
+  set "VE_BUILD_PROOF_OBJECTS=template_draft.obj proof_page.obj native_store.obj"
+)
 set "VE_BUILD_TESTS=%VE_BUILD_ROOT%\build\fiohost"
 set "VE_BUILD_HELPERS=%VE_BUILD_ROOT%\build\host-tests"
 if not exist "%VE_BUILD_PLUGIN%" mkdir "%VE_BUILD_PLUGIN%"
 if not exist "%VE_BUILD_TESTS%" mkdir "%VE_BUILD_TESTS%"
 if not exist "%VE_BUILD_HELPERS%" mkdir "%VE_BUILD_HELPERS%"
 pushd "%VE_BUILD_PLUGIN%" || exit /b 1
-cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi /Fd:vegas-encoder.pdb "%VE_BUILD_ROOT%\src\vegas\adapter\plugin.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\render.cpp" "%VE_BUILD_ROOT%\src\support\diagnostics.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" "%VE_BUILD_ROOT%\src\engine\encode.cpp" || goto :fail
-link /nologo /DLL /DEBUG /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj ole32.lib oleaut32.lib user32.lib version.lib bcrypt.lib || goto :fail
+cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi /Fd:vegas-encoder.pdb %VE_BUILD_PROOF_FLAGS% "%VE_BUILD_ROOT%\src\vegas\adapter\plugin.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\render.cpp" "%VE_BUILD_ROOT%\src\support\diagnostics.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" "%VE_BUILD_ROOT%\src\engine\encode.cpp" %VE_BUILD_PROOF_SOURCES% || goto :fail
+link /nologo /DLL /DEBUG /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj %VE_BUILD_PROOF_OBJECTS% ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
 copy /y "%VE_BUILD_ROOT%\config\vegas-encoder.ini" vegas-encoder.ini >nul || goto :fail
 popd
 pushd "%VE_BUILD_TESTS%" || exit /b 1
-cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\fiohost\fiohost.cpp" "%VE_BUILD_ROOT%\tests\fiohost\fakehost.cpp" /link /OUT:fiohost.exe ole32.lib oleaut32.lib wbemuuid.lib || goto :fail
+cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\fiohost\fiohost.cpp" "%VE_BUILD_ROOT%\tests\fiohost\fakehost.cpp" /link /OUT:fiohost.exe ole32.lib oleaut32.lib wbemuuid.lib user32.lib || goto :fail
 popd
 pushd "%VE_BUILD_HELPERS%" || exit /b 1
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\host_helpers.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" /link /OUT:host-helpers.exe ole32.lib oleaut32.lib || goto :fail
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\native_boundary.cpp" /link /OUT:native-boundary.exe || goto :fail
+cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\native_configuration.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\template_draft.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\proof_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" /link /OUT:native-configuration.exe ole32.lib user32.lib gdi32.lib || goto :fail
 popd
 echo BUILD OK: Vegas Encoder, fiohost and native helpers
 exit /b 0

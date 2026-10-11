@@ -9,6 +9,11 @@ repository. The investigation remains a separate sibling. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for ownership, future UI/preset
 direction and the decision to postpone a public SDK.
 
+**User-design boundary:** continue integration and minimal one-setting persistence
+work only, then stop for the full app plan/design. A7's complete recipe model,
+preset-library behavior and rich UI/framework choices are deferred; a small proof
+payload is sufficient for A6. See [DESIGN_GATE.md](DESIGN_GATE.md).
+
 ## 1. Outcome and first supported path
 
 Deliver a production foundation that:
@@ -149,8 +154,9 @@ successful render or an unexplained user cancellation.
 
 ## 5. Milestones and implementation tasks
 
-Each milestone is a reviewable change with its own experiment, inputs, tool/build
-identities, raw output and observed checks. Gate state is tracked in STATUS.md; existing research
+Each milestone is a reviewable development change with focused checks and a concise
+result summary. Detailed diagnostics are optional unless needed for an ABI question,
+failure reproduction or installation rollback. Gate state is tracked in STATUS.md; existing research
 proofs are prerequisites and comparison inputs, not completion of product milestones.
 
 | ID | Deliverable | Dependency | Acceptance gate |
@@ -347,7 +353,7 @@ native template workflow. The full desktop preset catalog remains later work.
 3. Record unresolved color, performance, start-up and extended-format limits. Include
    stage timings and queue high-water marks without claiming an unmeasured speed gain.
 4. Record product version/source identity with host, DLL, encoder, settings schema,
-   decoded results and cleanup evidence in each real-host qualification report.
+   decoded results and cleanup in concise real-host qualification summaries.
 5. Demonstrate independent checkout build/tests and a saved-template render without
    the desktop application running. The investigation remains provenance, not a dependency.
 
@@ -371,7 +377,9 @@ publish only when requested. Record and preserve restoration steps for each inst
 Use existing tools when they cover the behavior. Add focused tests for new
 ownership, malformed-input and configuration behavior. Fake-host success cannot
 replace a real-host gate. Keep raw commands, identities, logs and checker output
-in evidence; summarize decisive results in tracked notes.
+only when useful for failure reproduction or compatibility verification; summarize
+the checks and material limits in the task response or product docs. Routine work
+does not require an experiment note or evidence archive.
 
 ## 7. Risks and decisions for review
 

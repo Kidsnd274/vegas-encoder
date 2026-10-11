@@ -24,7 +24,9 @@ and exact input hashes are in [ORIGIN.md](../ORIGIN.md) and
 
 Host IIDs and discovery CLSID are retained. Vegas Encoder's own filter/type/preset
 IDs are new; proof templates are not automatically imported. Returned templates use
-the evidenced host allocator; its unverified Free slot is not guessed. Private bytes
+the evidenced host allocator. The configuration follow-up establishes its Free
+slot on the exact inspected host module, paired with the holder's calloc copies;
+see [native ownership contract](NATIVE_CONFIGURATION.md). Private bytes
 are copied through conformance, but arbitrary UI/save/reload persistence is unproven.
 
 Internal helpers check declared spans, owned-field bounds, text terminators and
@@ -37,19 +39,28 @@ or a third-party capture as qualification of our current binary.
 
 Extracted checked templates, frame leases, HRESULT exception containment, product
 identity, generated fixtures and installer checks are authored implementation changes.
-Their helper/fake tests establish code behavior. No new native IID, vtable slot,
-structure interpretation or real-host behavior is inferred from them.
+Their helper/fake tests establish code behavior. The configuration work adds
+previously decoded page/holder declarations and ownership semantics established
+from the exact host/connector copies. Its opt-in native bridge is tested with
+fakes; the corrected page's on/off settings also reach real VEGAS renders.
 
 Preserve host ownership, caller-thread reads/progress, frame release before transport
 waits, actual delivered timing, valid short/final audio reads and distinct encoder
-failure/cancellation results. Progress failures beyond the observed cancel code
-still need a separately qualified classification change.
+failure/cancellation results. The new uninstalled foundation candidate classifies
+only the observed progress cancellation code as user cancellation in the encoded
+path and preserves other failed HRESULTs. Fake recovery checks and real
+cancellation/recovery pass; controlled real error recovery remains open.
+Raw diagnostic behavior is unchanged.
 
 ## Unresolved work
 
-Our exporter reports zero property pages. The complete VEGAS-specific editable
-template exchange, page lifetime and setting persistence require a focused native
-experiment; generic COM documentation alone cannot provide them. Multiple-container
+The default exporter reports zero property pages. The installed opt-in
+build implements one technical proof page using the measured native ownership
+contract. Its first real UI attempt displayed a blank page; the corrected build
+shows the window during activation and its on/off settings reach Render. Actual
+Apply/Cancel and save/restart behavior remain fake-host tested; the user deferred
+real two-template/restart qualification. Generic COM docs and fake tests do not
+provide it. Multiple-container
 extensions, general color/HDR, full token variants, additional hosts, long/slow
 stability and simultaneous jobs remain unqualified.
 

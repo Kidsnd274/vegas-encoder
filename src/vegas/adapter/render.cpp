@@ -7,6 +7,9 @@
 // drift (Voukoder's fixed 1601-sample reads lose ~0.6 samples per frame).
 #include "vegas_encoder.h"
 #include "../../engine/encode.h"
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+#include "../configuration/template_draft.h"
+#endif
 
 #include <cmath>
 #include <cstdio>
@@ -14,6 +17,7 @@
 #include <new>
 #include <algorithm>
 #include <limits>
+#include <stdexcept>
 
 using namespace sfio;
 
@@ -209,7 +213,12 @@ struct Report {
 
 class RenderFile final : public ISfRenderFile {
  public:
-  explicit RenderFile(Tpl t) : tpl_(std::move(t)) {}
+  explicit RenderFile(Tpl t) : tpl_(std::move(t)) {
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+    // Snapshot the one proof value at Create; later page edits cannot change it.
+    proofExtraReport_ = configuration::ReadProofSettings(tpl_).extraReport;
+#endif
+  }
   ~RenderFile() {
     encoder_.reset();
     for (ISfReadStream*& s : streams_)
@@ -444,13 +453,15 @@ class RenderFile final : public ISfRenderFile {
     HRESULT hr = p->SetPosition(frame);
     if (hr != S_OK) r.nonOk.push_back({6, frame, hr});
     if (FAILED(hr)) {
-      Stop(r, "cancelled", "progress SetPosition failed", hr);
+      Stop(r, hr == SF_E_PROGRESS_CANCELLED ? "cancelled" : "failed", "progress SetPosition failed", hr);
       return false;
     }
     hr = p->CheckCancel();
     if (hr != S_OK) r.nonOk.push_back({7, frame, hr});
     if (FAILED(hr)) {
-      Stop(r, "cancelled", "progress slot 7 failed", hr);
+      // Only the recorded native cancellation code is classified as user
+      // cancellation. Other failed HRESULTs retain their original identity.
+      Stop(r, hr == SF_E_PROGRESS_CANCELLED ? "cancelled" : "failed", "progress slot 7 failed", hr);
       return false;
     }
     return true;
@@ -593,7 +604,7 @@ class RenderFile final : public ISfRenderFile {
       }
       auto keepGoing = [&] { return poll(frame); };
       if (!encoder_->Submit(false, std::move(owned), keepGoing)) {
-        if (r.status != "cancelled") fail(encoder_->Reason().c_str(), encoder_->Error());
+        if (ok) fail(encoder_->Reason().c_str(), encoder_->Error());
         break;
       }
       r.framesWritten++;
@@ -621,7 +632,7 @@ class RenderFile final : public ISfRenderFile {
           if (got < want) r.shortReads++;
           samples.resize((size_t)got * fmt.blockAlign);  // S_FALSE with data is consumed
           if (!encoder_->Submit(true, std::move(samples), keepGoing)) {
-            if (r.status != "cancelled") fail(encoder_->Reason().c_str(), encoder_->Error());
+            if (ok) fail(encoder_->Reason().c_str(), encoder_->Error());
             break;
           }
           r.samplesWritten += got;
@@ -631,7 +642,7 @@ class RenderFile final : public ISfRenderFile {
     if (ok && encoder_) {
       auto finalPoll = [&] { return poll(r.frameCountReported); };
       if (!encoder_->Finish(finalPoll)) {
-        if (r.status != "cancelled") fail(encoder_->Reason().c_str(), encoder_->Error());
+        if (ok) fail(encoder_->Reason().c_str(), encoder_->Error());
       }
     }
     if (encoder_) {
@@ -943,6 +954,10 @@ class RenderFile final : public ISfRenderFile {
     auto opt = [&str](const std::string& x) { return x.empty() ? std::string("null") : str(x); };
     std::string dll = ModulePath(g_module), host = ModulePath(nullptr);
     add("{\n  \"schema\": \"ffbridge-diag/1\",\n");
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+    if (proofExtraReport_)
+      add("  \"configuration_proof\": {\"extra_report\": true, \"proof_version\": 1},\n");
+#endif
     add("  \"plugin\": {\"name\": \"vegas-encoder\", \"version\": " + str(kVersion) + ", \"dll\": " + str(dll) +
         ", \"dll_sha256\": " + str(Sha256File(Widen(dll))) + "},\n");
     snprintf(s, sizeof s, ", \"pid\": %lu},\n", GetCurrentProcessId());
@@ -1036,6 +1051,9 @@ class RenderFile final : public ISfRenderFile {
 
   LONG ref_ = 1;
   Tpl tpl_;
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+  bool proofExtraReport_ = false;
+#endif
   std::wstring path_;
   std::vector<ISfReadStream*> streams_;
   ISfReadMeta* meta_ = nullptr;
@@ -1048,7 +1066,12 @@ HRESULT CreateRenderFile(const SFTEMPLATE* t, ISfRenderFile** out) {
   if (!out) return E_POINTER;
   *out = nullptr;
   return NativeBoundary([&]() -> HRESULT {
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+    try { *out = new RenderFile(Tpl::Copy(t)); }
+    catch (const std::invalid_argument&) { return E_INVALIDARG; }
+#else
     *out = new RenderFile(Tpl::Copy(t));
+#endif
     BestEffortDiagnostic([&] { Log("RenderFile %p created", (void*)*out); });
     return S_OK;
   });

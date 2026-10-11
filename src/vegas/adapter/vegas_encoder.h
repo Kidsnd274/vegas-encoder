@@ -23,7 +23,11 @@ static_assert(sizeof(void*) == 8 && sizeof(LONG_PTR) == 8, "VEGAS x64 pointer wi
 
 namespace vegas_encoder {
 
-inline constexpr const char* kVersion = "0.1.0-dev";
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+inline constexpr const char* kVersion = "0.1.2-config-proof";
+#else
+inline constexpr const char* kVersion = "0.1.1-dev";
+#endif
 
 // Own identities (never reuse another plug-in's IDs).
 // Filter CLSID reported by GetFilterInfo and served by DllGetClassObject.

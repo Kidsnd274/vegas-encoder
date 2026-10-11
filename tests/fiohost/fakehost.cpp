@@ -9,6 +9,7 @@
 // can validate the exporter's output. Slot-6 cancel now follows F-045 and
 // a final audio read returns S_FALSE with data (F-041).
 #include "fakehost.h"
+#include "../../src/vegas/abi/configuration_abi.h"
 
 #include <cmath>
 #include <cstdio>
@@ -21,7 +22,6 @@ namespace {
 
 constexpr int FW = 320, FH = 180;  // fixture size
 constexpr double kPi = 3.14159265358979323846;
-constexpr HRESULT kFakeCancel = E_ABORT;  // stand-in; VEGAS's value is unknown
 
 struct Rgb {
   BYTE r, g, b;
@@ -305,7 +305,10 @@ class FakeAudio final : public Counted<ISfReadAudioStream> {
 
 class FakeProgress final : public Counted<ISfProgress> {
  public:
-  explicit FakeProgress(LONGLONG cancelAt) : cancelAt_(cancelAt) {}
+  FakeProgress(LONGLONG cancelAt, int failureSlot, LONGLONG failureAt, int failureCall,
+               const LONGLONG* audioReads)
+      : cancelAt_(cancelAt), failureSlot_(failureSlot), failureAt_(failureAt), failureCall_(failureCall),
+        audioReads_(audioReads) {}
   HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override {
     return Qi(riid, ppv, {IID_IUnknown, __uuidof(ISfProgress)});
   }
@@ -316,19 +319,30 @@ class FakeProgress final : public Counted<ISfProgress> {
     return S_OK;
   }
   HRESULT STDMETHODCALLTYPE SetPosition(LONGLONG p) override {
+    if (position != p) callsAtPosition_ = 0;
+    callsAtPosition_++;
     position = p;
     positions++;
+    if (FailNow(6)) return E_ACCESSDENIED;
     return (cancelAt_ >= 0 && p >= cancelAt_) ? SF_E_PROGRESS_CANCELLED : S_OK;
   }
   HRESULT STDMETHODCALLTYPE CheckCancel() override {
     checks++;
-    return (cancelAt_ >= 0 && position >= cancelAt_) ? kFakeCancel : S_OK;
+    return FailNow(7) ? E_ACCESSDENIED : S_OK;
   }
   HRESULT STDMETHODCALLTYPE Slot8(LONG) override { return S_OK; }
   LONGLONG total = -1, position = -1, positions = 0, checks = 0;
 
  private:
+  bool FailNow(int slot) const {
+    return failureSlot_ == slot && position >= failureAt_ && callsAtPosition_ >= failureCall_ &&
+        (!audioReads_ || *audioReads_ > failureAt_);
+  }
   LONGLONG cancelAt_;
+  int failureSlot_;
+  LONGLONG failureAt_;
+  int failureCall_, callsAtPosition_ = 0;
+  const LONGLONG* audioReads_;
 };
 
 class FakeMeta final : public Counted<ISfReadMeta> {
@@ -371,6 +385,96 @@ int g_failures = 0;
 void Check(bool ok, const char* what) {
   printf("  %s %s\n", ok ? "ok  " : "FAIL", what);
   if (!ok) g_failures++;
+}
+
+class FakeTemplateHolder final : public Counted<ISfFileIOTemplateEditHolder> {
+ public:
+  FakeTemplateHolder(ISfHostAllocator* allocator, const SFTEMPLATE* value) : allocator_(allocator) {
+    const BYTE* bytes = reinterpret_cast<const BYTE*>(value);
+    saved.assign(bytes, bytes + At<DWORD>(value, 0));
+  }
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** out) override {
+    return Qi(iid, out, {IID_IUnknown, __uuidof(ISfFileIOTemplateEditHolder)});
+  }
+  HRESULT STDMETHODCALLTYPE Slot3(SFTEMPLATE** out) override {
+    *out = static_cast<SFTEMPLATE*>(allocator_->Alloc(saved.size()));
+    if (!*out) return E_OUTOFMEMORY;
+    memcpy(*out, saved.data(), saved.size());
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE Slot4(const SFTEMPLATE* value) override {
+    const DWORD bytes = At<DWORD>(value, 0);
+    if (bytes < tpl::fixedSize || bytes > (1u << 20)) return E_INVALIDARG;
+    const BYTE* start = reinterpret_cast<const BYTE*>(value);
+    std::vector<BYTE> copy(start, start + bytes);
+    saved.swap(copy);
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE Slot5(SFTEMPLATE**) override { return E_NOTIMPL; }
+  HRESULT STDMETHODCALLTYPE Slot6(LONG, LONG*) override { return E_NOTIMPL; }
+  HRESULT STDMETHODCALLTYPE Slot7(LONG, LONG) override { return E_NOTIMPL; }
+  std::vector<BYTE> saved;
+ private:
+  ISfHostAllocator* allocator_;
+};
+
+class FakePageSite final : public Counted<IPropertyPageSite> {
+ public:
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** out) override {
+    return Qi(iid, out, {IID_IUnknown, IID_IPropertyPageSite});
+  }
+  HRESULT STDMETHODCALLTYPE OnStatusChange(DWORD) override { return S_OK; }
+  HRESULT STDMETHODCALLTYPE GetLocaleID(LCID* out) override { if (!out) return E_POINTER; *out = 0x409; return S_OK; }
+  HRESULT STDMETHODCALLTYPE GetPageContainer(IUnknown** out) override { if (out) *out = nullptr; return E_NOINTERFACE; }
+  HRESULT STDMETHODCALLTYPE TranslateAccelerator(MSG*) override { return S_FALSE; }
+};
+
+bool ConfigureAndReload(ISfRenderFileClass* renderClass, ISfHostAllocator* allocator,
+                        SFTEMPLATE*& value, const RenderTestOptions& options) {
+  LONG free = 0, sale = 0, flags = 0;
+  if (renderClass->GetPropertyPageCount(&free, &sale, &flags) != S_OK || free != 1) return false;
+  IPropertyPage* page = nullptr;
+  if (renderClass->GetPropertyPage(0, &page) != S_OK || !page) return false;
+  ISfFileIOPropertyPage* native = nullptr;
+  FakeTemplateHolder holder(allocator, value);
+  FakePageSite site;
+  IUnknown* object = &holder;
+  BYTE info[56]{};
+  HRESULT result = page->QueryInterface(__uuidof(ISfFileIOPropertyPage), reinterpret_cast<void**>(&native));
+  if (SUCCEEDED(result)) result = native->Slot14(value, info);
+  if (native) native->Release();
+  if (SUCCEEDED(result)) result = page->SetPageSite(&site);
+  if (SUCCEEDED(result)) result = page->SetObjects(1, &object);
+  HWND parent = CreateWindowExW(0, L"STATIC", L"Offline proof page", WS_OVERLAPPED,
+      0, 0, 400, 120, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+  RECT rect{0, 0, 360, 80};
+  bool active = false;
+  if (SUCCEEDED(result)) { result = page->Activate(parent, &rect, FALSE); active = SUCCEEDED(result); }
+  HWND dialog = parent ? GetWindow(parent, GW_CHILD) : nullptr;
+  HWND checkbox = dialog ? GetDlgItem(dialog, 100) : nullptr;
+  if (SUCCEEDED(result) && !checkbox) result = E_FAIL;
+  if (SUCCEEDED(result)) {
+    const bool enabled = SendMessageW(checkbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+    if (enabled != (options.configurationProof != 0)) SendMessageW(checkbox, BM_CLICK, 0, 0);
+    result = page->Apply();
+  }
+  if (active) page->Deactivate();
+  page->SetObjects(0, nullptr);
+  page->SetPageSite(nullptr);
+  page->Release();
+  if (parent) DestroyWindow(parent);
+  if (result != S_OK || holder.ref != 1 || site.ref != 1) return false;
+  const SFTEMPLATE* saved = reinterpret_cast<const SFTEMPLATE*>(holder.saved.data());
+  SaveTemplate(options.outDir, L"configured-template.tpl", saved);
+  const std::vector<BYTE> reloaded = ReadFileBytes(options.outDir + L"\\configured-template.tpl");
+  if (reloaded != holder.saved) return false;
+  auto* restored = static_cast<SFTEMPLATE*>(allocator->Alloc(reloaded.size()));
+  if (!restored) return false;
+  memcpy(restored, reloaded.data(), reloaded.size());
+  allocator->Free(value);
+  value = restored;
+  // The following Create uses saved bytes directly, with no new conform call.
+  return true;
 }
 
 }  // namespace
@@ -421,6 +525,8 @@ int RunRenderTest(ISfRenderFileClass* rc, ISfHostAllocator* alloc, const RenderT
   printf("ConformTemplateToSource(pass1, host, 0) hr=0x%08lx\n", hr);
   Check(hr == S_OK && create, "second reason-0 pass allocates the Create template");
   if (!create) return 1;
+  if (o.configurationProof >= 0)
+    Check(ConfigureAndReload(rc, alloc, create, o), "native page Apply and owned-byte save/reload before Create (no fresh conform)");
   SaveTemplate(o.outDir, L"create.tpl", create);
 
   BITMAPINFOHEADER bih = At<BITMAPINFOHEADER>(create, tpl::videoRenderBih);
@@ -442,7 +548,11 @@ int RunRenderTest(ISfRenderFileClass* rc, ISfHostAllocator* alloc, const RenderT
     printf("render %d of %d\n", run, o.renders);
     FakeVideo video(o.frames, bih.biWidth, bih.biHeight, bih.biCompression, deliveredFps);
     FakeAudio audio(audioRec.sampleRate, audioRec.channels, audioRec.format, samples, deliveredFps, o.shortRead);
-    FakeProgress progress(o.cancelAt);
+    const bool injectStop = !o.recover || run == 1;
+    const LONGLONG cancelAt = injectStop ? o.cancelAt : -1;
+    const int failureSlot = injectStop ? o.progressFailureSlot : 0;
+    FakeProgress progress(cancelAt, failureSlot, o.progressFailureAt, o.progressFailureCall,
+                          o.progressFailureAfterAudioRead ? &audio.reads : nullptr);
     FakeMeta meta;
     ISfRenderFile* file = nullptr;
     hr = rc->Create(&file, nullptr, 0, nullptr, create);  // VEGAS passes null/0 here (F-036)
@@ -462,15 +572,16 @@ int RunRenderTest(ISfRenderFileClass* rc, ISfHostAllocator* alloc, const RenderT
       Check(file->GetFileName(name, 0x104) == S_OK && wcscmp(name, path) == 0, "GetFileName returns the SetFile path");
     Check(file->CloseFile() == S_OK, "CloseFile");
     file->Release();
-    if (o.expectFailure) {
+    if (injectStop && (o.expectFailure || failureSlot)) {
       Check(FAILED(hr) && hr != SF_E_RENDER_STOPPED, "failure is distinct from cancel");
-    } else if (o.cancelAt < 0) {
+      if (failureSlot) Check(hr == E_ACCESSDENIED, "progress failure preserves its original HRESULT");
+    } else if (cancelAt < 0) {
       Check(hr == S_OK, "Render returns S_OK");
       Check(video.served == o.frames, "every frame requested once");
       Check(audio.samples == (o.videoOnly ? 0 : samples), "audio sample count matches delivered duration");
     } else {
       Check(hr == SF_E_RENDER_STOPPED, "cancelled Render returns 0x8004E017 (Voukoder's code)");
-      Check(video.served == o.cancelAt, "no frame requested after the cancel");
+      Check(video.served == cancelAt, "no frame requested after the cancel");
     }
     Check(progress.total == o.frames, "progress total = frame count");
     Check(video.outstanding == 0 && video.lockErrors == 0, "frame locks balanced");

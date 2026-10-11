@@ -1,61 +1,72 @@
-# First Vegas Encoder real-host qualification
+# Vegas Encoder foundation runtime check
 
-Status: pending. This procedure is prepared; bootstrap did not execute it or
-change the installed host. Target identity is in [TARGET.md](TARGET.md).
+Target: Boris FX VEGAS Pro 2026.0.3.189 x64, identity in [TARGET.md](TARGET.md).
+Current progress and exact candidate identities are in [STATUS.md](STATUS.md).
+Real 1080p/fractional renders and the configuration checkbox's on/off render effects
+pass on earlier builds. Current `0.1.2-config-proof` real cancellation/recovery
+also passes: cancelled output is unpublished/removed, locks and child are cleared,
+and the next render in the same host session decodes to 299 frames and 478,878
+audio sample frames. Controlled failure/recovery remains unverified. The user deferred
+real saved-template restart testing; its procedure remains in
+[NATIVE_CONFIGURATION.md](NATIVE_CONFIGURATION.md) for later product qualification.
 
-## Candidate and installation
+## Candidate and rollback
 
-1. Use the exact DLL recorded in `evidence/bootstrap/final-identities.json`; preserve
-   DLL/PDB/INI as a candidate with hashes before any rebuild. Recheck the host executable
-   hash/version and FFmpeg identity. If host bytes changed, update the target record
-   before reusing old compatibility evidence.
-2. Configure `build/vegas-encoder/vegas-encoder.ini` before installation: executable,
-   fixed FFmpeg output mode and logging. Close VEGAS.
-3. Run the explicit installer only when performing this runtime qualification:
+The installed version is now `0.1.2-config-proof`, preserved under
+`build/candidate-0.1.2-config-proof/`. It adds accurate encoded progress-failure
+handling and passes fake-host recovery checks. The user explicitly approved the
+upgrade, and DLL/PDB/INI/discovery manifest match the tested candidate. Host,
+sharedk, FFmpeg and other discovery configs are unchanged. Real cancel/recovery
+now passes on this candidate; see STATUS.md for its exact result and limits.
 
-```powershell
-.\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026'
-```
-
-The installer uses its own folder/config and manifests exact files/hashes. It refuses
-reparse traversal, existing unrecorded paths, modified installation contents and
-programs running from the target. Elevation helper output goes to a named transcript.
-It leaves installed ffbridge/Voukoder and host discovery configs in place.
-
-## Observe and record
-
-- Fresh launch lists Vegas Encoder under Render As, with the visible lossless MKV
-  preset. Capture Components/Render As, template summary and new product logs.
-- Render the existing counter/audio fixture to a fresh `.mkv`. Expect 90 frames and
-  144,000 stereo sample frames, exact markers and sync. Run
-  `scripts/Check-EncodedRender.py` on `<output>.vegas-encoder.json` with a fresh
-  decode directory and `--fixture`; supply FFmpeg/FFprobe paths.
-- Repeat to another filename. Cancel a longer render, verify bounded response and
-  absence of child/partial/completed output, then render the fixture again in the
-  same session. Define the expected cancellation limit from the configured waits
-  before the experiment; fake cancel coverage is not proof of this behavior.
-- Exercise a missing/early-exit encoder and an unwritable/existing destination through
-  a saved, reversible test configuration. Record native HRESULT, user-visible message,
-  stderr/manifest and cleanup; preserve pre-existing destination bytes.
-- Qualify fractional/1080p and slow/long cases before extending the supported matrix.
-  Use the staged plan for color/metadata/performance evidence; do not assume a speed gain.
-
-Keep exact host/DLL/encoder hashes, user steps, logs, output hashes, decoded check
-results and restoration outcome under a fresh evidence folder. A new product DLL
-must earn its own result even though its predecessor rendered successfully.
-
-## Restore
-
-Close VEGAS, then remove only the product's recorded installation:
+The prior working `0.1.1-config-proof` installation is backed up in
+`build/rollback-before-foundation-closeout/`, including its manifest/config and
+restoration instructions. To restore it with VEGAS closed:
 
 ```powershell
-.\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -Uninstall
+.\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -Update -BuildDir 'L:\repos\vegas-encoder\build\rollback-before-foundation-closeout'
 ```
 
-If installation files were edited, the installer intentionally refuses hash drift;
-restore their recorded candidate bytes before update/uninstall. Unrecorded files are
-preserved by refusal. Keep candidate hashes/manifest and changed settings so restoration
-is concrete. The separate ffbridge proof installation remains available.
+The installer owns only the product folder and discovery file. It refuses running
+host processes, modified recorded files and unrecorded installation contents.
+An INI test change must be prepared in its own candidate and installed deliberately;
+do not edit the live INI and then expect a hash-checked update to accept it. INI
+changes take effect after VEGAS restarts. The original real-render-tested `0.1.0-dev`
+backup remains in `build/rollback-before-configuration-proof/`.
 
-Native property-page editing and saved recipe settings are not implemented in this
-candidate. First establish render parity, then perform A5–A7's configuration proof.
+## Recovery checks and future qualification
+
+1. **Cancel, then render again in the same session (passed).** Render a sufficiently long
+   timeline range to a new `foundation_cancel.mkv` and cancel while encoding.
+   Expect a cancelled result, no completed MKV, no remaining owned FFmpeg process
+   or partial file, and zero outstanding frame locks. Render a short range to a
+   fresh `foundation_recovery.mkv` without restarting VEGAS. Expect S_OK, encoder
+   exit zero and published media. Inspect the existing report/logs and decode the
+   successful output. Record the observed cancellation response; no strict Abort
+   deadline or stalled-pipe qualification is currently claimed.
+2. **Controlled failure, then recovery (not yet observed in real VEGAS).** Prepare one reversible unavailable-encoder
+   or blocked-destination case first. Confirm the adapter reports a failure with
+   its reason/code rather than success or cancellation, preserves pre-existing
+   output, and cleans up its owned process/partial file/host locks. Restore the
+   test condition and render successfully again. A settings change that needs a
+   host restart does not establish same-session recovery; record which case was
+   actually exercised. Avoid relying on a VEGAS preflight rejection as an adapter
+   failure test.
+
+Keep a short outcome summary with the tested build/host and relevant reports.
+Detailed diagnostics are needed only if a check fails. Do not create a research
+ledger, copy media, or collect broad evidence inventories for this check.
+
+## App handoff
+
+Foundation code now covers discovery, template/frame ownership, fixed media
+delivery, process/transport cleanup, failure classification and a native editable
+proof value. Cancellation/recovery has passed in real VEGAS; controlled failure
+and deferred persistence retain their qualification limits.
+Raw diagnostic mode, broader host/format support, color/HDR qualification and
+formal stalled-I/O deadlines retain their documented limits.
+
+The user reports app designs on another branch; `origin/product-ui-design` is
+available. The user requested a foundation commit and explicitly left design-branch
+review for next time. Stop after the checkpoint. No new SDK repository, codec catalog, full recipe schema,
+preset library or UI framework selection is needed in this foundation task.
