@@ -177,6 +177,25 @@ ignored. This implementation checkpoint does not claim that deferred or outstand
 runtime checks passed. Earlier checkpoints are documented in
 [checkpoint note](experiments/2026-10-10-implementation-checkpoint.md).
 
+## Product planning (2026-10-11)
+
+The product-layer plan and design exploration for review are in
+[product/README.md](product/README.md):
+
+- specification, architecture, recipe and command rules, FFmpeg integration, UI
+  behaviour, roadmap and research notes;
+- eight interactive HTML design directions with screenshots and a review.
+
+Supporting work:
+
+- 226 real FFmpeg 8.1.3 test muxes and FFmpeg help/probe captures, in ignored
+  `evidence/2026-10-11-product-design/`;
+- a prototype command compiler/validator used by the mockups.
+
+Documentation and mockups only: no product code, no Windows build, and **no real
+VEGAS test ran**. Gate state is unchanged. See the
+[experiment note](experiments/2026-10-11-product-design.md).
+
 ## Next task
 
 Stop implementation at this requested foundation checkpoint. Do not review or

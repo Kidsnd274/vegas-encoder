@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vegas Encoder: native page inside VEGAS Custom Settings</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Mock of the Win32 property page the exporter DLL would show inside VEGAS's
+  Custom Template dialog (gated on adapter milestone A5). It is deliberately
+  plain: native controls, no Flutter. The rich editor opens as a separate,
+  owned window (docs/product/TECH_ARCHITECTURE.md §5).
+  The surrounding dialog is a simplified stand-in, not a copy of VEGAS's UI.
+-->
+<style>
+  :root {
+    --host-bg: #2b2d31; --host-panel: #333539; --host-line: #4a4d52; --host-text: #e3e4e6;
+    --host-muted: #a3a6ab; --host-field: #1f2023; --host-accent: #4f8fe6; --host-btn: #44474c;
+    --ok: #57b36b; --warn: #e3b341; --err: #e5534b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #1b1c1e; color: var(--host-text); font: 13px/1.45 "Segoe UI Variable Text", "Segoe UI", "Noto Sans", system-ui, sans-serif; }
+  header.doc { max-width: 1320px; margin: 0 auto; padding: 32px 40px 8px; }
+  header.doc h1 { font-size: 22px; font-weight: 600; margin: 0 0 6px; }
+  header.doc p { margin: 0; color: var(--host-muted); max-width: 72ch; }
+  .states { max-width: 1320px; margin: 0 auto; padding: 24px 40px 56px; display: grid; grid-template-columns: repeat(2, 620px); gap: 40px; }
+  figure { margin: 0; }
+  figcaption { color: var(--host-muted); margin: 0 0 10px; min-height: 2.9em; }
+  figcaption strong { color: var(--host-text); font-weight: 600; }
+
+  /* Simplified VEGAS dialog frame */
+  .dlg { width: 620px; height: 560px; background: var(--host-bg); border: 1px solid #111; box-shadow: 0 18px 40px rgba(0,0,0,.45); display: flex; flex-direction: column; position: relative; }
+  .dlg-title { height: 32px; display: flex; align-items: center; padding: 0 0 0 12px; background: #232427; border-bottom: 1px solid #111; font-size: 12px; color: var(--host-muted); }
+  .dlg-title span { flex: 1; }
+  .dlg-title .x { width: 44px; height: 32px; display: grid; place-items: center; color: var(--host-muted); }
+  .dlg-body { padding: 14px 16px 0; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .row { display: grid; grid-template-columns: 92px 1fr auto; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .row label { color: var(--host-muted); }
+  .field { height: 26px; background: var(--host-field); border: 1px solid var(--host-line); padding: 3px 8px; color: var(--host-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .icon-btn { width: 26px; height: 26px; border: 1px solid var(--host-line); background: var(--host-btn); display: grid; place-items: center; color: var(--host-muted); }
+  .tabs { display: flex; gap: 2px; margin-top: 6px; border-bottom: 1px solid var(--host-line); }
+  .tab { padding: 6px 14px; color: var(--host-muted); border: 1px solid transparent; border-bottom: 0; }
+  .tab.on { color: var(--host-text); background: var(--host-panel); border-color: var(--host-line); margin-bottom: -1px; }
+  .page { flex: 1; background: var(--host-panel); border: 1px solid var(--host-line); border-top: 0; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; }
+  .btn { min-width: 84px; height: 28px; padding: 0 14px; border: 1px solid var(--host-line); background: var(--host-btn); color: var(--host-text); font: inherit; }
+  .btn.default { border-color: var(--host-accent); box-shadow: inset 0 0 0 1px var(--host-accent); }
+  .btn:focus-visible, .icon-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+  .icon-btn[disabled] { color: #5d6066; }
+  .btn[disabled] { color: #777a80; border-color: #3d4045; box-shadow: none; }
+
+  /* The Vegas Encoder page itself: plain Win32 group boxes and labels */
+  .group { border: 1px solid var(--host-line); padding: 12px 12px 10px; position: relative; }
+  .group > .legend { position: absolute; top: -9px; left: 8px; padding: 0 5px; background: var(--host-panel); color: var(--host-muted); font-size: 12px; }
+  dl { display: grid; grid-template-columns: 92px 1fr; gap: 5px 10px; margin: 0; }
+  dt { color: var(--host-muted); }
+  dd { margin: 0; }
+  .origin { color: var(--host-muted); }
+  .origin b { color: var(--host-text); font-weight: 600; }
+  .note { display: flex; gap: 8px; align-items: flex-start; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; }
+  .actions { display: flex; gap: 8px; align-items: center; }
+  .menu { position: absolute; background: #26282b; border: 1px solid var(--host-line); box-shadow: 0 8px 18px rgba(0,0,0,.5); padding: 4px 0; width: 280px; z-index: 2; }
+  .menu div { padding: 5px 14px; }
+  .menu div.sep { height: 1px; padding: 0; background: var(--host-line); margin: 4px 0; }
+  .menu div.hot { background: var(--host-accent); color: #fff; }
+  .menu small { color: var(--host-muted); }
+  .menu div.hot small { color: #dfe9fb; }
+  .busy { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--host-accent); background: rgba(79,143,230,.12); }
+  .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; flex: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+  .dim::after { content: ""; position: absolute; inset: 32px 0 0 0; background: rgba(15,16,18,.35); pointer-events: none; }
+  .notes { max-width: 1320px; margin: 0 auto; padding: 0 40px 64px; color: var(--host-muted); }
+  .notes h2 { color: var(--host-text); font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+  .notes ul { margin: 0; padding-left: 18px; max-width: 90ch; }
+  .notes li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<header class="doc">
+  <h1>Native page in VEGAS's Custom Settings dialog</h1>
+  <p>Shared by every design direction. Gated on adapter milestone A5. Plain Win32 controls in the DLL: a summary, <em>Edit settings…</em> to open the Vegas Encoder window, and a quick <em>Load preset</em> menu.</p>
+</header>
+
+<div class="states">
+  <figure>
+    <figcaption><strong>Normal.</strong> The template's settings at a glance, where they came from, and what will render them.</figcaption>
+    <div class="dlg" id="native-normal">
+      <div class="dlg-title"><span>Custom Settings: Vegas Encoder</span><div class="x" aria-hidden="true">✕</div></div>
+      <div class="dlg-body">
+        <div class="row"><label>Template</label><div class="field" id="tpl-name"></div><div style="display:flex;gap:4px"><button class="icon-btn" aria-label="Save template" title="Save template"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2.5h8l2.5 2.5v8.5h-10.5z"/><path d="M5 2.5v3.5h5v-3.5M5 13.5v-4h6v4"/></svg></button><button class="icon-btn" aria-label="Delete template" title="Delete template"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4.5h10M6.5 4.5v-2h3v2M4.5 4.5l.7 9h5.6l.7-9"/></svg></button></div></div>
+        <div class="row"><label>Description</label><div class="field" style="grid-column: span 2">Renders through FFmpeg with Vegas Encoder.</div></div>
+        <div class="tabs"><div class="tab on">Vegas Encoder</div><div class="tab">Project</div></div>
+        <div class="page">
+          <div class="group"><span class="legend">Settings</span>
+            <dl id="summary"></dl>
+          </div>
+          <div class="origin" id="origin"></div>
+          <div class="actions" style="position:relative">
+            <button class="btn default">Edit settings…</button>
+            <button class="btn">Load preset ▾</button>
+          </div>
+          <div style="flex:1"></div>
+          <div class="group"><span class="legend">Renders with</span>
+            <div class="note"><span class="dot" style="background:var(--ok)"></span><div id="ffmpeg-line"></div></div>
+            <div class="note" id="msg-line" style="margin-top:6px"><span class="dot" style="background:var(--host-muted)"></span><div>VEGAS delivers 10-bit frames. This encode stores 8-bit.</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="dlg-foot"><button class="btn default">OK</button><button class="btn">Cancel</button><button class="btn">About…</button></div>
+    </div>
+  </figure>
+
+  <figure>
+    <figcaption><strong>Editor open.</strong> VEGAS stays responsive but disabled, like a modal dialog, until the Vegas Encoder window closes.</figcaption>
+    <div class="dlg dim" id="native-busy">
+      <div class="dlg-title"><span>Custom Settings: Vegas Encoder</span><div class="x" aria-hidden="true">✕</div></div>
+      <div class="dlg-body">
+        <div class="row"><label>Template</label><div class="field" id="tpl-name-2"></div><div style="display:flex;gap:4px"><button class="icon-btn" disabled aria-label="Save template"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2.5h8l2.5 2.5v8.5h-10.5z"/><path d="M5 2.5v3.5h5v-3.5M5 13.5v-4h6v4"/></svg></button><button class="icon-btn" disabled aria-label="Delete template"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4.5h10M6.5 4.5v-2h3v2M4.5 4.5l.7 9h5.6l.7-9"/></svg></button></div></div>
+        <div class="row"><label>Description</label><div class="field" style="grid-column: span 2">Renders through FFmpeg with Vegas Encoder.</div></div>
+        <div class="tabs"><div class="tab on">Vegas Encoder</div><div class="tab">Project</div></div>
+        <div class="page">
+          <div class="busy"><span class="spinner" aria-hidden="true"></span><div><b>Vegas Encoder window is open.</b><br><span style="color:var(--host-muted)">Apply there to update this template, or Cancel to leave it unchanged.</span></div></div>
+          <div class="actions"><button class="btn default">Bring to front</button><button class="btn">Close editor</button></div>
+          <div class="group" style="opacity:.6"><span class="legend">Settings</span><dl id="summary-2"></dl></div>
+          <div style="flex:1"></div>
+          <div class="origin">If the window closes unexpectedly, the template keeps its previous settings.</div>
+        </div>
+      </div>
+      <div class="dlg-foot"><button class="btn" disabled>OK</button><button class="btn" disabled>Cancel</button><button class="btn" disabled>About…</button></div>
+    </div>
+  </figure>
+
+  <figure>
+    <figcaption><strong>Load preset.</strong> Swap in a library preset without opening the editor. Favorites first, then the full list.</figcaption>
+    <div class="dlg" id="native-menu">
+      <div class="dlg-title"><span>Custom Settings: Vegas Encoder</span><div class="x" aria-hidden="true">✕</div></div>
+      <div class="dlg-body">
+        <div class="row"><label>Template</label><div class="field tpl-name-x"></div><div style="display:flex;gap:4px"><button class="icon-btn" aria-label="Save template"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 2.5h8l2.5 2.5v8.5h-10.5z"/><path d="M5 2.5v3.5h5v-3.5M5 13.5v-4h6v4"/></svg></button><button class="icon-btn" aria-label="Delete template"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 4.5h10M6.5 4.5v-2h3v2M4.5 4.5l.7 9h5.6l.7-9"/></svg></button></div></div>
+        <div class="row"><label>Description</label><div class="field" style="grid-column: span 2">Renders through FFmpeg with Vegas Encoder.</div></div>
+        <div class="tabs"><div class="tab on">Vegas Encoder</div><div class="tab">Project</div></div>
+        <div class="page">
+          <div class="group"><span class="legend">Settings</span><dl class="summary-x"></dl></div>
+          <div class="origin origin-x"></div>
+          <div class="actions" style="position:relative">
+            <button class="btn default">Edit settings…</button>
+            <button class="btn" aria-expanded="true">Load preset ▾</button>
+            <div class="menu" style="left: 124px; top: 32px;" role="menu" aria-label="Load preset">
+              <div><small>Favorites</small></div>
+              <div class="hot" role="menuitem">YouTube upload, H.264 <small>(revision 6)</small></div>
+              <div role="menuitem">Client review, 1080p 8 Mbps</div>
+              <div role="menuitem">4K HEVC master, 10-bit</div>
+              <div class="sep"></div>
+              <div role="menuitem">All presets…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dlg-foot"><button class="btn default">OK</button><button class="btn">Cancel</button><button class="btn">About…</button></div>
+    </div>
+  </figure>
+</div>
+
+<section class="notes">
+  <h2>Behaviour notes</h2>
+  <ul>
+    <li><em>Edit settings…</em> writes a session file and starts <code>VegasEncoder.exe --edit-session</code>, owned by this dialog. The page shows the open state within 100 ms; the editor window should appear within about a second.</li>
+    <li>Apply in the editor returns settings to this page. The template changes only when VEGAS applies the page (OK), following the semantics measured in adapter milestone A6.</li>
+    <li><em>Load preset</em> copies a library preset into the template without opening the editor. The origin line updates to that preset and revision.</li>
+    <li>"Edited in VEGAS" appears when the template differs from its origin revision. "Library has a newer revision" appears when the preset has moved on; updating happens in the editor, where the differences are shown.</li>
+    <li>Nothing here reads the library during a render. The template holds a complete copy of the settings.</li>
+  </ul>
+</section>
+
+<script src="avoptions.js"></script>
+<script src="model.js"></script>
+<script>
+  const s = VE.templateSession();
+  const r = s.recipe, sum = VE.summary(r), est = VE.estimate(r, VE.vegas);
+  const inst = VE.installations.find((i) => i.isDefault);
+  const rows = [
+    ['Container', sum.container + (r.container.faststart ? ', fast start' : '')],
+    ['Video', `${sum.video} with ${sum.videoEncoder}, ${sum.mode.toLowerCase()} ${sum.videoQuality.replace(/^CRF /, 'CRF ')}, ${sum.speed} preset, ${sum.depth}`],
+    ['Audio', `${sum.audio}, ${sum.audioQuality}`],
+    ['Size', est.label],
+  ];
+  const html = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('');
+  document.getElementById('summary').innerHTML = html;
+  document.getElementById('summary-2').innerHTML = html;
+  document.querySelectorAll('.summary-x').forEach((e) => { e.innerHTML = html; });
+  document.querySelectorAll('.tpl-name-x').forEach((e) => { e.textContent = s.templateName; });
+  document.getElementById('tpl-name').textContent = s.templateName;
+  document.getElementById('tpl-name-2').textContent = s.templateName;
+  const changes = VE.diff(s.base, s.recipe).length;
+  const originHtml =
+    `From preset <b>${s.origin.name}</b>, revision ${s.origin.revision}. Edited in VEGAS (${changes} changes). Library has revision ${s.libraryRevision}.`;
+  document.getElementById('origin').innerHTML = originHtml;
+  document.querySelectorAll('.origin-x').forEach((e) => { e.innerHTML = originHtml; });
+  document.getElementById('ffmpeg-line').textContent = `${inst.label} (${inst.build}), the default on this PC. ${sum.videoEncoder} and ${sum.audio} are ready.`;
+</script>
+</body>
+</html>
