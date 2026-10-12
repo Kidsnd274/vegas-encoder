@@ -1,7 +1,7 @@
 # UI behaviour specification
 
 Updated: 2026-10-12 (Asia/Singapore). Status: proposal, updated for the chosen
-direction.
+direction; §1, §9, §10 and §11 now record what the app workstream built in F0 and F1.
 
 This document covers the behaviour Flutter will implement: states, flows, the signal
 path, the size card, theme, keyboard, copy and the token structure. The chosen
@@ -23,8 +23,10 @@ popup moves the command preview into a collapsible bottom strip.
 
 - Light and dark token sets (§10). Both windows follow the Windows app theme
   (Settings > Personalization > Colors, "Choose your app mode") by default and switch
-  live when it changes. To verify in the P2 spike: Flutter's platform brightness tracks
-  that setting live on Windows.
+  live when it changes. Verified on Windows 11 (F0 spike, 2026-10-12): Flutter's
+  embedder watches `AppsUseLightTheme` and the app followed a change in about 0.1 s.
+  The runner reports "Animation effects" itself, because Flutter's Windows embedder
+  does not (see §9).
 - Settings > Theme offers **Follow Windows** (default), **Light** and **Dark**. The
   popup uses the same choice, read from the app settings.
 - VEGAS's own dialogs keep their look; only Vegas Encoder windows change.
@@ -292,56 +294,92 @@ Sliders support arrows, Page Up/Down, and Home/End.
   always paired with an icon and text.
 - Flutter `Semantics` labels on custom controls: slider (value plus meaning), chips,
   and signal path nodes (role, name, state, and "Show size and quality" on File).
-- Contrast is checked in both themes.
+- Contrast is checked in both themes (`app/test/unit/tokens_test.dart`). The dark set
+  passes everywhere. Measured shortfalls of the light set, kept as the mockup has them
+  until the owner decides:
+  - `muted` on `paper` is 4.39:1, so the app never puts muted text on paper (it uses
+    `text2` there);
+  - `faintText` is 3.4–3.7:1; it is used for placeholders and slider tick numbers;
+  - `pip` on `paper` is 2.0:1; every pip carries a text label;
+  - control borders (`line2`) are 1.6–1.7:1 in both themes, under the 3:1 guideline for
+    component boundaries.
 - Reduced motion (Windows "Animation effects" off) disables decorative transitions.
-  State changes still update instantly.
-- Text scales up to 150% without clipping, within each window's minimum size.
+  State changes still update instantly. The runner reads `SPI_GETCLIENTAREAANIMATION`
+  and reports changes; the app sets `MediaQuery.disableAnimations`, and every
+  duration goes through `VeTokens.motion`.
+- Text scales up to 150% without clipping, within each window's minimum size. Known
+  gap: signal path nodes have fixed sizes from the mockup, so their text clips at large
+  scales (F2 sizes the diagram from the text scale).
 
 ## 10. Design tokens (Flutter `ThemeExtension`)
 
 The light and dark values are the `:root` token sets in
-[design/signal-flow.html](design/signal-flow.html). Both sets fill the same roles:
+[design/signal-flow.html](design/signal-flow.html), implemented in `app/lib/design/`
+(built in F1):
 
 ```dart
-@immutable
-class VeTokens extends ThemeExtension<VeTokens> {
-  // Surfaces
-  final Color canvas, panel, raised, line, text, textMuted, focus;
-  // Roles: what part of the command a thing belongs to
-  final Color roleInput, roleVideo, roleAudio, roleContainer, roleOutput, roleExtra;
-  // Status
-  final Color error, warning, info, success;
-  // Type
-  final TextStyle display, title, body, label, numeric, mono;
-  // Shape and space
-  final double radiusSmall, radiusLarge, space1, space2, space3, space4; // 4/8/12/16/24/32 scale
-  final Duration motionShort, motionMedium; // zero when reduced motion
-  // …copyWith / lerp
+// palette.dart: every CSS token by name, light and dark (presentation-only
+// --canvas and --pres-muted left out). CSS name → Dart field, for example:
+//   --paper paper, --surface surface, --surface-2 surface2, --panel panel,
+//   --ink ink, --text2 text2, --muted muted, --nd-text nodeText, --faint-text faintText,
+//   --line line, --line2 line2, --fill fill, --fill-sel fillSelected, --lit lit,
+//   --vw videoWire, --vw-text videoText, --aw audioWire, --cont containerWire, --pip pip,
+//   --err error, --errbg errorBackground, --warnt warning, --ok success, --macro macro,
+//   --vwl videoTint, --awl audioTint, --contl containerTint, --sel selection, --shadow-rgb shadow
+class VePalette { /* 57 colours, light and dark constants, lerp */
+  // UI_SPEC role names, as getters:
+  Color get roleInput, roleVideo, roleAudio, roleContainer, roleOutput, roleExtra, focus;
 }
+
+// tokens.dart
+class VeTokens extends ThemeExtension<VeTokens> {
+  final Brightness brightness;
+  final VePalette colors;
+  final VeTextStyles text; // body 13, small 12.5, caption 12, micro 11.5, label, button,
+                           // panelTitle 15, popupTitle 18, pageTitle 19, headline 22,
+                           // nodeTitle 17, figure 26, display 34, mono 12.5/1.7, monoEditor 14/23
+  List<BoxShadow> get raisedShadow, restingShadow, segmentShadow, popoverShadow, toastShadow;
+  static Duration motion(BuildContext, Duration); // zero when reduced motion
+}
+abstract final class VeSpace { s1..s6 = 4, 8, 12, 16, 24, 32 }
+abstract final class VeRadius { xs 3, sm 5, md 6, lg 8, xl 10 }
+abstract final class VeDurations { short 150 ms, medium 300 ms, wire 400 ms, wireCurve }
 ```
 
 - Role colours are used consistently across the command preview, node stripes and
-  diagram wires. Signal Flow adds `pip` (conversion marker) and the wire widths.
+  diagram wires. Signal Flow adds `pip` (conversion marker) and the wire widths
+  (video 10/4 px for 10-bit/8-bit; audio 6/5/2.5 px for float/24/16-bit; ×0.6 in the
+  strip).
 - `VeTokens.light` and `VeTokens.dark` are both registered; `ThemeMode` follows the
-  setting in §1.
-- Fonts: Instrument Sans for the UI and JetBrains Mono for commands. Both are OFL,
-  bundled and subset.
+  setting in §1. `ThemeData.platform` is fixed to Windows.
+- Fonts: Instrument Sans (UI) and JetBrains Mono (commands), OFL, bundled as the
+  upstream variable fonts (`app/assets/fonts/README.md`). Flutter maps `FontWeight` to
+  the `wght` axis, so the mockup's 550/620/650 weights are exact. Not subset yet: the
+  start-time measurement does not need it (see `workstreams/app.md`).
 - Components are Vegas Encoder's own, built on Flutter's base widgets, not the Material
-  look. A headless kit is an option only after checking its current version.
+  look. Material is used only for `ThemeData`, `TextField` internals and tooltips, all
+  themed from the tokens. No headless kit.
 
 ## 11. Component inventory (Flutter)
 
+Built in F1 (`app/lib/design/components/`), with sample data in the design-system
+gallery and goldens in both themes: `VeButton`, `VeIconButton`, `VeLinkButton`, `VeKbd`,
+`VeTextField`, `VeNumberField`, `VeSegmented`, `VeSwitch`, `VeSlider`, `VeSelect`,
+`VePopover`/`VeListbox`, `VeStatusTag`, `VeField`/`VeReadout`, `VeTitleBar`, and the
+rows marked F1 below. Components take display models; values come from `ve_core` and
+`ve_services` through the app state, never computed in the design layer.
+
 | Component | Notes |
 | --- | --- |
-| `EncoderPicker` | Grouped by codec; hardware vendor; availability state with reason; search |
-| `RateModeSwitch` | Segmented; only the encoder's modes |
-| `QualityControl` | Slider, field and marks; bitrate variant; profile-steps variant |
-| `SignalPath` | Full and strip layouts; nodes, wires sized by bit depth, conversion pips, marks; keyboard navigation (`CustomPainter` for wires) |
-| `ExtraArgumentsField` | Monospace field; unknown-option warnings from parsed options |
-| `CommandView` | Tokens with roles; collapsed inputs chip; copy; multi-line |
+| `EncoderPicker` | F1 (`VeEncoderPicker`). Grouped by codec; hardware vendor; availability state with reason; search still to come |
+| `RateModeSwitch` | F1 as `VeSegmented`. Segmented; only the encoder's modes |
+| `QualityControl` | F1 (`VeQualityControl`): slider, field, marks, recommended band. Bitrate and profile-steps variants in F2 |
+| `SignalPath` | F1. Full and strip layouts; nodes, wires sized by bit depth, conversion pips, marks; keyboard navigation (`CustomPainter` for wires) |
+| `ExtraArgumentsField` | F1 as a mono `VeTextField` with `VeMessage` warnings; the option check comes from the core in F2 |
+| `CommandView` | F1. Tokens with roles; collapsed inputs chip; copy; multi-line |
 | `CommandEditor` | `TextEditingController.buildTextSpan` highlighting, macro chips, lint underlines; autocomplete overlay last |
-| `MessageList` / `InlineMessage` | Levels, field focus |
-| `SizeQualityCard` | Length field; total, per-minute rate and range; video/audio split; consequences |
+| `MessageList` / `InlineMessage` | F1 (`VeCheckList`, `VeMessage`). Levels, field focus |
+| `SizeQualityCard` | F1. Length field; total, per-minute rate and range; video/audio split; consequences |
 | `OriginBanner` | Popup origin states and actions |
 | `DiffList` | Field label, from → to |
 | `InstallationCard`, `CapabilityTable` | FFmpeg screen |

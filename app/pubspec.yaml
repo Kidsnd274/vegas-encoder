@@ -1,0 +1,32 @@
+name: vegas_encoder
+description: "Vegas Encoder desktop app, VEGAS popup editor and render progress window."
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.4.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  # The app draws its own components and icons; the Material icon font is not bundled.
+  uses-material-design: false
+
+  fonts:
+    - family: Instrument Sans
+      fonts:
+        - asset: assets/fonts/InstrumentSans/InstrumentSans-Variable.ttf
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono/JetBrainsMono-Variable.ttf
+        - asset: assets/fonts/JetBrainsMono/JetBrainsMono-Italic-Variable.ttf
+          style: italic
