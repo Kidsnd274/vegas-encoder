@@ -394,7 +394,7 @@ performance rule: TECH_ARCHITECTURE §5.6.
 | Item | Behaviour |
 | --- | --- |
 | Size | About 380×250; not resizable; placed at the bottom-right of the monitor VEGAS is on |
-| Showing | Appears when a render starts **without taking focus**. Keep on top is a pin in the title bar (remembered) |
+| Showing | Appears when a render starts **without taking focus**. Keep on top is a pin in the title bar (remembered in C7 `keepOnTop`); **off by default** (owner, 2026-10-12). Mockup S6 shows it pinned |
 | Header | Wire glyph for 10-bit or 8-bit output, output file name, encoder summary |
 | Progress | A video-wire bar with a round head; percentage and "Frame 9,607 of 22,873" |
 | Figures | Encoding fps, speed (× realtime), bitrate, size so far, final size (about, extrapolated from bytes so far), time left and total |

@@ -82,10 +82,16 @@ memory (needs machine settings).
   start time above; `RendererFromEnvironment` in `windows/runner/main.cpp` is the one
   place to change, and `VEGAS_ENCODER_RENDERER=impeller` tries Impeller meanwhile.
   Re-measure on each Flutter upgrade and with VEGAS running.
-- **Flutter 3.47.7** at `L:\flutter` is intended (newest). README, ROADMAP and
-  WORKSTREAMS still say 3.44.6 (owner documents).
+- **Flutter 3.47.7** at `L:\flutter` is intended (newest). ROADMAP and WORKSTREAMS
+  now say so (applied with the owner's approval).
 - **Light tokens accepted as the mockup has them**, including the contrast figures in
   UI_SPEC §9.
+- **Keep on top off by default**, matching C7 `keepOnTop=false`. The pin is remembered
+  in C7; mockup S6 just shows the pinned state. `main.dart` now starts the progress
+  window unpinned; F6 reads the remembered value.
+- **Fake core limits: go to the real core.** Platform adds the four contract requests
+  below, keeps B1 short and builds B2 next; no fixture sweep of edited states. App
+  builds F2 with injected fixtures and F3 on the service fakes meanwhile.
 
 ## B0 review, app side
 
@@ -103,7 +109,7 @@ additive requests.
 | Size and quality | `estimate(…, durationSec)`: per-minute, total, min/max per minute, approx | None. F2 changes `SizeQualityCard` to show these figures instead of multiplying kb/s by the length itself |
 | Quality control | `NumericControl` with direction and marks | Recommended band per resolution (B1 profiles), optional |
 | Encoder picker | `videoOrder` groups, `EncoderProfile.hw/depths`, installation availability | None |
-| Settings | C7 `theme` (system/light/dark), `progressWindow`, `keepOnTop` | **Request:** a place for app UI state (desktop window bounds, last length in the size card). **Owner:** C7 defaults `keepOnTop=false`; mockup S6 shows the pin on and the app currently starts the progress window on top |
+| Settings | C7 `theme` (system/light/dark), `progressWindow`, `keepOnTop` | **Request:** a place for app UI state (desktop window bounds, last length in the size card). Keep on top: off by default, as C7 has it (owner decision above) |
 
 **Main constraint for F2:** `FakeVeCore` only answers its fixtures (the six built-ins
 and the popup snapshot). Any edit (CRF 18 to 17, another encoder) throws

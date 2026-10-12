@@ -16,10 +16,12 @@ Future<void> main(List<String> args) async {
   unawaited(window.trace('dart_main'));
 
   // The runner shows the window on the first frame, so placement (owner,
-  // keep on top) happens before runApp and the window never jumps.
+  // keep on top) happens before runApp and the window never jumps. Keep on top
+  // is off by default (owner decision); F6 reads the remembered pin from C7
+  // `keepOnTop` here.
   await window.configure(
     ownerHwnd: mode is EditSessionLaunch ? mode.ownerHwnd : null,
-    keepOnTop: mode is RenderMonitorLaunch ? true : null,
+    keepOnTop: mode is RenderMonitorLaunch ? false : null,
   );
   final initial = await window.state();
   binding.addPostFrameCallback((_) => unawaited(window.trace('dart_first_frame')));

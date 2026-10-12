@@ -104,7 +104,7 @@ The early milestones are chosen so neither side waits.
 
 ## 5. Shared rules
 
-- Windows x64 only. Flutter at `L:\flutter` (3.44.6 when this was written); upgrading
+- Windows x64 only. Flutter at `L:\flutter` (3.47.7 / Dart 3.13.5); upgrading
   the SDK is the owner's call.
 - The visual reference is `design/signal-flow.html` (light and dark); behaviour is
   `UI_SPEC.md`; settings rules are `SETTINGS_AND_COMMANDS.md`.
