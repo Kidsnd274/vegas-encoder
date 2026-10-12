@@ -171,6 +171,15 @@ Future<void> main() async {
 
   final machine = FakeMachineSettingsRepository();
   final original = await machine.read();
+  check(
+    !original.keepOnTop && !MachineSettings().keepOnTop,
+    'monitor starts unpinned',
+  );
+  check(
+    original.uiState!.desktopWindowBounds!.x == -1280 &&
+        original.uiState!.lastSizeLengthText == '10:00',
+    'UI-state fixture uses virtual desktop',
+  );
   final saved = await machine.save(
     original.copyWith(progressWindow: false),
     expectedRevision: original.revision,
@@ -185,9 +194,106 @@ Future<void> main() async {
       expectedRevision: 1,
     );
   }, 'DEFAULT-NOT-FOUND');
+  final uiJson = original.uiState!.toJson();
+  uiJson['future'] = {
+    'nested': [1],
+  };
+  (uiJson['desktopWindowBounds'] as Map)['future'] = {'scale': 1.25};
+  final uiState = AppUiState.fromJson(uiJson);
+  (uiJson['future'] as Map).clear();
+  final uiSnapshots = <MachineSettings>[];
+  final uiSub = machine.watch().listen(uiSnapshots.add);
+  final uiSaved = await machine.save(
+    saved.copyWith(
+      uiState: uiState.copyWith(
+        desktopWindowBounds: uiState.desktopWindowBounds!.copyWith(x: -1920),
+        desktopMaximized: true,
+        lastSizeLengthText: '1:',
+      ),
+    ),
+    expectedRevision: saved.revision,
+  );
+  await tick();
+  check(
+    uiSaved.revision == 2 &&
+        !uiSaved.progressWindow &&
+        uiSaved.defaultFFmpegId == original.defaultFFmpegId &&
+        !uiSaved.keepOnTop,
+    'UI write preserves render preferences',
+  );
+  check(
+    uiSnapshots.last.uiState!.lastSizeLengthText == '1:' &&
+        uiSnapshots.last.uiState!.desktopMaximized,
+    'UI watch preserves incomplete text and maximize',
+  );
+  check(
+    (uiSaved.uiState!.toJson()['future'] as Map).isNotEmpty &&
+        (uiSaved.uiState!.desktopWindowBounds!.toJson()['future']
+                as Map)['scale'] ==
+            1.25,
+    'UI state and bounds preserve unknown nested keys',
+  );
+  final uiCopy = uiSaved.toJson();
+  ((uiCopy['uiState'] as Map)['desktopWindowBounds'] as Map)['x'] = 0;
+  check(
+    uiSaved.uiState!.desktopWindowBounds!.x == -1920,
+    'UI serialization returns independent copy',
+  );
+  await rejects(() async {
+    await machine.save(saved, expectedRevision: 1);
+  }, 'REVISION-CONFLICT');
+  check(
+    (await machine.read()).uiState!.lastSizeLengthText == '1:',
+    'conflicting write preserves UI state',
+  );
+  check(
+    uiState.copyWith(lastSizeLengthText: '').lastSizeLengthText == '',
+    'empty input retained',
+  );
+  check(
+    uiState
+                .copyWith(desktopWindowBounds: null, lastSizeLengthText: null)
+                .desktopWindowBounds ==
+            null &&
+        uiState.copyWith(lastSizeLengthText: null).lastSizeLengthText == null &&
+        uiSaved.copyWith(uiState: null).uiState == null,
+    'explicit null clears UI fields',
+  );
+  final oldMachine = MachineSettings.fromJson({'machine': 1});
+  check(
+    oldMachine.uiState == null && !oldMachine.toJson().containsKey('uiState'),
+    'older machine file needs no migration',
+  );
+  check(
+    !AppUiState.fromJson({}).desktopMaximized,
+    'missing UI maximize defaults false',
+  );
+  await uiSub.cancel();
 
   final live = FakeLiveRenderStatusReader();
   final samples = FakeLiveRenderStatusReader.samples();
+  check(
+    samples.every((s) => s.hostHwnd == '123456'),
+    'host handle in every live phase',
+  );
+  final oldLiveJson = samples.first.toJson()..remove('hostHwnd');
+  final oldLive = LiveRenderStatus.fromJson(oldLiveJson);
+  check(
+    oldLive.hostHwnd == null && !oldLive.toJson().containsKey('hostHwnd'),
+    'older live files leave handle unavailable',
+  );
+  check(
+    samples.first.copyWith(hostHwnd: null).hostHwnd == null,
+    'handle can be cleared',
+  );
+  const maxHandle = '18446744073709551615';
+  check(
+    LiveRenderStatus.fromJson(
+          samples.first.copyWith(hostHwnd: maxHandle).toJson(),
+        ).hostHwnd ==
+        maxHandle,
+    'HWND decimal string round-trips without numeric precision loss',
+  );
   check(
     samples.map((s) => s.state).toSet().length == RenderState.values.length,
     'all seven render states',
@@ -201,6 +307,11 @@ Future<void> main() async {
   check(
     snapshots.length == 3 && snapshots.first == null,
     'live replay and updates',
+  );
+  check(
+    (await live.read('live'))!.hostHwnd == '123456' &&
+        snapshots.last!.hostHwnd == '123456',
+    'host placement fact survives reader and watch',
   );
   await rejects(() async {
     live.publish('live', samples[0]);

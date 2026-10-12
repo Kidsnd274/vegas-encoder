@@ -275,259 +275,323 @@ const String b0FixtureJson = r'''{
         "display": [
           {
             "text": "ffmpeg",
-            "role": "exe"
+            "role": "exe",
+            "field": null
           },
           {
             "text": "-hide_banner",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-nostdin",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-loglevel",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "info",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-stats_period",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "0.5",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-progress",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "pipe:1",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "rawvideo",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-pix_fmt",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "p010le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-s",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "1920x1080",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-r",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "30000/1001",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-video",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "f32le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ar",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "48000",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ac",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "2",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-audio",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "0:v:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "1:a:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-c:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "libx264",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "-preset",
-            "role": "video"
+            "role": "video",
+            "field": "video.speed"
           },
           {
             "text": "slow",
-            "role": "video"
+            "role": "video",
+            "field": "video.speed"
           },
           {
             "text": "-crf",
-            "role": "video"
+            "role": "video",
+            "field": "video.quality"
           },
           {
             "text": "18",
-            "role": "video"
+            "role": "video",
+            "field": "video.quality"
           },
           {
             "text": "-profile:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "high",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "-pix_fmt",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "yuv420p",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "-g",
-            "role": "video"
+            "role": "video",
+            "field": "video.gopSec"
           },
           {
             "text": "60",
-            "role": "video"
+            "role": "video",
+            "field": "video.gopSec"
           },
           {
             "text": "-color_primaries",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_trc",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-colorspace",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_range",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "tv",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-c:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "aac",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "-b:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].bitrateK"
           },
           {
             "text": "320k",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].bitrateK"
           },
           {
             "text": "-movflags",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.faststart"
           },
           {
             "text": "+faststart",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.faststart"
           },
           {
             "text": "-f",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "mp4",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "D:\\Renders\\Sample project.mp4",
-            "role": "output"
+            "role": "output",
+            "field": null
           }
         ],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v libx264 -preset slow -crf 18 -profile:v high -pix_fmt yuv420p -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a aac -b:a 320k -movflags +faststart -f mp4 \"D:\\Renders\\Sample project.mp4\"",
@@ -543,6 +607,32 @@ const String b0FixtureJson = r'''{
           "depth": 8,
           "pixfmt": "yuv420p"
         },
+        "signalPath": {
+          "video": {
+            "inputFormat": "p010le",
+            "outputFormat": "yuv420p",
+            "inputBits": 10,
+            "outputBits": 8,
+            "inputChroma": "4:2:0",
+            "outputChroma": "4:2:0",
+            "chromaChanged": false,
+            "conversion": true,
+            "containerSupport": "ok"
+          },
+          "audio": [
+            {
+              "inputFormat": "flt",
+              "outputFormat": "fltp",
+              "inputBits": 32,
+              "outputBits": 32,
+              "inputChroma": null,
+              "outputChroma": null,
+              "chromaChanged": null,
+              "conversion": true,
+              "containerSupport": "ok"
+            }
+          ]
+        },
         "issues": [
           {
             "id": "V-DEPTH-DOWN",
@@ -550,15 +640,23 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": [
+              43,
+              44
+            ]
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": [
+              59,
+              60
+            ]
           },
           {
             "id": "V-UNTESTED",
@@ -566,7 +664,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "summary": {
@@ -590,15 +689,17 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -606,7 +707,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "manual-7.1": [
@@ -616,15 +718,17 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -632,7 +736,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "btbn-lgpl-8.0": [
@@ -642,7 +747,8 @@ const String b0FixtureJson = r'''{
             "field": "video.encoder",
             "message": "x264 isn’t in FFmpeg 8.0 LGPL. Not in this build. LGPL builds leave out GPL encoders such as x264 and x265.",
             "params": {},
-            "fix": "Choose another encoder, or switch FFmpeg on the FFmpeg page."
+            "fix": "Choose another encoder, or switch FFmpeg on the FFmpeg page.",
+            "tokenIndices": []
           },
           {
             "id": "V-DEPTH-DOWN",
@@ -650,15 +756,17 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -666,7 +774,127 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
+          }
+        ]
+      },
+      "compileIssues": {
+        "gyan-8.1": [
+          {
+            "id": "V-DEPTH-DOWN",
+            "level": "info",
+            "field": "video.depth",
+            "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              43,
+              44
+            ]
+          },
+          {
+            "id": "V-FASTSTART",
+            "level": "info",
+            "field": "container.faststart",
+            "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              59,
+              60
+            ]
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "manual-7.1": [
+          {
+            "id": "V-DEPTH-DOWN",
+            "level": "info",
+            "field": "video.depth",
+            "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              43,
+              44
+            ]
+          },
+          {
+            "id": "V-FASTSTART",
+            "level": "info",
+            "field": "container.faststart",
+            "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              59,
+              60
+            ]
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "btbn-lgpl-8.0": [
+          {
+            "id": "V-ENC-MISSING",
+            "level": "error",
+            "field": "video.encoder",
+            "message": "x264 isn’t in FFmpeg 8.0 LGPL. Not in this build. LGPL builds leave out GPL encoders such as x264 and x265.",
+            "params": {},
+            "fix": "Choose another encoder, or switch FFmpeg on the FFmpeg page.",
+            "tokenIndices": [
+              35,
+              36
+            ]
+          },
+          {
+            "id": "V-DEPTH-DOWN",
+            "level": "info",
+            "field": "video.depth",
+            "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              43,
+              44
+            ]
+          },
+          {
+            "id": "V-FASTSTART",
+            "level": "info",
+            "field": "container.faststart",
+            "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              59,
+              60
+            ]
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
           }
         ]
       },
@@ -967,291 +1195,363 @@ const String b0FixtureJson = r'''{
         "display": [
           {
             "text": "ffmpeg",
-            "role": "exe"
+            "role": "exe",
+            "field": null
           },
           {
             "text": "-hide_banner",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-nostdin",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-loglevel",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "info",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-stats_period",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "0.5",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-progress",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "pipe:1",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "rawvideo",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-pix_fmt",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "p010le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-s",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "1920x1080",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-r",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "30000/1001",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-video",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "f32le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ar",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "48000",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ac",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "2",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-audio",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "0:v:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "1:a:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-c:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "hevc_nvenc",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "-preset",
-            "role": "video"
+            "role": "video",
+            "field": "video.speed"
           },
           {
             "text": "p5",
-            "role": "video"
+            "role": "video",
+            "field": "video.speed"
           },
           {
             "text": "-tune",
-            "role": "video"
+            "role": "video",
+            "field": "video.tune"
           },
           {
             "text": "hq",
-            "role": "video"
+            "role": "video",
+            "field": "video.tune"
           },
           {
             "text": "-rc",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "vbr",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "-cq",
-            "role": "video"
+            "role": "video",
+            "field": "video.quality"
           },
           {
             "text": "20",
-            "role": "video"
+            "role": "video",
+            "field": "video.quality"
           },
           {
             "text": "-b:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "0",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "-profile:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "main10",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "-pix_fmt",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "p010le",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "-g",
-            "role": "video"
+            "role": "video",
+            "field": "video.gopSec"
           },
           {
             "text": "60",
-            "role": "video"
+            "role": "video",
+            "field": "video.gopSec"
           },
           {
             "text": "-color_primaries",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_trc",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-colorspace",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_range",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "tv",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-tag:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "hvc1",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "-c:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "aac",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "-b:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].bitrateK"
           },
           {
             "text": "320k",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].bitrateK"
           },
           {
             "text": "-movflags",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.faststart"
           },
           {
             "text": "+faststart",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.faststart"
           },
           {
             "text": "-f",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "mp4",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "D:\\Renders\\Sample project.mp4",
-            "role": "output"
+            "role": "output",
+            "field": null
           }
         ],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v hevc_nvenc -preset p5 -tune hq -rc vbr -cq 20 -b:v 0 -profile:v main10 -pix_fmt p010le -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -tag:v hvc1 -c:a aac -b:a 320k -movflags +faststart -f mp4 \"D:\\Renders\\Sample project.mp4\"",
@@ -1267,6 +1567,32 @@ const String b0FixtureJson = r'''{
           "depth": 10,
           "pixfmt": "p010le"
         },
+        "signalPath": {
+          "video": {
+            "inputFormat": "p010le",
+            "outputFormat": "p010le",
+            "inputBits": 10,
+            "outputBits": 10,
+            "inputChroma": "4:2:0",
+            "outputChroma": "4:2:0",
+            "chromaChanged": false,
+            "conversion": false,
+            "containerSupport": "ok"
+          },
+          "audio": [
+            {
+              "inputFormat": "flt",
+              "outputFormat": "fltp",
+              "inputBits": 32,
+              "outputBits": 32,
+              "inputChroma": null,
+              "outputChroma": null,
+              "chromaChanged": null,
+              "conversion": true,
+              "containerSupport": "ok"
+            }
+          ]
+        },
         "issues": [
           {
             "id": "V-HARDWARE",
@@ -1274,15 +1600,25 @@ const String b0FixtureJson = r'''{
             "field": "video.encoder",
             "message": "Runs on NVIDIA GeForce RTX 4070.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": [
+              35,
+              36,
+              61,
+              62
+            ]
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": [
+              67,
+              68
+            ]
           },
           {
             "id": "V-UNTESTED",
@@ -1290,7 +1626,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "summary": {
@@ -1314,15 +1651,17 @@ const String b0FixtureJson = r'''{
             "field": "video.encoder",
             "message": "Runs on NVIDIA GeForce RTX 4070.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -1330,7 +1669,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "manual-7.1": [
@@ -1340,15 +1680,17 @@ const String b0FixtureJson = r'''{
             "field": "video.encoder",
             "message": "Runs on NVIDIA GeForce RTX 4070.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -1356,7 +1698,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "btbn-lgpl-8.0": [
@@ -1366,15 +1709,17 @@ const String b0FixtureJson = r'''{
             "field": "video.encoder",
             "message": "Runs on NVIDIA GeForce RTX 4070.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -1382,7 +1727,121 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
+          }
+        ]
+      },
+      "compileIssues": {
+        "gyan-8.1": [
+          {
+            "id": "V-HARDWARE",
+            "level": "info",
+            "field": "video.encoder",
+            "message": "Runs on NVIDIA GeForce RTX 4070.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              35,
+              36,
+              61,
+              62
+            ]
+          },
+          {
+            "id": "V-FASTSTART",
+            "level": "info",
+            "field": "container.faststart",
+            "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              67,
+              68
+            ]
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "manual-7.1": [
+          {
+            "id": "V-HARDWARE",
+            "level": "info",
+            "field": "video.encoder",
+            "message": "Runs on NVIDIA GeForce RTX 4070.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              35,
+              36,
+              61,
+              62
+            ]
+          },
+          {
+            "id": "V-FASTSTART",
+            "level": "info",
+            "field": "container.faststart",
+            "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              67,
+              68
+            ]
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "btbn-lgpl-8.0": [
+          {
+            "id": "V-HARDWARE",
+            "level": "info",
+            "field": "video.encoder",
+            "message": "Runs on NVIDIA GeForce RTX 4070.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              35,
+              36,
+              61,
+              62
+            ]
+          },
+          {
+            "id": "V-FASTSTART",
+            "level": "info",
+            "field": "container.faststart",
+            "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              67,
+              68
+            ]
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
           }
         ]
       },
@@ -1670,251 +2129,313 @@ const String b0FixtureJson = r'''{
         "display": [
           {
             "text": "ffmpeg",
-            "role": "exe"
+            "role": "exe",
+            "field": null
           },
           {
             "text": "-hide_banner",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-nostdin",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-loglevel",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "info",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-stats_period",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "0.5",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-progress",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "pipe:1",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "rawvideo",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-pix_fmt",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "p010le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-s",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "1920x1080",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-r",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "30000/1001",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-video",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "f32le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ar",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "48000",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ac",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "2",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-audio",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "0:v:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "1:a:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-c:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "libsvtav1",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "-preset",
-            "role": "video"
+            "role": "video",
+            "field": "video.speed"
           },
           {
             "text": "6",
-            "role": "video"
+            "role": "video",
+            "field": "video.speed"
           },
           {
             "text": "-crf",
-            "role": "video"
+            "role": "video",
+            "field": "video.quality"
           },
           {
             "text": "32",
-            "role": "video"
+            "role": "video",
+            "field": "video.quality"
           },
           {
             "text": "-pix_fmt",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "yuv420p10le",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "-g",
-            "role": "video"
+            "role": "video",
+            "field": "video.gopSec"
           },
           {
             "text": "60",
-            "role": "video"
+            "role": "video",
+            "field": "video.gopSec"
           },
           {
             "text": "-color_primaries",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_trc",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-colorspace",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_range",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "tv",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-c:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "libopus",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "-b:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].bitrateK"
           },
           {
             "text": "160k",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].bitrateK"
           },
           {
             "text": "-vbr",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].mode"
           },
           {
             "text": "on",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].mode"
           },
           {
             "text": "-f",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "matroska",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "D:\\Renders\\Sample project.mkv",
-            "role": "output"
+            "role": "output",
+            "field": null
           }
         ],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v libsvtav1 -preset 6 -crf 32 -pix_fmt yuv420p10le -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a libopus -b:a 160k -vbr on -f matroska \"D:\\Renders\\Sample project.mkv\"",
@@ -1930,6 +2451,32 @@ const String b0FixtureJson = r'''{
           "depth": 10,
           "pixfmt": "yuv420p10le"
         },
+        "signalPath": {
+          "video": {
+            "inputFormat": "p010le",
+            "outputFormat": "yuv420p10le",
+            "inputBits": 10,
+            "outputBits": 10,
+            "inputChroma": "4:2:0",
+            "outputChroma": "4:2:0",
+            "chromaChanged": false,
+            "conversion": true,
+            "containerSupport": "ok"
+          },
+          "audio": [
+            {
+              "inputFormat": "flt",
+              "outputFormat": "flt",
+              "inputBits": 32,
+              "outputBits": 32,
+              "inputChroma": null,
+              "outputChroma": null,
+              "chromaChanged": null,
+              "conversion": false,
+              "containerSupport": "ok"
+            }
+          ]
+        },
         "issues": [
           {
             "id": "V-UNTESTED",
@@ -1937,7 +2484,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "summary": {
@@ -1961,7 +2509,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "manual-7.1": [
@@ -1971,7 +2520,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "btbn-lgpl-8.0": [
@@ -1981,7 +2531,43 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
+          }
+        ]
+      },
+      "compileIssues": {
+        "gyan-8.1": [
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "manual-7.1": [
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "btbn-lgpl-8.0": [
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
           }
         ]
       },
@@ -2266,227 +2852,283 @@ const String b0FixtureJson = r'''{
         "display": [
           {
             "text": "ffmpeg",
-            "role": "exe"
+            "role": "exe",
+            "field": null
           },
           {
             "text": "-hide_banner",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-nostdin",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-loglevel",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "info",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-stats_period",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "0.5",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-progress",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "pipe:1",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "rawvideo",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-pix_fmt",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "p010le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-s",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "1920x1080",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-r",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "30000/1001",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-video",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "f32le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ar",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "48000",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ac",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "2",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-audio",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "0:v:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "1:a:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-c:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "prores_ks",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "-profile:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "hq",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "-vendor",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "apl0",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "-pix_fmt",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "yuv422p10le",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "-color_primaries",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_trc",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-colorspace",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_range",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "tv",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-c:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "pcm_s24le",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "-f",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "mov",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "D:\\Renders\\Sample project.mov",
-            "role": "output"
+            "role": "output",
+            "field": null
           }
         ],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v prores_ks -profile:v hq -vendor apl0 -pix_fmt yuv422p10le -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a pcm_s24le -f mov \"D:\\Renders\\Sample project.mov\"",
@@ -2502,6 +3144,32 @@ const String b0FixtureJson = r'''{
           "depth": 10,
           "pixfmt": "yuv422p10le"
         },
+        "signalPath": {
+          "video": {
+            "inputFormat": "p010le",
+            "outputFormat": "yuv422p10le",
+            "inputBits": 10,
+            "outputBits": 10,
+            "inputChroma": "4:2:0",
+            "outputChroma": "4:2:2",
+            "chromaChanged": true,
+            "conversion": true,
+            "containerSupport": "ok"
+          },
+          "audio": [
+            {
+              "inputFormat": "flt",
+              "outputFormat": "s32",
+              "inputBits": 32,
+              "outputBits": 24,
+              "inputChroma": null,
+              "outputChroma": null,
+              "chromaChanged": null,
+              "conversion": true,
+              "containerSupport": "ok"
+            }
+          ]
+        },
         "issues": [
           {
             "id": "V-CHROMA-UP",
@@ -2509,7 +3177,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "ProRes stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -2517,7 +3186,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "summary": {
@@ -2541,7 +3211,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "ProRes stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -2549,7 +3220,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "manual-7.1": [
@@ -2559,7 +3231,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "ProRes stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -2567,7 +3240,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "btbn-lgpl-8.0": [
@@ -2577,7 +3251,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "ProRes stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -2585,7 +3260,70 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
+          }
+        ]
+      },
+      "compileIssues": {
+        "gyan-8.1": [
+          {
+            "id": "V-CHROMA-UP",
+            "level": "info",
+            "field": "video.depth",
+            "message": "ProRes stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "manual-7.1": [
+          {
+            "id": "V-CHROMA-UP",
+            "level": "info",
+            "field": "video.depth",
+            "message": "ProRes stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "btbn-lgpl-8.0": [
+          {
+            "id": "V-CHROMA-UP",
+            "level": "info",
+            "field": "video.depth",
+            "message": "ProRes stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
           }
         ]
       },
@@ -2868,219 +3606,273 @@ const String b0FixtureJson = r'''{
         "display": [
           {
             "text": "ffmpeg",
-            "role": "exe"
+            "role": "exe",
+            "field": null
           },
           {
             "text": "-hide_banner",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-nostdin",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-loglevel",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "info",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-stats_period",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "0.5",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-progress",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "pipe:1",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "rawvideo",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-pix_fmt",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "p010le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-s",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "1920x1080",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-r",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "30000/1001",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-video",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "f32le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ar",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "48000",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ac",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "2",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-audio",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "0:v:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "1:a:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-c:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "dnxhd",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "-profile:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "dnxhr_hq",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "-pix_fmt",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "yuv422p",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "-color_primaries",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_trc",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-colorspace",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_range",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "tv",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-c:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "pcm_s16le",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "-f",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "mxf",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "D:\\Renders\\Sample project.mxf",
-            "role": "output"
+            "role": "output",
+            "field": null
           }
         ],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v dnxhd -profile:v dnxhr_hq -pix_fmt yuv422p -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a pcm_s16le -f mxf \"D:\\Renders\\Sample project.mxf\"",
@@ -3096,6 +3888,32 @@ const String b0FixtureJson = r'''{
           "depth": 8,
           "pixfmt": "yuv422p"
         },
+        "signalPath": {
+          "video": {
+            "inputFormat": "p010le",
+            "outputFormat": "yuv422p",
+            "inputBits": 10,
+            "outputBits": 8,
+            "inputChroma": "4:2:0",
+            "outputChroma": "4:2:2",
+            "chromaChanged": true,
+            "conversion": true,
+            "containerSupport": "ok"
+          },
+          "audio": [
+            {
+              "inputFormat": "flt",
+              "outputFormat": "s16",
+              "inputBits": 32,
+              "outputBits": 16,
+              "inputChroma": null,
+              "outputChroma": null,
+              "chromaChanged": null,
+              "conversion": true,
+              "containerSupport": "ok"
+            }
+          ]
+        },
         "issues": [
           {
             "id": "V-DEPTH-DOWN",
@@ -3103,7 +3921,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-CHROMA-UP",
@@ -3111,7 +3930,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "DNxHR stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -3119,7 +3939,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "summary": {
@@ -3143,7 +3964,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-CHROMA-UP",
@@ -3151,7 +3973,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "DNxHR stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -3159,7 +3982,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "manual-7.1": [
@@ -3169,7 +3993,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-CHROMA-UP",
@@ -3177,7 +4002,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "DNxHR stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -3185,7 +4011,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "btbn-lgpl-8.0": [
@@ -3195,7 +4022,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-CHROMA-UP",
@@ -3203,7 +4031,8 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "DNxHR stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -3211,7 +4040,97 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
+          }
+        ]
+      },
+      "compileIssues": {
+        "gyan-8.1": [
+          {
+            "id": "V-DEPTH-DOWN",
+            "level": "info",
+            "field": "video.depth",
+            "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          },
+          {
+            "id": "V-CHROMA-UP",
+            "level": "info",
+            "field": "video.depth",
+            "message": "DNxHR stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "manual-7.1": [
+          {
+            "id": "V-DEPTH-DOWN",
+            "level": "info",
+            "field": "video.depth",
+            "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          },
+          {
+            "id": "V-CHROMA-UP",
+            "level": "info",
+            "field": "video.depth",
+            "message": "DNxHR stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "btbn-lgpl-8.0": [
+          {
+            "id": "V-DEPTH-DOWN",
+            "level": "info",
+            "field": "video.depth",
+            "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          },
+          {
+            "id": "V-CHROMA-UP",
+            "level": "info",
+            "field": "video.depth",
+            "message": "DNxHR stores 4:2:2 color. VEGAS delivers 4:2:0, so the extra color resolution is interpolated, not recovered.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
           }
         ]
       },
@@ -3497,243 +4416,303 @@ const String b0FixtureJson = r'''{
         "display": [
           {
             "text": "ffmpeg",
-            "role": "exe"
+            "role": "exe",
+            "field": null
           },
           {
             "text": "-hide_banner",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-nostdin",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-loglevel",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "info",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-stats_period",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "0.5",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-progress",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "pipe:1",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "rawvideo",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-pix_fmt",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "p010le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-s",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "1920x1080",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-r",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "30000/1001",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-video",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "f32le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ar",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "48000",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ac",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "2",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-0000-audio",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "0:v:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "1:a:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-c:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "ffv1",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "-level",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "3",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "-g",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "1",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "-slices",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "16",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "-slicecrc",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "1",
-            "role": "video"
+            "role": "video",
+            "field": "video.mode"
           },
           {
             "text": "-pix_fmt",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "yuv420p10le",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "-color_primaries",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_trc",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-colorspace",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_range",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "tv",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-c:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "pcm_f32le",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "-f",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "matroska",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "D:\\Renders\\Sample project.mkv",
-            "role": "output"
+            "role": "output",
+            "field": null
           }
         ],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v ffv1 -level 3 -g 1 -slices 16 -slicecrc 1 -pix_fmt yuv420p10le -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a pcm_f32le -f matroska \"D:\\Renders\\Sample project.mkv\"",
@@ -3749,6 +4728,32 @@ const String b0FixtureJson = r'''{
           "depth": 10,
           "pixfmt": "yuv420p10le"
         },
+        "signalPath": {
+          "video": {
+            "inputFormat": "p010le",
+            "outputFormat": "yuv420p10le",
+            "inputBits": 10,
+            "outputBits": 10,
+            "inputChroma": "4:2:0",
+            "outputChroma": "4:2:0",
+            "chromaChanged": false,
+            "conversion": true,
+            "containerSupport": "ok"
+          },
+          "audio": [
+            {
+              "inputFormat": "flt",
+              "outputFormat": "flt",
+              "inputBits": 32,
+              "outputBits": 32,
+              "inputChroma": null,
+              "outputChroma": null,
+              "chromaChanged": null,
+              "conversion": false,
+              "containerSupport": "ok"
+            }
+          ]
+        },
         "issues": [
           {
             "id": "V-UNTESTED",
@@ -3756,7 +4761,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "summary": {
@@ -3780,7 +4786,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "manual-7.1": [
@@ -3790,7 +4797,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "btbn-lgpl-8.0": [
@@ -3800,7 +4808,43 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
+          }
+        ]
+      },
+      "compileIssues": {
+        "gyan-8.1": [
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "manual-7.1": [
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "btbn-lgpl-8.0": [
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
           }
         ]
       },
@@ -4092,259 +5136,323 @@ const String b0FixtureJson = r'''{
         "display": [
           {
             "text": "ffmpeg",
-            "role": "exe"
+            "role": "exe",
+            "field": null
           },
           {
             "text": "-hide_banner",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-nostdin",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-loglevel",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "info",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-stats_period",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "0.5",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-progress",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "pipe:1",
-            "role": "global"
+            "role": "global",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "rawvideo",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-pix_fmt",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "p010le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-s",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "3840x2160",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-r",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "30000/1001",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-7f3a-video",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-f",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "f32le",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ar",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "48000",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-ac",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "2",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-thread_queue_size",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "64",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-i",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "\\\\.\\pipe\\vegas-encoder-7f3a-audio",
-            "role": "input"
+            "role": "input",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "0:v:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-map",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "1:a:0",
-            "role": "map"
+            "role": "map",
+            "field": null
           },
           {
             "text": "-c:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "libx264",
-            "role": "video"
+            "role": "video",
+            "field": "video.encoder"
           },
           {
             "text": "-preset",
-            "role": "video"
+            "role": "video",
+            "field": "video.speed"
           },
           {
             "text": "slower",
-            "role": "video"
+            "role": "video",
+            "field": "video.speed"
           },
           {
             "text": "-crf",
-            "role": "video"
+            "role": "video",
+            "field": "video.quality"
           },
           {
             "text": "17",
-            "role": "video"
+            "role": "video",
+            "field": "video.quality"
           },
           {
             "text": "-profile:v",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "high",
-            "role": "video"
+            "role": "video",
+            "field": "video.profile"
           },
           {
             "text": "-pix_fmt",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "yuv420p",
-            "role": "video"
+            "role": "video",
+            "field": "video.depth"
           },
           {
             "text": "-g",
-            "role": "video"
+            "role": "video",
+            "field": "video.gopSec"
           },
           {
             "text": "60",
-            "role": "video"
+            "role": "video",
+            "field": "video.gopSec"
           },
           {
             "text": "-color_primaries",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_trc",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-colorspace",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "bt709",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-color_range",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "tv",
-            "role": "video"
+            "role": "video",
+            "field": "video.color"
           },
           {
             "text": "-c:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "aac",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].encoder"
           },
           {
             "text": "-b:a",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].bitrateK"
           },
           {
             "text": "256k",
-            "role": "audio"
+            "role": "audio",
+            "field": "audio[0].bitrateK"
           },
           {
             "text": "-movflags",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.faststart"
           },
           {
             "text": "+faststart",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.faststart"
           },
           {
             "text": "-f",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "mp4",
-            "role": "mux"
+            "role": "mux",
+            "field": "container.format"
           },
           {
             "text": "D:\\Renders\\Lakeside wedding final.mp4",
-            "role": "output"
+            "role": "output",
+            "field": null
           }
         ],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 3840x2160 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-7f3a-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-7f3a-audio -map 0:v:0 -map 1:a:0 -c:v libx264 -preset slower -crf 17 -profile:v high -pix_fmt yuv420p -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a aac -b:a 256k -movflags +faststart -f mp4 \"D:\\Renders\\Lakeside wedding final.mp4\"",
@@ -4360,6 +5468,32 @@ const String b0FixtureJson = r'''{
           "depth": 8,
           "pixfmt": "yuv420p"
         },
+        "signalPath": {
+          "video": {
+            "inputFormat": "p010le",
+            "outputFormat": "yuv420p",
+            "inputBits": 10,
+            "outputBits": 8,
+            "inputChroma": "4:2:0",
+            "outputChroma": "4:2:0",
+            "chromaChanged": false,
+            "conversion": true,
+            "containerSupport": "ok"
+          },
+          "audio": [
+            {
+              "inputFormat": "flt",
+              "outputFormat": "fltp",
+              "inputBits": 32,
+              "outputBits": 32,
+              "inputChroma": null,
+              "outputChroma": null,
+              "chromaChanged": null,
+              "conversion": true,
+              "containerSupport": "ok"
+            }
+          ]
+        },
         "issues": [
           {
             "id": "V-DEPTH-DOWN",
@@ -4367,15 +5501,23 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": [
+              43,
+              44
+            ]
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": [
+              59,
+              60
+            ]
           },
           {
             "id": "V-UNTESTED",
@@ -4383,7 +5525,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "summary": {
@@ -4407,15 +5550,17 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -4423,7 +5568,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "manual-7.1": [
@@ -4433,15 +5579,17 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -4449,7 +5597,8 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           }
         ],
         "btbn-lgpl-8.0": [
@@ -4459,7 +5608,8 @@ const String b0FixtureJson = r'''{
             "field": "video.encoder",
             "message": "x264 isn’t in FFmpeg 8.0 LGPL. Not in this build. LGPL builds leave out GPL encoders such as x264 and x265.",
             "params": {},
-            "fix": "Choose another encoder, or switch FFmpeg on the FFmpeg page."
+            "fix": "Choose another encoder, or switch FFmpeg on the FFmpeg page.",
+            "tokenIndices": []
           },
           {
             "id": "V-DEPTH-DOWN",
@@ -4467,15 +5617,17 @@ const String b0FixtureJson = r'''{
             "field": "video.depth",
             "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-FASTSTART",
             "level": "info",
-            "field": "container",
+            "field": "container.faststart",
             "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
           },
           {
             "id": "V-UNTESTED",
@@ -4483,7 +5635,127 @@ const String b0FixtureJson = r'''{
             "field": "",
             "message": "B0 design fixture. Not tested with VEGAS yet.",
             "params": {},
-            "fix": null
+            "fix": null,
+            "tokenIndices": []
+          }
+        ]
+      },
+      "compileIssues": {
+        "gyan-8.1": [
+          {
+            "id": "V-DEPTH-DOWN",
+            "level": "info",
+            "field": "video.depth",
+            "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              43,
+              44
+            ]
+          },
+          {
+            "id": "V-FASTSTART",
+            "level": "info",
+            "field": "container.faststart",
+            "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              59,
+              60
+            ]
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "manual-7.1": [
+          {
+            "id": "V-DEPTH-DOWN",
+            "level": "info",
+            "field": "video.depth",
+            "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              43,
+              44
+            ]
+          },
+          {
+            "id": "V-FASTSTART",
+            "level": "info",
+            "field": "container.faststart",
+            "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              59,
+              60
+            ]
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
+          }
+        ],
+        "btbn-lgpl-8.0": [
+          {
+            "id": "V-ENC-MISSING",
+            "level": "error",
+            "field": "video.encoder",
+            "message": "x264 isn’t in FFmpeg 8.0 LGPL. Not in this build. LGPL builds leave out GPL encoders such as x264 and x265.",
+            "params": {},
+            "fix": "Choose another encoder, or switch FFmpeg on the FFmpeg page.",
+            "tokenIndices": [
+              35,
+              36
+            ]
+          },
+          {
+            "id": "V-DEPTH-DOWN",
+            "level": "info",
+            "field": "video.depth",
+            "message": "VEGAS delivers 10-bit frames. This encode stores 8-bit, which can show banding in smooth gradients.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              43,
+              44
+            ]
+          },
+          {
+            "id": "V-FASTSTART",
+            "level": "info",
+            "field": "container.faststart",
+            "message": "Fast start rewrites the file once encoding ends so playback can begin before download finishes. Large renders take a little longer to finish.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": [
+              59,
+              60
+            ]
+          },
+          {
+            "id": "V-UNTESTED",
+            "level": "info",
+            "field": "",
+            "message": "B0 design fixture. Not tested with VEGAS yet.",
+            "params": {},
+            "fix": null,
+            "tokenIndices": []
           }
         ]
       },

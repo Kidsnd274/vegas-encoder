@@ -7,6 +7,11 @@ the sibling ve_core path package. No Flutter or third-party dependencies.
 See [C3–C7 contracts](../../docs/product/CONTRACTS.md) for exact file/service shapes.
 Real Windows discovery, process execution and repositories arrive in B3.
 
+Contract v1 additions: `LiveRenderStatus.hostHwnd` carries the host main window for
+monitor placement; `MachineSettings.uiState` carries desktop bounds/maximize and
+the last size-card length text via the existing revision-checked settings API.
+The default machine/live fixtures expose these; keepOnTop still defaults false.
+
 `FakeFFmpegDiscovery`, `FakeFFmpegProbe`, `FakeHardwareTests`, `FakePresetLibrary`,
 `FakeMachineSettingsRepository`, `FakeJobRepository` and `FakeEditSessionService`
 have default mockup fixtures. `FakeFFmpegHelpParser` maps injected exact text to

@@ -416,9 +416,8 @@ class FakeMachineSettingsRepository implements MachineSettingsRepository {
   FakeMachineSettingsRepository({MachineSettings? settings})
     : _store = _Store(
         settings ??
-            MachineSettings(
-              installations: _installations(),
-              defaultFFmpegId: 'gyan-8.1',
+            MachineSettings.fromJson(
+              jsonMap(jsonMap(jsonDecode(b0ServiceFixtureJson))['machine']),
             ),
       );
   final _Store<MachineSettings> _store;

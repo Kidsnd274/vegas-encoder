@@ -508,6 +508,7 @@ class Issue extends JsonModel {
     required String message,
     JsonMap params = const {},
     String? fix = null,
+    List<int> tokenIndices = const [],
     JsonMap extensions = const {},
   }) : super({
          'id': id,
@@ -516,6 +517,7 @@ class Issue extends JsonModel {
          'message': message,
          'params': params,
          'fix': fix,
+         'tokenIndices': tokenIndices,
          'extensions': extensions,
        });
   Issue.fromJson(super.json);
@@ -526,6 +528,8 @@ class Issue extends JsonModel {
   String get message => data['message'] as String;
   JsonMap get params => jsonMap(data['params'] ?? <String, Object?>{});
   String? get fix => data['fix'] as String?;
+  List<int> get tokenIndices =>
+      List<int>.unmodifiable((data['tokenIndices'] as List? ?? []).cast<int>());
   Issue copyWith({
     Object? id = absent,
     Object? level = absent,
@@ -533,6 +537,7 @@ class Issue extends JsonModel {
     Object? message = absent,
     Object? params = absent,
     Object? fix = absent,
+    Object? tokenIndices = absent,
     Object? extensions = absent,
   }) => Issue.fromJson(
     changed({
@@ -542,6 +547,7 @@ class Issue extends JsonModel {
       if (!identical(message, absent)) 'message': message,
       if (!identical(params, absent)) 'params': params,
       if (!identical(fix, absent)) 'fix': fix,
+      if (!identical(tokenIndices, absent)) 'tokenIndices': tokenIndices,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -603,20 +609,29 @@ class CommandToken extends JsonModel {
   CommandToken({
     required String text,
     TokenRole role = TokenRole.extra,
+    String? field = null,
     JsonMap extensions = const {},
-  }) : super({'text': text, 'role': role.name, 'extensions': extensions});
+  }) : super({
+         'text': text,
+         'role': role.name,
+         'field': field,
+         'extensions': extensions,
+       });
   CommandToken.fromJson(super.json);
   String get text => data['text'] as String;
   TokenRole get role =>
       TokenRole.values.byName(data['role'] as String? ?? 'extra');
+  String? get field => data['field'] as String?;
   CommandToken copyWith({
     Object? text = absent,
     Object? role = absent,
+    Object? field = absent,
     Object? extensions = absent,
   }) => CommandToken.fromJson(
     changed({
       if (!identical(text, absent)) 'text': text,
       if (!identical(role, absent)) 'role': (role as TokenRole).name,
+      if (!identical(field, absent)) 'field': field,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -683,6 +698,104 @@ class ResolvedSettings extends JsonModel {
   );
 }
 
+/// Core facts at a stream's encoder input, before codec compression.
+class StreamSignalFacts extends JsonModel {
+  StreamSignalFacts({
+    String? inputFormat = null,
+    String? outputFormat = null,
+    int? inputBits = null,
+    int? outputBits = null,
+    String? inputChroma = null,
+    String? outputChroma = null,
+    bool? chromaChanged = null,
+    bool? conversion = null,
+    String containerSupport = 'unknown',
+    JsonMap extensions = const {},
+  }) : super({
+         'inputFormat': inputFormat,
+         'outputFormat': outputFormat,
+         'inputBits': inputBits,
+         'outputBits': outputBits,
+         'inputChroma': inputChroma,
+         'outputChroma': outputChroma,
+         'chromaChanged': chromaChanged,
+         'conversion': conversion,
+         'containerSupport': containerSupport,
+         'extensions': extensions,
+       });
+  StreamSignalFacts.fromJson(super.json);
+  String? get inputFormat => data['inputFormat'] as String?;
+  String? get outputFormat => data['outputFormat'] as String?;
+  int? get inputBits => data['inputBits'] as int?;
+  int? get outputBits => data['outputBits'] as int?;
+  String? get inputChroma => data['inputChroma'] as String?;
+  String? get outputChroma => data['outputChroma'] as String?;
+  bool? get chromaChanged => data['chromaChanged'] as bool?;
+  bool? get conversion => data['conversion'] as bool?;
+  String get containerSupport =>
+      data['containerSupport'] as String? ?? 'unknown';
+  StreamSignalFacts copyWith({
+    Object? inputFormat = absent,
+    Object? outputFormat = absent,
+    Object? inputBits = absent,
+    Object? outputBits = absent,
+    Object? inputChroma = absent,
+    Object? outputChroma = absent,
+    Object? chromaChanged = absent,
+    Object? conversion = absent,
+    Object? containerSupport = absent,
+    Object? extensions = absent,
+  }) => StreamSignalFacts.fromJson(
+    changed({
+      if (!identical(inputFormat, absent)) 'inputFormat': inputFormat,
+      if (!identical(outputFormat, absent)) 'outputFormat': outputFormat,
+      if (!identical(inputBits, absent)) 'inputBits': inputBits,
+      if (!identical(outputBits, absent)) 'outputBits': outputBits,
+      if (!identical(inputChroma, absent)) 'inputChroma': inputChroma,
+      if (!identical(outputChroma, absent)) 'outputChroma': outputChroma,
+      if (!identical(chromaChanged, absent)) 'chromaChanged': chromaChanged,
+      if (!identical(conversion, absent)) 'conversion': conversion,
+      if (!identical(containerSupport, absent))
+        'containerSupport': containerSupport,
+      if (!identical(extensions, absent)) 'extensions': extensions,
+    }),
+  );
+}
+
+class SignalPathFacts extends JsonModel {
+  SignalPathFacts({
+    StreamSignalFacts? video = null,
+    List<StreamSignalFacts> audio = const [],
+    JsonMap extensions = const {},
+  }) : super({
+         'video': video?.toJson(),
+         'audio': audio.map((v) => v.toJson()).toList(),
+         'extensions': extensions,
+       });
+  SignalPathFacts.fromJson(super.json);
+  StreamSignalFacts? get video => data['video'] == null
+      ? null
+      : StreamSignalFacts.fromJson(jsonMap(data['video']));
+  List<StreamSignalFacts> get audio => List<StreamSignalFacts>.unmodifiable(
+    jsonMaps(data['audio'] ?? []).map(StreamSignalFacts.fromJson),
+  );
+  SignalPathFacts copyWith({
+    Object? video = absent,
+    Object? audio = absent,
+    Object? extensions = absent,
+  }) => SignalPathFacts.fromJson(
+    changed({
+      if (!identical(video, absent))
+        'video': (video as StreamSignalFacts?)?.toJson(),
+      if (!identical(audio, absent))
+        'audio': (audio as List<StreamSignalFacts>)
+            .map((v) => v.toJson())
+            .toList(),
+      if (!identical(extensions, absent)) 'extensions': extensions,
+    }),
+  );
+}
+
 class CompileResult extends JsonModel {
   CompileResult({
     required String executable,
@@ -691,6 +804,7 @@ class CompileResult extends JsonModel {
     String commandLine = '',
     String advancedTemplate = '',
     ResolvedSettings? resolved = null,
+    SignalPathFacts? signalPath = null,
     List<Issue> issues = const [],
     JsonMap summary = const {},
     JsonMap extensions = const {},
@@ -701,6 +815,7 @@ class CompileResult extends JsonModel {
          'commandLine': commandLine,
          'advancedTemplate': advancedTemplate,
          'resolved': resolved?.toJson(),
+         'signalPath': signalPath?.toJson(),
          'issues': issues.map((v) => v.toJson()).toList(),
          'summary': summary,
          'extensions': extensions,
@@ -717,6 +832,9 @@ class CompileResult extends JsonModel {
   ResolvedSettings? get resolved => data['resolved'] == null
       ? null
       : ResolvedSettings.fromJson(jsonMap(data['resolved']));
+  SignalPathFacts? get signalPath => data['signalPath'] == null
+      ? null
+      : SignalPathFacts.fromJson(jsonMap(data['signalPath']));
   List<Issue> get issues => List<Issue>.unmodifiable(
     jsonMaps(data['issues'] ?? []).map(Issue.fromJson),
   );
@@ -728,6 +846,7 @@ class CompileResult extends JsonModel {
     Object? commandLine = absent,
     Object? advancedTemplate = absent,
     Object? resolved = absent,
+    Object? signalPath = absent,
     Object? issues = absent,
     Object? summary = absent,
     Object? extensions = absent,
@@ -744,6 +863,8 @@ class CompileResult extends JsonModel {
         'advancedTemplate': advancedTemplate,
       if (!identical(resolved, absent))
         'resolved': (resolved as ResolvedSettings?)?.toJson(),
+      if (!identical(signalPath, absent))
+        'signalPath': (signalPath as SignalPathFacts?)?.toJson(),
       if (!identical(issues, absent))
         'issues': (issues as List<Issue>).map((v) => v.toJson()).toList(),
       if (!identical(summary, absent)) 'summary': summary,

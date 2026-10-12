@@ -351,5 +351,15 @@
   "progressWindow": true,
   "keepOnTop": false,
   "verifyOutput": true,
-  "theme": "system"
+  "theme": "system",
+  "uiState": {
+    "desktopWindowBounds": {
+      "x": -1280,
+      "y": 80,
+      "width": 1200,
+      "height": 800
+    },
+    "desktopMaximized": false,
+    "lastSizeLengthText": "10:00"
+  }
 }
