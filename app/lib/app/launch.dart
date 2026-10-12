@@ -1,0 +1,90 @@
+import 'package:flutter/foundation.dart';
+
+/// How VegasEncoder.exe was started (TECH_ARCHITECTURE §9.2). The Windows
+/// runner applies the same rule to choose the window (launch_options.cpp).
+@immutable
+sealed class LaunchMode {
+  const LaunchMode();
+
+  /// Parses the process arguments. The first of `--edit-session` or
+  /// `--render-monitor` decides the mode; without either, the desktop app runs.
+  factory LaunchMode.fromArguments(List<String> args) {
+    for (var i = 0; i < args.length; i++) {
+      final arg = args[i];
+      if (arg == '--edit-session' || arg == '--render-monitor') {
+        final value = i + 1 < args.length ? args[i + 1] : null;
+        if (value == null || value.isEmpty || value.startsWith('--')) {
+          return LaunchError(arg, '$arg needs a path after it.');
+        }
+        return arg == '--edit-session'
+            ? EditSessionLaunch(value, ownerHwnd: _ownerFrom(args))
+            : RenderMonitorLaunch(value);
+      }
+    }
+    return const DesktopLaunch();
+  }
+
+  /// Provisional `--owner <hwnd>` (decimal). The edit-session contract (C4)
+  /// puts the owner in request.json, read through ve_services; this argument
+  /// lets the window spike and fake hosts run before that exists.
+  static int? _ownerFrom(List<String> args) {
+    final i = args.indexOf('--owner');
+    if (i < 0 || i + 1 >= args.length) return null;
+    return int.tryParse(args[i + 1]);
+  }
+
+  /// The window kind the runner created for these arguments.
+  LaunchWindow get window;
+}
+
+enum LaunchWindow { desktop, editSession, renderMonitor }
+
+final class DesktopLaunch extends LaunchMode {
+  const DesktopLaunch();
+  @override
+  LaunchWindow get window => LaunchWindow.desktop;
+  @override
+  bool operator ==(Object other) => other is DesktopLaunch;
+  @override
+  int get hashCode => 0;
+}
+
+/// `--edit-session <dir>`: the VEGAS popup for one session directory.
+final class EditSessionLaunch extends LaunchMode {
+  const EditSessionLaunch(this.sessionDir, {this.ownerHwnd});
+  final String sessionDir;
+  final int? ownerHwnd;
+  @override
+  LaunchWindow get window => LaunchWindow.editSession;
+  @override
+  bool operator ==(Object other) =>
+      other is EditSessionLaunch && other.sessionDir == sessionDir && other.ownerHwnd == ownerHwnd;
+  @override
+  int get hashCode => Object.hash(sessionDir, ownerHwnd);
+}
+
+/// `--render-monitor <file>`: the progress window for one live status file.
+final class RenderMonitorLaunch extends LaunchMode {
+  const RenderMonitorLaunch(this.liveFile);
+  final String liveFile;
+  @override
+  LaunchWindow get window => LaunchWindow.renderMonitor;
+  @override
+  bool operator ==(Object other) => other is RenderMonitorLaunch && other.liveFile == liveFile;
+  @override
+  int get hashCode => liveFile.hashCode;
+}
+
+/// A mode flag without its path. The runner still made that kind of window,
+/// so the app shows the problem there instead of exiting silently.
+final class LaunchError extends LaunchMode {
+  const LaunchError(this.flag, this.message);
+  final String flag;
+  final String message;
+  @override
+  LaunchWindow get window => flag == '--edit-session' ? LaunchWindow.editSession : LaunchWindow.renderMonitor;
+  @override
+  bool operator ==(Object other) => other is LaunchError && other.flag == flag && other.message == message;
+  @override
+  int get hashCode => Object.hash(flag, message);
+}
