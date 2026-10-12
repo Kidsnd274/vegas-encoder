@@ -1,6 +1,7 @@
 # FFmpeg integration: which FFmpeg, and what it can do
 
-Updated: 2026-10-11 (Asia/Singapore). Status: proposal.
+Updated: 2026-10-12 (Asia/Singapore). Status: proposal. Distribution is decided:
+user-supplied FFmpeg, with no download offer for now (owner, 2026-10-12).
 
 This answers the owner's open question: "how the program knows what codecs are
 available and which FFmpeg instance to use."
@@ -9,7 +10,10 @@ Supporting material:
 
 - Measurements and parsing rules: [research/FFMPEG_DISCOVERY.md](research/FFMPEG_DISCOVERY.md).
 - Raw evidence in the ignored `evidence/2026-10-11-product-design/` folder (`ffmpeg-probe/`, `container-matrix/`).
-- All local checks used FFmpeg 8.1.3 on Linux. Windows builds still need their own fixtures.
+- All design-time checks used FFmpeg 8.1.3 on a Linux machine. The product is
+  Windows-only, so P1 recaptures the help text, container matrix and probe timings
+  with Windows builds (gyan.dev and BtbN, static and shared). Those become the
+  fixtures; the numbers below are indicative until then.
 
 ## 1. Choosing the FFmpeg
 
@@ -86,7 +90,7 @@ Rules verified against FFmpeg 8.1.3 output:
   scientific notation, and enum names as defaults (`p4`, `twoloop`, `auto`).
 - Some options appear twice under alias names (NVENC `spatial_aq` and `spatial-aq`).
   Merge entries with the same type, range, default and description into one option
-  with aliases, so search and "All options" don't show duplicates.
+  with aliases, so lint and autocomplete don't show duplicates.
 - `-h encoder=X` lists **private** options only. Generic codec options (`-b`, `-g`,
   `-bf`, `-maxrate`, `-compression_level`, …) come from a curated list, or from
   `-h full` if ever needed.

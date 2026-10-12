@@ -1,18 +1,29 @@
 # Vegas Encoder status
 
-Updated: 2026-10-11 (Asia/Singapore). Installed version: 0.1.2-config-proof.
+Updated: 2026-10-12 (Asia/Singapore). Installed version: 0.1.2-config-proof.
 
 ## Current progress
 
+**Product design (2026-10-12):** the `product-ui-design` branch is merged into master,
+and the owner has reviewed it. Decisions are in
+[docs/product/README.md](product/README.md#decisions): the Signal Flow direction
+(round 2 mockup in `docs/product/design/signal-flow.html`), Basic/Advanced modes,
+Flutter, Windows x64 only, a theme that follows Windows, no proof-template migration,
+and render progress through a VEGAS status line (if a real-host test allows it) plus a
+small progress window. The project license is still open. No product code exists
+yet. This is design work only: no VEGAS runtime claim, and the adapter gates below
+are unchanged.
+
+**Next:** the product build starts in two parallel workstreams, app and platform
+([docs/product/WORKSTREAMS.md](product/WORKSTREAMS.md)).
+
 **Scope boundary:** finish the VEGAS integration foundation before starting app
-work. The user reports the app design is complete on another branch;
-`origin/product-ui-design` is available locally and has not been merged here.
-The user chose to defer the two-template/restart persistence test. Retain that
+work. The user chose to defer the two-template/restart persistence test. Retain that
 qualification limit rather than treating it as a prerequisite for this handoff.
-The user requested a commit of the completed implementation/scaffolding and
-explicitly deferred app-design branch review to a later session.
-Framework, presets, full settings schema and rich desktop/popup work follow a
-review of that design branch. See [design stop point](DESIGN_GATE.md).
+The user requested a commit of the completed implementation/scaffolding.
+Presets, the full settings schema and rich desktop/popup work follow the product
+roadmap ([docs/product/ROADMAP.md](product/ROADMAP.md)). See
+[design stop point](DESIGN_GATE.md).
 
 First real Vegas Encoder render passes decoded checks: 182 1080p frames at
 30000/1001 and 291,491 float32 stereo sample frames, S_OK/encoder exit zero,

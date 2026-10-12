@@ -11,9 +11,15 @@ Every statement below carries one of three labels:
 
 No Windows build was run.
 
+**Note (2026-10-12):** these notes were taken on a Linux machine. The owner has since
+chosen Flutter for a Windows-only product, with all development on Windows. The
+Windows engine artifacts, the toolchain check and every "to verify" item below need
+redoing on the Windows machine. The direction is Signal Flow, so the `fluent_ui` and
+Mica notes no longer apply.
+
 ## Local toolchain (verified)
 
-`flutter --version` on the development machine (Linux host):
+`flutter --version` on the earlier development machine (Linux host):
 
 - Flutter 3.47.2, stable channel, framework revision d3b14c8769 (2026-08-26)
 - Dart 3.13.2

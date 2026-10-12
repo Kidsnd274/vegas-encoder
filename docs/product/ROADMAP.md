@@ -1,6 +1,6 @@
 # Product roadmap
 
-Updated: 2026-10-11 (Asia/Singapore). Status: proposal.
+Updated: 2026-10-12 (Asia/Singapore). Status: proposal; P0 decisions recorded.
 
 The product phases run alongside the adapter gates in [ADAPTER_PLAN.md](../ADAPTER_PLAN.md);
 gate state is tracked in [STATUS.md](../STATUS.md). No calendar estimates are given,
@@ -13,8 +13,8 @@ and STATUS is updated at the end.
 ```mermaid
 flowchart LR
     P0[P0 Review<br/>direction + decisions] --> P1[P1 Core + schema<br/>engine argv parity]
-    P1 --> P2[P2 Flutter skeleton<br/>library, Guided, FFmpeg]
-    P2 --> P3[P3 Command mode,<br/>all options, history]
+    P1 --> P2[P2 Flutter skeleton<br/>library, Basic, FFmpeg]
+    P2 --> P3[P3 Advanced mode,<br/>history]
     A4[A4 real-host parity] --> P4
     A5[A5 page exchange] --> P4[P4 VEGAS page,<br/>popup, payload]
     A6[A6 one-setting proof] --> P4
@@ -23,31 +23,46 @@ flowchart LR
     P4 --> P5[P5 Installer, signing,<br/>pinned presets]
 ```
 
-## P0: Review (now)
+## P0: Review
 
-- Choose a design direction, or a mix (see [design/index.html](design/index.html)).
-- Confirm or adjust the decisions in [README.md](README.md#decisions-for-the-owner).
-- **Exit:** a chosen direction with a list of changes, and accepted T1–T8 decisions in TECH_ARCHITECTURE §1.
+- **Done 2026-10-12.** The owner chose Signal Flow with a list of changes, built as
+  [design/signal-flow.html](design/signal-flow.html), and recorded the decisions in
+  [README.md](README.md#decisions): Basic/Advanced, Flutter, Windows only, a theme
+  that follows Windows, Riverpod, user-supplied FFmpeg, no proof-template migration,
+  and render progress through a VEGAS status line plus a small progress window.
+- Still open: the project license. T1 and T2 stand as plan defaults.
+- From here the work runs in two parallel workstreams, app and platform, described in
+  [WORKSTREAMS.md](WORKSTREAMS.md). The phases below say what is built; that file says
+  who builds it and in what order.
 
 ## P1: Product core and schema (no VEGAS, no Flutter)
 
-1. Write `schema/recipe.v1.schema.json` and `schema/encoder-profiles.v1.json` from the
+1. Recapture the FFmpeg facts on Windows: `-h encoder=`, `-encoders`, `-muxers` and the
+   container matrix with gyan.dev and BtbN builds (static and shared), plus probe
+   timings. The design-time captures came from a Linux build.
+2. Write `schema/recipe.v1.schema.json` and `schema/encoder-profiles.v1.json` from the
    prototype data in `design/shared/model.js`. Encoder option facts come from the
-   captured help text; container rules come from the matrix.
-2. Add `src/core`: normalize, validate, compile, lint, payload envelope, session formats
+   Windows help captures; container rules come from the Windows matrix.
+3. Add `src/core`: normalize, validate, compile, lint, payload envelope, session formats
    and the C ABI. C++17, no Windows or VEGAS headers.
-3. Golden fixtures. Every built-in preset plus edge cases (template mode, missing
+4. Golden fixtures. Every built-in preset plus edge cases (template mode, missing
    macros, unknown encoder, ProRes 4444, DNxHR pixel format, CBR in MP4) map to
    expected argv. The compile path for the current fixed profile must reproduce the
    existing FFV1/PCM command.
-4. Engine change: accept argv plus input specs instead of the fixed profile. Add
-   `-progress pipe:1` parsing and ffprobe output verification before publish.
-5. Extend the fake-host suite to render several compiled recipes through FFmpeg
+5. Engine change: accept argv plus input specs instead of the fixed profile. Add
+   `-progress pipe:1` parsing, the live render status file (TECH_ARCHITECTURE §5.6) and
+   ffprobe output verification before publish.
+6. Extend the fake-host suite to render several compiled recipes through FFmpeg
    (x264/MP4, ProRes/MOV, FFV1/MKV), decode them, and run the existing checkers where
    they apply.
 
+**Independent track: VEGAS status line.** Static analysis of `ISfProgress` slots 3 and 4
+in VEGAS 2026.0.3.189 (sibling investigation), then an opt-in test build that writes a
+status line during a real render, run with the owner. Keep it or drop it on the result.
+
 **Exit:**
-- Core tests pass on Linux and Windows.
+- Core tests pass on Windows.
+- Parser and lint fixtures come from Windows FFmpeg builds.
 - Fake-host suite passes with recipes.
 - Fixed-profile decoded output is unchanged.
 - Measured compile time is recorded.
@@ -55,44 +70,55 @@ flowchart LR
 
 ## P2: Flutter skeleton
 
-1. `app/` on Flutter 3.47. Core is built through build hooks, with the CMake fallback if
-   the C++ spike fails. Run the TECH_ARCHITECTURE §9.4 Windows spikes:
+1. `app/` on the installed Flutter (3.44.6 at `L:\flutter` on 2026-10-12; the research
+   assumed 3.47, and upgrading is the owner's call). Core is built through
+   `packages/ve_core` build hooks, with the CMake fallback if the C++ spike fails. Run
+   the TECH_ARCHITECTURE §9.4 Windows spikes:
    - start time;
    - console flash;
    - owner HWND;
    - renderer;
-   - file watching.
-2. Design system from the chosen direction's tokens (`ThemeExtension`). Components:
+   - file watching;
+   - theme: platform brightness follows the Windows app theme live;
+   - a window that shows without taking focus.
+2. Design system from Signal Flow's light and dark tokens (`ThemeExtension`), with
+   Instrument Sans and JetBrains Mono bundled. Components:
+   - signal path, full and strip layouts;
    - encoder picker with availability;
    - mode switch;
    - quality control;
+   - Extra arguments field with option checks;
+   - size and quality card;
    - command preview;
    - message list.
 3. Presets: library repository (files, revisions, watch); built-ins; list, search,
    favorites; duplicate, save, import/export.
-4. Guided editor for every curated encoder; live command, validation and estimate via FFI.
+4. Basic editor for every curated encoder; live command, validation and estimate via FFI.
 5. FFmpeg page: discovery, identity, probe, cache, hardware tests; the default is written
    to `machine.json`.
-6. Linux development build and golden screenshots of each screen.
+6. Golden screenshots of each screen in light and dark.
 
 **Exit:**
 - Windows release build measured against the §9.3 budgets.
 - Golden tests pass.
 - Presets round-trip through core.
 
-## P3: Command mode, all options, history
+## P3: Advanced mode and history
 
-1. Command editor:
+1. Advanced editor:
    - highlighting;
    - locked macro chips;
    - lint in place;
-   - autocomplete from parsed options;
-   - seed from Guided and switch back.
-2. "All options" with typed editors and changed-value marks; cross-setting search.
-3. History from `jobs.jsonl` and job records: detail, stderr, command, verification,
+   - seed from Basic and switch back;
+   - macros panel and resolved command.
+2. History from `jobs.jsonl` and job records: detail, stderr, command, verification,
    and "open settings as new preset".
+3. Render progress window (`--render-monitor`), driven by a fake live status file.
+4. **Last:** autocomplete from parsed options. It reuses lint's data; the work is the
+   popover. It can move to v1+ without blocking the phase.
 
-**Exit:** Command-mode recipes compile and render in the fake host, and lint fixtures pass.
+**Exit:** Advanced-mode recipes compile and render in the fake host, and lint fixtures
+pass. Autocomplete is either done or explicitly deferred.
 
 ## P4: VEGAS integration (gated)
 
@@ -105,20 +131,26 @@ flowchart LR
 1. Native property page: summary, Edit settings…, Load preset; and the open-editor state
    (mock: `design/shared/vegas-native-page.html`).
 2. Session protocol v1 and popup mode: owner, modality, crash-safe result, Apply/Cancel.
-3. A7 payload envelope in `abExtra`. Measure the size limit. Migrate legacy markers if
-   that is accepted.
-4. The render path uses the template's recipe:
+3. A7 payload envelope in `abExtra`. Measure the size limit. Proof-template markers are
+   not migrated (owner decision).
+4. Popup size card: fill in the project length if the page exchange exposes it;
+   otherwise leave the length empty.
+5. The render path uses the template's recipe:
    - "follow project" choices resolved;
    - errors before render for missing or failed encoders;
-   - job records.
-5. Real-host checklist on 2026.0.3.189:
+   - job records;
+   - the progress window launched at render start, and the VEGAS status line if the
+     P1 track kept it.
+6. Progress window performance check (TECH_ARCHITECTURE §5.6): three real renders with
+   it and three without. Over about 2% slower, or visible disturbance to VEGAS, drops it.
+7. Real-host checklist on 2026.0.3.189:
    - render each qualified recipe;
    - repeat, cancel and failure renders;
    - two templates, unapplied cancel, save and restart;
    - recipe edited or deleted in the library, with the template still rendering;
    - editor crash recovery;
    - owner and focus behaviour.
-6. Publish the first **qualified matrix**, for example x264/MP4, NVENC HEVC/MP4,
+8. Publish the first **qualified matrix**, for example x264/MP4, NVENC HEVC/MP4,
    ProRes/MOV and FFV1/MKV with AAC/PCM, each with evidence.
 
 **Exit:**

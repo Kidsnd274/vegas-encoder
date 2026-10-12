@@ -1,11 +1,13 @@
 # Vegas Encoder product specification
 
-Updated: 2026-10-11 (Asia/Singapore). Status: proposal for review.
+Updated: 2026-10-12 (Asia/Singapore). Status: proposal, updated with the owner's
+decisions of 2026-10-12 ([README.md](README.md#decisions)).
 
 What the product does for its users, feature by feature, and the flows that tie it
 together. The architecture is in [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md), the
 settings rules in [SETTINGS_AND_COMMANDS.md](SETTINGS_AND_COMMANDS.md), and the
-visual exploration in [design/](design/DESIGN_BRIEF.md).
+chosen design in [design/signal-flow.html](design/signal-flow.html). The product runs
+on Windows x64 only, because VEGAS Pro does.
 
 ## 1. Principles
 
@@ -43,25 +45,29 @@ Priority labels:
 | Bit depth (8/10) mapped to the right pixel format; keyframe interval in seconds; BT.709 color tags | v1 | Bit-depth loss and chroma interpolation explained inline |
 | **Audio stream:** encoder (AAC, Opus, FLAC, ALAC, PCM 16/24/32f, AC-3, E-AC-3, MP3), bitrate / VBR quality / lossless level, sample rate, channels (source, stereo, mono) | v1 | Opus restricted to 48 kHz, etc. |
 | Turn video or audio off | v1 | Audio-only renders blocked until the adapter supports them |
-| **All options** per encoder: every private option the FFmpeg reports, typed editors, defaults shown, changed values marked, searchable | v1 | Parsed from `-h encoder=X`; works for uncurated encoders too |
-| **Extra arguments** per stream | v1 | Appended verbatim; linted |
+| **Signal path** diagram as the editor's navigation: wire thickness for bit depth, pips for conversions | v1 | Full on the desktop, a one-row strip in the popup |
+| **Extra arguments** per stream, for any option without a control | v1 | Replaces same-name generated options; unknown options warn, checked against `-h encoder=X` |
 | Live command preview, copyable, grouped by stream | v1 | Same compiler as the render |
-| Size estimate for the project duration (exact for bitrate modes, "about" for quality modes) | v1 | |
+| **Size and quality** behind the File node: rate per minute, total for a typed length, range for quality modes | v1 | The popup fills in the project length only if VEGAS shares it (**gated** A5) |
+| Light and dark themes, following Windows | v1 | Settings can force either |
 | **Test this preset**: run FFmpeg on synthetic frames at the project's format, then verify the output | v1 | Finds failing GPU encoders and bad arguments before a VEGAS render (Voukoder Pro Scene Test precedent) |
 | Modified dots, per-field reset, Reset to preset; "default" relative to the encoder speed preset | v1 | StaxRip and HandBrake precedents |
-| Search across every setting | v1+ | D4 Inspector's hero; useful in any direction |
 | "From VEGAS" panel: delivered size, rate, pixel format, audio format | v1 (read-only) | Overrides (frame size, rate, input format) are **gated** |
-| Filters (scale, deinterlace, LUT) as structured controls | Later | Command mode and Extra arguments cover them meanwhile |
+| Filters (scale, deinterlace, LUT) as structured controls | Later | Advanced mode and Extra arguments cover them meanwhile |
 
-### 2.2 Command mode
+**Dropped (owner, 2026-10-12):** an "All options" editor for every private option
+FFmpeg reports, and a search across every setting. Basic keeps curated controls;
+anything else goes in Extra arguments or Advanced mode.
+
+### 2.2 Advanced mode
 
 | Feature | Priority | Notes |
 | --- | --- | --- |
 | Write the whole command; `{inputs}` and `{output}` required; value macros (`{fps}`, `{gop:2s}`, `{project}`…) | v1 | |
 | Syntax highlighting by role; locked macro chips | v1 | |
 | Lint in place: missing macros, invalid enum values, unknown options, `-y`, extra inputs/outputs | v1 | Warnings never block; errors block Apply |
-| Autocomplete for options and values from the selected FFmpeg | v1 | |
-| Seed from Guided settings; switching back keeps both | v1 | |
+| Autocomplete for options and values from the selected FFmpeg | v1, built last | Uses lint's parsed options; can slip to v1+ without blocking |
+| Seed from Basic settings; switching back keeps both | v1 | |
 | Extra inputs (logo, LUT file) via `-i` | v1 | Indexed from 2 |
 | "Import fields from command" (reverse mapping) | v1+ | StaxRip offers Import Command Line; map the curated subset, list what couldn't be mapped |
 
@@ -88,7 +94,9 @@ Priority labels:
 | Template stores the full recipe snapshot plus origin | v1, **gated A7** | Versioned envelope |
 | Update from library (diff preview), Save to library (new or origin), Load preset | v1 | |
 | Render using the template's recipe and the machine's default FFmpeg | v1, **gated A4–A7** | Output verification before publish |
-| Progress and cancel as today; actionable error messages with FFmpeg's last error line | v1 | Existing engine behaviour extended |
+| Progress and cancel as today; actionable error messages with FFmpeg's last error line | v1 | Existing engine behaviour extended. VEGAS's own progress bar is already driven frame by frame |
+| Live encode statistics: a status line in VEGAS's render dialog | v1 if the real-host test works | Two unmapped text methods on VEGAS's progress interface; dropped if they don't show text safely (TECH_ARCHITECTURE §5.6) |
+| Live encode statistics: small progress window (encode fps, speed, bitrate, size so far, final size, time left; done and failed states) | v1, on by default, can be turned off | Separate process reading a status file; never takes focus. Dropped if it costs more than about 2% of render time (TECH_ARCHITECTURE §5.6). Mock: design S6, UI_SPEC §12 |
 
 ### 2.5 FFmpeg management
 
@@ -112,7 +120,9 @@ Priority labels:
 
 ### 2.7 App settings
 
-- **Theme:** system, light or dark.
+- **Theme:** Follow Windows (default), Light or Dark.
+- **Rendering:** "Show a progress window during renders" (on by default) and "Keep it
+  on top".
 - **Logs:** retention in days and Open log folder. Every job log starts with a
   system-information header: CPU, GPU and driver, FFmpeg path, version and hash.
 - **VEGAS integration:**
@@ -151,8 +161,9 @@ Priority labels:
    is open" and VEGAS is disabled behind the window.
 2. The popup opens with the template name, "From VEGAS: 3840×2160, 29.97 fps, 10-bit
    4:2:0, 48 kHz stereo", and the origin "From YouTube upload, H.264 (revision 5)".
-3. The user changes CRF 18 to 17 and the speed from slow to slower. The command and
-   size estimate update; "2 changes from the preset" appears.
+3. The user changes CRF 18 to 17 and the speed from slow to slower. The command
+   updates, the Video encoder node shows "Changed", and "2 changes in this template"
+   appears. Clicking the File node shows the new size estimate.
 4. **Apply to template.** The window closes and the page summary updates. The footer
    reminds the user to save the template in VEGAS to keep it.
 
@@ -169,7 +180,7 @@ Priority labels:
 ### F5 Create a preset (desktop)
 
 1. **Presets**, then **New preset** (from blank or from a built-in).
-2. The Guided editor opens:
+2. The Basic editor opens:
    - choose the container;
    - turn on video and pick an encoder (unavailable ones are marked, with reasons);
    - pick a mode and set quality;
@@ -179,10 +190,10 @@ Priority labels:
 
 ### F6 Write a command (desktop or popup)
 
-1. Switch to **Command**. The template is seeded from the current settings.
+1. Switch to **Advanced**. The template is seeded from the current settings.
 2. Edit. Highlighting, lint and autocomplete come from the selected FFmpeg's real options.
 3. Errors (e.g. missing `{output}`) disable Save/Apply with a clear message. Warnings don't.
-4. Switching back to Guided keeps the command saved but inactive, and says so.
+4. Switching back to Basic keeps the command saved but inactive, and says so.
 
 ### F7 Diagnose a failed render
 
@@ -211,7 +222,7 @@ are flagged, not removed.
 | VEGAS delivers P010 (10-bit 4:2:0) only on the encoded path | ADAPTER_DATA_FLOW | "From VEGAS" shows it; bit-depth/chroma messages |
 | One stereo float audio stream at 48 kHz (qualified) | ENCODING_BASELINE | Channels: source/stereo/mono; no multi-track |
 | No audio-only renders | STATUS limits | Video can't be turned off while audio is on |
-| Color metadata unknown; HDR unqualified | ADAPTER_DATA_FLOW | BT.709 tagging only; HDR via Command mode with a warning |
+| Color metadata unknown; HDR unqualified | ADAPTER_DATA_FLOW | BT.709 tagging only; HDR via Advanced mode with a warning |
 | Single-pass only: frames stream once | Pipe design | No two-pass modes; "two-pass via lossless intermediate" listed as Later |
 | One container extension per exporter class (`*.mkv`) until per-template extensions are proven | ADAPTER_PLAN §2 | Popup notes when VEGAS's filename extension differs from the container; the engine writes the right extension (**to verify**: how VEGAS names the file) |
 | Untested encoder/container combinations with VEGAS | Qualification gates | "Not tested with VEGAS yet" info, never blocking |

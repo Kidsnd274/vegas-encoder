@@ -4,62 +4,63 @@ This is a product development repository. The sibling investigation is historica
 provenance and a resource for specific unresolved native-interface questions.
 Use a lightweight development workflow; do not inherit its research ledger process.
 
-## Current scope and app-design stop point
+## Current stage: building the product
 
-The user reports the app plan/design is complete on another branch. Review that
-design before the next product stage; until then, finish only the VEGAS integration foundation and the fixed
-encoding path needed to validate it. A temporary one-setting native page is a
-technical proof, not the final product UI.
+The VEGAS integration foundation is committed. The owner reviewed the product design
+on 2026-10-12 and recorded the decisions in docs/product/README.md (Decisions):
 
-The user now wants this foundation implementation checkpoint committed and then
-to stop. Do not review or merge the app-design branch in this task; that is for
-next time. Keep outstanding runtime qualification limits explicit at closeout.
+- Signal Flow is the direction. docs/product/design/signal-flow.html is the visual
+  reference in light and dark; docs/product/UI_SPEC.md is the behaviour.
+- Basic and Advanced modes. Basic has curated controls plus Extra arguments; there is
+  no all-options list. Advanced-mode autocomplete is built last.
+- Flutter with Riverpod and the app's own components (not the Material look). The
+  theme follows Windows.
+- Windows x64 only, for the product, development, tests and CI.
+- User-supplied FFmpeg. No proof-template migration.
+- Render progress: a status line in VEGAS's render dialog if a real-host test shows it
+  works, plus a small progress window that is dropped if it measurably slows renders
+  (docs/product/TECH_ARCHITECTURE.md §5.6).
 
-The foundation is ready for the design handoff when the stated target supports:
+Work runs in two parallel workstreams, **app** and **platform**. Before product work,
+read docs/product/README.md, docs/product/WORKSTREAMS.md and the documents your
+workstream uses. Stay inside the paths your workstream owns. Ask for changes elsewhere
+through your file in docs/product/workstreams/, and keep using a stub meanwhile. The
+C++ core is the only implementation of compile, validate, lint and completion; the app
+reaches it and the system only through packages/ve_core and packages/ve_services.
 
-- reliable discovery and rendered video/audio delivery;
-- repeated renders, cancellation/recovery and useful failure handling;
-- an editable native configuration page with understood template ownership;
-- one setting saved in a VEGAS template, surviving reopen/restart and reaching
-  the next render, with separate templates and Apply/Cancel behavior verified.
-
-The user explicitly deferred the real two-template/restart persistence test.
-Keep it unverified in support notes and revisit during product qualification;
-do not repeat it as a prerequisite for this foundation handoff. Real cancellation/
-recovery now passes; controlled real failure recovery remains a qualification
-limit at this requested checkpoint. Review the existing design only before the
-later product feature stage, not during this closeout.
-Do not claim the original full qualification checklist passed without those tests.
-Do not select the desktop UI framework, build preset/library management, finalize
-the full encoding-settings model or recipe schema, or implement basic/advanced
-views and the full popup editor before that design is supplied. Generic plumbing
-and a small versioned proof payload are permitted; product decisions stay open.
-See docs/DESIGN_GATE.md. Do not claim the gate is passed from offline mocks alone.
+Outstanding qualification limits stay explicit: the real two-template/restart
+persistence test and controlled real failure recovery are unverified (see
+docs/STATUS.md). Features gated on A5–A7 stay gated until real-host evidence exists.
+Do not claim a gate passed from offline mocks, fakes or design decisions.
 
 ## Development rules
 
 Read README.md, ORIGIN.md, docs/STATUS.md, docs/ARCHITECTURE.md,
 docs/ADAPTER_PLAN.md and docs/INTEGRATION_CONTRACT.md before changing native code.
 The primary target identity is in docs/TARGET.md. Keep the engine and portable
-settings/media concepts independent of VEGAS native interfaces. A public SDK is deferred.
+settings/media concepts independent of VEGAS native interfaces. Keep src/core free of
+Windows and VEGAS headers. A public SDK is deferred.
 
 Compatibility claims must identify the actual build and tested host. Keep binary
 hashes for installation/release verification or when needed to distinguish builds;
 do not inventory/hash every input for routine development. Fake-host checks do not
 prove real VEGAS compatibility. Preserve existing finding references and uncertain fields.
 Keep host calls on Render's caller thread; copy/release host frames before waits.
+Nothing may make Render wait on the app or the progress window.
 No payload/download/installer execution belongs to source inspection.
 
 Production code lives here; the sibling investigation is provenance and a place
 for targeted ABI experiments. Builds and fake tests must not require that checkout.
 Keep origin/attribution for imported or reused code. Existing import manifests remain
-historical provenance; no per-task manifest is required. No project license is selected.
+historical provenance; no per-task manifest is required. No project license is selected;
+check licences before adding a dependency or bundling a font or asset.
 
 Run focused checks for ownership, bounds, timing, cancellation and changed scripts.
-Update docs/STATUS.md when a milestone, limitation or next task changes. Summarize
-what changed and the focused checks actually performed in the task response or
-appropriate product documentation. State whether validation used a fake host or
-real VEGAS when that distinction matters.
+App work needs widget tests and golden tests in light and dark for what it changes.
+Update docs/STATUS.md (platform) or your workstream file when a milestone, limitation
+or next task changes. Summarize what changed and the focused checks actually performed
+in the task response or appropriate product documentation. State whether validation
+used fakes, a fake host or real VEGAS when that distinction matters.
 
 Do not create dated experiment notes, numbered findings, raw command archives,
 copied media or comprehensive evidence inventories for every task. Keep detailed
@@ -71,12 +72,16 @@ Keep installation changes reversible with an appropriate backup/manifest and cle
 restoration instructions. This is operational rollback information, not a research
 workflow. Test output can go under ignored build/test-results/; existing runners'
 -EvidenceDir argument simply names their output folder.
-Do not automatically commit, publish, install or replace an installed exporter.
+Commit only to your own workstream branch, and only when the owner's task prompt
+allows it. Never push, merge into master, rewrite shared history, publish, install or
+replace an installed exporter without asking. Upgrading the Flutter SDK or other
+machine-wide tools is the owner's call.
 
 For external API/library-specific questions use current primary documentation and
 Context7, resolving the library before requesting docs (maximum three commands per
-question); do not guess quota/network failures away. Pure refactoring and authored
-scripts can be validated from this implementation and its focused tests.
+question); do not guess quota/network failures away. This applies to Flutter, Dart
+and pub packages too. Pure refactoring and authored scripts can be validated from
+this implementation and its focused tests.
 
 Use `npx ctx7@latest library <official-name> "<specific concept>"` first unless a
 valid `/org/project` ID is supplied, then `npx ctx7@latest docs <id> "<concept>"`.

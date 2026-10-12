@@ -1,13 +1,15 @@
 # Recipes and FFmpeg command compilation
 
-Updated: 2026-10-11 (Asia/Singapore). Status: proposal (schema v1 draft).
+Updated: 2026-10-12 (Asia/Singapore). Status: proposal (schema v1 draft). Basic and
+Advanced are the round 1 Guided and Command modes, renamed by the owner.
 
 This document specifies:
 
 - what a recipe contains;
 - how the product core turns it into an FFmpeg command;
-- how Command mode works;
-- which validation messages exist.
+- how Advanced mode works;
+- which validation messages exist;
+- how the size estimate is worked out.
 
 The executable prototype is [design/shared/model.js](design/shared/model.js). Every
 mockup uses it, so the commands shown in the designs follow these rules. The product
@@ -36,8 +38,7 @@ implementation is the C++ core ([TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) §4
     "depth": 8,                       // output bit depth; mapped to a pixel format by the encoder profile
     "gopSec": 2,                      // keyframe interval in seconds; null = encoder default
     "color": "bt709",                 // tag policy: bt709 | none (more after color qualification)
-    "options": { "aq-mode": "3" },    // private AVOptions set in "All options" (name without dash)
-    "extra": ""                       // Extra arguments: appended verbatim (tokenized)
+    "extra": ""                       // Extra arguments: appended (tokenized); replaces same-name options
   },
   "audio": {
     "enabled": true,
@@ -46,10 +47,10 @@ implementation is the C++ core ([TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) §4
     "bitrateK": 320, "vbr": null, "level": null,
     "sampleRate": "source",           // source | 44100 | 48000 | 96000
     "channels": "source",             // source | stereo | mono
-    "options": {}, "extra": ""
+    "extra": ""
   },
   "command": {
-    "mode": "structured",             // structured (Guided) | template (Command)
+    "mode": "structured",             // structured (Basic) | template (Advanced)
     "template": ""                    // kept even while inactive
   },
   "vegas": {                          // VEGAS-facing preferences — gated, read-only until qualified
@@ -71,6 +72,10 @@ implementation is the C++ core ([TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) §4
   `{ "vepreset": 1, "revision": 6, "favorite": true, "recipe": {…} }`.
   Template snapshots never carry library metadata. They carry only `origin`.
 - **Machine-local values are never stored:** no FFmpeg path, GPU index or HWND.
+- **No per-option map.** Basic has no "All options" editor (owner decision,
+  2026-10-12), so v1 has no `options` field. Options without a control live in
+  `extra`. The design prototype still carries an `options` map; the product schema
+  drops it. Adding a structured map later is an additive change.
 - **Audio is a list in the product schema.** v1 stores `"audio": [ {…} ]` with exactly
   one element, the single stereo stream VEGAS delivers today. Multi-track is then an
   additive change, not a migration (HandBrake and Resolve model audio as rows). The
@@ -94,11 +99,12 @@ implementation is the C++ core ([TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) §4
 - **At render**, the DLL builds this from actual stream and frame information. That is
   existing behaviour: delivered timing wins over template nominal rates (F-041).
 - **In the desktop app**, preview uses a sample context: 1080p 29.97, P010, 48 kHz
-  stereo, 10 minutes. The user can switch it to 4K 59.94 to see the effect.
+  stereo. The user can switch it to 4K 59.94 to see the effect. The size estimate uses
+  the length typed on the File node (§7), not a sample duration.
 - **In the popup**, preview uses the project facts the page supplies; anything unknown
   falls back to the sample.
 
-## 3. Compilation (Guided mode)
+## 3. Compilation (Basic mode)
 
 The order is fixed so commands are predictable and diff cleanly:
 
@@ -109,8 +115,8 @@ The order is fixed so commands are predictable and diff cleanly:
 | 3 | Video input | `-f rawvideo -pix_fmt p010le -s 3840x2160 -r 30000/1001 -thread_queue_size 64 -i \\.\pipe\vegas-encoder-<id>-video` | product-owned, from delivered media |
 | 4 | Audio input | `-f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\.\pipe\vegas-encoder-<id>-audio` | product-owned, only if audio enabled |
 | 5 | Maps | `-map 0:v:0 -map 1:a:0` | product-owned |
-| 6 | Video | `-c:v <enc>`, speed, tune, rate control, multipass, profile, `-pix_fmt`, `-g`, color tags, Apple tag, private options, extra | encoder profile + recipe |
-| 7 | Audio | `-c:a <enc>`, bitrate/VBR/level, `-ar`, `-ac`, private options, extra | encoder profile + recipe |
+| 6 | Video | `-c:v <enc>`, speed, tune, rate control, multipass, profile, `-pix_fmt`, `-g`, color tags, Apple tag, extra | encoder profile + recipe |
+| 7 | Audio | `-c:a <enc>`, bitrate/VBR/level, `-ar`, `-ac`, extra | encoder profile + recipe |
 | 8 | Container | `-movflags +faststart` (MP4 only), `-f <muxer>` | container profile |
 | 9 | Output | temp path with the final extension | product-owned |
 
@@ -150,7 +156,7 @@ format the encoder accepts:
   `round(gopSec × fps)`. For example, 2 s at 30000/1001 is 60 frames.
 - **Color tags.** `bt709` writes `-color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv`.
   This is a tagging policy, not a conversion. Color metadata from VEGAS is
-  unqualified (ADAPTER_DATA_FLOW), so HDR and other primaries stay Command-mode
+  unqualified (ADAPTER_DATA_FLOW), so HDR and other primaries stay Advanced-mode
   territory until a color qualification exists.
 - **Apple HEVC tag.** HEVC in MP4/MOV adds `-tag:v hvc1`, because FFmpeg's default
   `hev1` doesn't play in Apple software (matrix evidence).
@@ -164,9 +170,9 @@ format the encoder accepts:
   `-f <muxer>` explicitly, then publishes by rename after exit 0 and successful output
   verification.
 
-## 4. Command mode
+## 4. Advanced mode
 
-Command mode replaces groups 5–9 with the user's text. Groups 1–4 still come from
+Advanced mode replaces groups 5–9 with the user's text. Groups 1–4 still come from
 the product. The user places them with `{inputs}`:
 
 ```text
@@ -230,20 +236,26 @@ shown in History.
 - After `-c:v ` / `-c:a ` it offers encoders, with Ready / Not in this FFmpeg / Failed
   test badges.
 
-## 5. Guided ↔ Command switching
+**Cost and order.** The suggestions come from the same parsed options and encoder
+profiles that lint needs, so they add no separate data to maintain: a new FFmpeg build
+brings its own options. The prototype's `complete()` is about 30 lines. The real cost
+is the Flutter popover (caret position, keyboard, focus), written once. It is built
+last in P3 and can slip to v1+ without blocking Advanced mode.
+
+## 5. Basic ↔ Advanced switching
 
 | Action | Result |
 | --- | --- |
-| Guided → Command, no template yet | Template seeded from the compiled groups 5–9 (one argument group per line), `{inputs}`/`{output}` inserted. Structured fields kept. |
-| Guided → Command, template exists | Ask: "Use your saved command" (default) or "Replace it with the current settings". |
-| Command → Guided | Template kept but inactive; banner: "Your command is saved. Renders use these settings until you switch back." |
-| Save while in Command mode | Both stored; `command.mode` decides what renders. |
+| Basic → Advanced, no template yet | Template seeded from the compiled groups 5–9 (one argument group per line), `{inputs}`/`{output}` inserted. Structured fields kept. |
+| Basic → Advanced, template exists | Ask: "Use your saved command" (default) or "Replace it with the current settings". |
+| Advanced → Basic | Template kept but inactive; banner: "Your command is saved. Renders use these settings until you switch back." |
+| Save while in Advanced mode | Both stored; `command.mode` decides what renders. |
 
 No reverse parsing of a command into fields in v1. Round-tripping arbitrary FFmpeg
 arguments into controls is lossy and surprising. A later "Import fields from command"
 could recognize the curated subset and show what it could not map.
 
-## 6. Validation catalog (Guided mode)
+## 6. Validation catalog (Basic mode)
 
 | ID | Level | Condition | Message (prototype wording) |
 | --- | --- | --- | --- |
@@ -258,14 +270,38 @@ could recognize the curated subset and show what it could not map.
 | V-H264-10BIT | warn | libx264 at 10-bit | 10-bit H.264 doesn't play on most phones, browsers or TVs. |
 | V-RATE | error | encoder lacks the sample rate | Opus doesn't support 44.1 kHz. Use 48 kHz. |
 | V-GOP | warn | gopSec > 10 | Keyframes more than 10 seconds apart make seeking slow. |
+| V-EXTRA-OPTION | warn | an option in Extra arguments is unknown to the encoder's parsed options and the generic list | -foo isn't an option of x264 in FFmpeg 8.1 full. FFmpeg stops with an error if it doesn't know an option. |
 | V-FASTSTART | info | MP4 + fast start | Fast start rewrites the file once encoding ends… |
 | V-UNTESTED | info | outside the qualified VEGAS matrix | Not tested with VEGAS yet. (Planned; not in the prototype.) |
 
 ## 7. Size estimate
 
-- **Bitrate modes:** size = (video + audio bitrate) × duration. Shown as a plain figure.
+Shown only on the File node (UI_SPEC §2).
+
+**Where the length comes from:**
+
+- **At render time VEGAS reports it exactly.** The adapter already reads the frame
+  count (`GetFrameCount`) and audio length (`GetStreamLength`) before encoding, so job
+  records and History always have the real duration and size.
+- **While editing, the length is unknown.** The desktop app has no project. The popup
+  only knows it if the native page can read the project or render-region length from
+  VEGAS; that is unproven and **gated** on A5. The render range can also change in
+  Render As after the template is chosen.
+- VEGAS's exporter interface has an `EstimateFileSize` method, which the adapter
+  doesn't implement (it would log `E_NOTIMPL`). VEGAS 2026.0.3.189 never called it
+  during the five real renders in the local adapter logs (checked 2026-10-12), so
+  nothing is known about when VEGAS asks or where it shows the answer. Not planned.
+
+**So the card shows:**
+
+- **A rate per minute, always.** It needs no length.
+- **A total for the length in the field.** Desktop: the user types it. Popup: the
+  project length when VEGAS shares it, otherwise empty.
+- **Bitrate modes:** size = (video + audio bitrate) × length, shown as a plain figure.
 - **Quality modes, profiles and lossless:** a rough guide from a bits-per-pixel model,
-  scaled by codec efficiency and resolution. Always labelled "About …" with the
-  explanation "file size depends on how busy the footage is".
-- **History:** completed jobs record actual sizes per recipe. A later version can show
-  "Your last 5 renders with this preset averaged 21 Mb/s".
+  scaled by codec efficiency and resolution. Always "About …", with a typical range
+  (for constant quality, 0.6× to 1.6× of the figure) and the explanation "the size
+  depends on how busy the footage is".
+- **Advanced mode:** no estimate.
+- **History (v1+):** completed jobs record actual sizes per recipe, so the card can show
+  "Your last 5 renders with this preset averaged 21 Mb/s", which beats any formula.

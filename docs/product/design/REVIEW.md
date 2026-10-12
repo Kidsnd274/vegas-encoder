@@ -6,6 +6,30 @@ model and showed no console errors in headless Chromium. Screenshots are in
 `screenshots/`. These are HTML mockups only: no Flutter code exists yet, and nothing
 ran in VEGAS.
 
+## Owner decision (2026-10-12)
+
+The owner chose **D3 Signal Flow** for its balance of simplicity and detail. The
+recommendation below (D1 as the base) is kept as the round 1 record and no longer
+applies. Round 2 is [signal-flow.html](signal-flow.html):
+
+- **Basic / Advanced** replace Guided / Command.
+- **Shorter diagram.** The desktop diagram drops from 336 px to about 216 px: nodes are
+  two lines plus a label row, and the legend moves to the title row. The popup uses a
+  one-row strip of about 100 px, with one line per encoder.
+- **Size and quality card only behind the File node.** It shows a rate per minute and a
+  total for a length the user types. The popup fills in the project length when VEGAS
+  shares it (gated on A5). There is no estimate in the command column.
+- **No D4 search and no "All options" list.** Basic keeps the curated controls.
+  Anything else goes in Extra arguments, which warns about options the encoder
+  doesn't have.
+- **Dark theme** that follows Windows, with light and dark token sets.
+- **Advanced-mode autocomplete is kept**, built last so it can slip without blocking.
+- The D3 `^` wrapping issue is fixed: each continuation stays on its line.
+
+Not adopted from other directions: D1's command deck, D4's search, D5's Mica look and
+always-visible card. D7's triangle remains a possible later "New preset from a
+destination" flow.
+
 ## Summary
 
 | Direction | Best at | Weak at | Fit |
@@ -19,7 +43,7 @@ ran in VEGAS.
 | D7 Destination | Beginners: intent first, with the triangle proposing a concrete recipe | The triangle mapping is opinionated and hides the encoder choice until fine-tune | Onboarding and "new preset" flow |
 | D8 Bars and Tone | Status at a glance: the bar strip shows which section is broken | Busy; the quality marks crowd; the command panel overlaps the Speed row | Memorable branding; status strip as a component |
 
-## Recommendation
+## Round 1 recommendation (superseded)
 
 **D1 Command Deck as the base,** completed with three borrowed components.
 
@@ -55,7 +79,7 @@ Why D1:
 | --- | --- |
 | D1 | Hover-to-token linking is not wired in the popup; the S4 hardware test output is illustrative |
 | D2 | Library button sits at the left of the scene row (spec says right) |
-| D3 | `^` continuation characters wrap onto their own lines in the command panel |
+| D3 | `^` continuation characters wrap onto their own lines in the command panel (fixed in round 2) |
 | D4 | No Ctrl+K palette; long commands break at hyphens |
 | D5 | "All options" and "Save to library" open nothing |
 | D6 | Long spine titles wrap to two condensed lines; consider a tooltip or shorter titles |

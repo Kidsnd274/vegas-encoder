@@ -1,20 +1,24 @@
 # Vegas Encoder product plan
 
-Updated: 2026-10-11 (Asia/Singapore). Status: **for the owner's review**. This folder covers
-the product layer built on top of the adapter: the desktop app, presets, the shared editor
-and the VEGAS configuration popup. Nothing here is implemented yet, and no real VEGAS test
-ran for this work. Adapter gate status is unchanged; see [STATUS.md](../STATUS.md).
+Updated: 2026-10-12 (Asia/Singapore). Status: **direction chosen; ready to build** in two
+parallel workstreams ([WORKSTREAMS.md](WORKSTREAMS.md)).
+This folder covers the product layer built on top of the adapter: the desktop app,
+presets, the shared editor and the VEGAS configuration popup. Nothing here is
+implemented yet, and no real VEGAS test ran for this work. Adapter gate status is
+unchanged; see [STATUS.md](../STATUS.md).
 
 ## Reading order
 
 | Document | What it answers |
 | --- | --- |
-| [design/index.html](design/index.html) | **Start here.** Eight interactive design directions, plus the shared VEGAS native page |
+| [design/signal-flow.html](design/signal-flow.html) | **Start here.** The chosen direction, Signal Flow round 2, in light and dark |
+| [WORKSTREAMS.md](WORKSTREAMS.md) | How the build is split between the app and platform agents: ownership, contracts, order |
+| [design/index.html](design/index.html) | The round 1 gallery of eight directions, plus the shared VEGAS native page |
 | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Features and priorities, key user flows, and the adapter limits shown to users |
 | [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) | Processes, shared C++ core, Flutter app, popup session protocol, payload, testing |
-| [SETTINGS_AND_COMMANDS.md](SETTINGS_AND_COMMANDS.md) | Recipe schema v1, how settings become an FFmpeg command, Command mode, validation |
+| [SETTINGS_AND_COMMANDS.md](SETTINGS_AND_COMMANDS.md) | Recipe schema v1, how settings become an FFmpeg command, Advanced mode, validation, size estimate |
 | [FFMPEG_INTEGRATION.md](FFMPEG_INTEGRATION.md) | Which FFmpeg is used, and how the app knows what it can do on this PC |
-| [UI_SPEC.md](UI_SPEC.md) | Behaviour every direction shares: states, keyboard, copy, Flutter tokens and components |
+| [UI_SPEC.md](UI_SPEC.md) | Shared behaviour: states, signal path, size card, theme, keyboard, copy, Flutter tokens and components |
 | [ROADMAP.md](ROADMAP.md) | Phases P0–P5 tied to adapter gates A4–A8, and the risks |
 | [design/DESIGN_BRIEF.md](design/DESIGN_BRIEF.md) | Design brief, vocabulary, screen list, the eight directions and the plan review |
 | [research/REFERENCE_PRODUCTS.md](research/REFERENCE_PRODUCTS.md) | Voukoder Classic/Pro, StaxRip, HandBrake, Shutter Encoder, Resolve: what to copy and avoid |
@@ -23,17 +27,25 @@ ran for this work. Adapter gate status is unchanged; see [STATUS.md](../STATUS.m
 
 ## The plan in brief
 
+- **Windows only.** VEGAS Pro runs only on Windows, so the app, the exporter DLL,
+  development, tests and CI all target Windows x64. Earlier research ran on a Linux
+  machine; its FFmpeg captures are recaptured with Windows builds in P1.
 - **One product core, two consumers.** A portable C++17 core turns a recipe plus the
   media VEGAS delivers into FFmpeg arguments. The exporter DLL links it for rendering.
   The Flutter app calls the same code through `dart:ffi` for the live preview, so what
   you see is what renders.
-- **Guided and Command modes edit one recipe.**
-  - Guided configures video and audio separately: encoder, rate-control mode,
-    quality or bitrate, speed, profile, bit depth, every parsed FFmpeg option, and
-    extra arguments.
-  - Command lets you write the whole FFmpeg command. Vegas Encoder owns only
+- **Basic and Advanced modes edit one recipe.**
+  - Basic configures video and audio separately: encoder, rate-control mode,
+    quality or bitrate, speed, tune, profile, bit depth and keyframes. Anything without
+    a control goes in a per-stream Extra arguments field, checked against the options
+    FFmpeg reports for that encoder.
+  - Advanced lets you write the whole FFmpeg command. Vegas Encoder owns only
     `{inputs}` (the VEGAS pipes) and `{output}`.
   - Switching between modes keeps both.
+- **The signal path is the editor's spine** (Signal Flow). VEGAS, the two encoders, the
+  container and the file are nodes; selecting one opens its settings. Wire thickness
+  shows bit depth, and a pip marks each pixel-format conversion. The desktop app shows
+  a shortened diagram; the VEGAS popup shows a one-row strip.
 - **The popup is a separate window, not Flutter inside VEGAS.**
   - The DLL's small native page launches `VegasEncoder.exe --edit-session`, owned and
     modal over VEGAS's dialog.
@@ -50,11 +62,13 @@ ran for this work. Adapter gate status is unchanged; see [STATUS.md](../STATUS.m
 
 ## What exists in this folder
 
-- **Interactive mockups** (`design/directions/*.html`). All of them use
-  `design/shared/model.js`, which is a working prototype of the compile, validate, lint,
-  autocomplete, estimate and diff rules. They also use `design/shared/avoptions.js`:
-  471 real options from 24 FFmpeg 8.1.3 encoders, generated by
-  `design/tools/build_avoptions.py`.
+- **The chosen direction** (`design/signal-flow.html`), with a theme switch for
+  reviewing light and dark. It uses `design/shared/model.js`, a working prototype of
+  the compile, validate, lint, autocomplete, estimate and diff rules, and
+  `design/shared/avoptions.js`: 471 real options from 24 FFmpeg 8.1.3 encoders,
+  generated by `design/tools/build_avoptions.py`.
+- **Round 1 mockups** (`design/directions/*.html`), kept as the record of the first
+  round. They still say Guided and Command.
 - **A mock of the native VEGAS page** (`design/shared/vegas-native-page.html`).
 - **Screenshots** of each screen (`design/screenshots/`).
 - **Raw evidence**, in the git-ignored `evidence/2026-10-11-product-design/`:
@@ -63,26 +77,41 @@ ran for this work. Adapter gate status is unchanged; see [STATUS.md](../STATUS.m
   - hardware probes;
   - probe timings.
 
-## Decisions for the owner
+## Decisions
 
-| # | Decision | Recommendation | Where |
+The owner reviewed the plan on 2026-10-12 and accepted the recommendations made in
+that review. Rows marked **plan default** were not raised separately and stand unless
+the owner objects.
+
+| # | Decision | Outcome | Where |
 | --- | --- | --- | --- |
-| 1 | Design direction, or which parts to mix | D1 Command Deck as the base, plus D4's settings search, D3's signal-path strip and D5's size card | design/REVIEW.md |
-| 2 | Mode names: "Guided / Command" vs your "Basic / Advanced" | Guided / Command. "Basic" undersells a mode that includes every encoder option, and "Command" says what the other mode is | DESIGN_BRIEF §2 |
-| 3 | Popup hosting | Separate process, owned and modal (T2) | TECH_ARCHITECTURE §5 |
-| 4 | Shared C++ core for compile and validation | Yes (T1) | TECH_ARCHITECTURE §4 |
-| 5 | FFmpeg distribution | User-supplied for v1; decide on a download helper after the license choice | FFMPEG_INTEGRATION §1 |
-| 6 | Show library presets directly in Render As | Research gate in P5. It is also the fallback if the page exchange (A5) fails | TECH_ARCHITECTURE §5.5 |
-| 7 | State management | Riverpod 3; signals is a reasonable alternative if you prefer it | research/FLUTTER_DESKTOP.md |
-| 8 | Proof-template migration (64-byte marker becomes the FFV1 preset) | Accept it if cheap. Otherwise start fresh with product templates | TECH_ARCHITECTURE §6.2 |
-| 9 | Project license | Still open. It affects FFmpeg bundling and font and library choices (all chosen fonts are OFL) | ARCHITECTURE §8 |
+| 1 | Design direction | **Decided:** D3 Signal Flow, with the round 2 changes below. D1, D4's search and D5's card are not adopted as such | design/signal-flow.html, design/REVIEW.md |
+| 2 | Mode names | **Decided:** Basic / Advanced | DESIGN_BRIEF §2 |
+| 3 | Basic mode scope | **Decided:** curated controls plus Extra arguments. No "All options" list and no cross-setting search; advanced parameters go in Extra arguments | UI_SPEC §2 |
+| 4 | Diagram size | **Decided:** full diagram on the desktop, shortened (about 216 px); one-row strip (about 100 px) in the popup | UI_SPEC §2 |
+| 5 | Size estimate | **Decided:** only behind the File node. Always a rate per minute; a total for a length the user types. The popup fills in the project length only if VEGAS shares it with the page (gated on A5) | UI_SPEC §2, SETTINGS_AND_COMMANDS §7 |
+| 6 | Advanced-mode autocomplete | **Decided:** keep it, built last in P3. Highlighting, lint and macros ship first; autocomplete can slip without blocking | ROADMAP P3 |
+| 7 | Theme | **Decided:** light and dark, following the Windows app theme by default | UI_SPEC §1 |
+| 8 | Platform | **Decided:** Windows x64 only, including development and tests | TECH_ARCHITECTURE §3, §10 |
+| 9 | UI framework | **Decided:** Flutter, with its own components on `ThemeExtension`, not the Material look. A headless kit (such as forui) only if a check of its current version fits | TECH_ARCHITECTURE §1 T7 |
+| 10 | State management | **Decided:** Riverpod 3 | research/FLUTTER_DESKTOP.md |
+| 11 | FFmpeg distribution | **Decided:** user-supplied. No download offer for now | FFMPEG_INTEGRATION §1 |
+| 12 | Popup hosting | **Plan default:** separate process, owned and modal (T2) | TECH_ARCHITECTURE §5 |
+| 13 | Shared C++ core for compile and validation | **Plan default:** yes (T1) | TECH_ARCHITECTURE §4 |
+| 14 | Show library presets directly in Render As | Research gate in P5. It is also the fallback if the page exchange (A5) fails | TECH_ARCHITECTURE §5.5 |
+| 15 | Proof-template migration | **Decided: no migration.** The foundation's test templates were for experiments; product templates start fresh | TECH_ARCHITECTURE §6.2 |
+| 16 | Live encode statistics during a render | **Decided:** a status line in VEGAS's render dialog if a real-host test shows it works, plus a small progress window in the app's design. The window is dropped if it measurably slows renders (rule in TECH_ARCHITECTURE §5.6) | TECH_ARCHITECTURE §5.6, UI_SPEC §12, design S6 |
+| 17 | Project license | Still open. It affects FFmpeg bundling and font and library choices (all chosen fonts are OFL) | ARCHITECTURE §8 |
 
 ## Design review notes
 
-All eight directions are built and screenshotted. Strengths, weaknesses, known issues
-and the recommendation are in [design/REVIEW.md](design/REVIEW.md).
+All eight round 1 directions are built and screenshotted. Strengths, weaknesses, known
+issues, the original recommendation and the owner's decision are in
+[design/REVIEW.md](design/REVIEW.md).
 
 ## Last Prompt by AI
+
+The round 1 handoff, kept as written. The owner review on 2026-10-12 supersedes its recommendation (D1 as the base) and its mode names; see [Decisions](#decisions).
 
 The full plan and all eight design directions are done and ready for your review. No agents are still running and there are no leftover processes. Nothing is committed: the plan and mockups are untracked files under `docs/product/`, plus small edits to `STATUS.md` and `ARCHITECTURE.md` and a new experiment note. Nothing ran in VEGAS or on Windows; these are plans and HTML mockups, not Flutter code.
 

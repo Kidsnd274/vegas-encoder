@@ -1,7 +1,10 @@
 # Vegas Encoder design brief
 
-Updated: 2026-10-11 (Asia/Singapore). Status: brief for the first design round.
-Mockups are review material; no Flutter UI exists yet and nothing here was run in VEGAS.
+Updated: 2026-10-12 (Asia/Singapore). Status: brief for the first design round, with the
+vocabulary and editor structure updated for round 2. The owner chose D3 Signal Flow on
+2026-10-12 ([REVIEW.md](REVIEW.md), [signal-flow.html](signal-flow.html)). Sections 4–8
+stay as the round 1 record. Mockups are review material; no Flutter UI exists yet and
+nothing here was run in VEGAS.
 
 ## 1. Subject, audience, job
 
@@ -18,7 +21,7 @@ FFmpeg commands; a few want nothing else.
 
 1. In VEGAS, pick or tweak an encode quickly, apply it and render. (VEGAS popup)
 2. Build and maintain a library of encodes that work every time. (Desktop app)
-3. Write any FFmpeg command, with rails that catch mistakes before a 40-minute render. (Command mode)
+3. Write any FFmpeg command, with rails that catch mistakes before a 40-minute render. (Advanced mode)
 4. Know which FFmpeg is used and what it can actually do on this PC. (FFmpeg page)
 5. Find out why a render failed. (History)
 
@@ -28,10 +31,11 @@ FFmpeg commands; a few want nothing else.
 | --- | --- |
 | Preset | A recipe saved in the Vegas Encoder library (desktop app). Built-in presets are read-only; duplicate to change. |
 | Render template | A VEGAS Render As template. It holds a complete copy of the settings, so it renders even if the preset is later edited or deleted. |
-| Guided | The structured editor: controls for container, video and audio. (The owner's "normal/basic" mode.) |
-| Command | Write the whole FFmpeg command yourself. (The owner's "advanced" mode.) |
-| Extra arguments | Free text appended to one stream's arguments in Guided mode (StaxRip's "Custom"). |
-| All options | Every private option the selected FFmpeg reports for the encoder, parsed from `ffmpeg -h encoder=X`. |
+| Basic | The structured editor: controls for container, video and audio. Called Guided in round 1. |
+| Advanced | Write the whole FFmpeg command yourself. Called Command in round 1. |
+| Extra arguments | Free text added to one stream's arguments in Basic mode (StaxRip's "Custom"). The place for any option without a control; checked against the options FFmpeg reports for the encoder. |
+| Signal path | The diagram of VEGAS, encoders, container and file. Full size on the desktop, a one-row strip in the popup. |
+| Size and quality | The estimate card behind the File node: a rate per minute, and a total for a length the user types. |
 | Apply | In the VEGAS popup: write the edited settings into the render template and close. |
 | Save to library | Copy settings into a preset (new, or the preset it came from). Never automatic. |
 | Update from library | Replace a template's settings with the newer revision of the preset it came from, after showing the differences. |
@@ -60,17 +64,20 @@ VEGAS native page (inside VEGAS Custom Template dialog, Win32, in the DLL)
 The shared editor is one component used by both the desktop app and the popup:
 
 ```text
-Editor
-├── Mode: Guided | Command
-├── Guided
-│   ├── Output       container, fast start, file extension note
-│   ├── Video        on/off, encoder, rate control + value, speed, tune, profile,
-│   │                bit depth, keyframe interval, color tags, all options, extra arguments
-│   ├── Audio        on/off, encoder, bitrate / VBR / lossless, sample rate, channels,
-│   │                all options, extra arguments
-│   └── From VEGAS   what VEGAS delivers (size, rate, pixel format) — read-only today
-├── Command          full command with locked {inputs}/{output}, macros, lint, autocomplete
-└── Always visible   live FFmpeg command, validation messages, size estimate
+Editor (round 2)
+├── Mode: Basic | Advanced
+├── Signal path      the nodes below; selecting one opens its settings
+├── Basic
+│   ├── From VEGAS     what VEGAS delivers (size, rate, pixel format) — read-only today
+│   ├── Video encoder  on/off, encoder, rate control + value, speed, tune, profile,
+│   │                  bit depth, keyframe interval, color tags, extra arguments
+│   ├── Audio encoder  on/off, encoder, bitrate / VBR / lossless, sample rate, channels,
+│   │                  extra arguments
+│   ├── Container      container, fast start, file extension note
+│   └── File           file name note and the size and quality card
+├── Advanced         full command with locked {inputs}/{output}, macros, lint, autocomplete
+└── Always visible   live FFmpeg command and validation messages
+                     (desktop: right column; popup: side panel)
 ```
 
 ## 4. Screens every direction must deliver

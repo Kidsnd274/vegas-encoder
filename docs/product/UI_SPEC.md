@@ -1,11 +1,12 @@
 # UI behaviour specification
 
-Updated: 2026-10-11 (Asia/Singapore). Status: proposal.
+Updated: 2026-10-12 (Asia/Singapore). Status: proposal, updated for the chosen
+direction.
 
-This document covers behaviour that every design direction shares: states, flows,
-keyboard, copy and the token structure Flutter will implement. Visual
-exploration lives in [design/](design/DESIGN_BRIEF.md); the vocabulary is
-fixed in the brief §2.
+This document covers the behaviour Flutter will implement: states, flows, the signal
+path, the size card, theme, keyboard, copy and the token structure. The chosen
+direction is Signal Flow, round 2 ([design/signal-flow.html](design/signal-flow.html)).
+The vocabulary is fixed in the brief §2.
 
 ## 1. Windows
 
@@ -15,9 +16,19 @@ fixed in the brief §2.
 | Popup editor | 1120×740 | 960×640 | Centred on its VEGAS owner; resizable; remembers size, not position |
 | Native page | Host-defined | — | Win32 inside VEGAS; see the mock |
 
-Below 1280 px width the desktop app collapses the library to an icon rail (or a
-drawer in directions without a rail), and the popup moves the command preview into a
-collapsible bottom strip.
+Below 1280 px width the desktop app collapses the library to an icon rail, and the
+popup moves the command preview into a collapsible bottom strip.
+
+### Theme
+
+- Light and dark token sets (§10). Both windows follow the Windows app theme
+  (Settings > Personalization > Colors, "Choose your app mode") by default and switch
+  live when it changes. To verify in the P2 spike: Flutter's platform brightness tracks
+  that setting live on Windows.
+- Settings > Theme offers **Follow Windows** (default), **Light** and **Dark**. The
+  popup uses the same choice, read from the app settings.
+- VEGAS's own dialogs keep their look; only Vegas Encoder windows change.
+- Every screen gets golden tests in both themes.
 
 ## 2. Presets screen (S1)
 
@@ -27,7 +38,8 @@ collapsible bottom strip.
   float to the top of their group. Search matches name, tags, encoder and codec
   (e.g. "nvenc", "prores", "youtube").
 - **Each item:** name, a one-line summary (codec and quality, audio, container) and
-  marks for favorite, built-in, command mode, and **availability** (an
+  marks for favorite, built-in, Advanced mode, a small wire glyph for 10-bit or
+  8-bit output, and **availability** (an
   error-coloured mark plus a tooltip such as "Needs x264: not in FFmpeg 8.0 LGPL").
 - **Context menu:** Duplicate, Rename, Export…, Copy share string, Delete (user
   presets only), Show in folder.
@@ -43,9 +55,30 @@ collapsible bottom strip.
 | Errors | Validation has errors | Save still allowed (presets can be work in progress); the preset shows an error mark in the library |
 | Updated elsewhere | File changed by the popup or another window | Banner: "This preset changed in another window." **Reload** / **Keep editing** (save then asks to overwrite or save as new) |
 
-### Guided editor sections
+### Signal path
 
-The sections are Output, Video, Audio and From VEGAS. Every direction must:
+The diagram is the editor's navigation. Its nodes are **From VEGAS**, **Video
+encoder**, **Audio encoder**, **Container** and **File**. Selecting a node opens its
+settings below it; arrow keys move between nodes.
+
+| Where | Size | Content |
+| --- | --- | --- |
+| Desktop | Full width, about 216 px tall | Title row with the context and the legend; nodes with a label row, a name and one detail line; wire labels for bit depth, codec and conversions |
+| Popup | One row, about 100 px tall | Small nodes; one line per encoder (name and quality); conversion pips with short labels such as "10 to 8-bit"; no legend or codec labels |
+
+- **Wire thickness is bit depth**: thick for 10-bit, thin for 8-bit. Audio uses the same
+  rule for float, 24-bit and 16-bit samples.
+- **An amber pip marks each format conversion**, labelled with what changes
+  ("p010le to yuv420p", "4:2:0, precision lost").
+- **Node marks:** availability problems turn a node red with the state; "Changed" and
+  "Revision 6" marks show local and library differences in the popup.
+- **Advanced mode** draws the nodes dashed, read back from the command. They don't
+  open settings; clicking one focuses the editor.
+
+### Basic editor
+
+Each node opens one panel: From VEGAS (read-only facts), Video encoder, Audio
+encoder, Container, and File. Every panel must:
 
 - Hide controls the encoder doesn't have. Keep their recipe values; they are only
   ignored by compile.
@@ -55,6 +88,37 @@ The sections are Output, Video, Audio and From VEGAS. Every direction must:
   summary list near the command. Clicking a summary item focuses its field.
 - Show units and meaning: "CRF 18, visually lossless", "8 Mb/s average, 12 Mb/s peak",
   "2 s (60 frames at 29.97 fps)".
+
+Basic has no list of every FFmpeg option and no cross-setting search. The curated
+controls cover the common settings; anything else goes in Extra arguments.
+
+### Extra arguments
+
+- One field per stream, in a monospace font. It is the place for any option without a
+  control.
+- An option typed here replaces the generated option of the same name
+  (SETTINGS_AND_COMMANDS §3), and the replaced control shows "set in Extra arguments".
+- Options are checked against the encoder's options parsed from the selected FFmpeg,
+  plus the generic list. An unknown option shows a warning under the field: "-foo isn't
+  an option of x264 in FFmpeg 8.1 full. FFmpeg stops with an error if it doesn't know
+  an option." It never blocks saving.
+
+### Size and quality (File node)
+
+The estimate appears only in the File node's panel, never in the command column.
+
+- **Length field.** The total is for a length the user types (m:ss or h:mm:ss).
+  - Desktop: starts at the last length used, 10:00 the first time.
+  - Popup: starts at the project length when VEGAS shares it with the native page
+    (**gated** on A5); otherwise it is empty and says "Type a length".
+- **Figures.** The total ("About 537 MB"), the rate per minute, and for quality modes a
+  typical range ("Typically 322 MB to 859 MB for 10:00"). Bitrate modes give a plain
+  figure. See SETTINGS_AND_COMMANDS §7.
+- **Split bar** for video and audio bitrate, then plain-language consequences of the
+  rate mode and bit depth (from D5's card).
+- **Advanced mode** shows no estimate: a custom command can do anything.
+- **Learning from renders (v1+).** "Your last 5 renders with this preset averaged
+  21 Mb/s" once History has data.
 
 ### Quality control
 
@@ -94,16 +158,16 @@ This catches failing hardware encoders and bad extra arguments early. Voukoder P
 - Always reachable; visible by default on the desktop.
 - `{inputs}` is collapsed into a "VEGAS video + audio" chip; it expands on click.
 - Supports copy (Ctrl+Shift+C) and a toggle between single-line and grouped multi-line
-  layouts.
-- Clicking a token focuses the control that produced it. Hovering a control
-  highlights its tokens. StaxRip's click-to-jump is the precedent; D1 makes it the hero.
+  layouts. In the multi-line layout each `^` continuation stays at the end of its line.
+- The group for the selected node is highlighted. Clicking a token focuses the control
+  that produced it; hovering a control highlights its tokens (StaxRip's click-to-jump).
 - Options replaced by Extra arguments show a small "set in Extra arguments" note at
   their control.
 
-## 3. Command mode (S2)
+## 3. Advanced mode (S2)
 
-- The mode switch reads "Guided | Command".
-- **Switching to Command** follows SETTINGS_AND_COMMANDS §5. The seed question appears
+- The mode switch reads "Basic | Advanced".
+- **Switching to Advanced** follows SETTINGS_AND_COMMANDS §5. The seed question appears
   only if a template already exists.
 - **Locked chips:** `{inputs}` and `{output}` are inline chips. They can be moved with
   cut and paste. They cannot be edited internally; deleting one shows its lint error.
@@ -111,7 +175,10 @@ This catches failing hardware encoders and bad extra arguments early. Voukoder P
   shows the message. A diagnostics list sits under the editor with "Go to" for each.
 - **Autocomplete:** opens after `-` or after an option that takes values. Tab or Enter
   accepts; Esc closes. Ctrl+Space opens it manually. Entries show type, default and
-  description, and are filtered by the selected FFmpeg's real options.
+  description, and are filtered by the selected FFmpeg's real options. It is built
+  last in P3: the data is the same parsed option list lint already uses, so the cost is
+  the popover (caret placement, keyboard and focus). If it slips, Advanced mode ships
+  with highlighting, lint and the macros panel.
 - **Macros panel:** lists the macros with descriptions. Click to insert at the caret.
 - **Preview:** a "Resolved command" toggle shows the expanded result for the current
   context: real pipe names, temp output, and `{gop:2s}` → 60.
@@ -123,7 +190,7 @@ This catches failing hardware encoders and bad extra arguments early. Voukoder P
 
 - Template name (editable; VEGAS also has its own name field, so a hint says
   "Rename in VEGAS to change the saved template name").
-- **From VEGAS** facts.
+- **From VEGAS** facts, shown in the strip's first node.
 - Origin line:
 
 | Origin state | Line | Actions |
@@ -197,12 +264,13 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
 | Keys | Action | Where |
 | --- | --- | --- |
 | Ctrl+K | Open preset… (palette) | Desktop |
-| Ctrl+F | Search settings / library | Desktop, popup |
+| Ctrl+F | Search the library | Desktop |
 | Ctrl+S | Save preset | Desktop |
 | Ctrl+Enter | Apply to template | Popup |
 | Esc | Cancel / close popover | Popup, popovers |
 | Ctrl+Shift+C | Copy command | Everywhere |
-| Ctrl+M | Switch Guided / Command | Editor |
+| Ctrl+M | Switch Basic / Advanced | Editor |
+| Arrow keys | Move between signal path nodes | Diagram |
 | Ctrl+1…4 | Presets, FFmpeg, History, Settings | Desktop |
 | F6 / Shift+F6 | Move between panes | Desktop |
 
@@ -222,15 +290,17 @@ Sliders support arrows, Page Up/Down, and Home/End.
 
 - Text contrast ≥ 4.5:1 (body) and ≥ 3:1 (large text, UI glyphs). Validation colour is
   always paired with an icon and text.
-- Flutter `Semantics` labels on custom controls: fader/slider (value plus meaning),
-  chips, wire diagram nodes, triangle puck.
+- Flutter `Semantics` labels on custom controls: slider (value plus meaning), chips,
+  and signal path nodes (role, name, state, and "Show size and quality" on File).
+- Contrast is checked in both themes.
 - Reduced motion (Windows "Animation effects" off) disables decorative transitions.
   State changes still update instantly.
 - Text scales up to 150% without clipping, within each window's minimum size.
 
 ## 10. Design tokens (Flutter `ThemeExtension`)
 
-Every direction fills the same roles, so switching or mixing directions is a token change:
+The light and dark values are the `:root` token sets in
+[design/signal-flow.html](design/signal-flow.html). Both sets fill the same roles:
 
 ```dart
 @immutable
@@ -250,10 +320,14 @@ class VeTokens extends ThemeExtension<VeTokens> {
 }
 ```
 
-- Role colours are used consistently across the command preview, section accents,
-  diagram wires (D3), strip caps (D2) and bar status (D8).
-- Every font is OFL, bundled and subset. The one exception is Segoe UI Variable, a
-  system font, used only for the Mica direction.
+- Role colours are used consistently across the command preview, node stripes and
+  diagram wires. Signal Flow adds `pip` (conversion marker) and the wire widths.
+- `VeTokens.light` and `VeTokens.dark` are both registered; `ThemeMode` follows the
+  setting in §1.
+- Fonts: Instrument Sans for the UI and JetBrains Mono for commands. Both are OFL,
+  bundled and subset.
+- Components are Vegas Encoder's own, built on Flutter's base widgets, not the Material
+  look. A headless kit is an option only after checking its current version.
 
 ## 11. Component inventory (Flutter)
 
@@ -262,12 +336,36 @@ class VeTokens extends ThemeExtension<VeTokens> {
 | `EncoderPicker` | Grouped by codec; hardware vendor; availability state with reason; search |
 | `RateModeSwitch` | Segmented; only the encoder's modes |
 | `QualityControl` | Slider, field and marks; bitrate variant; profile-steps variant |
-| `OptionRow` / `OptionGrid` | Typed editors for parsed AVOptions: enum, tri-state boolean, number with range, text; changed mark; reset |
+| `SignalPath` | Full and strip layouts; nodes, wires sized by bit depth, conversion pips, marks; keyboard navigation (`CustomPainter` for wires) |
+| `ExtraArgumentsField` | Monospace field; unknown-option warnings from parsed options |
 | `CommandView` | Tokens with roles; collapsed inputs chip; copy; multi-line |
-| `CommandEditor` | `TextEditingController.buildTextSpan` highlighting, macro chips, lint underlines, autocomplete overlay |
+| `CommandEditor` | `TextEditingController.buildTextSpan` highlighting, macro chips, lint underlines; autocomplete overlay last |
 | `MessageList` / `InlineMessage` | Levels, field focus |
-| `SizeEstimate` | Exact or "about"; video/audio split |
+| `SizeQualityCard` | Length field; total, per-minute rate and range; video/audio split; consequences |
 | `OriginBanner` | Popup origin states and actions |
 | `DiffList` | Field label, from → to |
 | `InstallationCard`, `CapabilityTable` | FFmpeg screen |
 | `JobList`, `JobDetail`, `LogView` | History |
+| `RenderMonitor` | Progress window (§12): wire progress bar, figures, done and failed states; reads the live status file through `ve_services` |
+
+## 12. Render progress window
+
+Mock: S6 in [design/signal-flow.html](design/signal-flow.html). Architecture and the
+performance rule: TECH_ARCHITECTURE §5.6.
+
+| Item | Behaviour |
+| --- | --- |
+| Size | About 380×250; not resizable; placed at the bottom-right of the monitor VEGAS is on |
+| Showing | Appears when a render starts **without taking focus**. Keep on top is a pin in the title bar (remembered) |
+| Header | Wire glyph for 10-bit or 8-bit output, output file name, encoder summary |
+| Progress | A video-wire bar with a round head; percentage and "Frame 9,607 of 22,873" |
+| Figures | Encoding fps, speed (× realtime), bitrate, size so far, final size (about, extrapolated from bytes so far), time left and total |
+| Finishing | "Writing the file index" (fast start), then "Checking the output" |
+| Done | Result sentence, as in History; **Open folder** and **Close**. Closes itself after 10 s unless the pointer is over it |
+| Failed | The reason and FFmpeg's error line; **Show in History** and **Open log**. Stays open |
+| Cancelled | "Cancelled in VEGAS"; closes after 5 s |
+| Cancel | Not offered: rendering is cancelled in VEGAS's own dialog, and the footer says so |
+| Updates | At most twice a second; no animation beyond the bar moving. Reduced motion changes nothing else |
+
+If VEGAS's render dialog can show a status line, it carries the same figures as one
+sentence: "x264: 61.8 fps, 2.06× realtime, 30.7 Mb/s, 1.23 GB so far".

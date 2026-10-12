@@ -1,6 +1,7 @@
 # Vegas Encoder product architecture
 
-Updated: 2026-10-11 (Asia/Singapore). Status: proposal for review. It extends
+Updated: 2026-10-12 (Asia/Singapore). Status: proposal; T7 and the platform are
+decided (Flutter, Windows x64 only; [README.md](README.md#decisions)). It extends
 [ARCHITECTURE.md](../ARCHITECTURE.md) §3–§6 with the product layer: shared core,
 Flutter app, VEGAS popup, presets and FFmpeg management. Nothing here is implemented
 or run in VEGAS. Native configuration exchange (A5), one-setting persistence (A6) and
@@ -15,9 +16,9 @@ designs that depend on them are marked **gated**.
 | T2 | How the editor appears from VEGAS | The DLL's native property page shows a summary and **launches `VegasEncoder.exe` as a separate, owned, modal process**. Exchange uses session files. | Keeps Flutter, its engine DLLs and GPU context out of the VEGAS process. A crash in the editor cannot take VEGAS down. The editor never touches VEGAS memory. | In-process Flutter engine (rejected for v1, §5.4); live pipe protocol (v2 upgrade path) |
 | T3 | Template payload | Versioned envelope in the template's private bytes (`abExtra`) holding the **complete recipe snapshot** as canonical UTF-8 JSON. | Matches ARCHITECTURE §5 (snapshot semantics). Debuggable. Forward-migratable. | Binary encoding or compression if A7 measures a tight size limit |
 | T4 | FFmpeg used for a render | Machine default from `machine.json`. A recipe never stores a path. The job records the exact executable, version and hash. | Recipes stay portable. Renders stay reproducible and diagnosable. | Per-preset machine-local override (later) |
-| T5 | Encoder knowledge | Declarative **encoder profiles** (data) used by both core (compile) and UI (fields). Uncurated encoders get a generic editor from parsed `-h encoder=X` options. | Adding an encoder is a data change. The UI and the compiler cannot disagree on what a field means. | Hand-written per-encoder widgets |
+| T5 | Encoder knowledge | Declarative **encoder profiles** (data) used by both core (compile) and UI (fields). Uncurated encoders get the generic controls; parsed `-h encoder=X` options check Extra arguments and drive Advanced-mode lint and autocomplete. | Adding an encoder is a data change. The UI and the compiler cannot disagree on what a field means. | Hand-written per-encoder widgets |
 | T6 | Capabilities | The app probes each FFmpeg installation, caches by content hash and **qualifies hardware encoders with real test encodes**. | "Listed" is not "works on this PC" (NVENC/QSV/AMF failures are routine). | — |
-| T7 | Flutter stack | Flutter 3.47 / Dart 3.13. Riverpod 3.4, freezed 4, build hooks + `native_toolchain_c` 0.19 (CMake fallback), package:win32 6.4, window_manager 0.5. No large UI kit; own design system on `ThemeExtension`. | Current, maintained and testable. Leaves the visual direction open. | fluent_ui 4.16 if the D5 Mica direction wins |
+| T7 | Flutter stack | Flutter 3.47 / Dart 3.13. Riverpod 3.4, freezed 4, build hooks + `native_toolchain_c` 0.19 (CMake fallback), package:win32 6.4, window_manager 0.5. No large UI kit and not the Material look: Signal Flow's own components on `ThemeExtension`, light and dark, following the Windows theme. **Decided** by the owner, 2026-10-12. | Current, maintained and testable. Flutter draws every pixel itself, so the diagram, wires and custom controls are ordinary `CustomPainter` and widget work. | A headless kit (such as forui) for base widgets, only after checking its current version |
 | T8 | Packaging | One signed installer (Inno Setup or WiX) for the app, DLL and config. Install/uninstall is reversible and manifest-based, as `Install-VegasEncoder.ps1` already does. | MSIX cannot place a plug-in under the VEGAS Program Files folder. | MSIX for the app alone plus a separate plug-in installer |
 
 ## 2. Processes and data flow
@@ -51,9 +52,10 @@ flowchart LR
 
 | Process | Lifetime | Talks to | Never does |
 | --- | --- | --- | --- |
-| VEGAS + `vegas-encoder.dll` | Host session | Template bytes, host readers, FFmpeg pipes, session files, `machine.json` (read), `jobs.jsonl` (append) | Load Flutter; read the preset library during a render; probe FFmpeg capabilities |
+| VEGAS + `vegas-encoder.dll` | Host session | Template bytes, host readers, FFmpeg pipes, session files, `machine.json` (read), `jobs.jsonl` (append), live render status file (write, §5.6) | Load Flutter; read the preset library during a render; probe FFmpeg capabilities; wait on the progress window |
 | `VegasEncoder.exe` desktop mode | User-started; single instance | Library, machine settings, cache, job logs, FFmpeg probes | Touch VEGAS memory or templates directly |
 | `VegasEncoder.exe --edit-session` | One per popup, owned by the VEGAS dialog | One session directory, library (read; write only on explicit Save to library), cache | Outlive its session; render |
+| `VegasEncoder.exe --render-monitor` | One per render, if enabled; exits after the render ends | The live status file (read), job record (read) | Take focus; touch FFmpeg, the pipes or VEGAS; slow the render |
 | `ffmpeg.exe` | One per render (engine) or per probe (app) | Pipes or `lavfi` test input | — |
 
 Host calls stay on Render's caller thread (existing rule). Session and editor
@@ -74,18 +76,20 @@ src/
 │   ├── machine/       machine.json read (DLL) / write helpers (app)
 │   └── capi/          ve_core.h: C ABI for dart:ffi (UTF-8 JSON in/out)
 ├── support/…
-app/                   NEW Flutter application (Windows target, Linux dev target)
+packages/               NEW pure Dart packages, no Flutter (platform workstream)
+├── ve_core/           domain models (Recipe, Preset, Issue, CompileResult…), the VeCore
+│                      API over ve_core.dll (ffigen + hook/build.dart), and FakeVeCore
+└── ve_services/       FFmpeg discovery, probe, help-text parser, hardware tests, cache;
+                       library repository; machine.json; job records and live status;
+                       session files. Each service has a fake for UI tests
+app/                   NEW Flutter application, Windows x64 only (app workstream)
 ├── lib/
-│   ├── main.dart      mode dispatch: desktop | --edit-session <dir>
-│   ├── core/          ffigen bindings + Dart wrappers over ve_core
-│   ├── domain/        Recipe, Preset, Installation, Capability, Job (immutable)
-│   ├── data/          library repository, machine settings, cache, jobs reader
-│   ├── ffmpeg/        discovery, probe runner, help-text parser, hardware tests
-│   ├── features/      presets/, editor/, command/, ffmpeg/, history/, settings/, popup/
-│   └── design/        tokens (ThemeExtension), typography, components
-├── hook/build.dart    builds src/core into ve_core.dll (native_toolchain_c)
-├── windows/runner/    owner HWND, single instance, DPI, Mica (if chosen)
-└── test/              unit, widget, golden; fixtures copied from evidence with provenance
+│   ├── main.dart      mode dispatch: desktop | --edit-session <dir> | --render-monitor <file>
+│   ├── state/         Riverpod providers and controllers over ve_core / ve_services
+│   ├── features/      presets/, editor/, advanced/, ffmpeg/, history/, settings/, popup/, monitor/
+│   └── design/        tokens (ThemeExtension, light and dark), typography, components
+├── windows/runner/    owner HWND, single instance, DPI, no-activate show
+└── test/              widget and golden tests (light and dark), using the fakes
 schema/
 ├── recipe.v1.schema.json         source of truth for recipe structure
 ├── encoder-profiles.v1.json      curated encoder knowledge (§6.3)
@@ -95,8 +99,9 @@ tests/core/                       C++ tests for compile, validation, payload bou
 
 The product core is the only code shared between the DLL and the app. The engine's
 existing rules still apply: no VEGAS headers outside `src/vegas` and owned buffers only.
-The core adds a stricter rule: **no Windows headers either**. That lets it build and
-run its tests on the Linux development machine and inside `flutter test`.
+The core adds a stricter rule: **no Windows headers either**. That keeps it testable on
+its own (plain C++ tests and `flutter test`) and keeps platform code at the edges.
+Development, tests and CI all run on Windows; there is no Linux target.
 
 ## 4. The product core
 
@@ -107,7 +112,7 @@ run its tests on the Linux development machine and inside `flutter test`.
 | Normalize | `ve_recipe_normalize(json) → {recipe, issues}`: fills defaults, drops nothing unknown, canonical key order | App save/load; DLL payload decode |
 | Validate | `ve_recipe_validate(recipe, media?, caps?) → issues[]` | App (live); DLL before render |
 | Compile | `ve_compile(recipe, media, paths) → {argv[], display[], issues[]}` | App preview (media = sample or VEGAS context); DLL render (media = delivered) |
-| Lint | `ve_template_lint(text, caps?) → diagnostics[]` | App Command mode; DLL before render |
+| Lint | `ve_template_lint(text, caps?) → diagnostics[]` | App Advanced mode; DLL before render |
 | Payload | `ve_payload_encode(recipe, origin) → bytes`, `ve_payload_decode(bytes) → {recipe, origin, migrated}` | DLL template I/O; app tests |
 | Session | `ve_session_read/write` | DLL property page; app popup mode |
 | Profiles | `ve_profiles() → json` | App reads the same encoder knowledge the compiler uses |
@@ -231,6 +236,49 @@ This depends on how VEGAS caches discovery and preset lists (F-044 leaves the in
 rule open), so it is a research gate. It is also a useful feature even when the page
 works ("Show in Render As" toggle per preset).
 
+### 5.6 Render progress (owner decision, 2026-10-12)
+
+VEGAS's own progress bar is already driven frame by frame (`SetTotal` / `SetPosition`
+on VEGAS's progress interface). Two additions show the encode statistics FFmpeg
+reports through `-progress pipe:1`: encode fps, speed, bitrate, size so far, and an
+extrapolated final size and time left.
+
+**1. A status line in VEGAS's render dialog (needs a real-host test).** VEGAS's progress
+interface (`ISfProgress`, `src/vegas/abi/sfio_abi.h`) has two unmapped methods that
+take text: slot 3 `(LPCWSTR, LONGLONG)` and slot 4 `(LPCWSTR)`. Their signatures come
+from the proxy-stub descriptors; their meaning is unknown, and neither Voukoder capture
+used them.
+
+- First, static analysis in the sibling investigation: what VEGAS 2026.0.3.189 does with
+  them.
+- Then an opt-in test build calls them during a real render, with the owner watching.
+- Text example: "x264: 61.8 fps, 2.06× realtime, 30.7 Mb/s, 1.23 GB so far".
+- Calls stay on Render's thread with the existing progress calls, at most twice a
+  second. Any failure disables the line for the rest of the render.
+- If the slots do nothing useful or misbehave, this part is dropped.
+
+**2. A small progress window (`--render-monitor`).** Mock: S6 in
+[design/signal-flow.html](design/signal-flow.html).
+
+- **Data path.** The engine's FFmpeg progress reader (not Render's thread) writes
+  `%LOCALAPPDATA%\VegasEncoder\jobs\<job>.live.json` by atomic replace, at most twice a
+  second. The fields are state (starting, encoding, finishing, verifying, done,
+  failed, cancelled), frames done and total, encode fps, speed, bitrate, bytes written,
+  elapsed, output path, template name, encoder summary and a message. The exact shape
+  is in the contracts document.
+- **Launch.** At render start, if the setting is on and the app is installed, the DLL
+  starts `VegasEncoder.exe --render-monitor <file>` with `CreateProcessW` and does not
+  wait. A failure to start is logged and ignored.
+- **Window.** It shows without taking focus, near VEGAS's window, and keep-on-top is a
+  toggle. It repaints only when the file changes. It exits a few seconds after a
+  successful end; after a failure it stays open.
+- **The encode never passes through the app.** Frames still go VEGAS → DLL → pipes →
+  FFmpeg. The window only reads a few hundred bytes twice a second.
+- **Performance rule (owner).** Measure the same real render three times with the
+  window and three times without. If the window costs more than about 2% of render
+  time, or visibly disturbs VEGAS, drop it and keep only the status line. Memory
+  budget: under 120 MB. Results go in the support notes with the host identity.
+
 ## 6. Recipes, presets and templates
 
 ### 6.1 Three objects (unchanged from ARCHITECTURE §5)
@@ -270,9 +318,10 @@ offset  size  field
   malformed JSON. It preserves the original bytes on any failure.
 - **Size:** design budget ≤ 16 KiB. Typical minified recipes are 1–3 KiB. The real
   limit is an A7 measurement, and compression is enabled only if it is needed.
-- **Legacy:** the current 64-byte private marker decodes as the built-in "Lossless
-  master, FFV1" recipe, if proof-template migration is accepted (ADAPTER_PLAN §7
-  leaves this a decision).
+- **Legacy:** the 64-byte private marker written by the foundation's temporary
+  one-checkbox page is a test payload. **Not migrated** (owner, 2026-10-12): those
+  templates were for experiments. Product templates start fresh; a proof template is
+  reported as made by a development build, with its bytes preserved.
 - **VEGAS-facing preferences** (frame size/rate overrides, requested pixel format) live
   in `vegasPrefs`. The adapter applies them only through evidenced template fields
   (render `BITMAPINFOHEADER`, video extension block). Each is **gated** separately;
@@ -298,8 +347,8 @@ It also declares container rules from the measured matrix
 `ve_profiles()`. The prototype of this data is `design/shared/model.js`.
 
 **Uncurated encoders** still work. The editor shows the generic controls (bitrate,
-`-q:v` where it applies, pixel format) and every parsed private option. Command mode
-remains the escape hatch.
+`-q:v` where it applies, pixel format) and Extra arguments, which are checked against
+the encoder's parsed private options. Advanced mode remains the escape hatch.
 
 ## 7. FFmpeg management
 
@@ -350,23 +399,27 @@ Research notes and versions: [research/FLUTTER_DESKTOP.md](research/FLUTTER_DESK
 ### 9.1 Layers
 
 ```text
-design/     tokens, typography, components (no business logic)
-features/   screens + controllers (Riverpod Notifiers); one folder per screen
-domain/     immutable models (freezed), pure Dart
-data/       repositories: library, machine settings, cache, jobs, session
-core/       ffigen bindings to ve_core + thin Dart wrappers (Isolate-safe)
-ffmpeg/     discovery, process runner, text parsers, hardware test scheduler
+app/lib/design/      tokens, typography, components (no business logic)
+app/lib/features/    screens and widgets; one folder per screen
+app/lib/state/       Riverpod Notifiers and providers
+packages/ve_core/    immutable domain models, VeCore over ve_core.dll (isolate-safe), FakeVeCore
+packages/ve_services/ library, machine settings, cache, jobs, live status, session;
+                     FFmpeg discovery, process runner, parsers, hardware test scheduler
 ```
 
+The packages are pure Dart, so they test without Flutter and give the two workstreams a
+clean seam ([WORKSTREAMS.md](WORKSTREAMS.md)). The app depends on them by path.
+
 - **Editor state.** One `EditorController` holds the draft recipe, the mode
-  (Guided/Command) and the dirty state. Derived values come from synchronous core calls
-  on each change, with `select` so only affected widgets rebuild: compiled command,
-  validation issues, size estimate. Slider drags coalesce to one compile per frame.
+  (Basic/Advanced), the selected signal-path node and the dirty state. Derived values
+  come from synchronous core calls on each change, with `select` so only affected
+  widgets rebuild: compiled command, validation issues, the signal path, and the size
+  estimate while the File node is open. Slider drags coalesce to one compile per frame.
 - **Mode switching keeps both.** A recipe holds `command.mode` and `command.template`
   alongside the structured fields.
-  - **Guided → Command** seeds the template from the compiled structured arguments.
+  - **Basic → Advanced** seeds the template from the compiled structured arguments.
     It asks first if a template already exists.
-  - **Command → Guided** keeps the template saved but inactive, and says so.
+  - **Advanced → Basic** keeps the template saved but inactive, and says so.
   Nothing is regenerated from visible fields (ARCHITECTURE §5).
 - **Unknown fields survive.** Dart models keep an `extensions` map for keys they don't
   know, so an older app never strips a newer field it round-trips.
@@ -377,6 +430,7 @@ ffmpeg/     discovery, process runner, text parsers, hardware test scheduler
 | --- | --- | --- | --- |
 | Desktop | User | Library index, machine settings, cache load in a background isolate | Navigation: Presets, FFmpeg, History, Settings |
 | Popup | DLL: `--edit-session <dir>` | Session read, cache read (non-blocking), owner HWND | Single window: template header + editor + Apply/Cancel |
+| Render monitor | DLL at render start: `--render-monitor <live file>` | Read the live status file; nothing else | Small progress window (§5.6); never takes focus |
 | Headless helpers (later) | Installer/support | e.g. `--probe <path>` for diagnostics | None |
 
 The desktop mode is single-instance (a second launch focuses the first). Popup
@@ -398,18 +452,24 @@ Record the numbers in an experiment note before claiming them.
 
 ### 9.4 Windows integration points
 
-- **Native core:** `hook/build.dart` builds `src/core` with `native_toolchain_c`.
+- **Native core:** `packages/ve_core/hook/build.dart` builds `src/core` with `native_toolchain_c`.
   Its C++ support needs a spike; if it falls short, use a CMake target added to
   `windows/CMakeLists.txt` that installs `ve_core.dll` beside the exe.
-- **Window chrome:** custom title bar (window_manager). Mica through
-  `DwmSetWindowAttribute(DWMWA_SYSTEMBACKDROP_TYPE)` via package:win32, only if the
-  Mica direction wins. `flutter_acrylic` was last published in 2024.
+- **Window chrome:** custom title bar (window_manager) drawn in the app's theme. No
+  Mica or acrylic backdrop.
+- **Theme:** confirm that Flutter's platform brightness follows the Windows app theme
+  and updates live when it changes; otherwise read `AppsUseLightTheme` and listen for
+  `WM_SETTINGCHANGE` in the runner. Set the dark title bar
+  (`DWMWA_USE_IMMERSIVE_DARK_MODE`) if the system frame is ever shown. (P2 spike.)
 - **Child processes:** probing runs `ffmpeg.exe` with no console window. Whether
   `Process.start` from a GUI subsystem app flashes a console must be verified. If it
   does, spawn through a tiny core helper using `CreateProcessW` with `CREATE_NO_WINDOW`
   and pipe handles. (P2 spike.)
 - **Owner window:** `--edit-session` mode reads the owner HWND from the request and
   sets it before first show, to avoid a flash at the wrong position.
+- **No-activate window:** the render monitor must appear without taking focus from
+  VEGAS (`SW_SHOWNOACTIVATE` / `WS_EX_NOACTIVATE`, or window_manager's equivalent).
+  P2 spike.
 - **Renderer:** Flutter's docs describe a Windows `ImpellerSwitch` in `main.cpp`.
   Confirm which backend 3.47 uses on the target machine. Text rendering and GPU
   compatibility must be checked inside a VEGAS session (VEGAS also holds the GPU).
@@ -418,9 +478,9 @@ Record the numbers in an experiment note before claiming them.
 
 | Layer | Tests | Runs on |
 | --- | --- | --- |
-| Core | Golden compile fixtures (`schema/fixtures/*.recipe.json` → `*.argv.json`), validation catalog, payload bounds/CRC/version/legacy, session round trip, fuzzed JSON | Linux + Windows CI, `flutter test` via build hooks |
-| Parser | Captured `-h encoder` / `-encoders` / `-muxers` fixtures (Linux 8.1.3 now; Windows builds later) with provenance | Dart unit tests |
-| UI | Widget tests per control; golden screenshots for each screen in light/dark at popup and desktop sizes | Linux desktop (dev), Windows CI |
+| Core | Golden compile fixtures (`schema/fixtures/*.recipe.json` → `*.argv.json`), validation catalog, payload bounds/CRC/version/legacy, session round trip, fuzzed JSON | Windows, local and CI; `flutter test` via build hooks |
+| Parser | Captured `-h encoder` / `-encoders` / `-muxers` fixtures from Windows builds (gyan.dev and BtbN), with provenance. The Linux 8.1.3 captures were design-time only | Dart unit tests |
+| UI | Widget tests per control; golden screenshots for each screen in light and dark, at popup and desktop sizes | Windows |
 | App integration | Fake session host: writes `request.json`, launches the app, drives Apply/Cancel, checks `result.json`; library concurrency | Windows |
 | Engine | Existing fake-host FFmpeg suite, extended with compiled recipes and output verification | Windows |
 | Real VEGAS | ADAPTER_PLAN A4–A8 gates plus the popup checklist (owner, focus, modality, crash recovery, Apply/Cancel, save/restart) | Exact target host only |
@@ -431,8 +491,8 @@ and hashes, per AGENTS.md.
 ## 11. Security and robustness notes
 
 - No shell: argv goes to `CreateProcessW` with CRT quoting (the existing `Quote()`).
-  Command-mode text is tokenized by core, never passed to `cmd.exe`.
-- Command mode can make FFmpeg write anywhere the user can. That is the user's machine
+  Advanced-mode text is tokenized by core, never passed to `cmd.exe`.
+- Advanced mode can make FFmpeg write anywhere the user can. That is the user's machine
   and choice. Lint warns about extra outputs, `-y`/`-n`, and inputs other than `{inputs}`.
 - Session and library files are per-user. The DLL validates every byte it reads (sizes,
   versions, schema), as it already does for templates.
@@ -444,7 +504,7 @@ and hashes, per AGENTS.md.
 See [ROADMAP.md](ROADMAP.md). In short:
 
 - **P1:** core and schema, plus engine argv parity with no VEGAS needed.
-- **P2:** Flutter skeleton with library, Guided editor and FFmpeg page.
-- **P3:** Command mode, all options and history.
+- **P2:** Flutter skeleton with library, signal path, Basic editor and FFmpeg page.
+- **P3:** Advanced mode and history.
 - **P4:** VEGAS page, session and payload (gated A5–A7).
 - **P5:** installer, signing and pinned presets.

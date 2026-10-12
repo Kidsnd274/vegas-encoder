@@ -2,6 +2,10 @@
 
 Updated: 2026-10-11. Research for the Vegas Encoder configurator (Flutter) and exporter DLL.
 
+**Note (2026-10-12):** the product targets Windows only. The [L] results below are a
+design-time record; P1 recaptures them with Windows FFmpeg builds, and those captures
+become the fixtures. Linux-only paths (VAAPI, `mkfifo`) are kept for reference only.
+
 **Evidence labels used below**
 
 - **[L]** = verified with FFmpeg 8.1.3 on Linux (Fedora build `/usr/bin/ffmpeg`, `--enable-shared --enable-gpl

@@ -1,5 +1,12 @@
 # Stop point before app design
 
+**Update 2026-10-12:** the design branch is merged and the owner has reviewed it.
+Decisions, including Signal Flow, Flutter and Windows only, are in
+[docs/product/README.md](product/README.md#decisions). Product implementation starts
+in two workstreams ([WORKSTREAMS.md](product/WORKSTREAMS.md)); the "stop before
+building" instructions below are superseded. The real-host qualification limits below
+still apply, and this gate is not passed by design decisions or offline mocks.
+
 The user now reports the app plan/design is complete on another branch. The local
 remote ref `origin/product-ui-design` is available; it has not been merged or
 approved for implementation in this foundation task. The user explicitly left its

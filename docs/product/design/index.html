@@ -31,14 +31,33 @@
   .shots span { position: absolute; left: 8px; bottom: 6px; background: rgba(22,25,29,.78); color: #fff; font-size: 12px; padding: 1px 7px; border-radius: 3px; }
   .missing { display: grid; place-items: center; height: 100%; color: var(--muted); font-size: 13px; }
   footer { border-top: 1px solid var(--line); padding-top: 24px; color: var(--muted); }
+  .dir.chosen { border-top: 0; padding-top: 8px; }
+  .dir.chosen .shots { grid-template-columns: repeat(2, 1fr); grid-template-rows: auto; }
+  .dir.chosen .shots a:first-child { grid-row: auto; aspect-ratio: 16 / 10; }
+  h2.round { font-size: 22px; margin: 32px 0 8px; padding-top: 28px; border-top: 1px solid var(--line); }
   @media (max-width: 900px) { .dir { grid-template-columns: 1fr; } .wrap { padding: 32px 20px; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Vegas Encoder design directions</h1>
-  <p class="lede">Eight ways to shape the same product: the desktop app, the shared editor in Guided and Command modes, the VEGAS popup, and the FFmpeg page. They all use the same content and live command compiler (<code>shared/model.js</code>), so the differences you see are design differences.</p>
-  <p class="lede">Open a direction to use it; most controls are live. Mixing is expected: note the parts you'd keep from each.</p>
+  <section class="dir chosen" aria-labelledby="chosen-h">
+    <div>
+      <span class="num">Chosen on 2026-10-12, round 2</span>
+      <h2 id="chosen-h">Signal Flow</h2>
+      <p>The owner picked D3. Round 2 adds Basic and Advanced modes, a shorter desktop diagram, a one-row strip in the VEGAS popup, size and quality behind the File node, Extra arguments instead of an all-options list, and a dark theme that follows Windows.</p>
+      <a class="open" href="signal-flow.html">Open Signal Flow, round 2</a>
+    </div>
+    <div class="shots">
+      <a href="signal-flow.html#s1" aria-label="Signal Flow, Basic editor"><img src="screenshots/signal-flow-s1.jpg" alt="" loading="lazy"><span>Basic editor</span></a>
+      <a href="signal-flow.html#s1f" aria-label="Signal Flow, File node with size and quality"><img src="screenshots/signal-flow-s1f.jpg" alt="" loading="lazy"><span>File node</span></a>
+      <a href="signal-flow.html#s3" aria-label="Signal Flow, VEGAS popup"><img src="screenshots/signal-flow-s3.jpg" alt="" loading="lazy"><span>VEGAS popup</span></a>
+      <a href="signal-flow.html?theme=dark#s1" aria-label="Signal Flow, dark theme"><img src="screenshots/signal-flow-s1-dark.jpg" alt="" loading="lazy"><span>Dark</span></a>
+    </div>
+  </section>
+  <h2 class="round">Round 1: eight directions</h2>
+  <p class="lede">Eight ways to shape the same product: the desktop app, the shared editor in Guided and Command modes (renamed Basic and Advanced in round 2), the VEGAS popup, and the FFmpeg page. They all use the same content and live command compiler (<code>shared/model.js</code>), so the differences you see are design differences.</p>
+  <p class="lede">These are kept as the record of the first round. Their notes still say Guided and Command.</p>
   <ul class="links">
     <li><a href="DESIGN_BRIEF.md">Design brief</a></li>
     <li><a href="shared/vegas-native-page.html">Native page inside VEGAS (shared)</a></li>
@@ -47,7 +66,7 @@
     <li><a href="REVIEW.md">Design review and recommendation</a></li>
   </ul>
   <div id="list"></div>
-  <footer>Mockups are review material for Flutter implementation. Nothing here ran in VEGAS. Screenshots were captured with headless Chromium on Linux, so system fonts such as Segoe UI fall back to Noto Sans.</footer>
+  <footer>Mockups are review material for Flutter implementation. Nothing here ran in VEGAS. Round 1 screenshots were captured with headless Chromium on Linux, so system fonts such as Segoe UI fall back to Noto Sans. Round 2 screenshots were captured with headless Chrome on Windows.</footer>
 </div>
 <script>
   const dirs = [
