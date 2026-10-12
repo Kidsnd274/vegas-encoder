@@ -1,6 +1,7 @@
 {
   "live": 1,
   "jobId": "b0-render",
+  "hostHwnd": "123456",
   "sequence": 6,
   "updatedAt": "2026-10-12T06:22:05Z",
   "state": "failed",

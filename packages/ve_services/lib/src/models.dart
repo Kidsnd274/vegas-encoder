@@ -589,6 +589,80 @@ class Preset extends JsonModel {
   );
 }
 
+class DesktopWindowBounds extends JsonModel {
+  DesktopWindowBounds({
+    required int x,
+    required int y,
+    required int width,
+    required int height,
+    JsonMap extensions = const {},
+  }) : super({
+         'x': x,
+         'y': y,
+         'width': width,
+         'height': height,
+         'extensions': extensions,
+       });
+  DesktopWindowBounds.fromJson(super.json);
+  int get x => data['x'] as int;
+  int get y => data['y'] as int;
+  int get width => data['width'] as int;
+  int get height => data['height'] as int;
+  DesktopWindowBounds copyWith({
+    Object? x = absent,
+    Object? y = absent,
+    Object? width = absent,
+    Object? height = absent,
+    Object? extensions = absent,
+  }) => DesktopWindowBounds.fromJson(
+    changed({
+      if (!identical(x, absent)) 'x': x,
+      if (!identical(y, absent)) 'y': y,
+      if (!identical(width, absent)) 'width': width,
+      if (!identical(height, absent)) 'height': height,
+      if (!identical(extensions, absent)) 'extensions': extensions,
+    }),
+  );
+}
+
+class AppUiState extends JsonModel {
+  AppUiState({
+    DesktopWindowBounds? desktopWindowBounds = null,
+    bool desktopMaximized = false,
+    String? lastSizeLengthText = null,
+    JsonMap extensions = const {},
+  }) : super({
+         'desktopWindowBounds': desktopWindowBounds?.toJson(),
+         'desktopMaximized': desktopMaximized,
+         'lastSizeLengthText': lastSizeLengthText,
+         'extensions': extensions,
+       });
+  AppUiState.fromJson(super.json);
+  DesktopWindowBounds? get desktopWindowBounds =>
+      data['desktopWindowBounds'] == null
+      ? null
+      : DesktopWindowBounds.fromJson(jsonMap(data['desktopWindowBounds']));
+  bool get desktopMaximized => data['desktopMaximized'] as bool? ?? false;
+  String? get lastSizeLengthText => data['lastSizeLengthText'] as String?;
+  AppUiState copyWith({
+    Object? desktopWindowBounds = absent,
+    Object? desktopMaximized = absent,
+    Object? lastSizeLengthText = absent,
+    Object? extensions = absent,
+  }) => AppUiState.fromJson(
+    changed({
+      if (!identical(desktopWindowBounds, absent))
+        'desktopWindowBounds': (desktopWindowBounds as DesktopWindowBounds?)
+            ?.toJson(),
+      if (!identical(desktopMaximized, absent))
+        'desktopMaximized': desktopMaximized,
+      if (!identical(lastSizeLengthText, absent))
+        'lastSizeLengthText': lastSizeLengthText,
+      if (!identical(extensions, absent)) 'extensions': extensions,
+    }),
+  );
+}
+
 class MachineSettings extends JsonModel {
   MachineSettings({
     int machine = 1,
@@ -599,6 +673,7 @@ class MachineSettings extends JsonModel {
     bool keepOnTop = false,
     bool verifyOutput = true,
     String theme = 'system',
+    AppUiState? uiState = null,
     JsonMap extensions = const {},
   }) : super({
          'machine': machine,
@@ -609,6 +684,7 @@ class MachineSettings extends JsonModel {
          'keepOnTop': keepOnTop,
          'verifyOutput': verifyOutput,
          'theme': theme,
+         'uiState': uiState?.toJson(),
          'extensions': extensions,
        });
   MachineSettings.fromJson(super.json);
@@ -623,6 +699,9 @@ class MachineSettings extends JsonModel {
   bool get keepOnTop => data['keepOnTop'] as bool? ?? false;
   bool get verifyOutput => data['verifyOutput'] as bool? ?? true;
   String get theme => data['theme'] as String? ?? 'system';
+  AppUiState? get uiState => data['uiState'] == null
+      ? null
+      : AppUiState.fromJson(jsonMap(data['uiState']));
   MachineSettings copyWith({
     Object? machine = absent,
     Object? revision = absent,
@@ -632,6 +711,7 @@ class MachineSettings extends JsonModel {
     Object? keepOnTop = absent,
     Object? verifyOutput = absent,
     Object? theme = absent,
+    Object? uiState = absent,
     Object? extensions = absent,
   }) => MachineSettings.fromJson(
     changed({
@@ -647,6 +727,8 @@ class MachineSettings extends JsonModel {
       if (!identical(keepOnTop, absent)) 'keepOnTop': keepOnTop,
       if (!identical(verifyOutput, absent)) 'verifyOutput': verifyOutput,
       if (!identical(theme, absent)) 'theme': theme,
+      if (!identical(uiState, absent))
+        'uiState': (uiState as AppUiState?)?.toJson(),
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -804,6 +886,7 @@ class LiveRenderStatus extends JsonModel {
   LiveRenderStatus({
     int live = 1,
     required String jobId,
+    String? hostHwnd = null,
     int sequence = 0,
     required String updatedAt,
     RenderState state = RenderState.starting,
@@ -825,6 +908,7 @@ class LiveRenderStatus extends JsonModel {
   }) : super({
          'live': live,
          'jobId': jobId,
+         'hostHwnd': hostHwnd,
          'sequence': sequence,
          'updatedAt': updatedAt,
          'state': state.name,
@@ -847,6 +931,7 @@ class LiveRenderStatus extends JsonModel {
   LiveRenderStatus.fromJson(super.json);
   int get live => data['live'] as int? ?? 1;
   String get jobId => data['jobId'] as String;
+  String? get hostHwnd => data['hostHwnd'] as String?;
   int get sequence => data['sequence'] as int? ?? 0;
   String get updatedAt => data['updatedAt'] as String;
   RenderState get state =>
@@ -868,6 +953,7 @@ class LiveRenderStatus extends JsonModel {
   LiveRenderStatus copyWith({
     Object? live = absent,
     Object? jobId = absent,
+    Object? hostHwnd = absent,
     Object? sequence = absent,
     Object? updatedAt = absent,
     Object? state = absent,
@@ -890,6 +976,7 @@ class LiveRenderStatus extends JsonModel {
     changed({
       if (!identical(live, absent)) 'live': live,
       if (!identical(jobId, absent)) 'jobId': jobId,
+      if (!identical(hostHwnd, absent)) 'hostHwnd': hostHwnd,
       if (!identical(sequence, absent)) 'sequence': sequence,
       if (!identical(updatedAt, absent)) 'updatedAt': updatedAt,
       if (!identical(state, absent)) 'state': (state as RenderState).name,

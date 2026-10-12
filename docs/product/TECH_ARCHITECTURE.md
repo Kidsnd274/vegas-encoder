@@ -72,8 +72,8 @@ src/
 │   ├── profiles/      encoder/container profile data (generated header from JSON)
 │   ├── compile/       recipe + MediaDescription → argv; macros; template lint
 │   ├── payload/       template private-payload envelope
-│   ├── session/       editor session request/result formats
-│   ├── machine/       machine.json read (DLL) / write helpers (app)
+│   ├── session/       pure editor session request/result serialization (no file I/O)
+│   ├── machine/       pure machine-setting views; file I/O stays at system edges
 │   └── capi/          ve_core.h: C ABI for dart:ffi (UTF-8 JSON in/out)
 ├── support/…
 packages/               NEW pure Dart packages, no Flutter (platform workstream)
@@ -114,12 +114,13 @@ Development, tests and CI all run on Windows; there is no Linux target.
 | Compile | `ve_compile(recipe, media, paths) → {argv[], display[], issues[]}` | App preview (media = sample or VEGAS context); DLL render (media = delivered) |
 | Lint | `ve_template_lint(text, caps?) → diagnostics[]` | App Advanced mode; DLL before render |
 | Payload | `ve_payload_encode(recipe, origin) → bytes`, `ve_payload_decode(bytes) → {recipe, origin, migrated}` | DLL template I/O; app tests |
-| Session | `ve_session_read/write` | DLL property page; app popup mode |
+| Session | Pure request/result serialization; file I/O lives in `ve_services` / adapter, outside the core C ABI | DLL property page; app popup mode |
 | Profiles | `ve_profiles() → json` | App reads the same encoder knowledge the compiler uses |
 | Version | `ve_core_version()`, `ve_schema_max()` | Compatibility checks between app and DLL |
 
-All functions are pure apart from session file I/O. They are deterministic and
-reentrant, and they allocate only through a `ve_free` paired API. Strings are UTF-8
+All core functions are pure; session file I/O belongs to `ve_services` and the
+adapter. Functions are deterministic and reentrant, and they allocate only through
+a `ve_free` paired API. Strings are UTF-8
 at the C boundary. The DLL converts paths to wide strings at its own edge.
 
 ### 4.2 Why JSON at the boundary
@@ -128,6 +129,11 @@ A single JSON shape is used for template payloads, session files, preset files a
 FFI calls. That gives one serialization to test. The JSON is small (1–4 KB per
 recipe), so FFI cost is negligible compared with a frame: compile is expected well
 under 1 ms. This is to be measured in P1 and recorded.
+
+The recipe stores audio as a one-element list in v1. Template/session/job origin is
+`{presetId, revision, name}` (or null), separate from the complete recipe snapshot.
+Exact boundary shapes, including command provenance and per-stream signal-path
+facts returned by compile, are in [CONTRACTS.md](CONTRACTS.md).
 
 Dart sees typed models. C++ sees typed views. The canonical JSON written by core is
 the interchange format.
@@ -264,7 +270,8 @@ used them.
   `%LOCALAPPDATA%\VegasEncoder\jobs\<job>.live.json` by atomic replace, at most twice a
   second. The fields are state (starting, encoding, finishing, verifying, done,
   failed, cancelled), frames done and total, encode fps, speed, bitrate, bytes written,
-  elapsed, output path, template name, encoder summary and a message. The exact shape
+  elapsed, output path, template name, encoder summary, VEGAS's main HWND for
+  placement, and a message. The exact shape
   is in the contracts document.
 - **Launch.** At render start, if the setting is on and the app is installed, the DLL
   starts `VegasEncoder.exe --render-monitor <file>` with `CreateProcessW` and does not
@@ -287,7 +294,7 @@ used them.
 | --- | --- | --- |
 | Preset (library recipe) | `%APPDATA%\VegasEncoder\library\<id>.vepreset` | Canonical recipe JSON plus library metadata (revision history pointer, favorite, pinned) |
 | Render template payload | VEGAS template `abExtra` (and VEGAS's `.sft2` when the user saves) | Envelope (§6.2) holding a full recipe snapshot and origin `{presetId, revision, name}` |
-| Job record | `%LOCALAPPDATA%\vegas-encoder\jobs\<job>.json` + `jobs.jsonl` index | Resolved recipe hash, compiled argv, FFmpeg identity, delivered media, timings, result, verification |
+| Job record | `%LOCALAPPDATA%\VegasEncoder\jobs\<job>.json` + `jobs.jsonl` index in the same root as live status | Resolved recipe hash, compiled argv, FFmpeg identity, delivered media, timings, result, verification |
 
 - **One file per preset.** Easy to share, back up and diff. The desktop app and popup
   watch the folder (`FileSystemEntity.watch`) so they stay in sync.

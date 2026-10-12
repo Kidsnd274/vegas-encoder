@@ -6,6 +6,12 @@ Pure Dart models, `VeCore` interface, and `FakeVeCore`. Import
 See [C1/C2 contracts](../../docs/product/CONTRACTS.md) for wire shapes, null/default
 semantics, issue IDs, UTF-16 ranges and ownership. The native DLL/build hook is B2.
 
+App-review additions in contract v1: `CommandToken.field`, `Issue.tokenIndices`
+(indexes into compile display), and `CompileResult.signalPath` with raw per-stream
+format/precision/conversion/chroma/mux facts. Default fixtures include these facts;
+capability-specific highlights come from `CoreFixture.compileIssues`. Older JSON
+can omit them. They do not add live domain logic to the fake.
+
 ```dart
 final core = FakeVeCore();
 final fixture = core.fixtures.first;

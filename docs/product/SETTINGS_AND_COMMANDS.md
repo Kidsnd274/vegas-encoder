@@ -40,7 +40,7 @@ implementation is the C++ core ([TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) §4
     "color": "bt709",                 // tag policy: bt709 | none (more after color qualification)
     "extra": ""                       // Extra arguments: appended (tokenized); replaces same-name options
   },
-  "audio": {
+  "audio": [{
     "enabled": true,
     "encoder": "aac",
     "mode": "bitrate",                // bitrate | vbr | lossless (per encoder profile)
@@ -48,7 +48,7 @@ implementation is the C++ core ([TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) §4
     "sampleRate": "source",           // source | 44100 | 48000 | 96000
     "channels": "source",             // source | stereo | mono
     "extra": ""
-  },
+  }],
   "command": {
     "mode": "structured",             // structured (Basic) | template (Advanced)
     "template": ""                    // kept even while inactive
@@ -70,7 +70,10 @@ implementation is the C++ core ([TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) §4
 - **Library metadata lives outside the recipe.** Revision, favorite, pinned, updated and
   builtin are stored in the `.vepreset` wrapper:
   `{ "vepreset": 1, "revision": 6, "favorite": true, "recipe": {…} }`.
-  Template snapshots never carry library metadata. They carry only `origin`.
+  Template snapshots never carry library metadata. They carry only `origin`:
+  `{ "presetId": "yt-h264", "revision": 6, "name": "YouTube upload, H.264" }`
+  (or null), alongside the complete recipe snapshot. Sessions and job records use
+  the same origin shape.
 - **Machine-local values are never stored:** no FFmpeg path, GPU index or HWND.
 - **No per-option map.** Basic has no "All options" editor (owner decision,
   2026-10-12), so v1 has no `options` field. Options without a control live in

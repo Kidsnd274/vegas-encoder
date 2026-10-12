@@ -4,6 +4,7 @@ const String b0ServiceFixtureJson = r'''{
     {
       "live": 1,
       "jobId": "b0-render",
+      "hostHwnd": "123456",
       "sequence": 1,
       "updatedAt": "2026-10-12T06:22:00Z",
       "state": "starting",
@@ -25,6 +26,7 @@ const String b0ServiceFixtureJson = r'''{
     {
       "live": 1,
       "jobId": "b0-render",
+      "hostHwnd": "123456",
       "sequence": 2,
       "updatedAt": "2026-10-12T06:22:01Z",
       "state": "encoding",
@@ -46,6 +48,7 @@ const String b0ServiceFixtureJson = r'''{
     {
       "live": 1,
       "jobId": "b0-render",
+      "hostHwnd": "123456",
       "sequence": 3,
       "updatedAt": "2026-10-12T06:22:02Z",
       "state": "finishing",
@@ -67,6 +70,7 @@ const String b0ServiceFixtureJson = r'''{
     {
       "live": 1,
       "jobId": "b0-render",
+      "hostHwnd": "123456",
       "sequence": 4,
       "updatedAt": "2026-10-12T06:22:03Z",
       "state": "verifying",
@@ -88,6 +92,7 @@ const String b0ServiceFixtureJson = r'''{
     {
       "live": 1,
       "jobId": "b0-render",
+      "hostHwnd": "123456",
       "sequence": 5,
       "updatedAt": "2026-10-12T06:22:04Z",
       "state": "done",
@@ -109,6 +114,7 @@ const String b0ServiceFixtureJson = r'''{
     {
       "live": 1,
       "jobId": "b0-render",
+      "hostHwnd": "123456",
       "sequence": 6,
       "updatedAt": "2026-10-12T06:22:05Z",
       "state": "failed",
@@ -130,6 +136,7 @@ const String b0ServiceFixtureJson = r'''{
     {
       "live": 1,
       "jobId": "b0-render",
+      "hostHwnd": "123456",
       "sequence": 7,
       "updatedAt": "2026-10-12T06:22:06Z",
       "state": "cancelled",
@@ -2060,6 +2067,16 @@ const String b0ServiceFixtureJson = r'''{
     "progressWindow": true,
     "keepOnTop": false,
     "verifyOutput": true,
-    "theme": "system"
+    "theme": "system",
+    "uiState": {
+      "desktopWindowBounds": {
+        "x": -1280,
+        "y": 80,
+        "width": 1200,
+        "height": 800
+      },
+      "desktopMaximized": false,
+      "lastSizeLengthText": "10:00"
+    }
   }
 }''';

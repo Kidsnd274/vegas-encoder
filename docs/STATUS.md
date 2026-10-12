@@ -16,6 +16,15 @@ see [contracts](product/CONTRACTS.md) and [platform handoff](product/workstreams
 No native product-core implementation, real services or new VEGAS runtime claim
 is included, and the adapter gates below are unchanged.
 
+**B0 app review additions (Windows x64):** master including B0 and F0/F1 is merged
+into ws/platform. Contract v1 now includes token field provenance/issue display
+indexes, per-stream signal facts, a main host HWND in live status, and app UI state
+in machine.json. Models and existing fakes/fixtures expose them. Both packages
+analyze cleanly; 170 core, 57 service and 281 fixture checks pass, plus C/C++17 ABI
+header compilation x64 `/W4 /WX`. **Fakes/offline only; no new real VEGAS evidence.**
+Owner-approved architecture/settings reconciliation is applied. See the
+[platform handoff](product/workstreams/platform.md).
+
 **B0 checks (Windows x64):** both pure Dart packages analyze cleanly; 95 core,
 40 service and 163 fixture structure/bounds checks pass using fakes/design data.
 C/C++ draft-header checks and default/opt-in native builds pass MSVC `/W4 /WX`.
@@ -23,13 +32,14 @@ Existing 24 helper, 9 boundary, 67 configuration checks, default fake-host suite
 11-case/20-render proof/recovery suite and fake-tree installer tests pass with
 gyan FFmpeg 5.1.2. This is offline/fake-host validation, not a new real VEGAS test.
 
-**Next:** stop at B0 for the owner's merge/app review. Platform B1 follows after
-handoff: Windows FFmpeg recapture, with owner approval before downloading or
-installing current gyan.dev/BtbN builds. Workstream split:
+**Next:** stop at this contract milestone for owner merge, then B2 real core/FFI
+before B1 to unblock live editing. B1 downloads are approved into this worktree's
+ignored build/ only (source URL/version recorded), with existing `C:\ffmpeg` gyan
+5.1.2 as the older case. No installation or PATH change. Workstream split:
 [docs/product/WORKSTREAMS.md](product/WORKSTREAMS.md).
 
 **Scope boundary:** product work is now authorized on ws/app and ws/platform.
-The owner explicitly asked platform to stop after B0 for merging. The deferred real
+The owner asks platform to commit each milestone and stop for merging. The deferred real
 two-template/restart test and controlled real failure recovery remain qualification
 limits; B0's fixtures do not pass A5–A7. No installed DLL or rollback backup changed.
 
@@ -217,8 +227,10 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 ## Next task
 
-Platform stops after B0 for owner merge and app contract review. Next is B1 in
-[WORKSTREAMS.md](product/WORKSTREAMS.md): Windows FFmpeg facts from current gyan.dev
-and BtbN builds, only after approval for any download/install. Then B2–B4 in order.
+Platform stops after the additive app-review contract milestone for owner merge.
+B2 core/FFI is next, then the approved tight B1 Windows recapture (existing gyan
+5.1.2 plus current gyan.dev/BtbN builds in ignored build/, no installation/PATH change),
+then B3–B4. Order and rationale are in
+[platform.md](product/workstreams/platform.md).
 B5/B6 require the owner at the real host. Controlled failure/recovery and deferred
 persistence qualification remain open per [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).

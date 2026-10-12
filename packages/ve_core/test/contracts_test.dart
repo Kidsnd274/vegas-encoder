@@ -41,6 +41,61 @@ void main() {
       'executable display role',
     );
     check(
+      result.display
+          .where(
+            (t) => [
+              TokenRole.exe,
+              TokenRole.global,
+              TokenRole.input,
+              TokenRole.map,
+              TokenRole.output,
+            ].contains(t.role),
+          )
+          .every((t) => t.field == null),
+      'product-owned tokens have no editable field',
+    );
+    check(
+      result.display
+          .where(
+            (t) =>
+                t.role == TokenRole.video ||
+                t.role == TokenRole.audio ||
+                t.role == TokenRole.mux,
+          )
+          .every((t) => t.field != null),
+      'all generated settings have provenance',
+    );
+    check(
+      result.issues
+          .expand((i) => i.tokenIndices)
+          .every((i) => i >= 0 && i < result.display.length),
+      'compile issue display bounds',
+    );
+    check(
+      core.validate(recipe).every((i) => i.tokenIndices.isEmpty),
+      'standalone validation has no display indexes',
+    );
+    final signal = result.signalPath!;
+    check(
+      signal.video!.inputBits == 10 && signal.audio.single.inputBits == 32,
+      'core supplies source precision without app format parsing',
+    );
+    check(
+      signal.video!.outputFormat == result.resolved!.pixfmt &&
+          signal.video!.outputBits == result.resolved!.depth,
+      'resolved video facts agree',
+    );
+    check(
+      signal.audio.single.outputFormat != null &&
+          signal.audio.single.outputBits != null,
+      'audio output format and useful bits',
+    );
+    check(
+      signal.video!.containerSupport == 'ok' &&
+          signal.audio.single.containerSupport == 'ok',
+      'built-in mux facts',
+    );
+    check(
       !result.argv.contains(result.executable),
       'executable excluded from argv',
     );
@@ -71,6 +126,174 @@ void main() {
     );
   }
   final f = core.fixtures.first;
+  final missingEncoder = core.compile(
+    f.recipe,
+    media: f.media,
+    paths: f.paths,
+    capabilities: CoreCapabilities(installationId: 'btbn-lgpl-8.0'),
+  );
+  final pointed = missingEncoder.issues.firstWhere(
+    (i) => i.id == 'V-ENC-MISSING',
+  );
+  check(
+    pointed.tokenIndices.length == 2 &&
+        pointed.tokenIndices
+                .map((i) => missingEncoder.display[i].text)
+                .join(' ') ==
+            '-c:v libx264',
+    'capability-specific error points to emitted encoder pair',
+  );
+  final qualityTokens = f.compiled.display.where(
+    (t) => t.field == 'video.quality',
+  );
+  check(
+    qualityTokens.map((t) => t.text).join(' ') == '-crf 18',
+    'click-to-field points at flag and value',
+  );
+  final nv = core.fixtures.firstWhere((f) => f.recipe.id == 'yt-hevc-nv');
+  final opus = core.fixtures.firstWhere((f) => f.recipe.id == 'av1-small');
+  check(
+    opus.compiled.display
+            .where((t) => t.field == 'audio[0].mode')
+            .map((t) => t.text)
+            .join(' ') ==
+        '-vbr on',
+    'profile-generated bitrate-mode constant points to mode, not inactive VBR control',
+  );
+  check(
+    nv.compiled.signalPath!.video!.conversion == false,
+    'native P010 path explicitly has no conversion',
+  );
+  final prores = core.fixtures.firstWhere((f) => f.recipe.id == 'prores-hq');
+  check(
+    prores.compiled.signalPath!.video!.chromaChanged == true &&
+        prores.compiled.signalPath!.video!.outputChroma == '4:2:2',
+    'chroma change is data',
+  );
+  check(
+    prores.compiled.signalPath!.audio.single.outputFormat == 's32' &&
+        prores.compiled.signalPath!.audio.single.outputBits == 24,
+    '24-bit PCM precision differs from its carrier width',
+  );
+  final floatPcm = core.fixtures.firstWhere(
+    (f) => f.recipe.id == 'ffv1-master',
+  );
+  check(
+    floatPcm.compiled.signalPath!.audio.single.conversion == false,
+    'raw f32le and canonical flt are the same sample representation',
+  );
+
+  final sparseToken = CommandToken.fromJson({'text': 'ffmpeg', 'role': 'exe'});
+  final sparseIssue = Issue.fromJson({'id': 'future', 'message': 'future'});
+  final sparseCompile = CompileResult.fromJson({
+    'executable': 'ffmpeg',
+    'argv': [],
+  });
+  final sparseFacts = StreamSignalFacts.fromJson({});
+  check(
+    sparseToken.field == null && !sparseToken.toJson().containsKey('field'),
+    'old tokens preserve missing provenance',
+  );
+  check(
+    sparseIssue.tokenIndices.isEmpty &&
+        !sparseIssue.toJson().containsKey('tokenIndices'),
+    'old issues preserve missing references',
+  );
+  check(
+    sparseCompile.signalPath == null &&
+        !sparseCompile.toJson().containsKey('signalPath'),
+    'old compile facts are unavailable, not inferred',
+  );
+  check(
+    sparseFacts.conversion == null &&
+        sparseFacts.chromaChanged == null &&
+        sparseFacts.containerSupport == 'unknown',
+    'unknown is not false or supported',
+  );
+  check(
+    CommandToken(
+          text: '18',
+          field: 'video.quality',
+        ).copyWith(field: null).field ==
+        null,
+    'explicit null clears provenance',
+  );
+  final tokenList = <int>[2, 3];
+  final ownedIssue = Issue(
+    id: 'test',
+    message: 'test',
+    tokenIndices: tokenList,
+  );
+  tokenList.clear();
+  check(ownedIssue.tokenIndices.join(',') == '2,3', 'token references copied');
+  try {
+    ownedIssue.tokenIndices.add(4);
+    throw StateError('mutable token indexes');
+  } on UnsupportedError {
+    checks++;
+  }
+  final factsJson = f.compiled.signalPath!.toJson();
+  (factsJson['video'] as Map)['future'] = {
+    'nested': [1],
+  };
+  final ownedFacts = SignalPathFacts.fromJson(factsJson);
+  ((factsJson['video'] as Map)['future'] as Map).clear();
+  final blockedFacts = ownedFacts.copyWith(
+    video: ownedFacts.video!.copyWith(containerSupport: 'no'),
+    audio: [ownedFacts.audio.single.copyWith(containerSupport: 'warn')],
+  );
+  check(
+    (blockedFacts.video!.toJson()['future'] as Map).isNotEmpty,
+    'nested unknown signal facts survive immutable editing',
+  );
+  final injectedFacts = FakeVeCore(
+    fixtures: [
+      CoreFixture(
+        recipe: f.recipe,
+        media: f.media,
+        paths: f.paths,
+        normalized: f.normalized,
+        compiled: f.compiled.copyWith(
+          signalPath: blockedFacts,
+          issues: [
+            Issue(
+              id: 'test',
+              message: 'Untranslated message',
+              tokenIndices: [1],
+            ),
+          ],
+        ),
+        estimate: f.estimate,
+        validations: f.validations,
+      ),
+    ],
+  );
+  final injectedResult = injectedFacts.compile(
+    f.recipe,
+    media: f.media,
+    paths: f.paths,
+  );
+  check(
+    injectedResult.signalPath!.video!.containerSupport == 'no' &&
+        injectedResult.signalPath!.audio.single.containerSupport == 'warn',
+    'injected per-stream mux facts do not depend on issue text',
+  );
+  check(
+    injectedResult.copyWith(signalPath: null).signalPath == null,
+    'explicit null clears signal path',
+  );
+  check(
+    ownedFacts.copyWith(video: null, audio: <StreamSignalFacts>[]).video ==
+            null &&
+        ownedFacts.copyWith(audio: <StreamSignalFacts>[]).audio.isEmpty,
+    'disabled streams have no facts',
+  );
+  try {
+    ownedFacts.audio.clear();
+    throw StateError('mutable signal audio');
+  } on UnsupportedError {
+    checks++;
+  }
   throwsCode(
     () => core.compile(
       f.recipe.copyWith(video: f.recipe.video.copyWith(quality: 19.0)),

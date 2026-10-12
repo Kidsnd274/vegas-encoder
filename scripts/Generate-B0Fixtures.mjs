@@ -21,14 +21,76 @@ for (const name of ['avoptions.js', 'model.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, 'docs/product/design/shared', name), 'utf8'), context);
 }
 const ve = context.VE;
-const mapIssue = (issue) => {
+// Fixture annotations only: the product compiler will emit these facts in B2.
+// No additional edited-state fixtures or Dart domain implementation are added.
+const annotateTokens = (tokens, res) => {
+  const fields = {
+    video: {'-c:v':'video.encoder', '-preset':'video.speed', '-tune':'video.tune',
+      '-crf':'video.quality', '-cq':'video.quality', '-global_quality':'video.quality',
+      '-rc':'video.mode', '-qp':'video.qp', '-profile:v':'video.profile',
+      '-pix_fmt':res.mode === 'profile' ? 'video.profile' : 'video.depth',
+      '-g':res.mode === 'lossless' ? 'video.mode' : 'video.gopSec',
+      '-color_primaries':'video.color', '-color_trc':'video.color', '-colorspace':'video.color', '-color_range':'video.color',
+      '-tag:v':'video.encoder', '-vendor':'video.encoder', '-level':'video.mode', '-slices':'video.mode', '-slicecrc':'video.mode',
+      '-b:v':['cq','crf'].includes(res.mode) ? 'video.mode' : 'video.bitrateK',
+      '-minrate':'video.bitrateK', '-maxrate':res.mode === 'cbr' ? 'video.bitrateK' : 'video.maxrateK',
+      '-bufsize':res.mode === 'cbr' ? 'video.bitrateK' : 'video.maxrateK', '-multipass':'video.multipass'},
+    audio: {'-c:a':'audio[0].encoder', '-b:a':'audio[0].bitrateK',
+      '-vbr':res.amode === 'bitrate' ? 'audio[0].mode' : 'audio[0].vbr',
+      '-compression_level':'audio[0].level', '-ar':'audio[0].sampleRate', '-ac':'audio[0].channels'},
+    mux: {'-movflags':'container.faststart', '-f':'container.format'},
+  };
+  let field = null, stream = 'video';
+  return tokens.map((token, i) => {
+    if (token.role === 'video' || token.role === 'audio') stream = token.role;
+    if (token.role === 'extra') field = stream === 'video' ? 'video.extra' : 'audio[0].extra';
+    else if (!fields[token.role]) field = null;
+    else if (token.text.startsWith('-')) {
+      field = fields[token.role][token.text];
+      if (!field) throw new Error(`Unannotated fixture option ${token.text}`);
+    } else if (i === 0 || tokens[i-1].role !== token.role) throw new Error('Orphan fixture value');
+    return {...token, field};
+  });
+};
+// Authored sample facts, not Windows probes. Audio formats are encoder-side
+// FFmpeg sample formats; bits are useful precision, not storage/packet bitrate.
+const authoredSignals = {
+  'yt-h264': ['yuv420p',8,'4:2:0',true,'fltp',32,true],
+  'yt-hevc-nv': ['p010le',10,'4:2:0',false,'fltp',32,true],
+  'av1-small': ['yuv420p10le',10,'4:2:0',true,'flt',32,false],
+  'prores-hq': ['yuv422p10le',10,'4:2:2',true,'s32',24,true],
+  'dnxhr-hq': ['yuv422p',8,'4:2:2',true,'s16',16,true],
+  'ffv1-master': ['yuv420p10le',10,'4:2:0',true,'flt',32,false],
+};
+const signalFacts = (recipe, ctx) => {
+  if (ctx.video.pixfmt !== 'p010le' || ctx.audio?.sampleFmt !== 'f32le') throw new Error('New media needs authored signal facts');
+  const [pixfmt,depth,chroma,convertVideo,sampleFmt,bits,convertAudio] = authoredSignals[recipe.id];
+  return {
+    video: recipe.video.enabled ? {inputFormat:'p010le',outputFormat:pixfmt,inputBits:10,outputBits:depth,
+      inputChroma:'4:2:0',outputChroma:chroma,chromaChanged:chroma !== '4:2:0',conversion:convertVideo,
+      containerSupport:ve.compat.video[ve.videoEncoders[recipe.video.encoder].family][recipe.container.format]} : null,
+    audio: recipe.audio[0].enabled ? [{inputFormat:'flt',outputFormat:sampleFmt,inputBits:32,outputBits:bits,
+      inputChroma:null,outputChroma:null,chromaChanged:null,conversion:convertAudio,
+      containerSupport:ve.compat.audio[ve.audioEncoders[recipe.audio[0].encoder].family][recipe.container.format]}] : [],
+  };
+};
+const mapIssue = (issue, tokens = []) => {
   const text = issue.text;
   const id = /banding/.test(text) ? 'V-DEPTH-DOWN' : /interpolated/.test(text) ? 'V-CHROMA-UP'
     : /Fast start/.test(text) ? 'V-FASTSTART' : /Runs on/.test(text) ? 'V-HARDWARE'
-    : /test encode/.test(text) ? 'V-ENC-FAILED' : /isn’t in/.test(text) ? 'V-ENC-MISSING' : 'V-DESIGN';
-  return { id, level: issue.level, field: issue.field ?? '', message: text, params: {}, fix: issue.fix ?? null };
+    : /test encode/.test(text) ? 'V-ENC-FAILED' : /isn’t in/.test(text) ? 'V-ENC-MISSING'
+    : /can’t hold.*video|in .*works in FFmpeg/.test(text) ? 'V-CONTAINER-VIDEO'
+    : /can’t hold.*audio|audio in .*muxes/.test(text) ? 'V-CONTAINER-AUDIO' : 'V-DESIGN';
+  let field = issue.field ?? '';
+  if (field.startsWith('audio.')) field = field.replace('audio.','audio[0].');
+  if (field === 'video.gop') field = 'video.gopSec';
+  if (field === 'container') field = id === 'V-FASTSTART' ? 'container.faststart' : 'container.format';
+  const stream = id === 'V-CONTAINER-VIDEO' ? 'video' : id === 'V-CONTAINER-AUDIO' ? 'audio[0]' : null;
+  const tokenIndices = tokens.flatMap((token, i) => token.field === field ||
+    (stream && token.field === `${stream}.encoder`) ? [i] : []);
+  return { id, level: issue.level, field, message: text, params: stream ? {stream} : {}, fix: issue.fix ?? null, tokenIndices };
 };
-const issueNotice = { id: 'V-UNTESTED', level: 'info', field: '', message: 'B0 design fixture. Not tested with VEGAS yet.', params: {}, fix: null };
+const issueNotice = { id: 'V-UNTESTED', level: 'info', field: '', message: 'B0 design fixture. Not tested with VEGAS yet.', params: {}, fix: null, tokenIndices:[] };
 const cleanRecipe = (r) => {
   const copy = JSON.parse(JSON.stringify(r));
   for (const key of ['revision', 'updated', 'builtin', 'favorite']) delete copy[key];
@@ -49,7 +111,7 @@ const makeFixture = (r, ctx = ve.sampleContext) => {
   const recipe = cleanRecipe(r);
   const compiled = ve.compile(r, ctx);
   const res = compiled.resolved;
-  const tokens = compiled.tokens;
+  const tokens = annotateTokens(compiled.tokens, res);
   const output = tokens.at(-1).text;
   const advancedTemplate = ['{inputs}', ve.commandText(tokens.filter((x) => !['exe', 'global', 'input', 'output'].includes(x.role))), '{output}'].join('\n');
   const est = ve.estimate(r, { ...ctx, durationSec: 60 });
@@ -66,8 +128,10 @@ const makeFixture = (r, ctx = ve.sampleContext) => {
       commandLine: ve.commandText(tokens), advancedTemplate,
       resolved: { videoEncoder: res.enc.id, audioEncoder: res.aenc.id, videoMode: res.mode, audioMode: res.amode,
         quality: res.quality ?? null, speed: res.speed ?? null, profile: res.profile ?? null, depth: res.depth, pixfmt: res.pixfmt },
-      issues: [...ve.validate(r, 'gyan-8.1', ctx).map(mapIssue), issueNotice], summary: ve.summary(r) },
-    validations: Object.fromEntries(ve.installations.map((inst) => [inst.id, [...ve.validate(r, inst.id, ctx).map(mapIssue), issueNotice]])),
+      signalPath: signalFacts(recipe, ctx),
+      issues: [...ve.validate(r, 'gyan-8.1', ctx).map((issue) => mapIssue(issue, tokens)), issueNotice], summary: ve.summary(r) },
+    validations: Object.fromEntries(ve.installations.map((inst) => [inst.id, [...ve.validate(r, inst.id, ctx).map((issue) => mapIssue(issue)), issueNotice]])),
+    compileIssues: Object.fromEntries(ve.installations.map((inst) => [inst.id, [...ve.validate(r, inst.id, ctx).map((issue) => mapIssue(issue, tokens)), issueNotice]])),
     estimate: { available: true, approx: est.approx, videoKbps: est.videoKbps, audioKbps: est.audioKbps,
       bytesPerMinute: perMinute, totalBytes: null, minBytesPerMinute: est.approx ? perMinute * .6 : null,
       maxBytesPerMinute: est.approx ? perMinute * 1.6 : null,
@@ -142,7 +206,7 @@ const states = ['starting', 'encoding', 'finishing', 'verifying', 'done', 'faile
 const live = states.map((state, n) => {
   const terminal = ['done','failed','cancelled'].includes(state);
   const framesDone = state === 'starting' ? 0 : state === 'encoding' ? 7400 : state === 'cancelled' ? 3250 : 22873;
-  return { live: 1, jobId: 'b0-render', sequence: n + 1, updatedAt: `2026-10-12T06:22:0${n}Z`, state,
+  return { live: 1, jobId: 'b0-render', hostHwnd:'123456', sequence: n + 1, updatedAt: `2026-10-12T06:22:0${n}Z`, state,
     framesDone, framesTotal: 22873, encodeFps: state === 'starting' ? null : 61.8,
     speed: state === 'starting' ? null : 2.06, bitrateKbps: state === 'starting' ? null : 30700,
     bytesWritten: state === 'starting' ? 0 : state === 'done' ? 2930000000 : 1230000000,
@@ -175,7 +239,8 @@ const jobs = ve.history.map((h) => {
     message:h.note ?? '',stderrTail:h.log ?? '',verification:{state:h.status === 'succeeded' ? 'passed' : 'skipped',message:'B0 illustrative record',expectedCodecs:[],actualCodecs:[],ffprobeVersion:null},
     timings:{},published:h.status === 'succeeded',retainedPartialPath:null };
 });
-const machine = {machine:1,revision:0,installations,defaultFFmpegId:'gyan-8.1',progressWindow:true,keepOnTop:false,verifyOutput:true,theme:'system'};
+const machine = {machine:1,revision:0,installations,defaultFFmpegId:'gyan-8.1',progressWindow:true,keepOnTop:false,verifyOutput:true,theme:'system',
+  uiState:{desktopWindowBounds:{x:-1280,y:80,width:1200,height:800},desktopMaximized:false,lastSizeLengthText:'10:00'}};
 const serviceBundle = {live,request,jobs,machine};
 for (const [name,value] of Object.entries({request,machine,'result-apply':{protocol:1,sessionId:request.sessionId,action:'apply',recipe:request.recipe,origin:request.origin},'result-cancel':{protocol:1,sessionId:request.sessionId,action:'cancel'}})) {
   writeFile(path.join(dest,name+'.json'),JSON.stringify(value,null,2)+'\n');

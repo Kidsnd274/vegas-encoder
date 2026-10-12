@@ -92,6 +92,30 @@ for f in bundle['fixtures'] + bundle['additionalFixtures']:
     check(f['paths']['videoPipe'] in argv and f['paths']['audioPipe'] in argv,'pipe path agreement')
     check(argv[argv.index('-r')+1] == '/'.join(map(str,f['media']['video']['fps'])),'delivered rational timing')
     check(f['estimate']['totalBytes'] is None,'editing duration is unknown')
+    tokens = f['compile']['display']
+    for token in tokens:
+        field = token['field']
+        if field is not None:
+            value = r
+            for part in field.replace('[0]', '.0').split('.'):
+                value = value[int(part)] if isinstance(value, list) else value[part]
+    check(True, 'all token fields resolve to product recipe paths')
+    for issues in [f['compile']['issues'], *f['compileIssues'].values()]:
+        for issue in issues:
+            refs = issue['tokenIndices']
+            check(refs == sorted(set(refs)) and all(type(i) is int and 0 <= i < len(tokens) for i in refs),
+                  'compile issue display references unique and bounded')
+    check(all(not issue['tokenIndices'] for issues in f['validations'].values() for issue in issues),
+          'standalone validation has no display references')
+    signal = f['compile']['signalPath']
+    check(signal['video']['outputFormat'] == f['compile']['resolved']['pixfmt'] and
+          signal['video']['outputBits'] == f['compile']['resolved']['depth'], 'signal/resolved video parity')
+    check(signal['video']['conversion'] == (signal['video']['inputFormat'] != signal['video']['outputFormat']),
+          'sample video conversion facts')
+    check(signal['video']['chromaChanged'] == (signal['video']['inputChroma'] != signal['video']['outputChroma']),
+          'sample video chroma facts')
+    check(len(signal['audio']) == 1 and signal['audio'][0]['inputFormat'] == 'flt' and
+          signal['audio'][0]['outputBits'] in (16, 24, 32), 'audio format and precision facts')
     for installation in bundle['installations']:
         check(installation['isFixture'] and len(installation['identity']['sha256']) == 64,'synthetic identity marked')
 
@@ -131,9 +155,15 @@ for file in (FIXTURES/'live').glob('*.live.json'):
     live = json.loads(file.read_text(encoding='utf-8')); seen.add(live['state'])
     check(live['live'] == 1 and live['framesDone'] <= live['framesTotal'],'live identity/counts')
     check(live['bytesWritten'] >= 0 and live['elapsedSec'] >= 0,'live bounds')
+    check(live['hostHwnd'].isdigit() and 0 < int(live['hostHwnd']) <= 2**64-1, 'main host HWND string')
     if live['state'] == 'done':
         check(live['ffmpegExitCode'] == 0,'done fixture exit')
 check(seen == states,'all seven live states')
+machine = json.loads((FIXTURES/'machine.json').read_text(encoding='utf-8'))
+check(machine['keepOnTop'] is False, 'monitor default unpinned')
+bounds = machine['uiState']['desktopWindowBounds']
+check(bounds['x'] < 0 and bounds['width'] > 0 and bounds['height'] > 0, 'virtual desktop restored bounds')
+check(machine['uiState']['lastSizeLengthText'] == '10:00', 'last typed size-card text')
 for line in (FIXTURES/'jobs.jsonl').read_text(encoding='utf-8').splitlines():
     index = json.loads(line)
     check(index['recordFile'] == index['id']+'.json','safe index basename')

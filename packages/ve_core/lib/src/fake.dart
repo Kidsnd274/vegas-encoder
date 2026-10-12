@@ -35,8 +35,14 @@ class CoreFixture {
     required this.compiled,
     required this.estimate,
     required Map<String, List<Issue>> validations,
+    Map<String, List<Issue>>? compileIssues,
   }) : validations = Map.unmodifiable(
          validations.map((k, v) => MapEntry(k, List<Issue>.unmodifiable(v))),
+       ),
+       compileIssues = Map.unmodifiable(
+         (compileIssues ?? validations).map(
+           (k, v) => MapEntry(k, List<Issue>.unmodifiable(v)),
+         ),
        );
   factory CoreFixture.fromJson(JsonMap json) => CoreFixture(
     recipe: Recipe.fromJson(jsonMap(json['recipe'])),
@@ -48,6 +54,9 @@ class CoreFixture {
     validations: jsonMap(
       json['validations'],
     ).map((k, v) => MapEntry(k, jsonMaps(v).map(Issue.fromJson).toList())),
+    compileIssues: jsonMap(
+      json['compileIssues'] ?? json['validations'],
+    ).map((k, v) => MapEntry(k, jsonMaps(v).map(Issue.fromJson).toList())),
   );
   final Recipe recipe;
   final MediaDescription media;
@@ -56,6 +65,7 @@ class CoreFixture {
   final CompileResult compiled;
   final SizeEstimate estimate;
   final Map<String, List<Issue>> validations;
+  final Map<String, List<Issue>> compileIssues;
 }
 
 /// A fixture lookup, never a second implementation of the product rules.
@@ -191,7 +201,9 @@ class FakeVeCore implements VeCore {
         _key(paths.toJson()) != _key(f.paths.toJson()))
       return _missing('compile context');
     if (capabilities != null) {
-      final issues = validate(recipe, media: media, capabilities: capabilities);
+      final issues =
+          f.compileIssues[capabilities.installationId] ??
+          _missing('compile capabilities');
       return f.compiled.copyWith(issues: issues);
     }
     return f.compiled;
