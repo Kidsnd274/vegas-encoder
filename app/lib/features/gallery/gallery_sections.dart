@@ -747,7 +747,7 @@ class _FileAndCommandSectionState extends State<FileAndCommandSection> {
             child: Column(
               children: [
                 SizeQualityCard(
-                  estimate: Samples.estimate,
+                  estimate: Samples.estimateFor(_length),
                   lengthSeconds: _length,
                   onLengthChanged: (v) => setState(() => _length = v),
                 ),

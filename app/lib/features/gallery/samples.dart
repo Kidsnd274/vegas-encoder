@@ -340,21 +340,30 @@ abstract final class Samples {
         r'"D:\Renders\Sample project.mp4"',
   );
 
-  static const estimate = SizeEstimate(
-    videoKbps: 6840,
-    audioKbps: 320,
-    approximate: true,
-    spread: (low: 0.6, high: 1.6),
-    consequences: [
-      'Constant quality: the size depends on how busy the footage is.',
-      '8-bit: VEGAS’s 10-bit frames are reduced once, so smooth gradients can band.',
-    ],
-  );
+  /// Sample figures in the core's shape. A real estimate's total comes from
+  /// the core for the typed length; the gallery scales its sample instead.
+  static SizeEstimate estimateFor(int? lengthSec) {
+    const perMinute = (6840 + 320) * 1000 / 8 * 60;
+    return SizeEstimate(
+      videoKbps: 6840,
+      audioKbps: 320,
+      approximate: true,
+      bytesPerMinute: perMinute,
+      totalBytes: lengthSec == null ? null : perMinute * lengthSec / 60,
+      minBytesPerMinute: perMinute * 0.6,
+      maxBytesPerMinute: perMinute * 1.6,
+      consequences: const [
+        'Constant quality: the size depends on how busy the footage is.',
+        '8-bit: VEGAS’s 10-bit frames are reduced once, so smooth gradients can band.',
+      ],
+    );
+  }
 
   static const estimateBitrate = SizeEstimate(
     videoKbps: 8000,
     audioKbps: null,
     approximate: false,
+    bytesPerMinute: 8000 * 1000 / 8 * 60,
     consequences: [
       'Target bitrate: the size is predictable. Busy scenes get no extra bits, so they can soften.',
       'No audio: the file has video only.',

@@ -25,7 +25,7 @@ Offset _offsetOf(WidgetTester tester, String text) {
 
 void main() {
   group('SizeQualityCard', () {
-    testWidgets('quality mode: total, per-minute rate and typical range for the typed length', (tester) async {
+    testWidgets('quality mode: the core\'s total, the per-minute rate and its typical range', (tester) async {
       int? length = 600;
       await pumpThemed(
         tester,
@@ -33,7 +33,7 @@ void main() {
           width: 340,
           child: StatefulBuilder(
             builder: (context, setState) => SizeQualityCard(
-              estimate: Samples.estimate,
+              estimate: Samples.estimateFor(length),
               lengthSeconds: length,
               onLengthChanged: (v) => setState(() => length = v),
             ),
@@ -41,7 +41,7 @@ void main() {
         ),
       );
       expect(find.text('About 537 MB', findRichText: true), findsOneWidget);
-      expect(find.text('About 53.7 MB per minute. Typically 322 MB to 859 MB for 10:00.'), findsOneWidget);
+      expect(find.text('About 53.7 MB per minute, typically 32.2 MB to 85.9 MB.'), findsOneWidget);
       expect(find.text('Video 6.8 Mb/s', findRichText: true), findsOneWidget);
       expect(find.text('Audio 320 kb/s', findRichText: true), findsOneWidget);
       await tester.enterText(find.byType(TextField), '20:00');
@@ -52,18 +52,29 @@ void main() {
       await tester.pump();
       expect(length, isNull);
       expect(find.text('Type a length', findRichText: true), findsOneWidget);
-      expect(find.text('About 53.7 MB per minute.'), findsOneWidget, reason: 'the rate needs no length');
+      expect(
+        find.text('About 53.7 MB per minute, typically 32.2 MB to 85.9 MB.'),
+        findsOneWidget,
+        reason: 'the rate needs no length',
+      );
     });
 
     testWidgets('bitrate mode with audio off: exact figure, no audio share', (tester) async {
       await pumpThemed(
         tester,
-        SizedBox(
+        const SizedBox(
           width: 340,
           child: SizeQualityCard(
-            estimate: Samples.estimateBitrate,
+            estimate: SizeEstimate(
+              videoKbps: 8000,
+              audioKbps: null,
+              approximate: false,
+              bytesPerMinute: 60e6,
+              totalBytes: 120e6,
+              consequences: ['No audio: the file has video only.'],
+            ),
             lengthSeconds: 120,
-            onLengthChanged: (_) {},
+            onLengthChanged: _ignore,
             compact: true,
           ),
         ),
@@ -74,12 +85,34 @@ void main() {
       expect(find.text('No audio: the file has video only.'), findsOneWidget);
     });
 
+    testWidgets('a typed length without a total from the core says so', (tester) async {
+      await pumpThemed(
+        tester,
+        SizedBox(
+          width: 340,
+          child: SizeQualityCard(
+            estimate: SizeEstimate(
+              videoKbps: 6840,
+              audioKbps: 320,
+              approximate: true,
+              bytesPerMinute: Samples.estimateFor(null).bytesPerMinute,
+              totalNote: 'Total not available yet',
+            ),
+            lengthSeconds: 600,
+            onLengthChanged: (_) {},
+          ),
+        ),
+      );
+      expect(find.text('Total not available yet', findRichText: true), findsOneWidget);
+      expect(find.text('About 53.7 MB per minute.'), findsOneWidget);
+    });
+
     testWidgets('the split bar shows video and audio shares', (tester) async {
       await pumpThemed(
         tester,
         SizedBox(
           width: 340,
-          child: SizeQualityCard(estimate: Samples.estimate, lengthSeconds: 600, onLengthChanged: (_) {}),
+          child: SizeQualityCard(estimate: Samples.estimateFor(600), lengthSeconds: 600, onLengthChanged: (_) {}),
         ),
       );
       final bars = find.descendant(of: find.byType(ClipRRect), matching: find.byType(DecoratedBox));
@@ -152,3 +185,5 @@ void main() {
     });
   });
 }
+
+void _ignore(int? _) {}

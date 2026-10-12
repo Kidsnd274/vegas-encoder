@@ -89,7 +89,7 @@ void main() {
     expect(_Selectable.picked.last, SignalNode.file);
   });
 
-  testWidgets('with audio off the audio node is a dashed note and is skipped', (tester) async {
+  testWidgets('with audio off the audio node is a dashed note that still opens its settings', (tester) async {
     await pumpThemed(tester, _path(Samples.audioOffBadMux));
     expect(find.text('Audio is off. The file has video only.'), findsOneWidget);
     expect(find.text('Can’t mux'), findsOneWidget);
@@ -97,7 +97,13 @@ void main() {
     await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
+    expect(_Selectable.picked.last, SignalNode.audio, reason: 'turning audio back on happens in its settings');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
     expect(_Selectable.picked.last, SignalNode.container);
+    await tester.tap(find.text('Audio is off. The file has video only.'));
+    await tester.pump();
+    expect(_Selectable.picked.last, SignalNode.audio);
   });
 
   testWidgets('a failed hardware encoder says so on its node', (tester) async {

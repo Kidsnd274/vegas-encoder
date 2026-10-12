@@ -211,7 +211,7 @@ class _SignalPathState extends State<SignalPath> {
       } else {
         final mid = (g.sx + g.venc.left) / 2;
         if (v.formatLabel != null) out.add(at(mid, g.vy + 9, Text(v.formatLabel!, style: wl(c.videoText))));
-        out.add(at(mid, g.vy - 24, Text('No conversion', style: sub)));
+        if (v.conversionKnown) out.add(at(mid, g.vy - 24, Text('No conversion', style: sub)));
       }
       if (!_strip) {
         final mx = (g.venc.right + g.cont.left) / 2;
@@ -264,6 +264,7 @@ class _SignalPathState extends State<SignalPath> {
       Color? stripe,
       bool bad = false,
       bool source = false,
+      bool placeholder = false,
       String? tooltip,
     }) {
       return Positioned.fromRect(
@@ -276,7 +277,8 @@ class _SignalPathState extends State<SignalPath> {
           spoken: spoken,
           stripe: stripe,
           bad: bad,
-          dashed: m.fromCommand && !source,
+          dashed: placeholder || (m.fromCommand && !source),
+          placeholder: placeholder,
           source: source,
           strip: _strip,
           tooltip: tooltip,
@@ -344,18 +346,20 @@ class _SignalPathState extends State<SignalPath> {
         ),
       );
     } else {
+      // Still a node: selecting it opens the audio settings, where audio can
+      // be turned back on.
       out.add(
-        Positioned.fromRect(
-          rect: g.aenc,
-          child: CustomPaint(
-            painter: DashedRRectPainter(color: c.line2, radius: _strip ? 8 : 10),
-            child: Center(
-              child: Text(
-                _strip ? 'Audio off' : 'Audio is off. The file has video only.',
-                style: t.text.small.copyWith(color: c.muted),
-              ),
+        node(
+          SignalNode.audio,
+          g.aenc,
+          Center(
+            child: Text(
+              _strip ? 'Audio off' : 'Audio is off. The file has video only.',
+              style: t.text.small.copyWith(color: c.muted),
             ),
           ),
+          spoken: 'Audio encoder. Audio is off; the file has video only. Show audio settings',
+          placeholder: true,
         ),
       );
     }
@@ -665,6 +669,7 @@ class _NodeBox extends StatelessWidget {
     this.stripe,
     this.bad = false,
     this.dashed = false,
+    this.placeholder = false,
     this.source = false,
     this.tooltip,
   });
@@ -679,6 +684,9 @@ class _NodeBox extends StatelessWidget {
   final Color? stripe;
   final bool bad;
   final bool dashed;
+
+  /// A stage that is off: no fill or shadow until selected.
+  final bool placeholder;
   final bool source;
   final String? tooltip;
 
@@ -701,7 +709,11 @@ class _NodeBox extends StatelessWidget {
         onKeyEvent: (_, e) => onKey(e),
         builder: (context, s) {
           final borderColor = bad ? c.error : (selected ? c.ink : (s.hovered ? c.lineHover : c.line2));
-          final background = bad ? c.errorBackground : (source ? c.surface2 : c.surface);
+          final background = bad
+              ? c.errorBackground
+              : placeholder
+              ? const Color(0x00000000)
+              : (source ? c.surface2 : c.surface);
           final width = selected ? 2.0 : 1.0;
           // Node sizes are fixed by the layout; at large text scales the
           // content is clipped rather than overflowing the box.

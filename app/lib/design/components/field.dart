@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../tokens.dart';
+import 'button.dart';
 import 'message.dart';
 
 /// `.fld`: a labelled setting. The read-out on the right states the value and
@@ -67,6 +68,19 @@ class VeField extends StatelessWidget {
                       decoration: BoxDecoration(color: c.ink, shape: BoxShape.circle),
                     ),
                   ),
+                  if (onReset != null) ...[
+                    const SizedBox(width: 8),
+                    Semantics(
+                      label: 'Reset $label',
+                      excludeSemantics: true,
+                      button: true,
+                      child: VeLinkButton(
+                        label: 'Reset',
+                        onPressed: onReset,
+                        style: t.text.caption.copyWith(color: c.muted),
+                      ),
+                    ),
+                  ],
                 ],
                 if (readout == null)
                   const Spacer()

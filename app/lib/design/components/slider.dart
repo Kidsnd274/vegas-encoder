@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 
 import '../tokens.dart';
 import 'field.dart';
+import 'message.dart';
 import 'text_field.dart';
 
 /// A closed range on a slider's scale.
@@ -299,6 +300,9 @@ class VeQualityControl extends StatelessWidget {
     this.label = 'Quality',
     this.smallerLabel = 'Smaller file',
     this.higherLabel = 'Higher quality',
+    this.modified = false,
+    this.onReset,
+    this.messages = const [],
   });
 
   final VeQualityScale scale;
@@ -308,6 +312,12 @@ class VeQualityControl extends StatelessWidget {
   final String smallerLabel;
   final String higherLabel;
 
+  /// As on [VeField]: changed from the saved preset, its Reset, and the
+  /// core's messages for this field.
+  final bool modified;
+  final VoidCallback? onReset;
+  final List<VeMessage> messages;
+
   @override
   Widget build(BuildContext context) {
     final t = VeTokens.of(context);
@@ -315,6 +325,9 @@ class VeQualityControl extends StatelessWidget {
     final d = scale.describe(value);
     return VeField(
       label: label,
+      modified: modified,
+      onReset: onReset,
+      messages: messages,
       readout: VeReadout(value: d.value, meaning: d.meaning),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

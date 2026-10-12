@@ -7,16 +7,21 @@ import '../icons.dart';
 import '../tokens.dart';
 import 'text_field.dart';
 
-/// The rates behind an estimate, as the core reports them
-/// (SETTINGS_AND_COMMANDS §7). The card only multiplies by the typed length.
+/// An estimate as the core reports it (SETTINGS_AND_COMMANDS §7, CONTRACTS C2
+/// `SizeEstimate`). The card only formats these figures; it never works out a
+/// size itself.
 @immutable
 class SizeEstimate {
   const SizeEstimate({
     required this.videoKbps,
     required this.audioKbps,
     required this.approximate,
-    this.spread,
+    required this.bytesPerMinute,
+    this.totalBytes,
+    this.minBytesPerMinute,
+    this.maxBytesPerMinute,
     this.consequences = const [],
+    this.totalNote,
   });
 
   final double videoKbps;
@@ -26,21 +31,28 @@ class SizeEstimate {
 
   /// Quality modes have no fixed size; bitrate modes are close.
   final bool approximate;
+  final double bytesPerMinute;
 
-  /// Typical range around the estimate for quality modes, as multipliers
-  /// (for example 0.6 and 1.6).
-  final ({double low, double high})? spread;
+  /// The total for the typed length; null when there is none.
+  final double? totalBytes;
+
+  /// Typical range per minute, for quality modes.
+  final double? minBytesPerMinute;
+  final double? maxBytesPerMinute;
 
   /// Plain-language results of the rate mode and bit depth.
   final List<String> consequences;
 
+  /// Shown in place of the total when a length is typed but the core gave
+  /// no total ("Total not available yet").
+  final String? totalNote;
+
   double get totalKbps => videoKbps + (audioKbps ?? 0);
-  double bytesFor(int seconds) => totalKbps * 1000 / 8 * seconds;
 }
 
 /// `SizeQualityCard` (UI_SPEC §2): shown only behind the File node. A rate per
-/// minute always; a total for a length the user types; a range for quality
-/// modes; the video and audio split; consequences.
+/// minute always; the core's total for a length the user types; a range for
+/// quality modes; the video and audio split; consequences.
 class SizeQualityCard extends StatefulWidget {
   const SizeQualityCard({
     super.key,
@@ -94,19 +106,15 @@ class _SizeQualityCardState extends State<SizeQualityCard> {
     final c = t.colors;
     final e = widget.estimate;
     final len = widget.lengthSeconds;
-    final perMinute = e.bytesFor(60);
     final about = e.approximate ? 'About ' : '';
-
-    final String range;
-    if (e.spread != null && len != null) {
-      final total = e.bytesFor(len);
-      range =
-          '$about${VeFormat.bytes(perMinute)} per minute. Typically '
-          '${VeFormat.bytes(total * e.spread!.low)} to ${VeFormat.bytes(total * e.spread!.high)} '
-          'for ${VeFormat.duration(len)}.';
+    final low = e.minBytesPerMinute, high = e.maxBytesPerMinute;
+    final String tail;
+    if (low != null && high != null) {
+      tail = ', typically ${VeFormat.bytes(low)} to ${VeFormat.bytes(high)}.';
     } else {
-      range = '$about${VeFormat.bytes(perMinute)} per minute${e.approximate ? '.' : ', set by the bitrate.'}';
+      tail = e.approximate ? '.' : ', set by the bitrate.';
     }
+    final range = '$about${VeFormat.bytes(e.bytesPerMinute)} per minute$tail';
 
     final bigStyle = widget.compact ? t.text.display.copyWith(fontSize: 28) : t.text.display;
     final smallBig = t.text.body.copyWith(fontSize: 17, fontWeight: const FontWeight(600), color: c.muted);
@@ -156,12 +164,12 @@ class _SizeQualityCardState extends State<SizeQualityCard> {
               child: Semantics(
                 liveRegion: true,
                 child: Text.rich(
-                  len == null
-                      ? TextSpan(text: 'Type a length', style: smallBig)
+                  len == null || e.totalBytes == null
+                      ? TextSpan(text: len == null ? 'Type a length' : e.totalNote ?? 'Type a length', style: smallBig)
                       : TextSpan(
                           children: [
                             if (e.approximate) TextSpan(text: 'About ', style: smallBig),
-                            TextSpan(text: VeFormat.bytes(e.bytesFor(len)), style: bigStyle),
+                            TextSpan(text: VeFormat.bytes(e.totalBytes!), style: bigStyle),
                           ],
                         ),
                   style: bigStyle,
