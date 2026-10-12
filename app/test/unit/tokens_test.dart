@@ -40,7 +40,7 @@ void main() {
 
   // UI_SPEC §9: text ≥ 4.5:1, UI glyphs ≥ 3:1, checked in both themes. These are
   // the pairs the components draw. Known shortfalls of the mockup tokens are
-  // listed separately and reported in docs/product/workstreams/app.md.
+  // listed separately; the owner accepted them on 2026-10-12 (UI_SPEC §9).
   final textPairs = <String, (Color Function(VePalette), Color Function(VePalette))>{
     'ink on paper': ((p) => p.ink, (p) => p.paper),
     'ink on surface': ((p) => p.ink, (p) => p.surface),
@@ -91,7 +91,7 @@ void main() {
     });
   }
 
-  test('known shortfalls of the light tokens, kept as measured (owner decision)', () {
+  test('known shortfalls of the light tokens, accepted by the owner', () {
     final p = VePalette.light;
     expect(contrast(p.muted, p.paper), closeTo(4.39, 0.01)); // app avoids muted text on paper
     expect(contrast(p.faintText, p.surface), closeTo(3.69, 0.01)); // placeholders, slider tick numbers

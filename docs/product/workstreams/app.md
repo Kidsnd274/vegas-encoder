@@ -1,7 +1,7 @@
 # App workstream
 
-Updated: 2026-10-12 (Asia/Singapore). Branch `ws/app`. Status: **F0 and F1 done**; F2–F6
-wait for platform milestone B0 merged into this branch.
+Updated: 2026-10-12 (Asia/Singapore). Branch `ws/app`. Status: **F0 and F1 done**; B0
+reviewed (below). F2–F6 continue on a branch that contains both F0/F1 and B0.
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); components were checked with widget and golden
@@ -75,56 +75,68 @@ Not done in F0: console flash from `Process.start` and folder watching (both bel
 runner path is wired; the app path is tested with a fake), window size and position
 memory (needs machine settings).
 
-## Next
+## Owner decisions (2026-10-12)
 
-F2 Presets screen and Basic editor, then F3, against the B0 fakes once B0 is merged.
-Also: size the diagram from the text scale (UI_SPEC §9 gap), Ctrl+Shift+C, and the
-command's single-line toggle.
+- **Renderer: deferred.** Impeller is Flutter's direction; decide later, since it
+  changes nothing in current work. The runner still defaults to Skia because of the
+  start time above; `RendererFromEnvironment` in `windows/runner/main.cpp` is the one
+  place to change, and `VEGAS_ENCODER_RENDERER=impeller` tries Impeller meanwhile.
+  Re-measure on each Flutter upgrade and with VEGAS running.
+- **Flutter 3.47.7** at `L:\flutter` is intended (newest). README, ROADMAP and
+  WORKSTREAMS still say 3.44.6 (owner documents).
+- **Light tokens accepted as the mockup has them**, including the contrast figures in
+  UI_SPEC §9.
 
-## Needs from platform
+## B0 review, app side
 
-1. **C4 edit session: the owner HWND before the first frame.** The window must be owned
-   before it shows. The app calls `configure(ownerHwnd)` before `runApp`, so the
-   session API in `ve_services` must return the owner from `request.json` without
-   waiting on anything slow. Proposal: also pass `--owner <decimal hwnd>` on the
-   command line; the app already accepts it (provisional) and it saves reading the file
-   first.
-2. **C4: closing and crashes.** The editor re-enables its owner just before its window
-   closes, so Windows returns activation to VEGAS. After an editor crash the page
-   should re-enable the owner and call `SetForegroundWindow` on it (possible in the
-   fake-host test).
-3. **C5 progress window placement.** The window goes to the monitor of the foreground
-   window at launch. Please pass VEGAS's main window (for example `--host-hwnd <hwnd>`
-   or a field in the live file) so placement doesn't depend on focus.
-4. **C2 display data.** The components take display models (see `lib/design/components`
-   and `lib/features/gallery/samples.dart` for the shapes). From `VeCore` the app needs:
-   - compile tokens with role (inputs, map, video, audio, mux, output), kind (flag,
-     value, macro, locked), the recipe field that produced each token, extra/error
-     marks, display quoting, and the copy text (multi-line with `^`);
-   - signal-path facts per stream: input and output bit depth or sample bits, the pixel
-     or sample formats either side of a conversion, chroma change, codec name,
-     availability with reason, and whether the container can hold it;
-   - a size estimate (`estimate` is not in the C2 list): video and audio kb/s, whether
-     it is approximate, and the typical-range multipliers for quality modes. The app only
-     multiplies by the typed length and formats;
-   - quality scales from encoder profiles: unit, range, direction, labelled marks, and a
-     recommended band per resolution where the profile has one;
-   - encoders grouped by codec with hardware vendor, bit depths, availability and reason.
-5. **C3/C7 settings the app keeps.** Theme choice (shared by the popup), desktop window
-   size and position, the last length typed in the size card, progress window on/off
-   and keep on top. Optionally a renderer override for support.
+Reviewed `docs/product/CONTRACTS.md` (platform B0, branch `ws/platform` at 5fa0a20)
+against what the components need. No breaking change is needed; the gaps below are
+additive requests.
 
-## Decisions for the owner
+| Need | B0 | Gap |
+| --- | --- | --- |
+| Popup owner before first frame | C4 `request.json` has `ownerHwnd` (decimal string); `EditSessionService.readRequest` | None. The provisional `--owner` argument stays for the spike harness only |
+| Crash recovery | Adapter task, gated on real-host evidence | Pass on the spike finding: after an editor crash the page should re-enable the owner and bring it forward |
+| Progress window placement | C5 has no host window | **Request:** VEGAS's main HWND in the launch arguments or live file |
+| Command view | `CompileResult.display` tokens with role; `commandLine` for copy | **Request:** the recipe field per token (click-to-field, lit tokens), and which tokens an error issue points at |
+| Signal path | `ResolvedSettings` (depth, pixfmt), media, profiles, compatibility, issues | **Request:** per-stream facts the app must not derive: audio output sample format and bits, chroma change, conversion yes/no, and "container can't hold this stream" as data rather than message text |
+| Size and quality | `estimate(…, durationSec)`: per-minute, total, min/max per minute, approx | None. F2 changes `SizeQualityCard` to show these figures instead of multiplying kb/s by the length itself |
+| Quality control | `NumericControl` with direction and marks | Recommended band per resolution (B1 profiles), optional |
+| Encoder picker | `videoOrder` groups, `EncoderProfile.hw/depths`, installation availability | None |
+| Settings | C7 `theme` (system/light/dark), `progressWindow`, `keepOnTop` | **Request:** a place for app UI state (desktop window bounds, last length in the size card). **Owner:** C7 defaults `keepOnTop=false`; mockup S6 shows the pin on and the app currently starts the progress window on top |
 
-1. **Renderer.** Default to Skia (0.34 s to a shown popup) instead of Flutter's default
-   Impeller (1.29 s)? Implemented as Skia with an Impeller opt-in; easy to flip back.
-   Impeller is Flutter's direction, so this is worth re-measuring on each Flutter
-   upgrade.
-2. **Flutter version.** `L:\flutter` is 3.47.7, not 3.44.6 as README/ROADMAP/WORKSTREAMS
-   say. Nothing was upgraded; the owner documents need the correction.
-3. **Light-theme contrast.** The mockup's light `muted` on paper (4.39:1), `faintText`
-   (3.4–3.7:1, placeholders and tick numbers) and control borders (1.6–1.7:1) miss
-   UI_SPEC §9. Keep, or darken those three light tokens slightly?
-4. **Progress window.** Keep on top defaults to on (as in S6). It has no taskbar button,
-   which is the normal result of never activating.
-5. **Fonts.** Bundled unsubset (about 570 KB); start time doesn't need subsetting now.
+**Main constraint for F2:** `FakeVeCore` only answers its fixtures (the six built-ins
+and the popup snapshot). Any edit (CRF 18 to 17, another encoder) throws
+`B0-FIXTURE-MISSING` until the native core (B2). F2 can build the Presets screen and
+the Basic editor and test edited states with injected fixtures, but the running app's
+editor won't update live until B2. Options: platform does B2 next, and/or adds a
+fixture sweep of common edits for the built-ins.
+
+## Handoff for the next app agent
+
+Start from the merged branch that contains both F0/F1 (this branch) and B0. Read
+AGENTS.md, WORKSTREAMS.md, CONTRACTS.md, this file and UI_SPEC first.
+
+1. Add path dependencies in `app/pubspec.yaml`: `ve_core: {path: ../packages/ve_core}`
+   and `ve_services: {path: ../packages/ve_services}`. Both are pure Dart with no
+   third-party dependencies; SDK `>=3.10`.
+2. Add providers in `app/lib/state/` for `VeCore` and each C3 service, defaulting to
+   the fakes until B2/B3; tests override them. Keep `windowControllerProvider`.
+3. Map core results to the existing display models (don't change the components'
+   inputs without updating goldens): `CompileResult.display` to `CommandDisplay`,
+   `ResolvedSettings` plus media to `SignalPathModel`, `SizeEstimate` to the size card,
+   `NumericControl` to `VeQualityScale`, `videoOrder` plus availability to
+   `VeEncoderGroup`. Mapping is display work; never derive domain facts (no pixel-format
+   parsing, no compatibility rules, no estimate maths).
+4. Back `themePreferenceProvider` with C7 `theme` (`system` = Follow Windows).
+5. Handle `CoreException` (`B0-FIXTURE-MISSING`) in the editor with a clear message
+   until B2.
+6. `features/gallery/` and `samples.dart` are the F1 reference. Keep them as the
+   design-system page (or under a debug flag) once Presets replaces it; the goldens use
+   them.
+7. Before each commit: `flutter analyze`, `flutter test`; regenerate goldens only for
+   intended visual changes and look at them. Window or runner changes: rebuild release
+   and run `tool/spikes/run_window_spikes.ps1`.
+8. Open items carried over: diagram size from the text scale (UI_SPEC §9), Ctrl+Shift+C,
+   the command's single-line toggle, window size and position memory (needs the
+   settings request above).

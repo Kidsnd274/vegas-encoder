@@ -296,7 +296,7 @@ Sliders support arrows, Page Up/Down, and Home/End.
   and signal path nodes (role, name, state, and "Show size and quality" on File).
 - Contrast is checked in both themes (`app/test/unit/tokens_test.dart`). The dark set
   passes everywhere. Measured shortfalls of the light set, kept as the mockup has them
-  until the owner decides:
+  (owner accepted, 2026-10-12):
   - `muted` on `paper` is 4.39:1, so the app never puts muted text on paper (it uses
     `text2` there);
   - `faintText` is 3.4–3.7:1; it is used for placeholders and slider tick numbers;
