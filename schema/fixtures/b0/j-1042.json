@@ -1,0 +1,283 @@
+{
+  "job": 1,
+  "id": "j-1042",
+  "startedAt": "2026-10-12T06:00:00Z",
+  "endedAt": "2026-10-12T06:22:00Z",
+  "project": "Lakeside wedding final.veg",
+  "templateName": "YouTube 4K upload (Lakeside)",
+  "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
+  "status": "succeeded",
+  "recipe": {
+    "schema": 1,
+    "id": "yt-h264",
+    "name": "YouTube upload, H.264",
+    "notes": "High-quality H.264 that YouTube re-encodes well. Use for anything up to 4K.",
+    "tags": [
+      "YouTube",
+      "Upload"
+    ],
+    "category": "web",
+    "container": {
+      "format": "mp4",
+      "faststart": true
+    },
+    "video": {
+      "enabled": true,
+      "encoder": "libx264",
+      "mode": "crf",
+      "quality": 18,
+      "bitrateK": 12000,
+      "maxrateK": null,
+      "qp": null,
+      "speed": "slow",
+      "tune": null,
+      "profile": "high",
+      "depth": 8,
+      "gopSec": 2,
+      "color": "bt709",
+      "extra": ""
+    },
+    "audio": [
+      {
+        "enabled": true,
+        "encoder": "aac",
+        "mode": "bitrate",
+        "bitrateK": 320,
+        "vbr": null,
+        "level": null,
+        "sampleRate": "source",
+        "channels": "source",
+        "extra": ""
+      }
+    ],
+    "command": {
+      "mode": "structured",
+      "template": ""
+    },
+    "vegas": {
+      "frame": "project",
+      "inputFormat": "p010"
+    },
+    "extensions": {}
+  },
+  "origin": {
+    "presetId": "yt-h264",
+    "revision": 6,
+    "name": "YouTube upload, H.264"
+  },
+  "recipeSha256": "b45c1c4846111550a76428a729728691f37a4e02b5150693e13e308be4fe2c2c",
+  "media": {
+    "video": {
+      "width": 3840,
+      "height": 2160,
+      "fps": [
+        30000,
+        1001
+      ],
+      "pixfmt": "p010le",
+      "sar": "1:1"
+    },
+    "audio": {
+      "rate": 48000,
+      "channels": 2,
+      "sampleFmt": "f32le"
+    },
+    "durationSec": 763.2
+  },
+  "ffmpeg": {
+    "id": "gyan-8.1",
+    "label": "FFmpeg 8.1 full",
+    "path": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffmpeg.exe",
+    "ffprobePath": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffprobe.exe",
+    "version": "8.1",
+    "build": "gyan.dev full build",
+    "source": "winget",
+    "license": "GPL v3",
+    "identity": {
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "key": "b0-fixture-gyan-8.1",
+      "size": 100000000,
+      "mtime": "2026-10-12T00:00:00Z",
+      "libraries": {}
+    },
+    "probedAt": "2026-10-12T01:12:00Z",
+    "probeMs": 2140,
+    "counts": {
+      "video": 142,
+      "audio": 91,
+      "muxers": 181
+    },
+    "availability": {
+      "libx264": {
+        "state": "ok"
+      },
+      "libx265": {
+        "state": "ok"
+      },
+      "libsvtav1": {
+        "state": "ok"
+      },
+      "libvpx-vp9": {
+        "state": "ok"
+      },
+      "h264_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "hevc_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "av1_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "h264_qsv": {
+        "state": "failed",
+        "reason": "No Intel graphics device on this PC.",
+        "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+      },
+      "hevc_qsv": {
+        "state": "failed",
+        "reason": "No Intel graphics device on this PC.",
+        "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+      },
+      "h264_amf": {
+        "state": "failed",
+        "reason": "AMD encoder runtime not found.",
+        "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+      },
+      "hevc_amf": {
+        "state": "failed",
+        "reason": "AMD encoder runtime not found.",
+        "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+      },
+      "prores_ks": {
+        "state": "ok"
+      },
+      "dnxhd": {
+        "state": "ok"
+      },
+      "ffv1": {
+        "state": "ok"
+      },
+      "aac": {
+        "state": "ok"
+      },
+      "libfdk_aac": {
+        "state": "missing",
+        "reason": "Not in this build. libfdk_aac is non-free and is left out of redistributable FFmpeg builds."
+      },
+      "libopus": {
+        "state": "ok"
+      },
+      "flac": {
+        "state": "ok"
+      },
+      "alac": {
+        "state": "ok"
+      },
+      "pcm_s16le": {
+        "state": "ok"
+      },
+      "pcm_s24le": {
+        "state": "ok"
+      },
+      "pcm_f32le": {
+        "state": "ok"
+      },
+      "ac3": {
+        "state": "ok"
+      },
+      "eac3": {
+        "state": "ok"
+      },
+      "libmp3lame": {
+        "state": "ok"
+      }
+    },
+    "isFixture": true
+  },
+  "argv": [
+    "-hide_banner",
+    "-nostdin",
+    "-loglevel",
+    "info",
+    "-stats_period",
+    "0.5",
+    "-progress",
+    "pipe:1",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "p010le",
+    "-s",
+    "3840x2160",
+    "-r",
+    "30000/1001",
+    "-thread_queue_size",
+    "64",
+    "-i",
+    "\\\\.\\pipe\\vegas-encoder-j-1042-video",
+    "-f",
+    "f32le",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-thread_queue_size",
+    "64",
+    "-i",
+    "\\\\.\\pipe\\vegas-encoder-j-1042-audio",
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "slow",
+    "-crf",
+    "18",
+    "-profile:v",
+    "high",
+    "-pix_fmt",
+    "yuv420p",
+    "-g",
+    "60",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-colorspace",
+    "bt709",
+    "-color_range",
+    "tv",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "320k",
+    "-movflags",
+    "+faststart",
+    "-f",
+    "mp4",
+    "D:\\Renders\\Lakeside wedding final.ve-partial-j-1042.mp4"
+  ],
+  "elapsedSec": 1486,
+  "sizeBytes": 9840000000,
+  "avgFps": 15.4,
+  "ffmpegExitCode": 0,
+  "hresult": "0x00000000",
+  "message": "",
+  "stderrTail": "",
+  "verification": {
+    "state": "passed",
+    "message": "B0 illustrative record",
+    "expectedCodecs": [],
+    "actualCodecs": [],
+    "ffprobeVersion": null
+  },
+  "timings": {},
+  "published": true,
+  "retainedPartialPath": null
+}

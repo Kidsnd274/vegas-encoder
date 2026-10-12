@@ -1,0 +1,21 @@
+{
+  "live": 1,
+  "jobId": "b0-render",
+  "sequence": 7,
+  "updatedAt": "2026-10-12T06:22:06Z",
+  "state": "cancelled",
+  "framesDone": 3250,
+  "framesTotal": 22873,
+  "encodeFps": 61.8,
+  "speed": 2.06,
+  "bitrateKbps": 30700,
+  "bytesWritten": 1230000000,
+  "elapsedSec": 249,
+  "etaSec": null,
+  "estimatedFinalBytes": null,
+  "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
+  "templateName": "YouTube 4K upload (Lakeside)",
+  "encoderSummary": "libx264 + aac",
+  "message": "Cancelled in VEGAS. Partial file removed.",
+  "ffmpegExitCode": null
+}

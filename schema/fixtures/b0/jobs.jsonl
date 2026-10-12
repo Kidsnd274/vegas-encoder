@@ -1,0 +1,5 @@
+{"index":1,"id":"j-1042","recordFile":"j-1042.json","startedAt":"2026-10-12T06:00:00Z","status":"succeeded","templateName":"YouTube 4K upload (Lakeside)","outputPath":"D:\\Renders\\Lakeside wedding final.mp4"}
+{"index":1,"id":"j-1041","recordFile":"j-1041.json","startedAt":"2026-10-12T06:00:00Z","status":"cancelled","templateName":"YouTube 4K upload (Lakeside)","outputPath":"D:\\Renders\\Lakeside wedding final.mp4"}
+{"index":1,"id":"j-1040","recordFile":"j-1040.json","startedAt":"2026-10-12T06:00:00Z","status":"succeeded","templateName":"YouTube upload, HEVC on GPU","outputPath":"D:\\Renders\\Channel trailer v2.mp4"}
+{"index":1,"id":"j-1039","recordFile":"j-1039.json","startedAt":"2026-10-12T06:00:00Z","status":"failed","templateName":"Small web file, AV1","outputPath":"D:\\Renders\\Channel trailer v2.mkv"}
+{"index":1,"id":"j-1038","recordFile":"j-1038.json","startedAt":"2026-10-12T06:00:00Z","status":"succeeded","templateName":"ProRes 422 HQ for editing","outputPath":"E:\\Handoff\\Product demo.mov"}

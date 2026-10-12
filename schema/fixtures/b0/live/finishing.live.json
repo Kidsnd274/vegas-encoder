@@ -1,0 +1,21 @@
+{
+  "live": 1,
+  "jobId": "b0-render",
+  "sequence": 3,
+  "updatedAt": "2026-10-12T06:22:02Z",
+  "state": "finishing",
+  "framesDone": 22873,
+  "framesTotal": 22873,
+  "encodeFps": 61.8,
+  "speed": 2.06,
+  "bitrateKbps": 30700,
+  "bytesWritten": 1230000000,
+  "elapsedSec": 245,
+  "etaSec": null,
+  "estimatedFinalBytes": null,
+  "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
+  "templateName": "YouTube 4K upload (Lakeside)",
+  "encoderSummary": "libx264 + aac",
+  "message": "",
+  "ffmpegExitCode": null
+}

@@ -1,0 +1,276 @@
+{
+  "job": 1,
+  "id": "j-1038",
+  "startedAt": "2026-10-12T06:00:00Z",
+  "endedAt": "2026-10-12T06:22:00Z",
+  "project": "Product demo.veg",
+  "templateName": "ProRes 422 HQ for editing",
+  "outputPath": "E:\\Handoff\\Product demo.mov",
+  "status": "succeeded",
+  "recipe": {
+    "schema": 1,
+    "id": "prores-hq",
+    "name": "ProRes 422 HQ for editing",
+    "notes": "",
+    "tags": [
+      "Intermediate",
+      "Resolve",
+      "Premiere"
+    ],
+    "category": "edit",
+    "container": {
+      "format": "mov",
+      "faststart": false
+    },
+    "video": {
+      "enabled": true,
+      "encoder": "prores_ks",
+      "mode": "profile",
+      "quality": null,
+      "bitrateK": 12000,
+      "maxrateK": null,
+      "qp": null,
+      "speed": null,
+      "tune": null,
+      "profile": "hq",
+      "depth": 10,
+      "gopSec": null,
+      "color": "bt709",
+      "extra": ""
+    },
+    "audio": [
+      {
+        "enabled": true,
+        "encoder": "pcm_s24le",
+        "mode": "lossless",
+        "bitrateK": 320,
+        "vbr": null,
+        "level": null,
+        "sampleRate": "source",
+        "channels": "source",
+        "extra": ""
+      }
+    ],
+    "command": {
+      "mode": "structured",
+      "template": ""
+    },
+    "vegas": {
+      "frame": "project",
+      "inputFormat": "p010"
+    },
+    "extensions": {}
+  },
+  "origin": {
+    "presetId": "prores-hq",
+    "revision": 1,
+    "name": "ProRes 422 HQ for editing"
+  },
+  "recipeSha256": "632f3e9cb431f1323b2407f3c75b9c8f7effb15447c3bb0abd77535a3dead04d",
+  "media": {
+    "video": {
+      "width": 3840,
+      "height": 2160,
+      "fps": [
+        30000,
+        1001
+      ],
+      "pixfmt": "p010le",
+      "sar": "1:1"
+    },
+    "audio": {
+      "rate": 48000,
+      "channels": 2,
+      "sampleFmt": "f32le"
+    },
+    "durationSec": 182
+  },
+  "ffmpeg": {
+    "id": "gyan-8.1",
+    "label": "FFmpeg 8.1 full",
+    "path": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffmpeg.exe",
+    "ffprobePath": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffprobe.exe",
+    "version": "8.1",
+    "build": "gyan.dev full build",
+    "source": "winget",
+    "license": "GPL v3",
+    "identity": {
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "key": "b0-fixture-gyan-8.1",
+      "size": 100000000,
+      "mtime": "2026-10-12T00:00:00Z",
+      "libraries": {}
+    },
+    "probedAt": "2026-10-12T01:12:00Z",
+    "probeMs": 2140,
+    "counts": {
+      "video": 142,
+      "audio": 91,
+      "muxers": 181
+    },
+    "availability": {
+      "libx264": {
+        "state": "ok"
+      },
+      "libx265": {
+        "state": "ok"
+      },
+      "libsvtav1": {
+        "state": "ok"
+      },
+      "libvpx-vp9": {
+        "state": "ok"
+      },
+      "h264_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "hevc_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "av1_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "h264_qsv": {
+        "state": "failed",
+        "reason": "No Intel graphics device on this PC.",
+        "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+      },
+      "hevc_qsv": {
+        "state": "failed",
+        "reason": "No Intel graphics device on this PC.",
+        "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+      },
+      "h264_amf": {
+        "state": "failed",
+        "reason": "AMD encoder runtime not found.",
+        "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+      },
+      "hevc_amf": {
+        "state": "failed",
+        "reason": "AMD encoder runtime not found.",
+        "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+      },
+      "prores_ks": {
+        "state": "ok"
+      },
+      "dnxhd": {
+        "state": "ok"
+      },
+      "ffv1": {
+        "state": "ok"
+      },
+      "aac": {
+        "state": "ok"
+      },
+      "libfdk_aac": {
+        "state": "missing",
+        "reason": "Not in this build. libfdk_aac is non-free and is left out of redistributable FFmpeg builds."
+      },
+      "libopus": {
+        "state": "ok"
+      },
+      "flac": {
+        "state": "ok"
+      },
+      "alac": {
+        "state": "ok"
+      },
+      "pcm_s16le": {
+        "state": "ok"
+      },
+      "pcm_s24le": {
+        "state": "ok"
+      },
+      "pcm_f32le": {
+        "state": "ok"
+      },
+      "ac3": {
+        "state": "ok"
+      },
+      "eac3": {
+        "state": "ok"
+      },
+      "libmp3lame": {
+        "state": "ok"
+      }
+    },
+    "isFixture": true
+  },
+  "argv": [
+    "-hide_banner",
+    "-nostdin",
+    "-loglevel",
+    "info",
+    "-stats_period",
+    "0.5",
+    "-progress",
+    "pipe:1",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "p010le",
+    "-s",
+    "3840x2160",
+    "-r",
+    "30000/1001",
+    "-thread_queue_size",
+    "64",
+    "-i",
+    "\\\\.\\pipe\\vegas-encoder-j-1038-video",
+    "-f",
+    "f32le",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-thread_queue_size",
+    "64",
+    "-i",
+    "\\\\.\\pipe\\vegas-encoder-j-1038-audio",
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-c:v",
+    "prores_ks",
+    "-profile:v",
+    "hq",
+    "-vendor",
+    "apl0",
+    "-pix_fmt",
+    "yuv422p10le",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-colorspace",
+    "bt709",
+    "-color_range",
+    "tv",
+    "-c:a",
+    "pcm_s24le",
+    "-f",
+    "mov",
+    "E:\\Handoff\\Product demo.ve-partial-j-1038.mov"
+  ],
+  "elapsedSec": 160,
+  "sizeBytes": 5020000000,
+  "avgFps": 34.1,
+  "ffmpegExitCode": 0,
+  "hresult": "0x00000000",
+  "message": "",
+  "stderrTail": "",
+  "verification": {
+    "state": "passed",
+    "message": "B0 illustrative record",
+    "expectedCodecs": [],
+    "actualCodecs": [],
+    "ffprobeVersion": null
+  },
+  "timings": {},
+  "published": true,
+  "retainedPartialPath": null
+}
