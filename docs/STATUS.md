@@ -10,20 +10,28 @@ and the owner has reviewed it. Decisions are in
 (round 2 mockup in `docs/product/design/signal-flow.html`), Basic/Advanced modes,
 Flutter, Windows x64 only, a theme that follows Windows, no proof-template migration,
 and render progress through a VEGAS status line (if a real-host test allows it) plus a
-small progress window. The project license is still open. No product code exists
-yet. This is design work only: no VEGAS runtime claim, and the adapter gates below
-are unchanged.
+small progress window. The project license is still open. The platform B0 contracts,
+draft recipe schema/C ABI and pure Dart packages with fakes are now implemented;
+see [contracts](product/CONTRACTS.md) and [platform handoff](product/workstreams/platform.md).
+No native product-core implementation, real services or new VEGAS runtime claim
+is included, and the adapter gates below are unchanged.
 
-**Next:** the product build starts in two parallel workstreams, app and platform
-([docs/product/WORKSTREAMS.md](product/WORKSTREAMS.md)).
+**B0 checks (Windows x64):** both pure Dart packages analyze cleanly; 95 core,
+40 service and 163 fixture structure/bounds checks pass using fakes/design data.
+C/C++ draft-header checks and default/opt-in native builds pass MSVC `/W4 /WX`.
+Existing 24 helper, 9 boundary, 67 configuration checks, default fake-host suite,
+11-case/20-render proof/recovery suite and fake-tree installer tests pass with
+gyan FFmpeg 5.1.2. This is offline/fake-host validation, not a new real VEGAS test.
 
-**Scope boundary:** finish the VEGAS integration foundation before starting app
-work. The user chose to defer the two-template/restart persistence test. Retain that
-qualification limit rather than treating it as a prerequisite for this handoff.
-The user requested a commit of the completed implementation/scaffolding.
-Presets, the full settings schema and rich desktop/popup work follow the product
-roadmap ([docs/product/ROADMAP.md](product/ROADMAP.md)). See
-[design stop point](DESIGN_GATE.md).
+**Next:** stop at B0 for the owner's merge/app review. Platform B1 follows after
+handoff: Windows FFmpeg recapture, with owner approval before downloading or
+installing current gyan.dev/BtbN builds. Workstream split:
+[docs/product/WORKSTREAMS.md](product/WORKSTREAMS.md).
+
+**Scope boundary:** product work is now authorized on ws/app and ws/platform.
+The owner explicitly asked platform to stop after B0 for merging. The deferred real
+two-template/restart test and controlled real failure recovery remain qualification
+limits; B0's fixtures do not pass A5–A7. No installed DLL or rollback backup changed.
 
 First real Vegas Encoder render passes decoded checks: 182 1080p frames at
 30000/1001 and 291,491 float32 stereo sample frames, S_OK/encoder exit zero,
@@ -209,8 +217,8 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 ## Next task
 
-Stop implementation at this requested foundation checkpoint. Do not review or
-merge `origin/product-ui-design` now; the user reserved it for next time. Future
-product qualification should cover controlled failure/recovery and the deferred
-persistence checks, per [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md). No additional SDK,
-ABI reconstruction, codec catalog or full recipe model belongs in this closeout.
+Platform stops after B0 for owner merge and app contract review. Next is B1 in
+[WORKSTREAMS.md](product/WORKSTREAMS.md): Windows FFmpeg facts from current gyan.dev
+and BtbN builds, only after approval for any download/install. Then B2–B4 in order.
+B5/B6 require the owner at the real host. Controlled failure/recovery and deferred
+persistence qualification remain open per [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).

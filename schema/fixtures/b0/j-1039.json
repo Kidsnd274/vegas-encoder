@@ -1,0 +1,281 @@
+{
+  "job": 1,
+  "id": "j-1039",
+  "startedAt": "2026-10-12T06:00:00Z",
+  "endedAt": "2026-10-12T06:22:00Z",
+  "project": "Channel trailer v2.veg",
+  "templateName": "Small web file, AV1",
+  "outputPath": "D:\\Renders\\Channel trailer v2.mkv",
+  "status": "failed",
+  "recipe": {
+    "schema": 1,
+    "id": "av1-small",
+    "name": "Small web file, AV1",
+    "notes": "",
+    "tags": [
+      "Web",
+      "Small"
+    ],
+    "category": "web",
+    "container": {
+      "format": "mkv",
+      "faststart": false
+    },
+    "video": {
+      "enabled": true,
+      "encoder": "libsvtav1",
+      "mode": "crf",
+      "quality": 32,
+      "bitrateK": 12000,
+      "maxrateK": null,
+      "qp": null,
+      "speed": "6",
+      "tune": null,
+      "profile": null,
+      "depth": 10,
+      "gopSec": 2,
+      "color": "bt709",
+      "extra": "-preset 14"
+    },
+    "audio": [
+      {
+        "enabled": true,
+        "encoder": "libopus",
+        "mode": "bitrate",
+        "bitrateK": 160,
+        "vbr": null,
+        "level": null,
+        "sampleRate": "source",
+        "channels": "source",
+        "extra": ""
+      }
+    ],
+    "command": {
+      "mode": "structured",
+      "template": ""
+    },
+    "vegas": {
+      "frame": "project",
+      "inputFormat": "p010"
+    },
+    "extensions": {}
+  },
+  "origin": {
+    "presetId": "av1-small",
+    "revision": 2,
+    "name": "Small web file, AV1"
+  },
+  "recipeSha256": "784f8336fb7f93d63029bbd580d669d97ed12eac4bf5505ada179ead6dd34b2a",
+  "media": {
+    "video": {
+      "width": 3840,
+      "height": 2160,
+      "fps": [
+        30000,
+        1001
+      ],
+      "pixfmt": "p010le",
+      "sar": "1:1"
+    },
+    "audio": {
+      "rate": 48000,
+      "channels": 2,
+      "sampleFmt": "f32le"
+    },
+    "durationSec": 94.5
+  },
+  "ffmpeg": {
+    "id": "gyan-8.1",
+    "label": "FFmpeg 8.1 full",
+    "path": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffmpeg.exe",
+    "ffprobePath": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffprobe.exe",
+    "version": "8.1",
+    "build": "gyan.dev full build",
+    "source": "winget",
+    "license": "GPL v3",
+    "identity": {
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "key": "b0-fixture-gyan-8.1",
+      "size": 100000000,
+      "mtime": "2026-10-12T00:00:00Z",
+      "libraries": {}
+    },
+    "probedAt": "2026-10-12T01:12:00Z",
+    "probeMs": 2140,
+    "counts": {
+      "video": 142,
+      "audio": 91,
+      "muxers": 181
+    },
+    "availability": {
+      "libx264": {
+        "state": "ok"
+      },
+      "libx265": {
+        "state": "ok"
+      },
+      "libsvtav1": {
+        "state": "ok"
+      },
+      "libvpx-vp9": {
+        "state": "ok"
+      },
+      "h264_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "hevc_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "av1_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "h264_qsv": {
+        "state": "failed",
+        "reason": "No Intel graphics device on this PC.",
+        "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+      },
+      "hevc_qsv": {
+        "state": "failed",
+        "reason": "No Intel graphics device on this PC.",
+        "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+      },
+      "h264_amf": {
+        "state": "failed",
+        "reason": "AMD encoder runtime not found.",
+        "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+      },
+      "hevc_amf": {
+        "state": "failed",
+        "reason": "AMD encoder runtime not found.",
+        "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+      },
+      "prores_ks": {
+        "state": "ok"
+      },
+      "dnxhd": {
+        "state": "ok"
+      },
+      "ffv1": {
+        "state": "ok"
+      },
+      "aac": {
+        "state": "ok"
+      },
+      "libfdk_aac": {
+        "state": "missing",
+        "reason": "Not in this build. libfdk_aac is non-free and is left out of redistributable FFmpeg builds."
+      },
+      "libopus": {
+        "state": "ok"
+      },
+      "flac": {
+        "state": "ok"
+      },
+      "alac": {
+        "state": "ok"
+      },
+      "pcm_s16le": {
+        "state": "ok"
+      },
+      "pcm_s24le": {
+        "state": "ok"
+      },
+      "pcm_f32le": {
+        "state": "ok"
+      },
+      "ac3": {
+        "state": "ok"
+      },
+      "eac3": {
+        "state": "ok"
+      },
+      "libmp3lame": {
+        "state": "ok"
+      }
+    },
+    "isFixture": true
+  },
+  "argv": [
+    "-hide_banner",
+    "-nostdin",
+    "-loglevel",
+    "info",
+    "-stats_period",
+    "0.5",
+    "-progress",
+    "pipe:1",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "p010le",
+    "-s",
+    "3840x2160",
+    "-r",
+    "30000/1001",
+    "-thread_queue_size",
+    "64",
+    "-i",
+    "\\\\.\\pipe\\vegas-encoder-j-1039-video",
+    "-f",
+    "f32le",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-thread_queue_size",
+    "64",
+    "-i",
+    "\\\\.\\pipe\\vegas-encoder-j-1039-audio",
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-c:v",
+    "libsvtav1",
+    "-crf",
+    "32",
+    "-pix_fmt",
+    "yuv420p10le",
+    "-g",
+    "60",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-colorspace",
+    "bt709",
+    "-color_range",
+    "tv",
+    "-preset",
+    "14",
+    "-c:a",
+    "libopus",
+    "-b:a",
+    "160k",
+    "-vbr",
+    "on",
+    "-f",
+    "matroska",
+    "D:\\Renders\\Channel trailer v2.ve-partial-j-1039.mkv"
+  ],
+  "elapsedSec": 3,
+  "sizeBytes": 0,
+  "avgFps": 0,
+  "ffmpegExitCode": 1,
+  "hresult": "0x80004005",
+  "message": "FFmpeg exited with code 1 before reading any frames.",
+  "stderrTail": "[libsvtav1 @ 0000020f] Error setting preset 14: must be between -2 and 13\n[vost#0:0/libsvtav1] Error while opening encoder\nConversion failed!",
+  "verification": {
+    "state": "skipped",
+    "message": "B0 illustrative record",
+    "expectedCodecs": [],
+    "actualCodecs": [],
+    "ffprobeVersion": null
+  },
+  "timings": {},
+  "published": false,
+  "retainedPartialPath": null
+}

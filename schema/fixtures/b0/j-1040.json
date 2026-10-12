@@ -1,0 +1,292 @@
+{
+  "job": 1,
+  "id": "j-1040",
+  "startedAt": "2026-10-12T06:00:00Z",
+  "endedAt": "2026-10-12T06:22:00Z",
+  "project": "Channel trailer v2.veg",
+  "templateName": "YouTube upload, HEVC on GPU",
+  "outputPath": "D:\\Renders\\Channel trailer v2.mp4",
+  "status": "succeeded",
+  "recipe": {
+    "schema": 1,
+    "id": "yt-hevc-nv",
+    "name": "YouTube upload, HEVC on GPU",
+    "notes": "10-bit HEVC on NVIDIA. Several times faster than x264 for long timelines.",
+    "tags": [
+      "YouTube",
+      "NVIDIA",
+      "HDR-ready"
+    ],
+    "category": "web",
+    "container": {
+      "format": "mp4",
+      "faststart": true
+    },
+    "video": {
+      "enabled": true,
+      "encoder": "hevc_nvenc",
+      "mode": "cq",
+      "quality": 20,
+      "bitrateK": 12000,
+      "maxrateK": null,
+      "qp": null,
+      "speed": "p5",
+      "tune": "hq",
+      "profile": "main10",
+      "depth": 10,
+      "gopSec": 2,
+      "color": "bt709",
+      "extra": ""
+    },
+    "audio": [
+      {
+        "enabled": true,
+        "encoder": "aac",
+        "mode": "bitrate",
+        "bitrateK": 320,
+        "vbr": null,
+        "level": null,
+        "sampleRate": "source",
+        "channels": "source",
+        "extra": ""
+      }
+    ],
+    "command": {
+      "mode": "structured",
+      "template": ""
+    },
+    "vegas": {
+      "frame": "project",
+      "inputFormat": "p010"
+    },
+    "extensions": {}
+  },
+  "origin": {
+    "presetId": "yt-hevc-nv",
+    "revision": 3,
+    "name": "YouTube upload, HEVC on GPU"
+  },
+  "recipeSha256": "094c7dcf7e8ffdf321d101a8097459f6f8a7544f4f878386f46c5b8a1e2e9809",
+  "media": {
+    "video": {
+      "width": 3840,
+      "height": 2160,
+      "fps": [
+        30000,
+        1001
+      ],
+      "pixfmt": "p010le",
+      "sar": "1:1"
+    },
+    "audio": {
+      "rate": 48000,
+      "channels": 2,
+      "sampleFmt": "f32le"
+    },
+    "durationSec": 94.5
+  },
+  "ffmpeg": {
+    "id": "gyan-8.1",
+    "label": "FFmpeg 8.1 full",
+    "path": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffmpeg.exe",
+    "ffprobePath": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffprobe.exe",
+    "version": "8.1",
+    "build": "gyan.dev full build",
+    "source": "winget",
+    "license": "GPL v3",
+    "identity": {
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "key": "b0-fixture-gyan-8.1",
+      "size": 100000000,
+      "mtime": "2026-10-12T00:00:00Z",
+      "libraries": {}
+    },
+    "probedAt": "2026-10-12T01:12:00Z",
+    "probeMs": 2140,
+    "counts": {
+      "video": 142,
+      "audio": 91,
+      "muxers": 181
+    },
+    "availability": {
+      "libx264": {
+        "state": "ok"
+      },
+      "libx265": {
+        "state": "ok"
+      },
+      "libsvtav1": {
+        "state": "ok"
+      },
+      "libvpx-vp9": {
+        "state": "ok"
+      },
+      "h264_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "hevc_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "av1_nvenc": {
+        "state": "ok",
+        "note": "NVIDIA GeForce RTX 4070"
+      },
+      "h264_qsv": {
+        "state": "failed",
+        "reason": "No Intel graphics device on this PC.",
+        "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+      },
+      "hevc_qsv": {
+        "state": "failed",
+        "reason": "No Intel graphics device on this PC.",
+        "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+      },
+      "h264_amf": {
+        "state": "failed",
+        "reason": "AMD encoder runtime not found.",
+        "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+      },
+      "hevc_amf": {
+        "state": "failed",
+        "reason": "AMD encoder runtime not found.",
+        "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+      },
+      "prores_ks": {
+        "state": "ok"
+      },
+      "dnxhd": {
+        "state": "ok"
+      },
+      "ffv1": {
+        "state": "ok"
+      },
+      "aac": {
+        "state": "ok"
+      },
+      "libfdk_aac": {
+        "state": "missing",
+        "reason": "Not in this build. libfdk_aac is non-free and is left out of redistributable FFmpeg builds."
+      },
+      "libopus": {
+        "state": "ok"
+      },
+      "flac": {
+        "state": "ok"
+      },
+      "alac": {
+        "state": "ok"
+      },
+      "pcm_s16le": {
+        "state": "ok"
+      },
+      "pcm_s24le": {
+        "state": "ok"
+      },
+      "pcm_f32le": {
+        "state": "ok"
+      },
+      "ac3": {
+        "state": "ok"
+      },
+      "eac3": {
+        "state": "ok"
+      },
+      "libmp3lame": {
+        "state": "ok"
+      }
+    },
+    "isFixture": true
+  },
+  "argv": [
+    "-hide_banner",
+    "-nostdin",
+    "-loglevel",
+    "info",
+    "-stats_period",
+    "0.5",
+    "-progress",
+    "pipe:1",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "p010le",
+    "-s",
+    "3840x2160",
+    "-r",
+    "30000/1001",
+    "-thread_queue_size",
+    "64",
+    "-i",
+    "\\\\.\\pipe\\vegas-encoder-j-1040-video",
+    "-f",
+    "f32le",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-thread_queue_size",
+    "64",
+    "-i",
+    "\\\\.\\pipe\\vegas-encoder-j-1040-audio",
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-c:v",
+    "hevc_nvenc",
+    "-preset",
+    "p5",
+    "-tune",
+    "hq",
+    "-rc",
+    "vbr",
+    "-cq",
+    "20",
+    "-b:v",
+    "0",
+    "-profile:v",
+    "main10",
+    "-pix_fmt",
+    "p010le",
+    "-g",
+    "60",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-colorspace",
+    "bt709",
+    "-color_range",
+    "tv",
+    "-tag:v",
+    "hvc1",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "320k",
+    "-movflags",
+    "+faststart",
+    "-f",
+    "mp4",
+    "D:\\Renders\\Channel trailer v2.ve-partial-j-1040.mp4"
+  ],
+  "elapsedSec": 41,
+  "sizeBytes": 310000000,
+  "avgFps": 69.2,
+  "ffmpegExitCode": 0,
+  "hresult": "0x00000000",
+  "message": "",
+  "stderrTail": "",
+  "verification": {
+    "state": "passed",
+    "message": "B0 illustrative record",
+    "expectedCodecs": [],
+    "actualCodecs": [],
+    "ffprobeVersion": null
+  },
+  "timings": {},
+  "published": true,
+  "retainedPartialPath": null
+}

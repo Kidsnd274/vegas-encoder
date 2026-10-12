@@ -1,0 +1,43 @@
+import 'dart:typed_data';
+import 'models.dart';
+
+/// Synchronous, deterministic calls. NativeVeCore and its build hook arrive in B2.
+/// Implementations never inspect the filesystem, run FFmpeg, or access VEGAS.
+abstract interface class VeCore {
+  CoreVersion get version;
+  ProfileCatalog profiles();
+  NormalizeResult normalize(Map<String, Object?> json);
+  List<Issue> validate(
+    Recipe recipe, {
+    MediaDescription? media,
+    CoreCapabilities? capabilities,
+  });
+  CompileResult compile(
+    Recipe recipe, {
+    required MediaDescription media,
+    required CompilePaths paths,
+    CoreCapabilities? capabilities,
+  });
+  List<Diagnostic> lint(String text, {CoreCapabilities? capabilities});
+  CompletionResult complete(
+    String text,
+    int caret, {
+    CoreCapabilities? capabilities,
+  });
+  SizeEstimate estimate(
+    Recipe recipe, {
+    required MediaDescription media,
+    double? durationSec,
+  });
+  List<FieldDiff> diff(Recipe before, Recipe after);
+  Uint8List encodePayload(TemplateSnapshot snapshot);
+  PayloadResult decodePayload(Uint8List bytes);
+}
+
+class CoreException implements Exception {
+  const CoreException(this.code, this.message);
+  final String code;
+  final String message;
+  @override
+  String toString() => 'CoreException($code): $message';
+}

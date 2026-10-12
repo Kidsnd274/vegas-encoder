@@ -1,0 +1,9 @@
+name: ve_services
+description: Vegas Encoder system service contracts and in-memory fakes.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+dependencies:
+  ve_core:
+    path: ../ve_core

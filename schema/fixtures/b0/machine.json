@@ -1,0 +1,355 @@
+{
+  "machine": 1,
+  "revision": 0,
+  "installations": [
+    {
+      "id": "gyan-8.1",
+      "label": "FFmpeg 8.1 full",
+      "path": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffmpeg.exe",
+      "ffprobePath": "C:\\Users\\editor\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.1-full_build\\bin\\ffprobe.exe",
+      "version": "8.1",
+      "build": "gyan.dev full build",
+      "source": "winget",
+      "license": "GPL v3",
+      "identity": {
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "key": "b0-fixture-gyan-8.1",
+        "size": 100000000,
+        "mtime": "2026-10-12T00:00:00Z",
+        "libraries": {}
+      },
+      "probedAt": "2026-10-12T01:12:00Z",
+      "probeMs": 2140,
+      "counts": {
+        "video": 142,
+        "audio": 91,
+        "muxers": 181
+      },
+      "availability": {
+        "libx264": {
+          "state": "ok"
+        },
+        "libx265": {
+          "state": "ok"
+        },
+        "libsvtav1": {
+          "state": "ok"
+        },
+        "libvpx-vp9": {
+          "state": "ok"
+        },
+        "h264_nvenc": {
+          "state": "ok",
+          "note": "NVIDIA GeForce RTX 4070"
+        },
+        "hevc_nvenc": {
+          "state": "ok",
+          "note": "NVIDIA GeForce RTX 4070"
+        },
+        "av1_nvenc": {
+          "state": "ok",
+          "note": "NVIDIA GeForce RTX 4070"
+        },
+        "h264_qsv": {
+          "state": "failed",
+          "reason": "No Intel graphics device on this PC.",
+          "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+        },
+        "hevc_qsv": {
+          "state": "failed",
+          "reason": "No Intel graphics device on this PC.",
+          "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+        },
+        "h264_amf": {
+          "state": "failed",
+          "reason": "AMD encoder runtime not found.",
+          "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+        },
+        "hevc_amf": {
+          "state": "failed",
+          "reason": "AMD encoder runtime not found.",
+          "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+        },
+        "prores_ks": {
+          "state": "ok"
+        },
+        "dnxhd": {
+          "state": "ok"
+        },
+        "ffv1": {
+          "state": "ok"
+        },
+        "aac": {
+          "state": "ok"
+        },
+        "libfdk_aac": {
+          "state": "missing",
+          "reason": "Not in this build. libfdk_aac is non-free and is left out of redistributable FFmpeg builds."
+        },
+        "libopus": {
+          "state": "ok"
+        },
+        "flac": {
+          "state": "ok"
+        },
+        "alac": {
+          "state": "ok"
+        },
+        "pcm_s16le": {
+          "state": "ok"
+        },
+        "pcm_s24le": {
+          "state": "ok"
+        },
+        "pcm_f32le": {
+          "state": "ok"
+        },
+        "ac3": {
+          "state": "ok"
+        },
+        "eac3": {
+          "state": "ok"
+        },
+        "libmp3lame": {
+          "state": "ok"
+        }
+      },
+      "isFixture": true
+    },
+    {
+      "id": "manual-7.1",
+      "label": "FFmpeg 7.1.1",
+      "path": "C:\\ffmpeg\\bin\\ffmpeg.exe",
+      "ffprobePath": "C:\\ffmpeg\\bin\\ffprobe.exe",
+      "version": "7.1.1",
+      "build": "gyan.dev essentials build",
+      "source": "manual",
+      "license": "GPL v3",
+      "identity": {
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "key": "b0-fixture-manual-7.1",
+        "size": 100000000,
+        "mtime": "2026-10-12T00:00:00Z",
+        "libraries": {}
+      },
+      "probedAt": "2026-10-09T01:12:00Z",
+      "probeMs": 1890,
+      "counts": {
+        "video": 98,
+        "audio": 74,
+        "muxers": 176
+      },
+      "availability": {
+        "libx264": {
+          "state": "ok"
+        },
+        "libx265": {
+          "state": "ok"
+        },
+        "libsvtav1": {
+          "state": "ok"
+        },
+        "libvpx-vp9": {
+          "state": "ok"
+        },
+        "h264_nvenc": {
+          "state": "ok",
+          "note": "NVIDIA GeForce RTX 4070"
+        },
+        "hevc_nvenc": {
+          "state": "ok",
+          "note": "NVIDIA GeForce RTX 4070"
+        },
+        "av1_nvenc": {
+          "state": "ok",
+          "note": "NVIDIA GeForce RTX 4070"
+        },
+        "h264_qsv": {
+          "state": "failed",
+          "reason": "No Intel graphics device on this PC.",
+          "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+        },
+        "hevc_qsv": {
+          "state": "failed",
+          "reason": "No Intel graphics device on this PC.",
+          "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+        },
+        "h264_amf": {
+          "state": "failed",
+          "reason": "AMD encoder runtime not found.",
+          "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+        },
+        "hevc_amf": {
+          "state": "failed",
+          "reason": "AMD encoder runtime not found.",
+          "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+        },
+        "prores_ks": {
+          "state": "ok"
+        },
+        "dnxhd": {
+          "state": "ok"
+        },
+        "ffv1": {
+          "state": "ok"
+        },
+        "aac": {
+          "state": "ok"
+        },
+        "libfdk_aac": {
+          "state": "missing",
+          "reason": "Not in this build. libfdk_aac is non-free and is left out of redistributable FFmpeg builds."
+        },
+        "libopus": {
+          "state": "ok"
+        },
+        "flac": {
+          "state": "ok"
+        },
+        "alac": {
+          "state": "ok"
+        },
+        "pcm_s16le": {
+          "state": "ok"
+        },
+        "pcm_s24le": {
+          "state": "ok"
+        },
+        "pcm_f32le": {
+          "state": "ok"
+        },
+        "ac3": {
+          "state": "ok"
+        },
+        "eac3": {
+          "state": "ok"
+        },
+        "libmp3lame": {
+          "state": "ok"
+        }
+      },
+      "isFixture": true
+    },
+    {
+      "id": "btbn-lgpl-8.0",
+      "label": "FFmpeg 8.0 LGPL",
+      "path": "D:\\Tools\\ffmpeg-n8.0-latest-win64-lgpl-shared\\bin\\ffmpeg.exe",
+      "ffprobePath": "D:\\Tools\\ffmpeg-n8.0-latest-win64-lgpl-shared\\bin\\ffprobe.exe",
+      "version": "8.0",
+      "build": "BtbN win64 LGPL shared",
+      "source": "path",
+      "license": "LGPL v2.1",
+      "identity": {
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "key": "b0-fixture-btbn-lgpl-8.0",
+        "size": 100000000,
+        "mtime": "2026-10-12T00:00:00Z",
+        "libraries": {}
+      },
+      "probedAt": "2026-10-05T01:12:00Z",
+      "probeMs": 2410,
+      "counts": {
+        "video": 120,
+        "audio": 88,
+        "muxers": 180
+      },
+      "availability": {
+        "libx264": {
+          "state": "missing",
+          "reason": "Not in this build. LGPL builds leave out GPL encoders such as x264 and x265."
+        },
+        "libx265": {
+          "state": "missing",
+          "reason": "Not in this build. LGPL builds leave out GPL encoders such as x264 and x265."
+        },
+        "libsvtav1": {
+          "state": "ok"
+        },
+        "libvpx-vp9": {
+          "state": "ok"
+        },
+        "h264_nvenc": {
+          "state": "ok",
+          "note": "NVIDIA GeForce RTX 4070"
+        },
+        "hevc_nvenc": {
+          "state": "ok",
+          "note": "NVIDIA GeForce RTX 4070"
+        },
+        "av1_nvenc": {
+          "state": "ok",
+          "note": "NVIDIA GeForce RTX 4070"
+        },
+        "h264_qsv": {
+          "state": "failed",
+          "reason": "No Intel graphics device on this PC.",
+          "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+        },
+        "hevc_qsv": {
+          "state": "failed",
+          "reason": "No Intel graphics device on this PC.",
+          "detail": "[hevc_qsv @ 000001d4] Error creating a MFX session: -9."
+        },
+        "h264_amf": {
+          "state": "failed",
+          "reason": "AMD encoder runtime not found.",
+          "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+        },
+        "hevc_amf": {
+          "state": "failed",
+          "reason": "AMD encoder runtime not found.",
+          "detail": "[h264_amf @ 000001c8] DLL amfrt64.dll failed to open"
+        },
+        "prores_ks": {
+          "state": "ok"
+        },
+        "dnxhd": {
+          "state": "ok"
+        },
+        "ffv1": {
+          "state": "ok"
+        },
+        "aac": {
+          "state": "ok"
+        },
+        "libfdk_aac": {
+          "state": "missing",
+          "reason": "Not in this build. libfdk_aac is non-free and is left out of redistributable FFmpeg builds."
+        },
+        "libopus": {
+          "state": "ok"
+        },
+        "flac": {
+          "state": "ok"
+        },
+        "alac": {
+          "state": "ok"
+        },
+        "pcm_s16le": {
+          "state": "ok"
+        },
+        "pcm_s24le": {
+          "state": "ok"
+        },
+        "pcm_f32le": {
+          "state": "ok"
+        },
+        "ac3": {
+          "state": "ok"
+        },
+        "eac3": {
+          "state": "ok"
+        },
+        "libmp3lame": {
+          "state": "ok"
+        }
+      },
+      "isFixture": true
+    }
+  ],
+  "defaultFFmpegId": "gyan-8.1",
+  "progressWindow": true,
+  "keepOnTop": false,
+  "verifyOutput": true,
+  "theme": "system"
+}
