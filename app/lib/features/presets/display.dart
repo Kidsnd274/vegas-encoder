@@ -40,6 +40,19 @@ String deliveredPixelFormat(String pixfmt) => _deliveredVideo[pixfmt]?.label ?? 
 int? deliveredDepth(String pixfmt) => _deliveredVideo[pixfmt]?.depth;
 String deliveredSampleFormat(String fmt) => _deliveredAudio[fmt]?.label ?? fmt;
 
+/// What kind of samples an FFmpeg sample format holds, for wire labels. Bits
+/// always come from the core's facts.
+const _sampleKind = <String, String>{
+  'flt': 'float',
+  'fltp': 'float',
+  'dbl': 'float',
+  'dblp': 'float',
+  's16': 'integer',
+  's16p': 'integer',
+  's32': 'integer',
+  's32p': 'integer',
+};
+
 String channelsLabel(int channels) => switch (channels) {
   1 => 'mono',
   2 => 'stereo',
@@ -177,14 +190,27 @@ String choiceName(core.ChoiceControl c, String value) => c.names[value] as Strin
 
 /// Groups the core's display tokens the way the command view draws them:
 /// the VEGAS inputs collapse into a chip, `-map` joins the program line, and
-/// each stage gets its own line. Extra arguments stay with their stream.
+/// each stage gets its own line. Extra arguments stay with their stream. Each
+/// token keeps the recipe field the core says produced it, and tokens an
+/// error issue points at (`tokenIndices`, display indexes) are marked.
 CommandDisplay commandDisplay(core.CompileResult result, {required bool audio}) {
   final inputs = <CommandToken>[];
   final lines = <CommandRole, List<CommandToken>>{for (final r in CommandRole.values) r: []};
+  final errors = {
+    for (final i in result.issues)
+      if (i.level == core.IssueLevel.error) ...i.tokenIndices,
+  };
   var program = result.executable;
   var lastStream = CommandRole.video;
-  for (final t in result.display) {
-    final token = CommandToken(_quote(t.text), extra: t.role == core.TokenRole.extra);
+  final display = result.display;
+  for (var index = 0; index < display.length; index++) {
+    final t = display[index];
+    final token = CommandToken(
+      _quote(t.text),
+      extra: t.role == core.TokenRole.extra,
+      error: errors.contains(index),
+      field: t.field,
+    );
     switch (t.role) {
       case core.TokenRole.exe:
         program = t.text;
@@ -240,11 +266,11 @@ SignalNode? nodeForField(String field) {
 
 // ------------------------------------------------------------ signal path
 
-/// Builds the diagram from the core's compile result when there is one, and
-/// from the recipe and catalog alone when the core couldn't work it out.
-/// Gaps until platform adds per-stream facts (workstreams/app.md, B0 review):
-/// audio sample-format conversions aren't drawn, and conversion notes come
-/// only from the core's V-DEPTH-DOWN and V-CHROMA-UP issues.
+/// Builds the diagram from the core's signal-path facts (CONTRACTS C2,
+/// `CompileResult.signalPath`): bits, formats, chroma, whether a conversion
+/// happens and whether the container can hold each stream. Without a compile
+/// result the recipe and catalog name the stages, and the wires claim no
+/// conversion either way.
 SignalPathModel signalPathModel({
   required core.Recipe recipe,
   required core.ProfileCatalog catalog,
@@ -254,27 +280,25 @@ SignalPathModel signalPathModel({
   int? lengthSec,
 }) {
   final summary = compiled?.summary ?? const <String, Object?>{};
-  final resolved = compiled?.resolved;
+  final facts = compiled?.signalPath;
   final issues = compiled?.issues ?? const <core.Issue>[];
   final v = recipe.video;
   final a = recipe.audio.first;
   final vp = catalog.videoEncoder(v.encoder);
   final ap = catalog.audioEncoder(a.encoder);
   final cp = catalog.container(recipe.container.format);
-  final inDepth = deliveredDepth(media.video.pixfmt) ?? 8;
+  final vf = facts?.video;
+  final af = facts?.audio.firstOrNull;
+  final inDepth = vf?.inputBits ?? deliveredDepth(media.video.pixfmt) ?? 8;
   final audioIn = _deliveredAudio[media.audio?.sampleFmt];
 
   SignalStream? video;
   if (v.enabled) {
-    // Without the core's resolved settings the wire keeps VEGAS's depth: the
-    // depth chosen in the panel isn't a fact about this path until compiled.
-    final outDepth = resolved?.depth ?? inDepth;
-    final outPixfmt = resolved?.pixfmt;
-    final converts = outPixfmt != null && outPixfmt != media.video.pixfmt;
-    final notes = [
-      if (issues.any((i) => i.id == 'V-DEPTH-DOWN')) 'precision lost',
-      if (issues.any((i) => i.id == 'V-CHROMA-UP')) 'color interpolated',
-    ];
+    final outDepth = vf?.outputBits ?? inDepth;
+    final chroma = vf?.chromaChanged == true
+        ? '${vf!.inputChroma} to ${vf.outputChroma}${issues.any((i) => i.id == 'V-CHROMA-UP') ? ', interpolated' : ''}'
+        : vf?.outputChroma;
+    final notes = [?chroma, if (outDepth < inDepth) 'precision lost'];
     video = SignalStream(
       encoder: summary['videoEncoder'] as String? ?? vp?.label ?? v.encoder,
       detail: compiled != null ? _videoDetail(summary) : _videoDetailFromRecipe(v, vp),
@@ -283,37 +307,47 @@ SignalPathModel signalPathModel({
       outputBits: outDepth,
       availability: availabilityOf(installation, v.encoder),
       runsOn: runsOn(vp),
-      conversion: converts
+      conversion: vf?.conversion == true
           ? SignalConversion(
-              label: '${media.video.pixfmt} to $outPixfmt',
-              shortLabel: outDepth != inDepth ? '$inDepth to $outDepth-bit' : 'Format change',
-              note: notes.isEmpty ? null : _capitalize(notes.join(', ')),
+              label: '${vf!.inputFormat ?? 'VEGAS frames'} to ${vf.outputFormat ?? 'encoder format'}',
+              shortLabel: outDepth != inDepth
+                  ? '$inDepth to $outDepth-bit'
+                  : vf.chromaChanged == true
+                  ? '${vf.inputChroma} to ${vf.outputChroma}'
+                  : 'Layout change',
+              note: notes.isEmpty ? null : notes.join(', '),
             )
           : null,
-      formatLabel: '$outDepth-bit',
+      formatLabel: vf == null ? '$outDepth-bit' : ['$outDepth-bit', ?vf.outputChroma].join(' '),
       inputLabel: '$inDepth-bit',
       outputLabel: '$outDepth-bit',
-      muxProblem:
-          vp != null &&
-          catalog.compatibilityOf(video: true, family: vp.family, container: recipe.container.format) == 'no',
-      conversionKnown: resolved != null,
+      muxProblem: vf?.containerSupport == 'no',
+      conversionKnown: vf?.conversion != null,
     );
   }
 
   SignalStream? audio;
   if (a.enabled && media.audio != null) {
-    final bits = audioIn?.bits ?? 32;
+    final inBits = af?.inputBits ?? audioIn?.bits ?? 32;
+    final outBits = af?.outputBits ?? inBits;
+    final outLabel = '$outBits-bit ${_sampleKind[af?.outputFormat] ?? audioIn?.short ?? ''}'.trim();
     audio = SignalStream(
       encoder: summary['audio'] as String? ?? ap?.label ?? a.encoder,
       detail: compiled != null ? (summary['audioQuality'] as String? ?? '') : _audioDetailFromRecipe(a, ap),
       codec: ap?.codec ?? a.encoder,
-      inputBits: bits,
-      outputBits: bits,
+      inputBits: inBits,
+      outputBits: outBits,
       availability: availabilityOf(installation, a.encoder),
-      formatLabel: audioIn == null ? media.audio!.sampleFmt : '${audioIn.bits}-bit ${audioIn.short}',
-      muxProblem:
-          ap != null &&
-          catalog.compatibilityOf(video: false, family: ap.family, container: recipe.container.format) == 'no',
+      conversion: af?.conversion == true
+          ? SignalConversion(
+              label: '${af!.inputFormat ?? 'VEGAS samples'} to ${af.outputFormat ?? 'encoder format'}',
+              shortLabel: outBits != inBits ? '$inBits to $outBits-bit' : 'Layout change',
+              note: [outLabel, if (outBits < inBits) 'precision lost'].join(', '),
+            )
+          : null,
+      formatLabel: outLabel,
+      muxProblem: af?.containerSupport == 'no',
+      conversionKnown: af?.conversion != null,
     );
   }
 
@@ -348,8 +382,6 @@ SignalPathModel signalPathModel({
     fromCommand: recipe.command.mode == 'template',
   );
 }
-
-String _capitalize(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
 String _videoDetail(Map<String, Object?> summary) =>
     [summary['videoQuality'], summary['speed']].whereType<String>().where((s) => s.isNotEmpty).join(', ');

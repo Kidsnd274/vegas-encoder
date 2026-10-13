@@ -35,6 +35,23 @@ void main() {
       expect(d.lines.first.tokens.map((t) => t.text), ['-map', '0:v:0', '-map', '1:a:0']);
       expect(d.lines.last.tokens.single.text, r'"D:\Renders\Sample project.mp4"', reason: 'quoted for display');
       expect(d.copyText, f.compiled.commandLine, reason: 'Copy is the core\'s command line');
+      final crf = d.lines[1].tokens.firstWhere((t) => t.text == '-crf');
+      expect(crf.field, 'video.quality', reason: 'the core names the field that produced each token');
+      expect(d.lines.last.tokens.single.field, isNull, reason: 'the output path has no recipe field');
+    });
+
+    test('tokens an error points at are marked', () async {
+      final f = fixture('yt-h264');
+      final lgpl = core.compile(
+        f.recipe,
+        media: f.media,
+        paths: f.paths,
+        capabilities: CoreCapabilities(installationId: 'btbn-lgpl-8.0'),
+      );
+      final d = commandDisplay(lgpl, audio: true);
+      final video = d.lines[1].tokens;
+      expect(video.where((t) => t.error).map((t) => t.text), ['-c:v', 'libx264']);
+      expect(d.lines.expand((l) => l.tokens).where((t) => t.error), hasLength(2), reason: 'info issues mark nothing');
     });
   });
 
@@ -57,7 +74,10 @@ void main() {
       expect(m.video!.detail, 'CRF 18, slow');
       expect(m.video!.outputBits, 8);
       expect(m.video!.conversion!.label, 'p010le to yuv420p');
-      expect(m.video!.conversion!.note, 'Precision lost', reason: 'from the core\'s V-DEPTH-DOWN issue');
+      expect(m.video!.conversion!.note, '4:2:0, precision lost', reason: 'from the core\'s signal facts');
+      expect(m.video!.conversion!.shortLabel, '10 to 8-bit');
+      expect(m.audio!.conversion!.label, 'flt to fltp', reason: 'AAC takes planar float');
+      expect(m.audio!.formatLabel, '32-bit float');
       expect(m.video!.availability, VeAvailability.ready);
       expect(m.audio!.detail, '320 kb/s');
       expect(m.container.label, 'MP4');
@@ -95,13 +115,35 @@ void main() {
       expect(m.video!.availability, VeAvailability.missing);
     });
 
-    test('the codec-to-container table marks a stream the container cannot hold', () {
+    test('ProRes and PCM 24-bit: chroma and audio precision come from the facts', () {
+      final f = fixture('prores-hq');
+      final m = signalPathModel(recipe: f.recipe, catalog: catalog, media: f.media, compiled: f.compiled);
+      expect(m.video!.conversion!.label, 'p010le to yuv422p10le');
+      expect(m.video!.conversion!.shortLabel, '4:2:0 to 4:2:2');
+      expect(m.video!.conversion!.note, '4:2:0 to 4:2:2, interpolated');
+      expect(m.audio!.outputBits, 24);
+      expect(m.audio!.conversion!.label, 'flt to s32');
+      expect(m.audio!.conversion!.note, '24-bit integer, precision lost');
+    });
+
+    test('the core\'s containerSupport fact breaks a wire; without facts nothing is claimed', () {
       final f = fixture('yt-h264');
-      final webm = f.recipe.withContainer((c) => c.copyWith(format: 'webm'));
-      final m = signalPathModel(recipe: webm, catalog: catalog, media: f.media);
+      final facts = f.compiled.signalPath!;
+      final cannot = f.compiled.copyWith(
+        signalPath: facts.copyWith(
+          video: facts.video!.copyWith(containerSupport: 'no'),
+          audio: [facts.audio.first.copyWith(containerSupport: 'no')],
+        ),
+      );
+      final m = signalPathModel(recipe: f.recipe, catalog: catalog, media: f.media, compiled: cannot);
       expect(m.video!.muxProblem, isTrue);
       expect(m.audio!.muxProblem, isTrue);
       expect(m.containerProblem, isTrue);
+
+      final webm = f.recipe.withContainer((c) => c.copyWith(format: 'webm'));
+      final none = signalPathModel(recipe: webm, catalog: catalog, media: f.media);
+      expect(none.containerProblem, isFalse, reason: 'no local compatibility calculation');
+      expect(none.video!.conversionKnown, isFalse);
     });
   });
 
@@ -172,6 +214,29 @@ void main() {
         'Small web file, AV1',
         'YouTube upload, HEVC on GPU',
       ]);
+    });
+
+    test('searching 500 presets stays within the 150 ms budget (TECH_ARCHITECTURE 9.3)', () {
+      final many = [
+        for (var i = 0; i < 500; i++)
+          libraryEntry(
+            presets[i % presets.length].copyWith(
+              recipe: presets[i % presets.length].recipe.copyWith(id: 'p$i', name: 'Preset $i'),
+              builtin: i.isEven,
+            ),
+            recipe: presets[i % presets.length].recipe.copyWith(id: 'p$i', name: 'Preset $i'),
+            favorite: i % 7 == 0,
+            dirty: false,
+            compiled: null,
+            catalog: catalog,
+          ),
+      ];
+      final watch = Stopwatch()..start();
+      for (final q in ['x', 'x2', 'x26', 'x264', 'nvenc', 'preset 4']) {
+        groupLibrary(many, query: q);
+      }
+      watch.stop();
+      expect(watch.elapsedMilliseconds / 6, lessThan(150), reason: 'per search, fakes only, no real core');
     });
 
     test('search matches names, tags and encoders; filters narrow the list', () {

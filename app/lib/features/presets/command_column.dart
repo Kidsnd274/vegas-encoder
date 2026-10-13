@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../design/components/button.dart';
@@ -19,6 +20,7 @@ class CommandColumn extends StatelessWidget {
     required this.onShowField,
     required this.multiline,
     required this.onToggleLayout,
+    this.litFields,
   });
 
   final EditorData data;
@@ -28,6 +30,10 @@ class CommandColumn extends StatelessWidget {
   /// Grouped lines, or one line.
   final bool multiline;
   final VoidCallback onToggleLayout;
+
+  /// Fields of the control under the pointer or holding focus; their tokens
+  /// are lit.
+  final ValueListenable<List<String>?>? litFields;
 
   static const double width = 432;
 
@@ -63,17 +69,24 @@ class CommandColumn extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           if (compiled != null)
-            CommandView(
-              command: commandDisplay(compiled, audio: data.recipe.audio.first.enabled),
-              activeRole: switch (node) {
-                SignalNode.source => CommandRole.inputs,
-                SignalNode.video => CommandRole.video,
-                SignalNode.audio => CommandRole.audio,
-                SignalNode.container => CommandRole.mux,
-                SignalNode.file => CommandRole.output,
-              },
-              multiline: multiline,
-              maxHeight: 360,
+            ValueListenableBuilder<List<String>?>(
+              valueListenable: litFields ?? ValueNotifier<List<String>?>(null),
+              builder: (context, lit, _) => CommandView(
+                command: commandDisplay(compiled, audio: data.recipe.audio.first.enabled),
+                litFields: {...?lit},
+                onTokenTap: (token) {
+                  if (token.field case final field?) onShowField(field);
+                },
+                activeRole: switch (node) {
+                  SignalNode.source => CommandRole.inputs,
+                  SignalNode.video => CommandRole.video,
+                  SignalNode.audio => CommandRole.audio,
+                  SignalNode.container => CommandRole.mux,
+                  SignalNode.file => CommandRole.output,
+                },
+                multiline: multiline,
+                maxHeight: 360,
+              ),
             )
           else
             _Unavailable(_whyNoCommand(data)),

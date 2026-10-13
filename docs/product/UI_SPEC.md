@@ -13,7 +13,7 @@ The vocabulary is fixed in the brief §2.
 
 | Window | Default | Minimum | Notes |
 | --- | --- | --- | --- |
-| Desktop app | 1440×900 | 1100×700 | Remembers size and position; single instance |
+| Desktop app | 1440×900 | 1100×700 | Remembers size, position and maximized (C7 `uiState`; clamped to a current monitor on restore); single instance |
 | Popup editor | 1120×740 | 960×640 | Centred on its VEGAS owner; resizable; remembers size, not position |
 | Native page | Host-defined | — | Win32 inside VEGAS; see the mock |
 
@@ -83,9 +83,11 @@ settings below it; arrow keys move between nodes.
   open settings; clicking one focuses the editor.
 - **Audio off** leaves a dashed audio node ("Audio is off. The file has video only.").
   It still opens the audio settings, where audio is turned back on.
-- **Only the core's facts.** Pips, notes and depths come from the core's compile result.
-  When the core gives none (an edit beyond the B0 fake core), the wire keeps VEGAS's
-  depth and claims neither a pip nor "No conversion".
+- **Only the core's facts.** Pips, notes, bits and broken wires come from the core's
+  signal facts (C2 `signalPath`): a pip wherever `conversion` is true, video and audio
+  alike ("flt to fltp" for AAC's planar input). When the core gives none (an edit
+  beyond the B0 fake core), the wire keeps VEGAS's depth and claims neither a pip nor
+  "No conversion".
 
 ### Basic editor
 
@@ -177,7 +179,9 @@ This catches failing hardware encoders and bad extra arguments early. Voukoder P
   layouts ("One line" / "Grouped" beside Copy). In the multi-line layout each `^`
   continuation stays at the end of its line.
 - The group for the selected node is highlighted. Clicking a token focuses the control
-  that produced it; hovering a control highlights its tokens (StaxRip's click-to-jump).
+  that produced it; hovering or focusing a control highlights its tokens (StaxRip's
+  click-to-jump). Both use the core's `CommandToken.field`; tokens an error issue points
+  at (`tokenIndices`) are underlined in the error colour.
 - Options replaced by Extra arguments show a small "set in Extra arguments" note at
   their control.
 

@@ -1,7 +1,8 @@
 import 'dart:ui' show AppExitResponse;
 
-import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/gestures.dart' show PointerDeviceKind, kSecondaryButton;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart' hide SizeEstimate;
@@ -24,14 +25,25 @@ import '../helpers.dart';
 void main() {
   late FakePresetLibrary library;
   late FakeWindowController window;
+  late FakeMachineSettingsRepository machine;
 
-  Future<void> pump(WidgetTester tester, {Size view = const Size(1440, 900)}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    Size view = const Size(1440, 900),
+    MachineSettings? settings,
+    ({WindowBounds bounds, bool maximized})? restored,
+  }) async {
     library = FakePresetLibrary(now: () => '2026-10-12T02:00:00Z');
-    window = FakeWindowController();
+    window = FakeWindowController(const WindowState(), restored);
+    machine = settings == null ? FakeMachineSettingsRepository() : FakeMachineSettingsRepository(settings: settings);
     await pumpApp(
       tester,
       view: view,
-      overrides: [windowControllerProvider.overrideWithValue(window), presetLibraryProvider.overrideWithValue(library)],
+      overrides: [
+        windowControllerProvider.overrideWithValue(window),
+        presetLibraryProvider.overrideWithValue(library),
+        machineSettingsRepositoryProvider.overrideWithValue(machine),
+      ],
     );
   }
 
@@ -421,5 +433,60 @@ void main() {
     expect(copied, startsWith('ffmpeg -hide_banner'));
     expect(copied, endsWith(r'"D:\Renders\Sample project.mp4"'));
     expect(find.text('Command copied'), findsOneWidget);
+  });
+
+  testWidgets('clicking a command token opens and focuses the setting that made it', (tester) async {
+    await pump(tester);
+    final view = find.byType(CommandView);
+    final paragraph = tester.renderObject<RenderParagraph>(find.descendant(of: view, matching: find.byType(RichText)));
+    final text = paragraph.text.toPlainText();
+    Offset at(String token) {
+      final start = text.indexOf(token);
+      final boxes = paragraph.getBoxesForSelection(
+        TextSelection(baseOffset: start, extentOffset: start + token.length),
+      );
+      return paragraph.localToGlobal(boxes.first.toRect().center);
+    }
+
+    await tester.tapAt(at('+faststart'));
+    await tester.pumpAndSettle();
+    expect(find.text('Joins the streams into one file'), findsOneWidget);
+    expect(focusIn<ContainerPanel>(), isTrue);
+  });
+
+  testWidgets('pointing at a control lights the tokens it produces', (tester) async {
+    await pump(tester);
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(gesture.removePointer);
+    await gesture.addPointer(location: Offset.zero);
+    await gesture.moveTo(tester.getCenter(find.text('Encoder speed')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<CommandView>(find.byType(CommandView)).litFields, {'video.speed'});
+    await gesture.moveTo(const Offset(5, 890));
+    await tester.pumpAndSettle();
+    expect(tester.widget<CommandView>(find.byType(CommandView)).litFields, isEmpty);
+  });
+
+  testWidgets('the size card keeps the length as typed, for next time', (tester) async {
+    await pump(
+      tester,
+      settings: MachineSettings(uiState: AppUiState(lastSizeLengthText: '1:30')),
+    );
+    await tester.tap(find.text('Sample project.mp4'));
+    await tester.pumpAndSettle();
+    expect(fieldWith('1:30'), findsOneWidget, reason: 'the remembered text, not 10:00');
+    await tester.enterText(fieldWith('1:30'), '20:');
+    await tester.pump(const Duration(milliseconds: 700));
+    expect((await machine.read()).uiState?.lastSizeLengthText, '20:', reason: 'kept exactly, even unfinished');
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('closing remembers where the window was', (tester) async {
+    await pump(tester, restored: (bounds: (x: -1500, y: 80, width: 1500, height: 950), maximized: true));
+    expect(await tester.binding.handleRequestAppExit(), AppExitResponse.exit);
+    final ui = (await machine.read()).uiState!;
+    expect(ui.desktopWindowBounds!.x, -1500, reason: 'another monitor to the left');
+    expect(ui.desktopWindowBounds!.width, 1500);
+    expect(ui.desktopMaximized, isTrue);
   });
 }

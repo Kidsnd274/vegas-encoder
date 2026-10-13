@@ -6,6 +6,7 @@ import 'presets.dart';
 import 'preview.dart';
 import 'recipe_edit.dart';
 import 'services.dart';
+import 'ui_state.dart';
 
 /// A core result, or why the core couldn't give one. Until the native core
 /// (B2) the fake core only knows the built-in presets as shipped, so most
@@ -117,7 +118,7 @@ final editorProvider = Provider<EditorData?>((ref) {
   final recipe = draft?.recipe ?? preset.recipe;
   final media = SamplePreview.media;
   final ext = catalog.containers.where((c) => c.id == recipe.container.format).firstOrNull?.ext;
-  final length = state.lengthSec;
+  final length = ref.watch(sizeLengthSecProvider);
 
   return EditorData(
     preset: preset,
