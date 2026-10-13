@@ -1,8 +1,10 @@
 # App workstream
 
-Updated: 2026-10-13 (Asia/Singapore). Branch `ws/app`. Status: **F0 and F1 done; F2
-done except the parts waiting on platform** (listed under Needs). F2 runs on the
-platform fakes (B0); the editor reacts to edits only once the real core (B2) lands.
+Updated: 2026-10-14 (Asia/Singapore). Branch `ws/app`. Status: **F0 and F1 done; F2
+and F3 done except the parts waiting on platform** (listed under Needs). F2 and F3 run
+on the platform fakes (B0). Master through B2 (`659fe02`) is merged; the app still
+selects `FakeVeCore`, so the editor reacts to edits only after the switch to
+`NativeVeCore` (see Handoff).
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
@@ -94,10 +96,70 @@ debug builds, and the goldens use it.
   `showVeTextDialog`, `VeToast`; `VeField` draws its Reset; `SizeQualityCard` shows the
   core's figures and no longer works out a size.
 
+**F3: FFmpeg, History and Settings** (UI_SPEC §5, §6, §6a; `lib/features/ffmpeg/`,
+`history/`, `settings/`, `lib/state/ffmpeg.dart`, `history.dart`, `settings.dart`):
+
+- Providers next to F2's (`state/services.dart`): `ffmpegDiscoveryProvider`,
+  `hardwareTestsProvider`, `jobRepositoryProvider` (fakes by default),
+  `discoveredInstallationsProvider`, `jobsProvider`, `jobRecordProvider`.
+- `MachineSettingsWriter` (`state/settings.dart`): every C7 write copies the latest
+  settings, changes its own fields, saves with `expectedRevision` and reapplies on a
+  conflict. UI state, the default FFmpeg, the installation list and the Settings
+  switches all go through it. `desktopSectionProvider` moves between sections.
+- FFmpeg: installation cards (default, build/license/source, path, checked, counts,
+  probe progress or failure, presets it can't render), Add FFmpeg… through a native
+  Open dialog (runner `pickFile`, `windows/runner/file_dialog.cpp`), Scan again, Set as
+  default, Copy path, Remove…; capability list by codec with Video/Audio, All/Only
+  problems/Hardware, search and Ctrl+F; encoder detail with the test-encode diagram,
+  FFmpeg's stderr line, presets that use it (opens them), Test again. Discovery's list
+  is written to C7 `installations`; a default discovery no longer lists keeps its
+  record. New availability state "Not checked yet" (C3 `unknown`; F2 showed it as
+  Testing…).
+- History: status filter, list with encoder, length, time taken, × realtime (finished
+  renders only) and size; detail with the result sentence, stderr tail, exit code and
+  HRESULT, output, FFmpeg identity, output check and the command; Copy command
+  (Ctrl+Shift+C), Open settings as new preset (`PresetsController.createFromRecipe`),
+  Open folder disabled until a reveal service exists.
+- Settings: Theme; Default FFmpeg with Manage installations; progress window, keep on
+  top (disabled while the window is off), check each file; About with the core version
+  and that services are fakes.
+- `VePageHeader`, `VeToastHost`, public `VeDotGridPainter`; `encodersNeeded` shared by
+  the library's marks and FFmpeg's "Used by".
+- The master merge brought B2's build hook into `ve_core`; `pubspec.lock` now resolves
+  its pinned Dart-team packages (`hooks`, `code_assets`, `native_toolchain_c` and their
+  BSD dependencies). Without that `flutter test` failed building native assets.
+- Built with two parallel agents (History, Settings) on files each owned; the parent
+  reviewed their goldens and code.
+
 ## Tests
 
-`flutter test` in `app/`: 225 tests, all passing. `flutter analyze`: no issues. All on
-fakes: platform fakes (B0) and a fake window controller.
+`flutter test` in `app/`: 319 tests, all passing (225 after F2). `flutter analyze`: no
+issues. All on fakes: platform fakes (B0), a fake window controller, and for F3 two
+test doubles (`test/ffmpeg_doubles.dart`: a probe and hardware tests that stall).
+
+F3 added:
+
+- Unit (`ffmpeg_test.dart`, 20): which fact wins for an encoder's state, unknown vs
+  missing, capability groups, filters and search, the not-ready summary, installation
+  cards (line, checked, counts, blocked presets, probe progress), encoder detail; the
+  controller's Set as default (next revision), Add (recorded, probed, cached,
+  selected), a refused Add, Remove (not the default), Scan again keeping a vanished
+  default and writing nothing when unchanged, a failed probe, hardware results, and
+  cancelling running work on dispose. History display (13): sentences, speed, Windows
+  quoting, the encoder for Advanced recipes; and `createFromRecipe`.
+- Widget: FFmpeg (15: cards and default, row detail and arrow keys, installation,
+  audio, only problems, search and Ctrl+F, Set as default saved, Add with the Open
+  dialog faked and cancelled, a refused Add, Remove… with confirm, Copy path, Testing…,
+  test results and Test again, probe progress and failure, Scan again, opening a preset
+  from "Used by", no installations, the 1100 px window); History (10: list, filter,
+  detail, copy, open as new preset, live publish, empty states, keyboard); Settings
+  (11: each control saved at revision + 1, keep on top disabled, default FFmpeg,
+  theme, live change from elsewhere, conflict reapplied, failed save, no installations,
+  Manage installations, About). The app shell test now walks Ctrl+2…4.
+- Golden: FFmpeg (default, failed hardware encoder, LGPL with only problems, audio,
+  probing, 1100 px), History (default, failed job, narrow), Settings (default, About,
+  no FFmpeg), each light and dark: 24 new images, 74 in all. History shows local times,
+  so its goldens assume this machine's time zone (Asia/Singapore), as F2's dates do.
 
 - Unit: launch parsing, formatting, tokens and contrast; recipe edits (canonical
   comparison, encoder changes, field paths, new names and IDs); mapping (command
@@ -154,6 +216,19 @@ it. The popup path does no new work (it differs from baseline only by machine no
 The progress window's "VEGAS stays foreground" check is inconclusive in this session:
 the harness could not make its fake VEGAS foreground for either build.
 
+**F3 recheck (2026-10-14), after the runner change for the Open dialog.** Release build
+(42.7 s, no C++ warnings or errors), same machine and harness, theme check skipped,
+fake host. The first start run overlapped with `flutter test`; the second is the
+comparison.
+
+| Check | Result |
+| --- | --- |
+| Start, Skia, warm, 10 runs | desktop 660 ms (Dart main to first frame 248 ms); popup 410 ms. Impeller: 1,627 / 1,349 ms. No change from F2 (688 / 439 ms): only Presets draws at start |
+| Owner window | Owner set, centred within 4 px, foreground, hidden and restored with the owner, owner re-enabled and foreground after Close; after a kill the owner can take the foreground back. Same as F0/F2 |
+| No-activate progress window | **Conclusive this time:** the fake VEGAS stayed foreground when the window appeared and after a click on it; `WS_EX_NOACTIVATE`, not topmost, 20 px from the work-area corner |
+| Desktop launch | Window shown, WM_CLOSE exits with code 0 |
+| Open dialog (`pickFile`) | Compiled in; not clicked or automated |
+
 ## Owner decisions (2026-10-12)
 
 - **Renderer: deferred.** The runner defaults to Skia for start time;
@@ -173,41 +248,65 @@ Delivered by platform's app-review additions (merged `a0d9b39`) and used in F2: 
 fields and issue token indexes, signal-path facts, C7 `uiState`. C5 `hostHwnd` is for
 the progress window (F6).
 
+Delivered in B2 (merged `bbcbe91`), **not yet mapped by the app** (next app task, with
+the `NativeVeCore` switch): `CompileResult.overriddenFields` for "set in Extra
+arguments"; `SizeEstimate.minTotalBytes`/`maxTotalBytes` for the typed length's range;
+`ResolvedSettings.gopFrames` for "2 s (60 frames at 29.97 fps)"; FakeVeCore treating
+`{}` and absent `extensions` alike.
+
 Open (additive):
 
 | Need | Request |
 | --- | --- |
-| "Set in Extra arguments" | UI_SPEC §2: a control whose option Extra arguments replaced says so. Extra tokens carry `video.extra`, but not which generated option (and so which control) they replaced. Needs that link, for example the replaced field on the token |
 | Favorites on built-ins | C3 saves are READ-ONLY for built-ins, so a star on a built-in lasts the session. Built-in favorite/pinned need a stored place |
-| Estimate range for a length | `SizeEstimate` has min/max per minute but a total only for the middle figure. The card shows "typically X to Y" per minute until the core gives the range for the typed length |
-| Keyframes in frames | The resolved `-g` in frames, for "2 s (60 frames at 29.97 fps)" (UI_SPEC §2); not shown until then |
-| FakeVeCore matching | Fixtures match exact JSON, so a model constructor's `extensions: {}` misses them. The app builds the sample media and paths from JSON; treating `{}` and absent alike would make this unnecessary |
-| Duplicate origin | C3 defines `builtin/<id>` for copies of built-ins; copies of Mine presets get no origin until a form is defined |
+| Duplicate origin | C3 defines `builtin/<id>` for copies of built-ins; copies of Mine presets get no origin until a form is defined. The same applies to History's "Open settings as new preset" (saved with no origin; a form such as `job/<id>` would do) |
+| Installation health (F3) | UI_SPEC §5 states Changed on disk, Missing and No ffprobe have no fact in `FFmpegInstallation`. Needs a per-installation status from discovery/read (unchanged / changed since checked / executable missing / ffprobe missing), without probing |
+| Discovery vs machine.json (F3) | Which is the source of truth for installations? The app shows `FFmpegDiscovery.watch()` and writes its list to C7 `installations` after Scan again, Add and Remove, keeping a default discovery no longer lists. If B3's discovery persists C7 itself, the app drops that write |
+| Probe results on the installation (F3) | After a probe, does discovery's record update (`probedAt`, `probeMs`, `counts`, `availability`)? The app shows this session's probe from `ProbeProgress.capabilities` and caches it with `CapabilityCache.write`; it would rather read one updated record |
+| Hardware results persisted (F3) | `HardwareTests.test` streams results, but nothing says where they are kept. The app holds them for the session. Does the service write them to the cache / installation availability, or should the app call `CapabilityCache.write`? |
+| Job index summary (F3) | `JobIndexEntry` has no encoder, project, duration, elapsed or size, so History reads every record to fill the list. Long histories need these in the index |
+| Full log (F3) | C6 carries only `stderrTail`. The full FFmpeg log needs a path or a read service |
+| Error tokens in a job (F3) | UI_SPEC §6 highlights the option FFmpeg names. Needs the argv indexes in the job record; the app won't parse stderr |
+| Job command line (F3) | The record should carry the core's `commandLine`; History quotes argv with standard Windows quoting until then. A recorded realtime figure would also replace History's length ÷ elapsed |
 | Test this preset | UI_SPEC §2: encode 60 synthetic frames (testsrc2 + sine) with the selected FFmpeg, verify with ffprobe, stream the log. No C3 service covers it; HardwareTests is per encoder. Needs a service that runs it and streams progress and the log |
-| Export, Show in folder, share string | Export… needs `PresetLibrary` to write the exported preset to a path the user picks (the app shows the file dialog); Show in folder needs the preset's file location or a "reveal" call; Copy share string needs a defined format. The app does no file or Explorer access of its own (AGENTS.md) |
+| Export, Show in folder, share string | Export… needs `PresetLibrary` to write the exported preset to a path the user picks (the app shows the file dialog); Show in folder needs the preset's file location or a "reveal" call; Copy share string needs a defined format. The app does no file or Explorer access of its own (AGENTS.md). History's Open folder needs the same reveal call |
 
 ## Open items
 
-Waiting on platform (see Needs): live results for edits (B2); "set in Extra
-arguments"; the size range for a typed length; keyframes in frames; the recommended
-quality band (B1 profiles); window bounds and length surviving a restart (B3's real
-settings repository); favorites on built-ins; Test this preset; Export…, Show in
-folder, Copy share string.
+Waiting on platform (see Needs): the recommended quality band (B1 profiles); settings,
+window bounds and length surviving a restart (B3's real settings repository); real
+discovery, probes and hardware tests (B3); favorites on built-ins; Test this preset;
+Export…, Show in folder / Open folder, Copy share string; installation health; the job
+index summary, full log, error tokens and command line.
 
-App side, later milestones: Advanced mode and Ctrl+M (F4); the popup's collapsible
-command strip (F5).
+App side: switch `veCoreProvider` to `NativeVeCore` and map B2's delivered fields
+(above); Advanced mode and Ctrl+M (F4); the popup's collapsible command strip (F5).
+The Open dialog (`pickFile`) is built and covered with a fake controller; it was not
+clicked through in the running app.
 
 ## Handoff for the next app agent
 
 Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md, this file and
-UI_SPEC first. Next is **F3: FFmpeg, History and Settings** on the service fakes
-(`FakeFFmpegDiscovery`, `FakeFFmpegProbe`, `FakeHardwareTests`, `FakeJobRepository`,
-`FakeMachineSettingsRepository`); add their providers next to the ones in
-`state/services.dart`.
+UI_SPEC first. F3 is done on the fakes. Next, in this order:
+
+1. **The real core.** Platform asks the app to switch `veCoreProvider`
+   (`state/services.dart`) from `FakeVeCore()` to `NativeVeCore()` now that B2 is
+   merged, keeping explicit `FakeVeCore` overrides in widget and golden tests (the
+   goldens were made with the fake). Then map B2's fields: `overriddenFields` ("set in
+   Extra arguments" at the control), the typed length's `minTotalBytes`/`maxTotalBytes`,
+   and `gopFrames` ("2 s (60 frames at 29.97 fps)"). Measure the desktop's start again
+   (the fake core's fixture decoding was ~220 ms of it). Part of F7, but it unblocks
+   edits in the editor.
+2. **F4: Advanced editor** (UI_SPEC §3).
 
 - Mapping from core and service results is display work in `features/*/display.dart`
   style files; never derive domain facts. Where a fact is missing, show less and add a
   request above.
+- Machine settings writes go through `machineSettingsWriterProvider`
+  (`state/settings.dart`); don't call `save` directly.
+- Riverpod 3 retries a failed provider; while it retries, the value is loading with the
+  error, so check `hasError` rather than matching `AsyncError`. Guard state writes after
+  an await with `ref.mounted`.
 - `CoreResult` (`state/editor.dart`) keeps a core failure explicit; the editor says
   what's missing instead of showing an old result.
 - Before each commit: `flutter analyze`, `flutter test`; regenerate goldens only for

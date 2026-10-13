@@ -124,7 +124,7 @@ VeAvailability availabilityOf(core.FFmpegInstallation? installation, String enco
     'ok' => VeAvailability.ready,
     'failed' => VeAvailability.failed,
     'missing' => VeAvailability.missing,
-    _ => VeAvailability.testing,
+    _ => VeAvailability.unknown,
   };
 }
 

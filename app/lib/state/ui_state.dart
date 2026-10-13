@@ -6,28 +6,23 @@ import 'package:ve_services/ve_services.dart';
 import '../design/format.dart';
 import 'presets.dart';
 import 'services.dart';
+import 'settings.dart';
 
 /// Writes the app's own UI state (C7 `uiState`: window bounds, the size card's
 /// length text). Each write copies the latest machine settings and changes only
 /// `uiState`, so another window's FFmpeg choice or pin survives; a revision
 /// conflict re-reads and reapplies.
 class UiStateWriter {
-  UiStateWriter(this._repository);
-  final MachineSettingsRepository _repository;
+  UiStateWriter(this._writer);
+  final MachineSettingsWriter _writer;
   Timer? _pending;
 
   Future<void> update(AppUiState Function(AppUiState current) change) async {
-    for (var attempt = 0; attempt < 3; attempt++) {
-      final current = await _repository.read();
-      try {
-        await _repository.save(
-          current.copyWith(uiState: change(current.uiState ?? AppUiState())),
-          expectedRevision: current.revision,
-        );
-        return;
-      } on ServiceException catch (e) {
-        if (e.code != 'REVISION-CONFLICT') rethrow;
-      }
+    try {
+      await _writer.update((s) => s.copyWith(uiState: change(s.uiState ?? AppUiState())));
+    } on ServiceException catch (e) {
+      // UI state is a convenience: losing three conflicts in a row drops it.
+      if (e.code != 'REVISION-CONFLICT') rethrow;
     }
   }
 
@@ -41,7 +36,7 @@ class UiStateWriter {
 }
 
 final uiStateWriterProvider = Provider<UiStateWriter>((ref) {
-  final writer = UiStateWriter(ref.watch(machineSettingsRepositoryProvider));
+  final writer = UiStateWriter(ref.watch(machineSettingsWriterProvider));
   ref.onDispose(writer.dispose);
   return writer;
 });

@@ -8,7 +8,10 @@ enum VeAvailability {
   ready('Ready'),
   missing('Not in this FFmpeg'),
   failed('Failed test on this PC'),
-  testing('Testing…');
+  testing('Testing…'),
+
+  /// Listed, but not tested on this PC yet (C3 state "unknown").
+  unknown('Not checked yet');
 
   const VeAvailability(this.label);
   final String label;
@@ -31,6 +34,7 @@ class VeStatusTag extends StatelessWidget {
     VeAvailability.missing => VeIcons.dash,
     VeAvailability.failed => VeIcons.error,
     VeAvailability.testing => VeIcons.refresh,
+    VeAvailability.unknown => VeIcons.info,
   };
 
   static Color colorOf(VePalette c, VeAvailability s) => switch (s) {
@@ -38,6 +42,7 @@ class VeStatusTag extends StatelessWidget {
     VeAvailability.missing => c.warning,
     VeAvailability.failed => c.error,
     VeAvailability.testing => c.ink,
+    VeAvailability.unknown => c.muted,
   };
 
   @override

@@ -14,12 +14,14 @@ import '../../state/app_state.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
 import '../../state/ui_state.dart';
+import '../ffmpeg/ffmpeg_page.dart';
 import '../gallery/gallery_page.dart';
+import '../history/history_page.dart';
 import '../presets/presets_page.dart';
+import '../settings/settings_page.dart';
 
 /// The desktop window: title bar with Presets, FFmpeg, History and Settings.
-/// FFmpeg, History and Settings say which milestone builds them. In debug
-/// builds Ctrl+Shift+D shows the design system gallery (F1).
+/// In debug builds Ctrl+Shift+D shows the design system gallery (F1).
 class DesktopShell extends ConsumerStatefulWidget {
   const DesktopShell({super.key});
 
@@ -28,7 +30,6 @@ class DesktopShell extends ConsumerStatefulWidget {
 }
 
 class _DesktopShellState extends ConsumerState<DesktopShell> {
-  int _section = 0;
   bool _gallery = false;
 
   static const _nav = [
@@ -38,10 +39,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     VeNavItem('Settings', shortcut: 'Ctrl+4'),
   ];
 
-  void _go(int i) => setState(() {
-    _section = i;
-    _gallery = false;
-  });
+  void _go(int i) {
+    ref.read(desktopSectionProvider.notifier).go(DesktopSection.values[i]);
+    setState(() => _gallery = false);
+  }
 
   /// Every way of closing the window (the title bar's Close, Alt+F4, the
   /// taskbar) reaches this: Flutter's Windows engine asks before it closes the
@@ -128,6 +129,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     final window = ref.watch(windowControllerProvider);
     final maximized = ref.watch(windowStateProvider.select((s) => s.maximized));
     final c = VeTokens.of(context).colors;
+    final section = ref.watch(desktopSectionProvider);
 
     return CallbackShortcuts(
       bindings: {
@@ -146,7 +148,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
               VeTitleBar(
                 appName: 'Vegas Encoder',
                 nav: _nav,
-                currentNav: _section,
+                currentNav: section.index,
                 onNav: _go,
                 maximized: maximized,
                 onDragStart: window.startDrag,
@@ -157,11 +159,11 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
               Expanded(
                 child: _gallery
                     ? const GalleryPage()
-                    : switch (_section) {
-                        0 => const PresetsPage(),
-                        1 => const _Pending(title: 'FFmpeg', milestone: 'F3'),
-                        2 => const _Pending(title: 'History', milestone: 'F3'),
-                        _ => const _Pending(title: 'Settings', milestone: 'F3'),
+                    : switch (section) {
+                        DesktopSection.presets => const PresetsPage(),
+                        DesktopSection.ffmpeg => const FFmpegPage(),
+                        DesktopSection.history => const HistoryPage(),
+                        DesktopSection.settings => const SettingsPage(),
                       },
               ),
             ],
@@ -173,24 +175,3 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
 }
 
 enum _CloseChoice { cancel, discard, save }
-
-class _Pending extends StatelessWidget {
-  const _Pending({required this.title, required this.milestone});
-  final String title;
-  final String milestone;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = VeTokens.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(title, style: t.text.headline),
-          const SizedBox(height: 6),
-          Text('This screen is built in milestone $milestone.', style: t.text.small.copyWith(color: t.colors.text2)),
-        ],
-      ),
-    );
-  }
-}

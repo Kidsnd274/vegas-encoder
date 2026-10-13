@@ -1,8 +1,9 @@
 # UI behaviour specification
 
-Updated: 2026-10-12 (Asia/Singapore). Status: proposal, updated for the chosen
-direction; §1, §9, §10 and §11 record what the app workstream built in F0 and F1, and
-§2 what F2 built (on the platform fakes; open items are in workstreams/app.md).
+Updated: 2026-10-14 (Asia/Singapore). Status: proposal, updated for the chosen
+direction; §1, §9, §10 and §11 record what the app workstream built in F0 and F1, §2
+what F2 built, and §5, §6 and §6a what F3 built (all on the platform fakes; open items
+are in workstreams/app.md).
 
 This document covers the behaviour Flutter will implement: states, flows, the signal
 path, the size card, theme, keyboard, copy and the token structure. The chosen
@@ -268,6 +269,41 @@ step. Voukoder Classic's preset-then-Apply confused users.
 
 The capability list is grouped by codec family, with a filter ("Only usable", "Hardware", "Search").
 
+**Built in F3** (`app/lib/features/ffmpeg/`, on the platform fakes):
+
+- **Header:** Add FFmpeg… (the Windows Open dialog through the runner's `pickFile`; the
+  path goes to `FFmpegDiscovery.add`), Scan again (`scan`, then a probe of each
+  installation with no cached capabilities), Test hardware encoders (the selected
+  installation, `force: true`). A refusal shows as a toast with discovery's message.
+- **Cards** on dotted paper, three across, more scroll sideways: name, Default, build,
+  license and source ("Installed with winget"), the path (tooltip with ffmpeg.exe and
+  ffprobe.exe), when it was checked, encoder and muxer counts, and "Can't render 1
+  preset: needs x264" (tooltip lists the presets). A running probe replaces the
+  checked line with its phase and count and a bar; a failed probe says why. Every card
+  has Set as default (not on the default), Copy path and Remove… (not on the default:
+  choose another default first); keeping them on every card keeps the strip's height
+  steady.
+- **Installations and the default** live in C7: Scan again, Add and Remove write
+  discovery's list to `machine.json` (skipped when unchanged), and a default that
+  discovery no longer lists keeps its record rather than switching to another
+  installation. Set as default saves `defaultFFmpegId` through
+  `save(expectedRevision)`, reapplied on a revision conflict.
+- **Capability list:** Video / Audio encoders, All / Only problems / Hardware (video
+  only), a search over name, FFmpeg name, codec, group and device (Ctrl+F), and a
+  summary ("FFmpeg 8.0 LGPL: 4 video and 1 audio encoders not ready"). Columns: codec,
+  encoder, FFmpeg name, bit depth, runs on (the device a passed test ran on), state,
+  reason; under 760 px the FFmpeg name and reason give way to the detail panel. A click
+  or focus selects a row; Up and Down move.
+- **States:** Ready, Not in this FFmpeg, Failed test on this PC, Testing…, and Not
+  checked yet (C3 `unknown`). The newest fact wins: a test running now, this session's
+  test result, this session's probe, then the installation's recorded availability.
+- **Detail** (450 px, 380 px below 1240 px): name, state, what it means and what to do,
+  the test failure class and 10-bit result, the test-encode diagram (testsrc2 → encoder
+  → null, dashed past an encoder that can't run), FFmpeg's stderr line, the presets that
+  use it (click opens the preset in Presets), and Test again for hardware encoders.
+- **Not shown yet** (no fact in C3): Changed on disk, Missing, No ffprobe. See
+  workstreams/app.md, Needs.
+
 ## 6. History screen (S5)
 
 - **List:** status, time, project, template, encoder, duration, elapsed time, speed
@@ -280,12 +316,55 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
   - output verification result.
 - **Actions:** Open folder, Copy command, Open settings as new preset.
 
+**Built in F3** (`app/lib/features/history/`, on the platform fakes). There is no S5
+mock; History uses S4's layout: the list on surface at the left, a 450 px detail on
+panel at the right (380 px below 1280 px).
+
+- **List:** status with icon and word; start time (local); template over project;
+  encoder ("Advanced command" for template recipes, never the inactive Basic one);
+  length; time taken; speed (× realtime, finished renders only); size ("No file" when
+  nothing was published). Filter: All / Succeeded / Failed / Cancelled, with a count.
+  Below 860 px the length and time-taken columns drop. The index has no summary fields,
+  so each row reads its record.
+- **Detail order:** result sentence; actions; FFmpeg said (stderr tail); how it stopped
+  (exit code, HRESULT); output path; FFmpeg identity (shortened hash, full value in a
+  tooltip); output check; the command.
+- **Actions:** Copy command (also Ctrl+Shift+C) copies ffmpeg's path and argv with
+  standard Windows quoting until the record carries the core's command line; Open
+  settings as new preset makes a Mine preset and switches to Presets; Open folder is
+  disabled until the platform has a reveal service.
+- **Keyboard:** Up and Down move the selection and focus. An empty history and a filter
+  with no matches each have their own message; a missing or unreadable record says so
+  in its row and in the detail.
+- **Not shown yet:** the full log, and FFmpeg's named option highlighted in the command
+  (both need C6 additions; see workstreams/app.md).
+
+## 6a. Settings screen
+
+Built in F3 (`app/lib/features/settings/`). Settings (Ctrl+4) is one centred column,
+at most 720 px wide, of surface cards. Every control saves at once to C7 `machine.json`
+through `MachineSettingsRepository.save(expectedRevision)`; a revision conflict is read
+again and reapplied, and a change saved elsewhere shows live. A failed save says so in a
+toast.
+
+- **Appearance:** Theme (Follow Windows / Light / Dark); the editor that opens from VEGAS
+  uses the same choice.
+- **FFmpeg:** Default FFmpeg, a list of the registered installations with the path under
+  it, plus Manage installations (opens FFmpeg). With none registered it warns that
+  renders need one and offers "Open the FFmpeg page". A default that names a missing
+  installation is an error, never a quiet switch to another one.
+- **Rendering:** show a progress window, keep it on top (off by default, disabled while
+  the progress window is off, the same setting as the window's pin), and check each file
+  after rendering. A note says VEGAS reads these when a render starts.
+- **About:** app, core version (marked "preview core (fake)" for the fake), recipe schema
+  and contracts, and whether the services are the platform's sample fakes.
+
 ## 7. Keyboard
 
 | Keys | Action | Where |
 | --- | --- | --- |
 | Ctrl+K | Open preset… (palette) | Desktop |
-| Ctrl+F | Search the library | Desktop |
+| Ctrl+F | Search the library; on FFmpeg, search the encoders | Desktop |
 | Ctrl+S | Save preset | Desktop |
 | Ctrl+Enter | Apply to template | Popup |
 | Esc | Cancel / close popover | Popup, popovers |
@@ -405,8 +484,9 @@ Undo), and in `features/presets/`: the Ctrl+K palette, `BitrateField`, and
 | `SizeQualityCard` | F1, reworked in F2 to take the core's figures (per minute, total for the typed length, range). Length field; video/audio split; consequences |
 | `OriginBanner` | Popup origin states and actions |
 | `DiffList` | Field label, from → to |
-| `InstallationCard`, `CapabilityTable` | FFmpeg screen |
-| `JobList`, `JobDetail`, `LogView` | History |
+| `InstallationCard`, `CapabilityTable` | F3 (`features/ffmpeg/`), with `EncoderDetail` and its test-encode diagram |
+| `JobList`, `JobDetail`, `LogView` | F3 (`features/history/`); the stderr tail shows in the detail, the full log waits on C6 |
+| `VePageHeader`, `VeToastHost` | F3 (`design/components/page_header.dart`): a section's heading and actions; one toast per screen |
 | `RenderMonitor` | Progress window (§12): wire progress bar, figures, done and failed states; reads the live status file through `ve_services` |
 
 ## 12. Render progress window

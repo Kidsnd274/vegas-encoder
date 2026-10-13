@@ -28,6 +28,36 @@ final ffmpegProbeProvider = Provider<FFmpegProbe>((ref) => FakeFFmpegProbe());
 
 final capabilityCacheProvider = Provider<CapabilityCache>((ref) => FakeCapabilityCache());
 
+/// Finds FFmpeg installations (PATH, winget, Scoop, Chocolatey, added by hand).
+final ffmpegDiscoveryProvider = Provider<FFmpegDiscovery>((ref) {
+  final discovery = FakeFFmpegDiscovery();
+  ref.onDispose(discovery.dispose);
+  return discovery;
+});
+
+/// Test encodes for hardware encoders on this PC.
+final hardwareTestsProvider = Provider<HardwareTests>((ref) => FakeHardwareTests());
+
+/// Render records (C6), for History.
+final jobRepositoryProvider = Provider<JobRepository>((ref) {
+  final jobs = FakeJobRepository();
+  ref.onDispose(jobs.dispose);
+  return jobs;
+});
+
+/// The installations discovery knows about, kept current.
+final discoveredInstallationsProvider = StreamProvider<List<FFmpegInstallation>>(
+  (ref) => ref.watch(ffmpegDiscoveryProvider).watch(),
+);
+
+/// The job index (C6 `jobs.jsonl`), kept current.
+final jobsProvider = StreamProvider<List<JobIndexEntry>>((ref) => ref.watch(jobRepositoryProvider).watch());
+
+/// One job's full record; null if the record is gone.
+final jobRecordProvider = FutureProvider.family<JobRecord?, String>(
+  (ref, id) => ref.watch(jobRepositoryProvider).get(id),
+);
+
 /// The profile catalog: encoders, their controls, containers and the
 /// codec-to-container table, all as the core reports them.
 final profilesProvider = Provider<ProfileCatalog>((ref) => ref.watch(veCoreProvider).profiles());

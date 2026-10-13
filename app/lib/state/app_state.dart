@@ -28,6 +28,20 @@ class WindowStateNotifier extends Notifier<WindowState> {
   }
 }
 
+/// The desktop window's sections, in title-bar order (Ctrl+1…4).
+enum DesktopSection { presets, ffmpeg, history, settings }
+
+/// The section the desktop window shows. Screens move to another section
+/// through this (History's "Open settings as new preset" opens Presets).
+final desktopSectionProvider = NotifierProvider<DesktopSectionNotifier, DesktopSection>(DesktopSectionNotifier.new);
+
+class DesktopSectionNotifier extends Notifier<DesktopSection> {
+  @override
+  DesktopSection build() => DesktopSection.presets;
+
+  void go(DesktopSection section) => state = section;
+}
+
 /// Settings > Theme (UI_SPEC §1). Both windows use the same choice, stored as
 /// C7 `theme` in machine settings (`system` is Follow Windows).
 enum ThemePreference {

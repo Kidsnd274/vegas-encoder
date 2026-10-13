@@ -234,6 +234,26 @@ class PresetsController extends Notifier<PresetsState> {
     return created;
   }
 
+  /// A new preset in Mine holding [recipe] (History's "Open settings as new
+  /// preset"), named [name], or "[name] (copy)" when that name is taken.
+  /// Selected, with the library's search and filters cleared so it shows.
+  /// It has no origin: C3 defines none for a render's settings yet.
+  Future<Preset?> createFromRecipe(Recipe recipe, {required String name}) async {
+    final names = _presets.map((p) => p.recipe.name).toSet();
+    final newName = names.contains(name) ? copyName(name, names) : name;
+    final created = await _library.save(
+      Preset(
+        // The library stamps its own time on save.
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+        requires: PresetRequirements(),
+        recipe: recipe.copyWith(id: uniqueId(newName, _presets.map((p) => p.recipe.id).toSet()), name: newName),
+      ),
+    );
+    if (!ref.mounted) return created;
+    state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
+    return created;
+  }
+
   Future<Preset> _create(Preset source, Recipe recipe, {String? name}) {
     final newName = name ?? copyName(recipe.name, _presets.map((p) => p.recipe.name).toSet());
     final newId = uniqueId(newName, _presets.map((p) => p.recipe.id).toSet());

@@ -99,7 +99,7 @@ class _SignalPathState extends State<SignalPath> {
             final g = _Geometry(box.maxWidth, height, _strip, k);
             final target = _WireValues.of(widget.model, _strip);
             return CustomPaint(
-              painter: _DotGridPainter(t.colors),
+              painter: VeDotGridPainter(t.colors),
               child: TweenAnimationBuilder<_WireValues>(
                 tween: _WireTween(end: target),
                 duration: VeTokens.motion(context, VeDurations.wire),
@@ -1041,9 +1041,9 @@ class _WirePainter extends CustomPainter {
       old.g.file != g.file;
 }
 
-/// Paper with grid dots every 16 px (`.dgw`).
-class _DotGridPainter extends CustomPainter {
-  _DotGridPainter(this.c);
+/// Paper with grid dots every 16 px (`.dgw`), also behind the FFmpeg cards.
+class VeDotGridPainter extends CustomPainter {
+  VeDotGridPainter(this.c);
   final VePalette c;
 
   @override
@@ -1058,5 +1058,5 @@ class _DotGridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DotGridPainter old) => old.c != c;
+  bool shouldRepaint(VeDotGridPainter old) => old.c != c;
 }
