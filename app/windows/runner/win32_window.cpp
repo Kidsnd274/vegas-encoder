@@ -226,8 +226,84 @@ bool Win32Window::Create() {
 }
 
 bool Win32Window::Show() {
+  if (options_.no_activate) {
+    return ShowWindow(window_handle_, SW_SHOWNOACTIVATE);
+  }
   return ShowWindow(window_handle_,
-                    options_.no_activate ? SW_SHOWNOACTIVATE : SW_SHOWNORMAL);
+                    start_maximized_ ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL);
+}
+
+bool Win32Window::RestoreBounds(RECT bounds, bool maximized) {
+  if (window_handle_ == nullptr || options_.kind != LaunchKind::kDesktop ||
+      bounds.right <= bounds.left || bounds.bottom <= bounds.top) {
+    return false;
+  }
+  HMONITOR monitor = MonitorFromRect(&bounds, MONITOR_DEFAULTTONULL);
+  if (monitor == nullptr) {
+    return false;  // That monitor is gone: keep the default placement.
+  }
+  const RECT work = WorkAreaOf(monitor);
+  const UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+  const double scale_factor = dpi / 96.0;
+  const int border_x = options_.resizable ? ResizeBorderX(dpi) : 0;
+  const int border_y = options_.resizable ? ResizeBorderY(dpi) : 0;
+  const int work_width = work.right - work.left;
+  const int work_height = work.bottom - work.top;
+  const int min_width = Scale(options_.min_width, scale_factor) + 2 * border_x;
+  const int min_height = Scale(options_.min_height, scale_factor) + border_y;
+  const int width = std::max(
+      min_width, std::min(static_cast<int>(bounds.right - bounds.left),
+                          work_width + 2 * border_x));
+  const int height = std::max(
+      min_height, std::min(static_cast<int>(bounds.bottom - bounds.top),
+                           work_height + border_y));
+  // Keep the whole window, title bar included, inside the work area (the
+  // invisible resize borders may hang over its edges).
+  const int x = std::max(
+      static_cast<int>(work.left) - border_x,
+      std::min(static_cast<int>(bounds.left),
+               static_cast<int>(work.right) + border_x - width));
+  const int y = std::max(
+      static_cast<int>(work.top),
+      std::min(static_cast<int>(bounds.top),
+               static_cast<int>(work.bottom) + border_y - height));
+  // Move first, so a monitor with another DPI rescales before the size is set.
+  SetWindowPos(window_handle_, nullptr, x, y, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+  SetWindowPos(window_handle_, nullptr, x, y, width, height,
+               SWP_NOZORDER | SWP_NOACTIVATE);
+  start_maximized_ = maximized && options_.resizable;
+  return true;
+}
+
+RECT Win32Window::RestoredBounds(bool* maximized) {
+  RECT rect{0, 0, 0, 0};
+  if (maximized != nullptr) {
+    *maximized = false;
+  }
+  if (window_handle_ == nullptr) {
+    return rect;
+  }
+  WINDOWPLACEMENT placement{sizeof(WINDOWPLACEMENT)};
+  if ((IsZoomed(window_handle_) || IsIconic(window_handle_)) &&
+      GetWindowPlacement(window_handle_, &placement)) {
+    // rcNormalPosition is in workspace coordinates: shift it by the gap
+    // between the monitor and its work area (a taskbar on the top or left).
+    rect = placement.rcNormalPosition;
+    MONITORINFO info{sizeof(MONITORINFO)};
+    if (GetMonitorInfo(MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST),
+                       &info)) {
+      OffsetRect(&rect, info.rcWork.left - info.rcMonitor.left,
+                 info.rcWork.top - info.rcMonitor.top);
+    }
+    if (maximized != nullptr) {
+      *maximized = IsZoomed(window_handle_) ||
+                   (placement.flags & WPF_RESTORETOMAXIMIZED) != 0;
+    }
+    return rect;
+  }
+  GetWindowRect(window_handle_, &rect);
+  return rect;
 }
 
 bool Win32Window::PlaceOnOwner(HWND owner) {

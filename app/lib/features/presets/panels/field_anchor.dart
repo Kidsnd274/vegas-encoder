@@ -1,9 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// Where each recipe field's control is, so "Show setting" can scroll to it
 /// and focus it (UI_SPEC §2: "Clicking a summary item focuses its field").
 class FieldAnchors {
   final Map<String, FocusNode> _nodes = {};
+
+  /// The fields of the control under the pointer or holding focus; the
+  /// command lights their tokens (UI_SPEC §2, Command preview).
+  final ValueNotifier<List<String>?> active = ValueNotifier(null);
 
   void _register(Iterable<String> fields, FocusNode node) {
     for (final f in fields) {
@@ -12,6 +17,18 @@ class FieldAnchors {
   }
 
   void _unregister(FocusNode node) => _nodes.removeWhere((_, n) => identical(n, node));
+
+  bool _disposed = false;
+
+  void dispose() {
+    _disposed = true;
+    active.dispose();
+  }
+
+  /// Clears the lit fields if they are still [fields].
+  void _release(List<String> fields) {
+    if (!_disposed && listEquals(active.value, fields)) active.value = null;
+  }
 
   /// Scrolls the control for [field] into view and focuses its first
   /// focusable part. False when no shown control has that field.
@@ -72,11 +89,28 @@ class _FieldAnchorState extends State<FieldAnchor> {
 
   @override
   void dispose() {
+    // After the frame: the tree is locked while widgets are disposed.
+    final anchors = _anchors, fields = widget.fields;
+    if (anchors != null) WidgetsBinding.instance.addPostFrameCallback((_) => anchors._release(fields));
     _anchors?._unregister(_node);
     _node.dispose();
     super.dispose();
   }
 
+  void _activate(bool on) {
+    final anchors = _anchors;
+    if (anchors == null) return;
+    if (on) {
+      anchors.active.value = widget.fields;
+    } else {
+      anchors._release(widget.fields);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => Focus(focusNode: _node, child: widget.child);
+  Widget build(BuildContext context) => MouseRegion(
+    onEnter: (_) => _activate(true),
+    onExit: (_) => _activate(_node.hasFocus),
+    child: Focus(focusNode: _node, onFocusChange: _activate, child: widget.child),
+  );
 }

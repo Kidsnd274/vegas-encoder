@@ -15,6 +15,7 @@ import '../../design/tokens.dart';
 import '../../state/editor.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
+import '../../state/ui_state.dart';
 import 'command_column.dart';
 import 'display.dart';
 import 'library_model.dart';
@@ -60,6 +61,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
   void dispose() {
     _toastTimer?.cancel();
     _search.dispose();
+    _anchors.dispose();
     for (final p in _panes) {
       p.dispose();
     }
@@ -303,7 +305,8 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
                           _ => _Editor(
                             data: data,
                             node: state.node,
-                            lengthSec: state.lengthSec,
+                            lengthSec: ref.watch(sizeLengthSecProvider),
+                            lengthText: ref.watch(sizeLengthTextProvider),
                             multiline: state.commandMultiline,
                             panes: _panes,
                             onSave: _save,
@@ -414,6 +417,7 @@ class _Editor extends ConsumerWidget {
     required this.data,
     required this.node,
     required this.lengthSec,
+    required this.lengthText,
     required this.multiline,
     required this.panes,
     required this.onSave,
@@ -426,6 +430,7 @@ class _Editor extends ConsumerWidget {
   final EditorData data;
   final SignalNode node;
   final int? lengthSec;
+  final String lengthText;
   final bool multiline;
 
   /// Library, diagram, settings and command pane focus nodes, for F6.
@@ -514,7 +519,8 @@ class _Editor extends ConsumerWidget {
                                 SignalNode.file => FilePanel(
                                   scope: scope,
                                   lengthSec: lengthSec,
-                                  onLengthChanged: controller.setLength,
+                                  lengthText: lengthText,
+                                  onLengthTextChanged: controller.setLengthText,
                                 ),
                               },
                             ),
@@ -533,6 +539,7 @@ class _Editor extends ConsumerWidget {
                       onShowField: onShowField,
                       multiline: multiline,
                       onToggleLayout: controller.toggleCommandLayout,
+                      litFields: FieldAnchorScope.maybeOf(context)?.active,
                     ),
                   ),
                 ),

@@ -52,11 +52,13 @@ debug builds, and the goldens use it.
   says it arrives in F4); the FFmpeg the checks are for; Duplicate, Revert (with Undo),
   Save preset or Save as new preset. Built-ins save as a new preset in Mine with origin
   `builtin/<id>`.
-- Signal path from the core's compile result: conversion pip from the resolved pixel
-  format, notes from V-DEPTH-DOWN / V-CHROMA-UP, availability from the installation,
-  "can't mux" from the catalog's codec-to-container table. Without a compile result it
-  is drawn from the recipe and catalog and claims no conversion either way. The
-  audio-off node stays selectable so audio can be turned back on.
+- Signal path from the core's signal facts (C2 `signalPath`, platform's app-review
+  additions): bits, formats, chroma and conversion for video and audio ("p010le to
+  yuv420p, 4:2:0, precision lost"; "flt to s32, 24-bit integer, precision lost"), and
+  a broken wire when `containerSupport` is `no`. Availability from the installation.
+  Without a compile result the recipe and catalog name the stages and the wires claim
+  no conversion either way. The audio-off node stays selectable so audio can be turned
+  back on.
 - Panels: From VEGAS (facts), Video (encoder picker, rate control, quality by mode,
   speed, tune/profile/multipass, bit depth, keyframes, color tags, Extra arguments),
   Audio (on/off, encoder, rate control, bitrate/VBR/level, sample rate, channels, Extra
@@ -69,6 +71,9 @@ debug builds, and the goldens use it.
   average, 12 Mb/s peak".
 - Command column: the core's tokens grouped by stage or on one line, the inputs chip,
   the selected node's group tinted, Copy and Ctrl+Shift+C; Checks for the chosen FFmpeg.
+  Clicking a token opens and focuses the control that produced it (`CommandToken.field`);
+  pointing at or focusing a control lights its tokens; tokens an error points at
+  (`Issue.tokenIndices`) are marked.
 - Keyboard: Ctrl+K opens a preset by name; Ctrl+F searches the library; Ctrl+S saves;
   F6 / Shift+F6 move between library, diagram, settings and command.
 - Drafts per preset; "changed in another window" banner (Reload / Keep editing), then
@@ -77,6 +82,12 @@ debug builds, and the goldens use it.
   Windows engine sends an exit request first, answered by an `AppLifecycleListener`.
 - The diagram and header grow with the Windows text size (heights; node text that
   doesn't fit ends in an ellipsis).
+- C7 `uiState`: the size card keeps the length exactly as typed (written after a short
+  pause, re-applied on a revision conflict); the desktop window's restored bounds and
+  maximized state are saved on close and restored before the first frame, clamped to a
+  current monitor's work area and the minimum size (runner `getBounds`, `configure`
+  with `bounds`). With B0's in-memory settings fake neither survives a restart; B3's
+  real repository makes them persist.
 - When the fake core has no answer (`B0-FIXTURE-MISSING`), the command, checks and
   estimate say the real core (B2) is needed instead of showing a stale result.
 - Settings > Theme is stored in C7 `theme`. New components: `showVeDialog`,
@@ -85,7 +96,7 @@ debug builds, and the goldens use it.
 
 ## Tests
 
-`flutter test` in `app/`: 218 tests, all passing. `flutter analyze`: no issues. All on
+`flutter test` in `app/`: 225 tests, all passing. `flutter analyze`: no issues. All on
 fakes: platform fakes (B0) and a fake window controller.
 
 - Unit: launch parsing, formatting, tokens and contrast; recipe edits (canonical
@@ -99,7 +110,10 @@ fakes: platform fakes (B0) and a fake window controller.
   FFmpeg without x264, Show setting focusing the control, audio off and on, context
   menu, changed in another window, close with unsaved changes through the exit request,
   copy, Ctrl+K, F6 panes, bitrate, New preset, error marks, command layout, the narrow
-  rail).
+  rail, token click and lighting, the remembered length, bounds saved on close).
+- Unit additions: token fields and error tokens, signal facts (ProRes chroma, PCM
+  24-bit precision, container support), and searching 500 presets under the 150 ms
+  budget (fakes only).
 - Golden: 25 views × light and dark = 50 images in `app/test/golden/goldens/`,
   including the Presets screen on the video, file, audio and container nodes, an edit,
   bitrate mode, an FFmpeg without x264, the 1100 px window with the library open, and
@@ -124,6 +138,22 @@ Release build, Windows 11 Pro 26300, 125% scaling, three monitors, fake host. Ru
 | No-activate window | Progress window shown and clicked while the fake VEGAS stayed foreground; `WS_EX_NOACTIVATE` and topmost set; 20 px (16 logical) from the work-area corner |
 | Single instance | A second desktop launch exits with code 0; the first stays and closes cleanly |
 
+**F2 recheck (2026-10-13), after the runner change for window bounds.** Same machine
+and spike harness; the F0/F1 build (`c56c2e5`) rebuilt as a baseline and run alternately
+with the current build, because this desktop session is busier than F0's.
+
+| Check | Baseline | Current |
+| --- | --- | --- |
+| Start, Skia, warm, 10 runs | desktop shown 517 ms (Dart main to first frame 33 ms); popup 398 ms | desktop 688 ms (Dart main to first frame 252 ms); popup 439 ms |
+| Owner window | Owner set, centred, hidden and restored with the owner, re-enabled, foreground after Close | Same |
+| No-activate progress window | `WS_EX_NOACTIVATE`; topmost (keep on top was on) | `WS_EX_NOACTIVATE`; not topmost (off by default, owner decision) |
+
+The desktop's extra ~220 ms is Dart work before the first frame: B0's fake core decodes
+its fixture JSON and the library compiles each preset; the native core (B2) replaces
+it. The popup path does no new work (it differs from baseline only by machine noise).
+The progress window's "VEGAS stays foreground" check is inconclusive in this session:
+the harness could not make its fake VEGAS foreground for either build.
+
 ## Owner decisions (2026-10-12)
 
 - **Renderer: deferred.** The runner defaults to Skia for start time;
@@ -139,19 +169,15 @@ Release build, Windows 11 Pro 26300, 125% scaling, three monitors, fake host. Ru
 
 ## Needs from platform
 
-From the B0 review (sent; additive):
+Delivered by platform's app-review additions (merged `a0d9b39`) and used in F2: token
+fields and issue token indexes, signal-path facts, C7 `uiState`. C5 `hostHwnd` is for
+the progress window (F6).
+
+Open (additive):
 
 | Need | Request |
 | --- | --- |
-| Command view | The recipe field per display token (click-to-field, lit tokens), and which tokens an error issue points at |
-| Signal path | Per-stream facts: audio output sample format and bits, chroma change, conversion yes/no and its note, "container can't hold this stream" as data, and display labels for what VEGAS delivers. F2 reads pips from the resolved pixel format, notes from V-DEPTH-DOWN/V-CHROMA-UP and labels P010/f32le itself until then |
-| Progress window placement | VEGAS's main HWND in the C5 launch arguments or live file |
-| App UI state | A place for desktop window bounds and the last length typed in the size card |
-
-New from F2 (additive):
-
-| Need | Request |
-| --- | --- |
+| "Set in Extra arguments" | UI_SPEC §2: a control whose option Extra arguments replaced says so. Extra tokens carry `video.extra`, but not which generated option (and so which control) they replaced. Needs that link, for example the replaced field on the token |
 | Favorites on built-ins | C3 saves are READ-ONLY for built-ins, so a star on a built-in lasts the session. Built-in favorite/pinned need a stored place |
 | Estimate range for a length | `SizeEstimate` has min/max per minute but a total only for the middle figure. The card shows "typically X to Y" per minute until the core gives the range for the typed length |
 | Keyframes in frames | The resolved `-g` in frames, for "2 s (60 frames at 29.97 fps)" (UI_SPEC §2); not shown until then |
@@ -162,11 +188,11 @@ New from F2 (additive):
 
 ## Open items
 
-Waiting on platform (see Needs): live results for edits (B2); click-to-field, lit tokens
-and "set in Extra arguments" (token fields); audio conversion pips (signal facts); the
-size range for a typed length; keyframes in frames; the recommended quality band (B1
-profiles); remembered window size and length (app UI state); favorites on built-ins;
-Test this preset; Export…, Show in folder, Copy share string.
+Waiting on platform (see Needs): live results for edits (B2); "set in Extra
+arguments"; the size range for a typed length; keyframes in frames; the recommended
+quality band (B1 profiles); window bounds and length surviving a restart (B3's real
+settings repository); favorites on built-ins; Test this preset; Export…, Show in
+folder, Copy share string.
 
 App side, later milestones: Advanced mode and Ctrl+M (F4); the popup's collapsible
 command strip (F5).

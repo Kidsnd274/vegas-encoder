@@ -35,13 +35,23 @@ class WindowState {
   int get hashCode => Object.hash(maximized, active, reducedMotion, keepOnTop);
 }
 
+/// A window's outer rectangle in physical screen pixels (C7
+/// `DesktopWindowBounds`).
+typedef WindowBounds = ({int x, int y, int width, int height});
+
 /// The app's own window: chrome actions, ownership and state. The Windows
 /// runner implements it (windows/runner/flutter_window.cpp); tests use
 /// [FakeWindowController].
 abstract interface class WindowController {
   /// Applies placement before the first frame. [ownerHwnd] makes the popup an
-  /// owned window centred on VEGAS's dialog. Returns whether the owner was set.
-  Future<bool> configure({int? ownerHwnd, bool? keepOnTop});
+  /// owned window centred on VEGAS's dialog. [bounds] and [maximized] restore
+  /// the desktop window where it was (clamped to a current monitor; ignored if
+  /// that monitor is gone). Returns whether the owner was set.
+  Future<bool> configure({int? ownerHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized});
+
+  /// Where the window is when restored, and whether it is maximized; null
+  /// outside the Windows runner.
+  Future<({WindowBounds bounds, bool maximized})?> restoredBounds();
   Future<WindowState> state();
   Stream<WindowState> get changes;
   Future<void> startDrag();
@@ -89,12 +99,23 @@ class MethodChannelWindowController implements WindowController {
   }
 
   @override
-  Future<bool> configure({int? ownerHwnd, bool? keepOnTop}) async {
+  Future<bool> configure({int? ownerHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized}) async {
     final result = await _invoke<Map<Object?, Object?>>('configure', {
       'ownerHwnd': ?ownerHwnd,
       'keepOnTop': ?keepOnTop,
+      if (bounds != null) 'bounds': {'x': bounds.x, 'y': bounds.y, 'width': bounds.width, 'height': bounds.height},
+      'maximized': ?maximized,
     });
     return result?['ownerSet'] == true;
+  }
+
+  @override
+  Future<({WindowBounds bounds, bool maximized})?> restoredBounds() async {
+    final m = await _invoke<Map<Object?, Object?>>('getBounds');
+    if (m == null) return null;
+    final (x, y, w, h) = (m['x'], m['y'], m['width'], m['height']);
+    if (x is! int || y is! int || w is! int || h is! int || w <= 0 || h <= 0) return null;
+    return (bounds: (x: x, y: y, width: w, height: h), maximized: m['maximized'] == true);
   }
 
   @override
@@ -138,10 +159,13 @@ class MethodChannelWindowController implements WindowController {
 
 /// Records calls; used by widget tests.
 class FakeWindowController implements WindowController {
-  FakeWindowController([this._state = const WindowState()]);
+  FakeWindowController([this._state = const WindowState(), this.restored]);
 
   WindowState _state;
   final List<String> calls = [];
+
+  /// What [restoredBounds] reports.
+  ({WindowBounds bounds, bool maximized})? restored;
   final StreamController<WindowState> _changes = StreamController<WindowState>.broadcast();
 
   void emit(WindowState state) {
@@ -150,10 +174,16 @@ class FakeWindowController implements WindowController {
   }
 
   @override
-  Future<bool> configure({int? ownerHwnd, bool? keepOnTop}) async {
-    calls.add('configure(owner: $ownerHwnd, keepOnTop: $keepOnTop)');
+  Future<bool> configure({int? ownerHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized}) async {
+    calls.add(
+      'configure(owner: $ownerHwnd, keepOnTop: $keepOnTop'
+      '${bounds == null ? '' : ', bounds: $bounds, maximized: $maximized'})',
+    );
     return ownerHwnd != null;
   }
+
+  @override
+  Future<({WindowBounds bounds, bool maximized})?> restoredBounds() async => restored;
 
   @override
   Future<WindowState> state() async => _state;

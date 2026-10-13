@@ -5,6 +5,7 @@ import 'package:ve_services/ve_services.dart';
 import '../design/components/signal_path/signal_path_model.dart';
 import 'recipe_edit.dart';
 import 'services.dart';
+import 'ui_state.dart';
 
 enum LibraryFilter { all, builtin, mine }
 
@@ -37,7 +38,7 @@ class PresetsState {
     this.filter = LibraryFilter.all,
     this.favoritesOnly = false,
     this.installationId,
-    this.lengthSec = 600,
+    this.lengthText,
     this.builtinFavorites = const {},
     this.commandMultiline = true,
   });
@@ -52,8 +53,9 @@ class PresetsState {
   /// The FFmpeg the checks are for; null is the default installation.
   final String? installationId;
 
-  /// The length typed in the size card. Desktop starts at 10:00.
-  final int? lengthSec;
+  /// The length text typed in the size card this session; null until typed
+  /// (then the remembered text, or 10:00, applies: see ui_state.dart).
+  final String? lengthText;
 
   /// Favorites on built-in presets for this session. The library can't save
   /// them (built-ins are read-only in C3); see workstreams/app.md, Needs.
@@ -70,7 +72,7 @@ class PresetsState {
     LibraryFilter? filter,
     bool? favoritesOnly,
     Object? installationId = _keep,
-    Object? lengthSec = _keep,
+    Object? lengthText = _keep,
     Map<String, bool>? builtinFavorites,
     bool? commandMultiline,
   }) => PresetsState(
@@ -81,7 +83,7 @@ class PresetsState {
     filter: filter ?? this.filter,
     favoritesOnly: favoritesOnly ?? this.favoritesOnly,
     installationId: identical(installationId, _keep) ? this.installationId : installationId as String?,
-    lengthSec: identical(lengthSec, _keep) ? this.lengthSec : lengthSec as int?,
+    lengthText: identical(lengthText, _keep) ? this.lengthText : lengthText as String?,
     builtinFavorites: builtinFavorites ?? this.builtinFavorites,
     commandMultiline: commandMultiline ?? this.commandMultiline,
   );
@@ -113,7 +115,13 @@ class PresetsController extends Notifier<PresetsState> {
   /// Clears the search, the Built-in/Mine filter and Favorites only.
   void showAll() => state = state.copyWith(query: '', filter: LibraryFilter.all, favoritesOnly: false);
   void selectInstallation(String id) => state = state.copyWith(installationId: id);
-  void setLength(int? seconds) => state = state.copyWith(lengthSec: seconds);
+
+  /// The size card's length as typed; remembered in C7 `uiState`.
+  void setLengthText(String text) {
+    state = state.copyWith(lengthText: text);
+    ref.read(uiStateWriterProvider).later((ui) => ui.copyWith(lastSizeLengthText: text));
+  }
+
   void toggleCommandLayout() => state = state.copyWith(commandMultiline: !state.commandMultiline);
 
   /// The recipe the editor shows for [id]: the draft, else the saved one.

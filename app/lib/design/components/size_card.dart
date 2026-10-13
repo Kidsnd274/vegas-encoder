@@ -59,6 +59,8 @@ class SizeQualityCard extends StatefulWidget {
     required this.estimate,
     required this.lengthSeconds,
     required this.onLengthChanged,
+    this.lengthText,
+    this.onLengthTextChanged,
     this.lengthHint = 'Type how long the video is.',
     this.compact = false,
   });
@@ -68,6 +70,11 @@ class SizeQualityCard extends StatefulWidget {
   /// Null shows "Type a length".
   final int? lengthSeconds;
   final ValueChanged<int?> onLengthChanged;
+
+  /// The text to show, exactly as last typed (it may not be a length yet);
+  /// defaults to [lengthSeconds] formatted.
+  final String? lengthText;
+  final ValueChanged<String>? onLengthTextChanged;
 
   /// Desktop: "Type how long the video is." Popup: "Project length from VEGAS."
   final String lengthHint;
@@ -80,16 +87,17 @@ class SizeQualityCard extends StatefulWidget {
 }
 
 class _SizeQualityCardState extends State<SizeQualityCard> {
-  late final TextEditingController _length = TextEditingController(
-    text: widget.lengthSeconds == null ? '' : VeFormat.duration(widget.lengthSeconds!),
-  );
+  late final TextEditingController _length = TextEditingController(text: _text);
+
+  String get _text =>
+      widget.lengthText ?? (widget.lengthSeconds == null ? '' : VeFormat.duration(widget.lengthSeconds!));
   final FocusNode _focus = FocusNode(debugLabel: 'length');
 
   @override
   void didUpdateWidget(SizeQualityCard old) {
     super.didUpdateWidget(old);
-    if (!_focus.hasFocus && old.lengthSeconds != widget.lengthSeconds) {
-      _length.text = widget.lengthSeconds == null ? '' : VeFormat.duration(widget.lengthSeconds!);
+    if (!_focus.hasFocus && (old.lengthSeconds != widget.lengthSeconds || old.lengthText != widget.lengthText)) {
+      _length.text = _text;
     }
   }
 
@@ -147,7 +155,10 @@ class _SizeQualityCardState extends State<SizeQualityCard> {
                   textAlign: TextAlign.right,
                   placeholder: 'm:ss',
                   semanticLabel: 'Length to estimate, minutes and seconds',
-                  onChanged: (s) => widget.onLengthChanged(VeFormat.parseLength(s)),
+                  onChanged: (s) {
+                    widget.onLengthTextChanged?.call(s);
+                    widget.onLengthChanged(VeFormat.parseLength(s));
+                  },
                 ),
               ],
             ),

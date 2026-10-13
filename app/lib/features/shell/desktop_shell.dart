@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ve_services/ve_services.dart' show DesktopWindowBounds;
 
 import '../../design/components/button.dart';
 import '../../design/components/dialog.dart';
@@ -12,6 +13,7 @@ import '../../design/tokens.dart';
 import '../../state/app_state.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
+import '../../state/ui_state.dart';
 import '../gallery/gallery_page.dart';
 import '../presets/presets_page.dart';
 
@@ -59,9 +61,31 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     super.dispose();
   }
 
+  /// Remembers where the window is (C7 `uiState`) for the next start. A
+  /// failed write never keeps the window open.
+  Future<AppExitResponse> _exit() async {
+    try {
+      final placed = await ref.read(windowControllerProvider).restoredBounds();
+      if (placed != null) {
+        final b = placed.bounds;
+        await ref
+            .read(uiStateWriterProvider)
+            .update(
+              (ui) => ui.copyWith(
+                desktopWindowBounds: DesktopWindowBounds(x: b.x, y: b.y, width: b.width, height: b.height),
+                desktopMaximized: placed.maximized,
+              ),
+            );
+      }
+    } on Object {
+      // Keep closing.
+    }
+    return AppExitResponse.exit;
+  }
+
   Future<AppExitResponse> _onExitRequested() async {
     final drafts = ref.read(presetsControllerProvider).drafts;
-    if (drafts.isEmpty) return AppExitResponse.exit;
+    if (drafts.isEmpty) return _exit();
     if (_asking || !mounted) return AppExitResponse.cancel;
     final presets = ref.read(presetsProvider).value ?? const [];
     final names = [
@@ -86,7 +110,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     } finally {
       _asking = false;
     }
-    if (choice == _CloseChoice.discard) return AppExitResponse.exit;
+    if (choice == _CloseChoice.discard) return _exit();
     if (choice != _CloseChoice.save) return AppExitResponse.cancel;
     final controller = ref.read(presetsControllerProvider.notifier);
     for (final id in drafts.keys.toList()) {
@@ -96,7 +120,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
         return AppExitResponse.cancel;
       }
     }
-    return AppExitResponse.exit;
+    return _exit();
   }
 
   @override

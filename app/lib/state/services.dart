@@ -14,9 +14,13 @@ final presetLibraryProvider = Provider<PresetLibrary>((ref) {
   return library;
 });
 
+/// The machine settings store (C7). `main` reads it before the first frame
+/// (the remembered window bounds) and hands the same instance to the app.
+MachineSettingsRepository createMachineSettingsRepository() => FakeMachineSettingsRepository();
+
 final machineSettingsRepositoryProvider = Provider<MachineSettingsRepository>((ref) {
-  final repository = FakeMachineSettingsRepository();
-  ref.onDispose(repository.dispose);
+  final repository = createMachineSettingsRepository();
+  if (repository is FakeMachineSettingsRepository) ref.onDispose(repository.dispose);
   return repository;
 });
 
