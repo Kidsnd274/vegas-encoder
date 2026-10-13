@@ -50,7 +50,8 @@ Existing 24 helper, 9 boundary, 67 configuration checks, default fake-host suite
 11-case/20-render proof/recovery suite and fake-tree installer tests pass with
 gyan FFmpeg 5.1.2. This is offline/fake-host validation, not a new real VEGAS test.
 
-**Next:** stop at B2 for owner merge, then keep B1 Windows recapture tight and do
+**Next:** B2 is merged into master (`bbcbe91`), and ws/platform is synchronized.
+Keep B1 Windows recapture tight, then do
 B3 real services, including the remaining F2 requests. B1 downloads are approved into this worktree's
 ignored build/ only (source URL/version recorded), with existing `C:\ffmpeg` gyan
 5.1.2 as the older case. No installation or PATH change. Workstream split:
@@ -245,8 +246,9 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 ## Next task
 
-Platform stops after B2 for owner merge; app switches its provider/mappings to the
-real core through its own workstream. Next is approved tight B1 Windows recapture (existing gyan
+Platform B2 is merged; the next platform agent continues with approved tight B1
+Windows recapture. App switches its provider/mappings to the real core through its
+own workstream. B1 uses existing gyan
 5.1.2 plus current gyan.dev/BtbN builds in ignored build/, no installation/PATH change),
 then B3–B4. Order and rationale are in
 [platform.md](product/workstreams/platform.md).

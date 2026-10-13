@@ -1,7 +1,7 @@
 # Platform workstream
 
 Updated: 2026-10-13 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
-branch `ws/platform`. **B2 complete; stop for owner merge.** Master through `ab7e7ab`
+branch `ws/platform`. **B2 merged into master (`bbcbe91`); ready for B1.** Master through `ab7e7ab`
 (F2) was merged before continuing. After B2 commit `d7f0605`, master through
 `230c724` (F2 token/fact/UI-state integration) was also merged into this branch.
 The app still selects FakeVeCore until its provider switch after B2 merge.
@@ -76,4 +76,5 @@ jobs. B1 downloads are already approved: current gyan.dev and BtbN into this
 worktree's ignored build/ only, recording source URLs/versions; existing gyan 5.1.2
 is the older case. Current downloads have not started. No installer/PATH change.
 B5 status-line and B6 gated adapter/progress performance tests need the owner with
-real VEGAS. Stop at this B2 milestone for merge as requested.
+real VEGAS. Next agent continues with B1, commits to ws/platform at that milestone,
+then stops for owner merge. B2 merge was explicitly requested by the owner.
