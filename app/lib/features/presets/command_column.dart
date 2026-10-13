@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../../design/components/button.dart';
 import '../../design/components/command_view.dart';
 import '../../design/components/message.dart';
 import '../../design/components/signal_path/signal_path_model.dart';
@@ -11,11 +12,22 @@ import 'display.dart';
 /// selected node's group highlighted, then the core's checks for the chosen
 /// FFmpeg. Clicking "Show setting" opens the node that holds the field.
 class CommandColumn extends StatelessWidget {
-  const CommandColumn({super.key, required this.data, required this.node, required this.onShowField});
+  const CommandColumn({
+    super.key,
+    required this.data,
+    required this.node,
+    required this.onShowField,
+    required this.multiline,
+    required this.onToggleLayout,
+  });
 
   final EditorData data;
   final SignalNode node;
   final ValueChanged<String> onShowField;
+
+  /// Grouped lines, or one line.
+  final bool multiline;
+  final VoidCallback onToggleLayout;
 
   static const double width = 432;
 
@@ -34,7 +46,21 @@ class CommandColumn extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 12, 14, 16),
         children: [
-          CommandHeader(onCopy: compiled == null ? null : () => copyCommand(compiled.commandLine)),
+          Row(
+            children: [
+              Expanded(child: CommandHeader(onCopy: compiled == null ? null : () => copyCommand(compiled.commandLine))),
+              if (compiled != null) ...[
+                const SizedBox(width: 4),
+                VeButton(
+                  label: multiline ? 'One line' : 'Grouped',
+                  variant: VeButtonVariant.ghost,
+                  size: VeButtonSize.small,
+                  tooltip: multiline ? 'Show the command on one line' : 'Show each stage on its own line',
+                  onPressed: onToggleLayout,
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 8),
           if (compiled != null)
             CommandView(
@@ -46,6 +72,7 @@ class CommandColumn extends StatelessWidget {
                 SignalNode.container => CommandRole.mux,
                 SignalNode.file => CommandRole.output,
               },
+              multiline: multiline,
               maxHeight: 360,
             )
           else

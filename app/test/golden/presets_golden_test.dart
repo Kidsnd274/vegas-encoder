@@ -39,6 +39,11 @@ void main() {
       await tester.enterText(find.byWidgetPredicate((w) => w is TextField && w.controller?.text == '18'), '17');
       await tester.pumpAndSettle();
     },
+    // Bitrate mode: Mb/s with common values and what the figures mean.
+    'bitrate': (tester) async {
+      await tester.tap(find.text('Bitrate'));
+      await tester.pumpAndSettle();
+    },
     // An FFmpeg without x264: red node, library mark, the core's error.
     'lgpl': (tester) async {
       await tester.tap(find.text('FFmpeg 8.1 full (default)'));
@@ -59,6 +64,30 @@ void main() {
           await act(tester);
           await expectGolden('presets_${name}_$theme');
         });
+      });
+
+      // The minimum window: the library is a rail, opened here over the editor.
+      testWidgets('presets_narrow', (tester) async {
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        await pumpApp(
+          tester,
+          view: const Size(1100, 700),
+          overrides: [windowControllerProvider.overrideWithValue(FakeWindowController())],
+        );
+        await tester.tap(find.bySemanticsLabel('Show the preset library (Ctrl+F)'));
+        await tester.pumpAndSettle();
+        await expectGolden('presets_narrow_$theme');
+      });
+
+      // Windows text size at 150%: the diagram grows so node text fits.
+      testWidgets('presets_text150', (tester) async {
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+        await pumpApp(tester, overrides: [windowControllerProvider.overrideWithValue(FakeWindowController())]);
+        await expectGolden('presets_text150_$theme');
       });
     });
   }

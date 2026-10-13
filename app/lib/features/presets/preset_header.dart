@@ -43,8 +43,9 @@ class PresetHeader extends StatelessWidget {
     const builtinNote = 'Built-in presets can’t be changed. Your changes will be saved as a new preset.';
 
     return Container(
-      height: 62,
-      padding: const EdgeInsets.fromLTRB(22, 0, 16, 0),
+      // 62 px at 100% text; taller when Windows text is larger.
+      constraints: const BoxConstraints(minHeight: 62),
+      padding: const EdgeInsets.fromLTRB(22, 6, 16, 6),
       decoration: BoxDecoration(
         color: c.surface,
         border: Border(bottom: BorderSide(color: c.line)),

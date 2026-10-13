@@ -17,8 +17,9 @@ The vocabulary is fixed in the brief §2.
 | Popup editor | 1120×740 | 960×640 | Centred on its VEGAS owner; resizable; remembers size, not position |
 | Native page | Host-defined | — | Win32 inside VEGAS; see the mock |
 
-Below 1280 px width the desktop app collapses the library to an icon rail, and the
-popup moves the command preview into a collapsible bottom strip.
+Below 1280 px width the desktop app collapses the library to an icon rail (library and
+Ctrl+K buttons; the library opens over the editor and closes on a choice, Esc or a click
+outside), and the popup moves the command preview into a collapsible bottom strip.
 
 ### Theme
 
@@ -46,7 +47,10 @@ popup moves the command preview into a collapsible bottom strip.
   error-coloured mark plus a tooltip such as "Needs x264: not in FFmpeg 8.0 LGPL").
 - **Context menu:** Duplicate, Rename, Export…, Copy share string, Delete (user
   presets only), Show in folder.
-- **Empty search:** "No presets match 'xyz'." plus a **New preset** action.
+- **Empty search:** "No presets match 'xyz'." plus a **New preset** action (a preset in
+  Mine started from the first built-in, named "New preset") and **Show all presets**.
+- **Error mark:** a preset the core finds errors in, for the chosen FFmpeg, shows an
+  error icon whose tooltip lists the core's messages.
 
 ### Editor states
 
@@ -143,8 +147,9 @@ encoder profile.
 - Mark a recommended band per resolution where the encoder profile provides one (for
   example x264 CRF 18–23 at 1080p).
 - Arrow keys step by 1; Page Up and Page Down step by 5.
-- Bitrate modes switch the control to Mb/s or kb/s with common values, and an
-  optional peak.
+- Bitrate modes switch the control to Mb/s with common values (2 to 80 Mb/s; any value
+  can be typed), and an optional peak. The read-out says "8 Mb/s average, 12 Mb/s
+  peak", "no peak cap", or "8 Mb/s constant".
 
 ### Defaults, changes and reset
 
@@ -169,7 +174,8 @@ This catches failing hardware encoders and bad extra arguments early. Voukoder P
 - Always reachable; visible by default on the desktop.
 - `{inputs}` is collapsed into a "VEGAS video + audio" chip; it expands on click.
 - Supports copy (Ctrl+Shift+C) and a toggle between single-line and grouped multi-line
-  layouts. In the multi-line layout each `^` continuation stays at the end of its line.
+  layouts ("One line" / "Grouped" beside Copy). In the multi-line layout each `^`
+  continuation stays at the end of its line.
 - The group for the selected node is highlighted. Clicking a token focuses the control
   that produced it; hovering a control highlights its tokens (StaxRip's click-to-jump).
 - Options replaced by Extra arguments show a small "set in Extra arguments" note at
@@ -316,9 +322,10 @@ Sliders support arrows, Page Up/Down, and Home/End.
   State changes still update instantly. The runner reads `SPI_GETCLIENTAREAANIMATION`
   and reports changes; the app sets `MediaQuery.disableAnimations`, and every
   duration goes through `VeTokens.motion`.
-- Text scales up to 150% without clipping, within each window's minimum size. Known
-  gap: signal path nodes have fixed sizes from the mockup, so their text clips at large
-  scales (F2 sizes the diagram from the text scale).
+- Text scales up to 150% without clipping, within each window's minimum size. The
+  diagram's height and node heights follow the text scale (F2); node widths stay so the
+  wire labels keep their room, and node text that doesn't fit ends in an ellipsis. The
+  header grows too.
 
 ## 10. Design tokens (Flutter `ThemeExtension`)
 
@@ -376,8 +383,9 @@ gallery and goldens in both themes: `VeButton`, `VeIconButton`, `VeLinkButton`, 
 `VeTextField`, `VeNumberField`, `VeSegmented`, `VeSwitch`, `VeSlider`, `VeSelect`,
 `VePopover`/`VeListbox`, `VeStatusTag`, `VeField`/`VeReadout` (with the modified dot and
 Reset since F2), `VeTitleBar`, and the rows marked F1 below. F2 added `showVeDialog`
-and `showVeTextDialog` (modal questions and names) and `VeToast` (confirmations, with
-Undo). Components take display models; values come from `ve_core` and
+and `showVeTextDialog` (modal questions and names), `VeToast` (confirmations, with
+Undo), and in `features/presets/`: the Ctrl+K palette, `BitrateField`, and
+`FieldAnchor` (how "Show setting" finds a field's control). Components take display models; values come from `ve_core` and
 `ve_services` through the app state, never computed in the design layer.
 
 | Component | Notes |

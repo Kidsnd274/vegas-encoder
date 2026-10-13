@@ -20,6 +20,7 @@ class LibraryEntry {
     this.depth,
     this.problem,
     this.problemDetail,
+    this.errors = const [],
   });
 
   final Preset preset;
@@ -37,6 +38,10 @@ class LibraryEntry {
 
   /// The availability reason, for the tooltip.
   final String? problemDetail;
+
+  /// The core's error messages for the chosen FFmpeg; the row shows an error
+  /// mark (UI_SPEC §2, Errors). Empty when the core couldn't check it.
+  final List<String> errors;
 
   String get id => preset.recipe.id;
   String get name => preset.recipe.name;
@@ -79,6 +84,7 @@ final libraryEntriesProvider = Provider<List<LibraryEntry>>((ref) {
   final settings = ref.watch(machineSettingsProvider).value;
   final installationId = ref.watch(selectedInstallationIdProvider);
   final installation = settings?.installations.where((i) => i.id == installationId).firstOrNull;
+  final capabilities = installationId == null ? null : ref.watch(capabilitiesProvider(installationId)).value;
   return [
     for (final p in presets)
       libraryEntry(
@@ -89,7 +95,12 @@ final libraryEntriesProvider = Provider<List<LibraryEntry>>((ref) {
         compiled: CoreResult.run(() {
           final recipe = state.drafts[p.recipe.id]?.recipe ?? p.recipe;
           final ext = catalog.container(recipe.container.format)?.ext;
-          return core.compile(recipe, media: SamplePreview.media, paths: SamplePreview.paths(ext));
+          return core.compile(
+            recipe,
+            media: SamplePreview.media,
+            paths: SamplePreview.paths(ext),
+            capabilities: capabilities,
+          );
         }).value,
         catalog: catalog,
         installation: installation,
@@ -146,6 +157,10 @@ LibraryEntry libraryEntry(
     depth: compiled?.resolved?.depth,
     problem: problem,
     problemDetail: detail,
+    errors: [
+      for (final i in compiled?.issues ?? const <Issue>[])
+        if (i.level == IssueLevel.error) i.message,
+    ],
   );
 }
 

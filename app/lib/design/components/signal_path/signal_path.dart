@@ -84,7 +84,10 @@ class _SignalPathState extends State<SignalPath> {
   @override
   Widget build(BuildContext context) {
     final t = VeTokens.of(context);
-    final height = widget.height ?? (_strip ? SignalPath.stripHeight : SignalPath.fullHeight);
+    // The full diagram grows with the Windows text size (up to 150%, UI_SPEC
+    // §9) so node text isn't clipped; the strip keeps its row height.
+    final k = _strip ? 1.0 : (MediaQuery.textScalerOf(context).scale(13) / 13).clamp(1.0, 1.5);
+    final height = (widget.height ?? (_strip ? SignalPath.stripHeight : SignalPath.fullHeight)) * k;
     return Semantics(
       container: true,
       label: 'Signal path',
@@ -93,7 +96,7 @@ class _SignalPathState extends State<SignalPath> {
         height: height,
         child: LayoutBuilder(
           builder: (context, box) {
-            final g = _Geometry(box.maxWidth, height, _strip);
+            final g = _Geometry(box.maxWidth, height, _strip, k);
             final target = _WireValues.of(widget.model, _strip);
             return CustomPaint(
               painter: _DotGridPainter(t.colors),
@@ -772,7 +775,7 @@ class _NodeBox extends StatelessWidget {
 
 /// Node rectangles and wire anchors (`layoutFor` in the mockup).
 class _Geometry {
-  _Geometry(double w, double h, bool strip) {
+  _Geometry(double w, double h, bool strip, [double k = 1]) {
     if (strip) {
       const pad = 14.0, top = 10.0, eh = 36.0;
       src = Rect.fromLTWH(pad, top, 132, h - 2 * top);
@@ -783,16 +786,20 @@ class _Geometry {
       file = Rect.fromLTWH(w - pad - 158, fy, 158, 50);
       cont = Rect.fromLTWH(((venc.right + file.left) / 2 - 46).roundToDouble(), fy, 92, 50);
     } else {
-      const pad = 22.0, top = 38.0, nh = 72.0;
-      src = Rect.fromLTWH(pad, top, 188, h - top - 14);
+      // Heights follow the text scale [k]; widths stay, so the gaps keep
+      // room for the pip and wire labels. Long node text ends in an ellipsis.
+      const pad = 22.0, kw = 1.0;
+      final top = 38.0 * k, nh = 72.0 * k, bottom = 14.0 * k;
       final vx = (w * 0.33).roundToDouble();
-      venc = Rect.fromLTWH(vx, top, 236, nh);
-      aenc = Rect.fromLTWH(vx, h - 14 - nh, 236, nh);
-      final fileX = w - pad - 184;
-      final cx = ((venc.right + fileX) / 2 - 75).roundToDouble();
-      final cy = ((venc.center.dy + aenc.center.dy) / 2 - 42).roundToDouble();
-      cont = Rect.fromLTWH(cx, cy, 150, 84);
-      file = Rect.fromLTWH(fileX, (cont.center.dy - 36).roundToDouble(), 184, 72);
+      src = Rect.fromLTWH(pad, top, 188 * kw, h - top - bottom);
+      venc = Rect.fromLTWH(vx, top, 236 * kw, nh);
+      aenc = Rect.fromLTWH(vx, h - bottom - nh, 236 * kw, nh);
+      final fileW = 184 * kw, contW = 150 * kw;
+      final fileX = w - pad - fileW;
+      final cx = ((venc.right + fileX) / 2 - contW / 2).roundToDouble();
+      final cy = ((venc.center.dy + aenc.center.dy) / 2 - 42 * k).roundToDouble();
+      cont = Rect.fromLTWH(cx, cy, contW, 84 * k);
+      file = Rect.fromLTWH(fileX, (cont.center.dy - 36 * k).roundToDouble(), fileW, 72 * k);
     }
     sx = src.right;
     vy = venc.center.dy;

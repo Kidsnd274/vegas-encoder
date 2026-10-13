@@ -19,11 +19,16 @@ import 'command_column.dart';
 import 'display.dart';
 import 'library_model.dart';
 import 'library_pane.dart';
+import 'palette.dart';
 import 'panels/audio_panel.dart';
+import 'panels/field_anchor.dart';
 import 'panels/other_panels.dart';
 import 'panels/panel_kit.dart';
 import 'panels/video_panel.dart';
 import 'preset_header.dart';
+
+/// Below this window width the library collapses to a rail (UI_SPEC §1).
+const double libraryRailBreakpoint = 1280;
 
 /// The Presets screen (S1): the library, then the selected preset's signal
 /// path, the selected node's settings, and the command with its checks.
@@ -36,13 +41,28 @@ class PresetsPage extends ConsumerStatefulWidget {
 
 class _PresetsPageState extends ConsumerState<PresetsPage> {
   final FocusNode _search = FocusNode(debugLabel: 'library search');
+  final FieldAnchors _anchors = FieldAnchors();
+
+  /// The panes F6 and Shift+F6 move between: library, diagram, settings,
+  /// command (UI_SPEC §7).
+  final List<FocusNode> _panes = [
+    for (final name in ['library', 'diagram', 'settings', 'command'])
+      FocusNode(debugLabel: '$name pane', skipTraversal: true, canRequestFocus: false),
+  ];
+
   ({String message, String? action, VoidCallback? onAction})? _toast;
   Timer? _toastTimer;
+
+  /// The library overlay in the narrow layout.
+  bool _libraryOpen = false;
 
   @override
   void dispose() {
     _toastTimer?.cancel();
     _search.dispose();
+    for (final p in _panes) {
+      p.dispose();
+    }
     super.dispose();
   }
 
@@ -124,6 +144,23 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
     if (mounted) _showToast('Duplicated into Mine');
   }
 
+  /// "New preset": a preset in Mine started from the first built-in.
+  Future<void> _newPreset() async {
+    final first = groupLibrary(ref.read(libraryEntriesProvider))
+        .where((g) => g.title == 'Built-in')
+        .firstOrNull
+        ?.subgroups
+        .first
+        .entries
+        .first;
+    if (first == null) return;
+    await _controller.createNew(first.id);
+    if (mounted) {
+      setState(() => _libraryOpen = false);
+      _showToast('Started a new preset in Mine from “${first.name}”');
+    }
+  }
+
   Future<void> _libraryAction(LibraryAction action, LibraryEntry entry) async {
     switch (action) {
       case LibraryAction.duplicate:
@@ -161,9 +198,40 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
     _showToast('Command copied');
   }
 
+  /// "Show setting": opens the node that holds [field], then scrolls to its
+  /// control and focuses it.
   void _showField(String field) {
     final node = nodeForField(field);
-    if (node != null) _controller.selectNode(node);
+    if (node == null) return;
+    _controller.selectNode(node);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _anchors.reveal(field);
+    });
+  }
+
+  Future<void> _openPalette() async {
+    final id = await showPresetPalette(context, ref.read(libraryEntriesProvider));
+    if (id != null && mounted) _controller.select(id);
+  }
+
+  void _searchLibrary(bool narrow) {
+    if (narrow && !_libraryOpen) setState(() => _libraryOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _search.requestFocus();
+    });
+  }
+
+  /// F6 / Shift+F6: the next or previous pane's first control.
+  void _cyclePane(int step) {
+    final current = _panes.indexWhere((p) => p.hasFocus);
+    for (var n = 1; n <= _panes.length; n++) {
+      final pane = _panes[((current < 0 ? (step > 0 ? -1 : 0) : current) + step * n) % _panes.length];
+      final target = pane.descendants.where((d) => d.canRequestFocus && !d.skipTraversal).firstOrNull;
+      if (target != null) {
+        target.requestFocus();
+        return;
+      }
+    }
   }
 
   /// Selects the first preset when nothing (or a deleted preset) is selected.
@@ -185,57 +253,105 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
     final data = ref.watch(editorProvider);
     if (presets.value case final list?) _ensureSelection(list, state);
 
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyS, control: true): () => unawaited(_save()),
-        const SingleActivator(LogicalKeyboardKey.keyF, control: true): _search.requestFocus,
-        const SingleActivator(LogicalKeyboardKey.keyC, control: true, shift: true): _copyCommand,
-      },
-      child: Focus(
-        autofocus: true,
-        child: Stack(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: 256,
-                  child: LibraryPane(searchFocus: _search, onAction: _libraryAction),
-                ),
-                Expanded(
-                  child: switch (presets) {
-                    AsyncError(:final error) => _Centered('The library couldn’t be read: $error'),
-                    _ when data == null => const SizedBox.shrink(),
-                    _ => _Editor(
-                      data: data,
-                      node: state.node,
-                      lengthSec: state.lengthSec,
-                      onSave: _save,
-                      onRevert: _revert,
-                      onDuplicate: () => _duplicate(data.preset.recipe.id),
-                      onMode: (m) {
-                        if (m == EditorMode.advanced) {
-                          _showToast('Advanced mode arrives in milestone F4');
-                        }
-                      },
-                      onShowField: _showField,
+    return LayoutBuilder(
+      builder: (context, box) {
+        final narrow = box.maxWidth < libraryRailBreakpoint;
+        final library = LibraryPane(
+          searchFocus: _search,
+          onAction: _libraryAction,
+          onNewPreset: _newPreset,
+          onPicked: narrow ? () => setState(() => _libraryOpen = false) : null,
+        );
+        return CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.keyS, control: true): () => unawaited(_save()),
+            const SingleActivator(LogicalKeyboardKey.keyF, control: true): () => _searchLibrary(narrow),
+            const SingleActivator(LogicalKeyboardKey.keyK, control: true): () => unawaited(_openPalette()),
+            const SingleActivator(LogicalKeyboardKey.keyC, control: true, shift: true): _copyCommand,
+            const SingleActivator(LogicalKeyboardKey.f6): () => _cyclePane(1),
+            const SingleActivator(LogicalKeyboardKey.f6, shift: true): () => _cyclePane(-1),
+            if (narrow && _libraryOpen)
+              const SingleActivator(LogicalKeyboardKey.escape): () => setState(() => _libraryOpen = false),
+          },
+          child: Focus(
+            autofocus: true,
+            child: FieldAnchorScope(
+              anchors: _anchors,
+              child: Stack(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (narrow)
+                        _LibraryRail(
+                          open: _libraryOpen,
+                          onToggle: () => setState(() => _libraryOpen = !_libraryOpen),
+                          onPalette: () => unawaited(_openPalette()),
+                        )
+                      else
+                        SizedBox(
+                          width: 256,
+                          child: Focus(
+                            focusNode: _panes[0],
+                            child: FocusTraversalGroup(child: library),
+                          ),
+                        ),
+                      Expanded(
+                        child: switch (presets) {
+                          AsyncError(:final error) => _Centered('The library couldn’t be read: $error'),
+                          _ when data == null => const SizedBox.shrink(),
+                          _ => _Editor(
+                            data: data,
+                            node: state.node,
+                            lengthSec: state.lengthSec,
+                            multiline: state.commandMultiline,
+                            panes: _panes,
+                            onSave: _save,
+                            onRevert: _revert,
+                            onDuplicate: () => _duplicate(data.preset.recipe.id),
+                            onMode: (m) {
+                              if (m == EditorMode.advanced) {
+                                _showToast('Advanced mode arrives in milestone F4');
+                              }
+                            },
+                            onShowField: _showField,
+                          ),
+                        },
+                      ),
+                    ],
+                  ),
+                  if (narrow && _libraryOpen)
+                    Positioned(
+                      left: _LibraryRail.width,
+                      top: 0,
+                      bottom: 0,
+                      width: 256,
+                      child: TapRegion(
+                        onTapOutside: (_) => setState(() => _libraryOpen = false),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(boxShadow: VeTokens.of(context).popoverShadow),
+                          child: Focus(
+                            focusNode: _panes[0],
+                            child: FocusTraversalGroup(child: library),
+                          ),
+                        ),
+                      ),
                     ),
-                  },
-                ),
-              ],
-            ),
-            if (_toast case final toast?)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 22,
-                child: Center(
-                  child: VeToast(message: toast.message, actionLabel: toast.action, onAction: toast.onAction),
-                ),
+                  if (_toast case final toast?)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 22,
+                      child: Center(
+                        child: VeToast(message: toast.message, actionLabel: toast.action, onAction: toast.onAction),
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -255,12 +371,51 @@ class _Centered extends StatelessWidget {
   }
 }
 
+/// The library collapsed to a rail in a narrow window: the library opens over
+/// the editor, and Ctrl+K opens a preset by name.
+class _LibraryRail extends StatelessWidget {
+  const _LibraryRail({required this.open, required this.onToggle, required this.onPalette});
+  final bool open;
+  final VoidCallback onToggle;
+  final VoidCallback onPalette;
+
+  static const double width = 52;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = VeTokens.of(context).colors;
+    return Container(
+      width: width,
+      padding: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border(right: BorderSide(color: c.line)),
+      ),
+      child: Column(
+        children: [
+          VeIconButton(
+            icon: VeIcons.layers,
+            label: open ? 'Hide the preset library' : 'Show the preset library (Ctrl+F)',
+            selected: open,
+            bordered: true,
+            onPressed: onToggle,
+          ),
+          const SizedBox(height: 8),
+          VeIconButton(icon: VeIcons.search, label: 'Open a preset by name (Ctrl+K)', onPressed: onPalette),
+        ],
+      ),
+    );
+  }
+}
+
 /// The selected preset: header, notices, diagram, node settings, command.
 class _Editor extends ConsumerWidget {
   const _Editor({
     required this.data,
     required this.node,
     required this.lengthSec,
+    required this.multiline,
+    required this.panes,
     required this.onSave,
     required this.onRevert,
     required this.onDuplicate,
@@ -271,6 +426,10 @@ class _Editor extends ConsumerWidget {
   final EditorData data;
   final SignalNode node;
   final int? lengthSec;
+  final bool multiline;
+
+  /// Library, diagram, settings and command pane focus nodes, for F6.
+  final List<FocusNode> panes;
   final VoidCallback onSave;
   final VoidCallback onRevert;
   final VoidCallback onDuplicate;
@@ -321,7 +480,12 @@ class _Editor extends ConsumerWidget {
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: c.line)),
           ),
-          child: SignalPath(model: model, selected: node, onSelect: controller.selectNode),
+          child: Focus(
+            focusNode: panes[1],
+            child: FocusTraversalGroup(
+              child: SignalPath(model: model, selected: node, onSelect: controller.selectNode),
+            ),
+          ),
         ),
         Expanded(
           child: ColoredBox(
@@ -330,32 +494,48 @@ class _Editor extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(22, 16, 22, 22),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _PanelHeader(node: node),
-                        const SizedBox(height: 14),
-                        KeyedSubtree(
-                          key: ValueKey('$id/${node.name}'),
-                          child: switch (node) {
-                            SignalNode.source => SourcePanel(scope: scope),
-                            SignalNode.video => VideoPanel(scope: scope),
-                            SignalNode.audio => AudioPanel(scope: scope),
-                            SignalNode.container => ContainerPanel(scope: scope),
-                            SignalNode.file => FilePanel(
-                              scope: scope,
-                              lengthSec: lengthSec,
-                              onLengthChanged: controller.setLength,
+                  child: Focus(
+                    focusNode: panes[2],
+                    child: FocusTraversalGroup(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(22, 16, 22, 22),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _PanelHeader(node: node),
+                            const SizedBox(height: 14),
+                            KeyedSubtree(
+                              key: ValueKey('$id/${node.name}'),
+                              child: switch (node) {
+                                SignalNode.source => SourcePanel(scope: scope),
+                                SignalNode.video => VideoPanel(scope: scope),
+                                SignalNode.audio => AudioPanel(scope: scope),
+                                SignalNode.container => ContainerPanel(scope: scope),
+                                SignalNode.file => FilePanel(
+                                  scope: scope,
+                                  lengthSec: lengthSec,
+                                  onLengthChanged: controller.setLength,
+                                ),
+                              },
                             ),
-                          },
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-                CommandColumn(data: data, node: node, onShowField: onShowField),
+                Focus(
+                  focusNode: panes[3],
+                  child: FocusTraversalGroup(
+                    child: CommandColumn(
+                      data: data,
+                      node: node,
+                      onShowField: onShowField,
+                      multiline: multiline,
+                      onToggleLayout: controller.toggleCommandLayout,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

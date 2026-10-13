@@ -10,6 +10,7 @@ import '../../design/components/text_field.dart';
 import '../../design/icons.dart';
 import '../../design/tokens.dart';
 import '../../state/presets.dart';
+import '../../state/services.dart';
 import 'library_model.dart';
 
 /// What the library's context menu can do with a preset.
@@ -18,10 +19,22 @@ enum LibraryAction { duplicate, rename, delete }
 /// The preset library (UI_SPEC §2, Library): search, Built-in/Mine filter,
 /// favorites, and the grouped list.
 class LibraryPane extends ConsumerWidget {
-  const LibraryPane({super.key, required this.searchFocus, required this.onAction});
+  const LibraryPane({
+    super.key,
+    required this.searchFocus,
+    required this.onAction,
+    required this.onNewPreset,
+    this.onPicked,
+  });
 
   final FocusNode searchFocus;
   final void Function(LibraryAction action, LibraryEntry entry) onAction;
+
+  /// "New preset" from an empty search.
+  final VoidCallback onNewPreset;
+
+  /// After a preset is chosen, for the narrow layout's library overlay.
+  final VoidCallback? onPicked;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -48,7 +61,10 @@ class LibraryPane extends ConsumerWidget {
               key: ValueKey('preset-${e.id}'),
               entry: e,
               selected: e.id == state.selectedId,
-              onSelect: () => controller.select(e.id),
+              onSelect: () {
+                controller.select(e.id);
+                onPicked?.call();
+              },
               onFavorite: () => controller.toggleFavorite(e.id),
               onAction: (a) => onAction(a, e),
             ),
@@ -104,8 +120,10 @@ class LibraryPane extends ConsumerWidget {
             ),
           ),
           Expanded(
-            child: rows.isEmpty
-                ? _NoMatch(query: state.query, onClear: controller.showAll)
+            child: !ref.watch(presetsProvider).hasValue
+                ? const SizedBox.shrink()
+                : rows.isEmpty
+                ? _NoMatch(query: state.query, onClear: controller.showAll, onNewPreset: onNewPreset)
                 : ListView(padding: const EdgeInsets.fromLTRB(8, 0, 8, 14), children: rows),
           ),
         ],
@@ -233,6 +251,7 @@ class _LibraryRow extends StatelessWidget {
             e.name,
             if (e.advanced) 'Advanced',
             if (e.dirty) 'unsaved changes',
+            if (e.errors.isNotEmpty) e.errors.length == 1 ? 'an error' : '${e.errors.length} errors',
             e.line,
             if (e.favorite) 'favorite',
           ].join(', '),
@@ -275,6 +294,13 @@ class _LibraryRow extends StatelessWidget {
                                 ),
                               ),
                               if (e.advanced) ...[const SizedBox(width: 6), const _Tag('Advanced')],
+                              if (e.errors.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                VeTooltip(
+                                  message: e.errors.join('\n'),
+                                  child: VeIcon(VeIcons.error, color: c.error, size: 14),
+                                ),
+                              ],
                               if (e.dirty) ...[
                                 const SizedBox(width: 6),
                                 Container(
@@ -400,9 +426,10 @@ class _Tag extends StatelessWidget {
 }
 
 class _NoMatch extends StatelessWidget {
-  const _NoMatch({required this.query, required this.onClear});
+  const _NoMatch({required this.query, required this.onClear, required this.onNewPreset});
   final String query;
   final VoidCallback onClear;
+  final VoidCallback onNewPreset;
 
   @override
   Widget build(BuildContext context) {
@@ -416,8 +443,22 @@ class _NoMatch extends StatelessWidget {
             query.trim().isEmpty ? 'No presets to show.' : 'No presets match “${query.trim()}”.',
             style: t.text.body.copyWith(color: t.colors.muted),
           ),
-          const SizedBox(height: 6),
-          VeLinkButton(label: 'Show all presets', onPressed: onClear),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              VeButton(
+                label: 'New preset',
+                icon: VeIcons.plus,
+                size: VeButtonSize.small,
+                tooltip: 'Start a preset in Mine from the first built-in',
+                onPressed: onNewPreset,
+              ),
+              VeLinkButton(label: 'Show all presets', onPressed: onClear),
+            ],
+          ),
         ],
       ),
     );

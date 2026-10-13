@@ -10,6 +10,7 @@ import '../../../design/tokens.dart';
 import '../../../state/preview.dart';
 import '../../../state/recipe_edit.dart';
 import '../display.dart';
+import 'field_anchor.dart';
 import 'panel_kit.dart';
 
 /// From VEGAS: what the project delivers. Read-only.
@@ -63,46 +64,52 @@ class ContainerPanel extends StatelessWidget {
     final current = r.container.format;
     return PanelColumns(
       left: [
-        VeField(
-          label: 'Container',
-          modified: s.modified('container.format'),
-          onReset: s.reset('container.format'),
-          messages: s.messages(['container', 'container.format']),
-          child: Semantics(
+        FieldAnchor(
+          fields: ['container', 'container.format'],
+          child: VeField(
             label: 'Container',
-            explicitChildNodes: true,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final c in s.catalog.containers)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: _ContainerOption(
-                      profile: c,
-                      selected: c.id == current,
-                      note: _fitNote(s, c.id, r, vp, ap),
-                      onTap: () => s.edit((r) => r.withContainer((x) => x.copyWith(format: c.id))),
+            modified: s.modified('container.format'),
+            onReset: s.reset('container.format'),
+            messages: s.messages(['container', 'container.format']),
+            child: Semantics(
+              label: 'Container',
+              explicitChildNodes: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final c in s.catalog.containers)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: _ContainerOption(
+                        profile: c,
+                        selected: c.id == current,
+                        note: _fitNote(s, c.id, r, vp, ap),
+                        onTap: () => s.edit((r) => r.withContainer((x) => x.copyWith(format: c.id))),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ],
       right: [
         if (current == 'mp4')
-          VeField(
-            label: 'Fast start',
-            modified: s.modified('container.faststart'),
-            onReset: s.reset('container.faststart'),
-            messages: s.messages(['container.faststart']),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: VeSwitch(
-                small: true,
-                label: 'Move the index to the front so playback starts early',
-                value: r.container.faststart,
-                onChanged: (on) => s.edit((r) => r.withContainer((x) => x.copyWith(faststart: on))),
+          FieldAnchor(
+            fields: ['container.faststart'],
+            child: VeField(
+              label: 'Fast start',
+              modified: s.modified('container.faststart'),
+              onReset: s.reset('container.faststart'),
+              messages: s.messages(['container.faststart']),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: VeSwitch(
+                  small: true,
+                  label: 'Move the index to the front so playback starts early',
+                  value: r.container.faststart,
+                  onChanged: (on) => s.edit((r) => r.withContainer((x) => x.copyWith(faststart: on))),
+                ),
               ),
             ),
           ),

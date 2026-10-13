@@ -1,11 +1,18 @@
+import 'dart:ui' show AppExitResponse;
+
 import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart' hide SizeEstimate;
+import 'package:vegas_encoder/design/components/field.dart' show VeField;
 import 'package:vegas_encoder/design/components/size_card.dart';
+import 'package:vegas_encoder/design/components/command_view.dart' show CommandView;
+import 'package:vegas_encoder/design/components/signal_path/signal_path.dart' show SignalPath;
 import 'package:vegas_encoder/features/presets/command_column.dart';
 import 'package:vegas_encoder/features/presets/library_pane.dart';
+import 'package:vegas_encoder/features/presets/panels/other_panels.dart' show ContainerPanel;
+import 'package:vegas_encoder/features/presets/panels/video_panel.dart' show VideoPanel;
 import 'package:vegas_encoder/features/presets/preset_header.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
@@ -18,13 +25,35 @@ void main() {
   late FakePresetLibrary library;
   late FakeWindowController window;
 
-  Future<void> pump(WidgetTester tester) async {
+  Future<void> pump(WidgetTester tester, {Size view = const Size(1440, 900)}) async {
     library = FakePresetLibrary(now: () => '2026-10-12T02:00:00Z');
     window = FakeWindowController();
     await pumpApp(
       tester,
+      view: view,
       overrides: [windowControllerProvider.overrideWithValue(window), presetLibraryProvider.overrideWithValue(library)],
     );
+  }
+
+  Future<void> keys(WidgetTester tester, LogicalKeyboardKey key, {bool control = false, bool shift = false}) async {
+    if (control) await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    if (shift) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(key);
+    if (shift) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    if (control) await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+  }
+
+  /// Whether keyboard focus is inside a widget of type [T].
+  bool focusIn<T>() {
+    final context = FocusManager.instance.primaryFocus?.context;
+    if (context == null) return false;
+    var found = false;
+    context.visitAncestorElements((e) {
+      found = e.widget is T;
+      return !found;
+    });
+    return found;
   }
 
   Finder inHeader(String text) => find.descendant(of: find.byType(PresetHeader), matching: find.text(text));
@@ -238,21 +267,141 @@ void main() {
     expect(saved.recipe.video.quality, 30);
   });
 
-  testWidgets('closing with unsaved changes asks first', (tester) async {
+  testWidgets('closing with unsaved changes asks first, however the window is closed', (tester) async {
     await pump(tester);
+    expect(await tester.binding.handleRequestAppExit(), AppExitResponse.exit, reason: 'nothing to save');
     await setCrf(tester, '17');
+
+    // The title bar's Close asks the runner to close; the engine then asks the
+    // framework, as it does for Alt+F4 and the taskbar.
     await tester.tap(find.bySemanticsLabel('Close'));
+    expect(window.calls, contains('close'));
+    var response = tester.binding.handleRequestAppExit();
     await tester.pumpAndSettle();
     expect(find.text('Save changes to “YouTube upload, H.264”?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(window.calls, isNot(contains('close')));
+    expect(await response, AppExitResponse.cancel);
 
-    await tester.tap(find.bySemanticsLabel('Close'));
+    response = tester.binding.handleRequestAppExit();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Don’t save'));
     await tester.pumpAndSettle();
-    expect(window.calls, contains('close'));
+    expect(await response, AppExitResponse.exit);
+  });
+
+  testWidgets('Save on close saves a built-in as a new preset, then exits', (tester) async {
+    await pump(tester);
+    await setCrf(tester, '17');
+    final response = tester.binding.handleRequestAppExit();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(await response, AppExitResponse.exit);
+    expect((await library.list()).where((p) => !p.builtin).single.recipe.video.quality, 17);
+  });
+
+  testWidgets('Ctrl+K opens a preset by name', (tester) async {
+    await pump(tester);
+    await keys(tester, LogicalKeyboardKey.keyK, control: true);
+    expect(find.text('Open a preset by name, encoder or tag'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'prores');
+    await tester.pumpAndSettle();
+    await keys(tester, LogicalKeyboardKey.enter);
+    expect(inHeader('ProRes 422 HQ for editing'), findsOneWidget);
+    expect(find.text('Open a preset by name, encoder or tag'), findsNothing);
+  });
+
+  testWidgets('F6 and Shift+F6 move between the panes', (tester) async {
+    await pump(tester);
+    await keys(tester, LogicalKeyboardKey.f6);
+    expect(focusIn<LibraryPane>(), isTrue);
+    await keys(tester, LogicalKeyboardKey.f6);
+    expect(focusIn<SignalPath>(), isTrue);
+    await keys(tester, LogicalKeyboardKey.f6);
+    expect(focusIn<VideoPanel>(), isTrue);
+    await keys(tester, LogicalKeyboardKey.f6);
+    expect(focusIn<CommandColumn>(), isTrue);
+    await keys(tester, LogicalKeyboardKey.f6, shift: true);
+    expect(focusIn<VideoPanel>(), isTrue);
+  });
+
+  testWidgets('"Show setting" focuses the control that holds the field', (tester) async {
+    await pump(tester);
+    await tester.tap(inCommand(find.text('Show setting')).last);
+    await tester.pumpAndSettle();
+    expect(focusIn<ContainerPanel>(), isTrue);
+    await tester.tap(inCommand(find.text('Show setting')).first);
+    await tester.pumpAndSettle();
+    expect(focusIn<VideoPanel>(), isTrue);
+  });
+
+  testWidgets('bitrate modes take Mb/s with common values and say what they mean', (tester) async {
+    await pump(tester);
+    await tester.tap(find.text('Bitrate'));
+    await tester.pumpAndSettle();
+    expect(find.text('Average bitrate'), findsOneWidget);
+    expect(find.text('12 Mb/s average, no peak cap'), findsOneWidget);
+    await tester.tap(find.text('Common').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('8 Mb/s').last);
+    await tester.pumpAndSettle();
+    expect(find.text('8 Mb/s average, no peak cap'), findsOneWidget);
+    await tester.enterText(
+      find.descendant(of: find.widgetWithText(VeField, 'Peak bitrate'), matching: find.byType(TextField)),
+      '12',
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('8 Mb/s average, 12 Mb/s peak'), findsOneWidget);
+  });
+
+  testWidgets('an empty search offers a new preset', (tester) async {
+    await pump(tester);
+    await tester.enterText(inLibrary(find.byType(TextField)), 'zzz');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New preset'));
+    await tester.pumpAndSettle();
+    expect(inHeader('New preset'), findsOneWidget);
+    expect(find.text('Started a new preset in Mine from “YouTube upload, H.264”'), findsOneWidget);
+    expect(inLibrary(find.text('New preset')), findsOneWidget, reason: 'the search was cleared');
+  });
+
+  testWidgets('presets with errors for the chosen FFmpeg are marked in the library', (tester) async {
+    await pump(tester);
+    expect(find.bySemanticsLabel(RegExp('YouTube upload, H.264, an error')), findsNothing);
+    await tester.tap(find.text('FFmpeg 8.1 full (default)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FFmpeg 8.0 LGPL').last);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel(RegExp('YouTube upload, H.264, an error')), findsOneWidget);
+  });
+
+  testWidgets('the command switches between grouped lines and one line', (tester) async {
+    await pump(tester);
+    String plain() => tester
+        .widget<RichText>(find.descendant(of: find.byType(CommandView), matching: find.byType(RichText)))
+        .text
+        .toPlainText();
+    expect(plain(), contains(' ^\n'));
+    await tester.tap(find.text('One line'));
+    await tester.pumpAndSettle();
+    expect(plain(), isNot(contains('^')));
+    expect(find.text('Grouped'), findsOneWidget);
+  });
+
+  testWidgets('a narrow window collapses the library to a rail that opens over the editor', (tester) async {
+    await pump(tester, view: const Size(1100, 760));
+    expect(find.byType(LibraryPane), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Show the preset library (Ctrl+F)'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LibraryPane), findsOneWidget);
+    await tester.tap(inLibrary(find.text('Small web file, AV1')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LibraryPane), findsNothing);
+    expect(inHeader('Small web file, AV1'), findsOneWidget);
+    await keys(tester, LogicalKeyboardKey.keyF, control: true);
+    expect(find.byType(LibraryPane), findsOneWidget);
+    expect(focusIn<LibraryPane>(), isTrue);
   });
 
   testWidgets('Ctrl+Shift+C copies the core\'s command line', (tester) async {

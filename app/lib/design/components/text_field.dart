@@ -225,10 +225,11 @@ class _VeNumberFieldState extends State<VeNumberField> {
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(widget.decimals ? r'[0-9.]' : r'[0-9]'))],
     );
     if (widget.unit == null) return field;
+    // In a narrow column the field gives way so the unit stays readable.
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        field,
+        Flexible(child: field),
         const SizedBox(width: 8),
         Text(widget.unit!, style: t.text.small.copyWith(color: t.colors.muted)),
       ],

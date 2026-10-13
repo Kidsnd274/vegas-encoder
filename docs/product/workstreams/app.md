@@ -1,8 +1,8 @@
 # App workstream
 
-Updated: 2026-10-12 (Asia/Singapore). Branch `ws/app`. Status: **F0, F1 and F2 done**.
-F2 runs on the platform fakes (B0); the editor reacts to edits only once the real core
-(B2) lands.
+Updated: 2026-10-13 (Asia/Singapore). Branch `ws/app`. Status: **F0 and F1 done; F2
+done except the parts waiting on platform** (listed under Needs). F2 runs on the
+platform fakes (B0); the editor reacts to edits only once the real core (B2) lands.
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
@@ -43,8 +43,11 @@ debug builds, and the goldens use it.
 - Library: Built-in then Mine, favorites first, then categories, then names; search
   over name, tags, encoders and summary; All/Built-in/Mine and Favorites only; rows with
   the core's summary line, output-depth glyph, Advanced tag, unsaved dot, and "Needs
-  x264: not in this FFmpeg" for the chosen FFmpeg. Context menu (right-click, Shift+F10,
-  Menu key): Duplicate, Rename…, Delete… (Mine only).
+  x264: not in this FFmpeg" for the chosen FFmpeg; an error mark (with the core's
+  messages as a tooltip) when the core finds errors for that FFmpeg. Context menu
+  (right-click, Shift+F10, Menu key): Duplicate, Rename…, Delete… (Mine only). An empty
+  search offers New preset (a preset in Mine started from the first built-in) and
+  Show all presets. Below 1280 px the library is a rail; it opens over the editor.
 - Header: name with Edited, Built-in/Mine, category, revision; Basic/Advanced (Advanced
   says it arrives in F4); the FFmpeg the checks are for; Duplicate, Revert (with Undo),
   Save preset or Save as new preset. Built-ins save as a new preset in Mine with origin
@@ -61,12 +64,19 @@ debug builds, and the goldens use it.
   (size card from the core's estimate, file name, how it is worked out). Hidden controls
   keep their recipe values; a new encoder resets its own controls to null (encoder
   default, resolved by the core). Changed fields show a dot and Reset; the core's issues
-  show at their field and in Checks, with "Show setting".
-- Command column: the core's tokens grouped by stage, the inputs chip, the selected
-  node's group tinted, Copy and Ctrl+Shift+C; Checks for the chosen FFmpeg.
-- Drafts per preset; Ctrl+S, Ctrl+F; "changed in another window" banner (Reload / Keep
-  editing), then Replace it / Save as new preset on save; closing with unsaved changes
-  asks Save / Don't save / Cancel (title-bar Close only, see open items).
+  show at their field and in Checks, where "Show setting" opens the node, scrolls to the
+  control and focuses it. Bitrate modes take Mb/s with common values and read "8 Mb/s
+  average, 12 Mb/s peak".
+- Command column: the core's tokens grouped by stage or on one line, the inputs chip,
+  the selected node's group tinted, Copy and Ctrl+Shift+C; Checks for the chosen FFmpeg.
+- Keyboard: Ctrl+K opens a preset by name; Ctrl+F searches the library; Ctrl+S saves;
+  F6 / Shift+F6 move between library, diagram, settings and command.
+- Drafts per preset; "changed in another window" banner (Reload / Keep editing), then
+  Replace it / Save as new preset on save. Closing with unsaved changes asks Save /
+  Don't save / Cancel however the window is closed (title bar, Alt+F4, taskbar): the
+  Windows engine sends an exit request first, answered by an `AppLifecycleListener`.
+- The diagram and header grow with the Windows text size (heights; node text that
+  doesn't fit ends in an ellipsis).
 - When the fake core has no answer (`B0-FIXTURE-MISSING`), the command, checks and
   estimate say the real core (B2) is needed instead of showing a stale result.
 - Settings > Theme is stored in C7 `theme`. New components: `showVeDialog`,
@@ -75,7 +85,7 @@ debug builds, and the goldens use it.
 
 ## Tests
 
-`flutter test` in `app/`: 203 tests, all passing. `flutter analyze`: no issues. All on
+`flutter test` in `app/`: 218 tests, all passing. `flutter analyze`: no issues. All on
 fakes: platform fakes (B0) and a fake window controller.
 
 - Unit: launch parsing, formatting, tokens and contrast; recipe edits (canonical
@@ -86,13 +96,18 @@ fakes: platform fakes (B0) and a fake window controller.
   delete, checks per FFmpeg, theme stored in C7).
 - Widget: controls, signal path, size card, command view, app shell, and the Presets
   screen (node panels, edit/Revert/Undo/Reset, save as new, search and filters, an
-  FFmpeg without x264, Show setting, audio off and on, context menu, changed in another
-  window, close with unsaved changes, copy).
-- Golden: 22 views × light and dark = 44 images in `app/test/golden/goldens/`,
+  FFmpeg without x264, Show setting focusing the control, audio off and on, context
+  menu, changed in another window, close with unsaved changes through the exit request,
+  copy, Ctrl+K, F6 panes, bitrate, New preset, error marks, command layout, the narrow
+  rail).
+- Golden: 25 views × light and dark = 50 images in `app/test/golden/goldens/`,
   including the Presets screen on the video, file, audio and container nodes, an edit,
-  and an FFmpeg without x264. Regenerate with `flutter test --update-goldens test/golden`.
-- Release build: `flutter build windows --release` succeeds; one warm launch showed the
-  first frame at 575 ms and closed with exit code 0 (a single run, not a measurement).
+  bitrate mode, an FFmpeg without x264, the 1100 px window with the library open, and
+  150% text. Regenerate with `flutter test --update-goldens test/golden`.
+- Release build: `flutter build windows --release` succeeds. A launch showed its first
+  frame and closed with exit code 0 on WM_CLOSE (what Alt+F4 sends) with nothing
+  unsaved. The unsaved-changes question on a real close is covered by widget tests
+  only, not clicked through in the running app.
 
 ## Spike results (F0)
 
@@ -142,18 +157,19 @@ New from F2 (additive):
 | Keyframes in frames | The resolved `-g` in frames, for "2 s (60 frames at 29.97 fps)" (UI_SPEC §2); not shown until then |
 | FakeVeCore matching | Fixtures match exact JSON, so a model constructor's `extensions: {}` misses them. The app builds the sample media and paths from JSON; treating `{}` and absent alike would make this unnecessary |
 | Duplicate origin | C3 defines `builtin/<id>` for copies of built-ins; copies of Mine presets get no origin until a form is defined |
+| Test this preset | UI_SPEC §2: encode 60 synthetic frames (testsrc2 + sine) with the selected FFmpeg, verify with ffprobe, stream the log. No C3 service covers it; HardwareTests is per encoder. Needs a service that runs it and streams progress and the log |
+| Export, Show in folder, share string | Export… needs `PresetLibrary` to write the exported preset to a path the user picks (the app shows the file dialog); Show in folder needs the preset's file location or a "reveal" call; Copy share string needs a defined format. The app does no file or Explorer access of its own (AGENTS.md) |
 
 ## Open items
 
-- Advanced mode (F4); Test this preset (needs B3 services); Ctrl+K palette; F6/Shift+F6
-  between panes; lit tokens and click-to-field (token fields request).
-- Export…, Copy share string and Show in folder (need a file dialog: a package or
-  platform channel, licence check first); "New preset" in an empty search.
-- Close by Alt+F4 or the taskbar goes straight to the runner and skips the unsaved
-  question; the runner should forward WM_CLOSE to Dart.
-- Icon rail below 1280 px (UI_SPEC §1); diagram size from the text scale (UI_SPEC §9);
-  the command's single-line toggle; window size and position memory (app UI state
-  request); common bitrate values and the recommended quality band per resolution.
+Waiting on platform (see Needs): live results for edits (B2); click-to-field, lit tokens
+and "set in Extra arguments" (token fields); audio conversion pips (signal facts); the
+size range for a typed length; keyframes in frames; the recommended quality band (B1
+profiles); remembered window size and length (app UI state); favorites on built-ins;
+Test this preset; Export…, Show in folder, Copy share string.
+
+App side, later milestones: Advanced mode and Ctrl+M (F4); the popup's collapsible
+command strip (F5).
 
 ## Handoff for the next app agent
 

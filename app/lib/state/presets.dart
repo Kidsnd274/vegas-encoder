@@ -39,6 +39,7 @@ class PresetsState {
     this.installationId,
     this.lengthSec = 600,
     this.builtinFavorites = const {},
+    this.commandMultiline = true,
   });
 
   final String? selectedId;
@@ -58,6 +59,9 @@ class PresetsState {
   /// them (built-ins are read-only in C3); see workstreams/app.md, Needs.
   final Map<String, bool> builtinFavorites;
 
+  /// The command's layout: grouped lines, or one line (UI_SPEC §2).
+  final bool commandMultiline;
+
   PresetsState copyWith({
     Object? selectedId = _keep,
     Map<String, PresetDraft>? drafts,
@@ -68,6 +72,7 @@ class PresetsState {
     Object? installationId = _keep,
     Object? lengthSec = _keep,
     Map<String, bool>? builtinFavorites,
+    bool? commandMultiline,
   }) => PresetsState(
     selectedId: identical(selectedId, _keep) ? this.selectedId : selectedId as String?,
     drafts: drafts ?? this.drafts,
@@ -78,6 +83,7 @@ class PresetsState {
     installationId: identical(installationId, _keep) ? this.installationId : installationId as String?,
     lengthSec: identical(lengthSec, _keep) ? this.lengthSec : lengthSec as int?,
     builtinFavorites: builtinFavorites ?? this.builtinFavorites,
+    commandMultiline: commandMultiline ?? this.commandMultiline,
   );
 
   bool isFavorite(Preset p) => p.builtin ? (builtinFavorites[p.recipe.id] ?? p.favorite) : p.favorite;
@@ -108,6 +114,7 @@ class PresetsController extends Notifier<PresetsState> {
   void showAll() => state = state.copyWith(query: '', filter: LibraryFilter.all, favoritesOnly: false);
   void selectInstallation(String id) => state = state.copyWith(installationId: id);
   void setLength(int? seconds) => state = state.copyWith(lengthSec: seconds);
+  void toggleCommandLayout() => state = state.copyWith(commandMultiline: !state.commandMultiline);
 
   /// The recipe the editor shows for [id]: the draft, else the saved one.
   Recipe? working(String id) => state.drafts[id]?.recipe ?? _find(id)?.recipe;
@@ -190,6 +197,32 @@ class PresetsController extends Notifier<PresetsState> {
     if (source == null || recipe == null) return null;
     final created = await _create(source, recipe);
     state = state.copyWith(selectedId: created.recipe.id);
+    return created;
+  }
+
+  /// A new preset in Mine, started from [templateId]'s settings (UI_SPEC §2,
+  /// "New preset"), with its own name and no notes, tags or origin. Selected.
+  Future<Preset?> createNew(String templateId) async {
+    final template = _find(templateId);
+    if (template == null) return null;
+    final names = _presets.map((p) => p.recipe.name).toSet();
+    var name = 'New preset';
+    for (var n = 2; names.contains(name); n++) {
+      name = 'New preset $n';
+    }
+    final created = await _library.save(
+      Preset(
+        updatedAt: template.updatedAt,
+        requires: template.requires,
+        recipe: template.recipe.copyWith(
+          id: uniqueId(name, _presets.map((p) => p.recipe.id).toSet()),
+          name: name,
+          notes: '',
+          tags: const <String>[],
+        ),
+      ),
+    );
+    state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
     return created;
   }
 

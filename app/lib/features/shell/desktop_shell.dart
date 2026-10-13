@@ -1,3 +1,5 @@
+import 'dart:ui' show AppExitResponse;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -39,39 +41,62 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     _gallery = false;
   });
 
-  /// Close asks first when presets have unsaved changes (UI_SPEC §2).
-  Future<void> _close() async {
-    final window = ref.read(windowControllerProvider);
+  /// Every way of closing the window (the title bar's Close, Alt+F4, the
+  /// taskbar) reaches this: Flutter's Windows engine asks before it closes the
+  /// last window. Unsaved presets ask first (UI_SPEC §2).
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(onExitRequested: _onExitRequested);
+  bool _asking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle;
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  Future<AppExitResponse> _onExitRequested() async {
     final drafts = ref.read(presetsControllerProvider).drafts;
-    if (drafts.isEmpty) return window.close();
+    if (drafts.isEmpty) return AppExitResponse.exit;
+    if (_asking || !mounted) return AppExitResponse.cancel;
     final presets = ref.read(presetsProvider).value ?? const [];
     final names = [
       for (final id in drafts.keys) presets.where((p) => p.recipe.id == id).firstOrNull?.recipe.name ?? id,
     ];
     final one = names.length == 1;
-    final choice = await showVeDialog<_CloseChoice>(
-      context,
-      title: one ? 'Save changes to “${names.first}”?' : 'Save changes to ${names.length} presets?',
-      message: one
-          ? 'Your changes are lost if you don’t save them.'
-          : 'These presets have unsaved changes: ${names.join(', ')}.',
-      actions: [
-        const VeDialogAction('Cancel', _CloseChoice.cancel),
-        const VeDialogAction('Don’t save', _CloseChoice.discard),
-        VeDialogAction(one ? 'Save' : 'Save all', _CloseChoice.save, variant: VeButtonVariant.primary),
-      ],
-    );
-    if (choice == _CloseChoice.discard) return window.close();
-    if (choice != _CloseChoice.save) return;
+    _asking = true;
+    final _CloseChoice? choice;
+    try {
+      choice = await showVeDialog<_CloseChoice>(
+        context,
+        title: one ? 'Save changes to “${names.first}”?' : 'Save changes to ${names.length} presets?',
+        message: one
+            ? 'Your changes are lost if you don’t save them.'
+            : 'These presets have unsaved changes: ${names.join(', ')}.',
+        actions: [
+          const VeDialogAction('Cancel', _CloseChoice.cancel),
+          const VeDialogAction('Don’t save', _CloseChoice.discard),
+          VeDialogAction(one ? 'Save' : 'Save all', _CloseChoice.save, variant: VeButtonVariant.primary),
+        ],
+      );
+    } finally {
+      _asking = false;
+    }
+    if (choice == _CloseChoice.discard) return AppExitResponse.exit;
+    if (choice != _CloseChoice.save) return AppExitResponse.cancel;
     final controller = ref.read(presetsControllerProvider.notifier);
     for (final id in drafts.keys.toList()) {
       if (await controller.save(id: id) == SaveOutcome.conflict) {
         // Changed in another window: stay open on that preset so the user decides.
         controller.select(id);
-        return;
+        return AppExitResponse.cancel;
       }
     }
-    await window.close();
+    return AppExitResponse.exit;
   }
 
   @override
@@ -103,7 +128,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                 onDragStart: window.startDrag,
                 onMinimize: window.minimize,
                 onToggleMaximize: window.toggleMaximize,
-                onClose: _close,
+                onClose: window.close,
               ),
               Expanded(
                 child: _gallery
