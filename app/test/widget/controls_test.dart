@@ -366,7 +366,7 @@ void main() {
 
     testWidgets('status tags use the brief’s words', (tester) async {
       await pumpThemed(tester, Row(children: [for (final s in VeAvailability.values) VeStatusTag(s)]));
-      for (final s in ['Ready', 'Not in this FFmpeg', 'Failed test on this PC', 'Testing…']) {
+      for (final s in ['Ready', 'Not in this FFmpeg', 'Failed test on this PC', 'Testing…', 'Not checked yet']) {
         expect(find.text(s), findsOneWidget);
       }
     });

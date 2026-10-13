@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 
+#include "file_dialog.h"
 #include "flutter/generated_plugin_registrant.h"
 #include "single_instance.h"
 #include "startup_trace.h"
@@ -195,6 +196,20 @@ void FlutterWindow::HandleMethodCall(
          EncodableValue(static_cast<int64_t>(rect.bottom - rect.top))},
         {EncodableValue("maximized"), EncodableValue(maximized)},
     }));
+  } else if (method == "pickFile") {
+    OpenFileRequest request;
+    for (auto [key, field] : {std::pair{"title", &request.title},
+                              std::pair{"filterName", &request.filter_name},
+                              std::pair{"filterPattern",
+                                        &request.filter_pattern}}) {
+      if (const auto* value = Find(args, key)) {
+        if (const auto* text = std::get_if<std::string>(value)) {
+          *field = *text;
+        }
+      }
+    }
+    const auto path = ShowOpenFileDialog(GetHandle(), request);
+    result->Success(path ? EncodableValue(*path) : EncodableValue());
   } else if (method == "trace") {
     if (const auto* label = Find(args, "label")) {
       if (const auto* text = std::get_if<std::string>(label)) {

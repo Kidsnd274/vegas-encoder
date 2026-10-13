@@ -5,8 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vegas_encoder/app/launch.dart';
 import 'package:vegas_encoder/design/components/title_bar.dart';
 import 'package:vegas_encoder/design/tokens.dart';
+import 'package:vegas_encoder/features/ffmpeg/ffmpeg_page.dart';
 import 'package:vegas_encoder/features/gallery/gallery_page.dart';
+import 'package:vegas_encoder/features/history/history_page.dart';
 import 'package:vegas_encoder/features/presets/presets_page.dart';
+import 'package:vegas_encoder/features/settings/settings_page.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
 
@@ -68,7 +71,14 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await tester.pumpAndSettle();
-      expect(find.text('This screen is built in milestone F3.'), findsOneWidget);
+      expect(find.byType(FFmpegPage), findsOneWidget);
+      for (final (key, page) in [(LogicalKeyboardKey.digit3, HistoryPage), (LogicalKeyboardKey.digit4, SettingsPage)]) {
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await tester.sendKeyEvent(key);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await tester.pumpAndSettle();
+        expect(find.byType(page), findsOneWidget);
+      }
       await tester.tap(find.text('Presets'));
       await tester.pumpAndSettle();
       expect(find.byType(PresetsPage), findsOneWidget);

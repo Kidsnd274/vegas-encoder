@@ -63,6 +63,11 @@ abstract interface class WindowController {
   Future<void> close();
   Future<void> setKeepOnTop(bool value);
 
+  /// The Windows Open dialog for one existing file, modal to this window.
+  /// Returns the chosen path, or null if cancelled. The app only passes the
+  /// path on to ve_services; it reads no file itself.
+  Future<String?> pickFile({required String title, required String filterName, required String filterPattern});
+
   /// Adds a line to the startup trace (VEGAS_ENCODER_STARTUP_TRACE).
   Future<void> trace(String label);
 }
@@ -154,6 +159,10 @@ class MethodChannelWindowController implements WindowController {
   }
 
   @override
+  Future<String?> pickFile({required String title, required String filterName, required String filterPattern}) =>
+      _invoke<String>('pickFile', {'title': title, 'filterName': filterName, 'filterPattern': filterPattern});
+
+  @override
   Future<void> trace(String label) => _invoke<void>('trace', {'label': label});
 }
 
@@ -166,6 +175,9 @@ class FakeWindowController implements WindowController {
 
   /// What [restoredBounds] reports.
   ({WindowBounds bounds, bool maximized})? restored;
+
+  /// What [pickFile] returns: the path "chosen" in the Open dialog.
+  String? pickedFile;
   final StreamController<WindowState> _changes = StreamController<WindowState>.broadcast();
 
   void emit(WindowState state) {
@@ -210,6 +222,12 @@ class FakeWindowController implements WindowController {
   Future<void> setKeepOnTop(bool value) async {
     calls.add('setKeepOnTop($value)');
     emit(_state.copyWith(keepOnTop: value));
+  }
+
+  @override
+  Future<String?> pickFile({required String title, required String filterName, required String filterPattern}) async {
+    calls.add('pickFile($filterPattern)');
+    return pickedFile;
   }
 
   @override

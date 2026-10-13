@@ -136,11 +136,7 @@ LibraryEntry libraryEntry(
     line = '${vp?.label ?? recipe.video.encoder}, ${audio.enabled ? ap?.label ?? audio.encoder : 'no audio'}';
   }
 
-  // Encoders this preset needs: the recipe's own, or what the library
-  // derived from an Advanced command.
-  final needs = advanced
-      ? preset.requires.encoders
-      : [if (recipe.video.enabled) recipe.video.encoder, if (audio.enabled) audio.encoder];
+  final needs = encodersNeeded(preset, recipe);
   String? problem;
   String? detail;
   for (final id in needs) {
@@ -167,10 +163,20 @@ LibraryEntry libraryEntry(
   );
 }
 
+/// Encoders [preset] needs to render, as [recipe] (its draft or saved
+/// settings) has them: the recipe's own in Basic mode, or what the library
+/// derived from an Advanced command (C3 `requires`).
+List<String> encodersNeeded(Preset preset, Recipe recipe) {
+  if (recipe.command.mode == 'template') return preset.requires.encoders;
+  final audio = recipe.audio.first;
+  return [if (recipe.video.enabled) recipe.video.encoder, if (audio.enabled) audio.encoder];
+}
+
 String _statePhrase(VeAvailability s) => switch (s) {
   VeAvailability.missing => 'not in this FFmpeg',
   VeAvailability.failed => 'failed its test on this PC',
   VeAvailability.testing => 'being tested',
+  VeAvailability.unknown => 'not checked on this PC yet',
   VeAvailability.ready => 'ready',
 };
 
