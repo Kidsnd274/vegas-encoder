@@ -17,7 +17,13 @@ String _key(Object? value) {
   Object? sorted(Object? value) {
     if (value is Map) {
       final keys = value.keys.cast<String>().toList()..sort();
-      return {for (final key in keys) key: sorted(value[key])};
+      return {
+        for (final key in keys)
+          if (!(key == 'extensions' &&
+              value[key] is Map &&
+              (value[key] as Map).isEmpty))
+            key: sorted(value[key]),
+      };
     }
     if (value is List) return value.map(sorted).toList();
     return value;
@@ -110,7 +116,10 @@ class FakeVeCore implements VeCore {
          (diffFixtures ??
                  jsonMap(b0Fixtures()['diffs']).map(
                    (k, v) => MapEntry(
-                     k,
+                     k
+                         .split('\n')
+                         .map((part) => _key(jsonDecode(part)))
+                         .join('\n'),
                      jsonMaps(v).map(FieldDiff.fromJson).toList(),
                    ),
                  ))
@@ -119,9 +128,10 @@ class FakeVeCore implements VeCore {
        _estimate = Map.unmodifiable(estimateFixtures ?? {}),
        _encode = Map.unmodifiable(
          (encodedPayloadFixtures ??
-                 jsonMap(
-                   b0Fixtures()['payloads'],
-                 ).map((k, v) => MapEntry(k, base64Decode(v as String))))
+                 jsonMap(b0Fixtures()['payloads']).map(
+                   (k, v) =>
+                       MapEntry(_key(jsonDecode(k)), base64Decode(v as String)),
+                 ))
              .map((k, v) => MapEntry(k, Uint8List.fromList(v))),
        ),
        _decode = Map.unmodifiable(

@@ -2,7 +2,8 @@
 
 Pure Dart system interfaces/models and an in-memory fake for every service. Import
 `package:ve_services/ve_services.dart` (also exports ve_core types). Only dependency:
-the sibling ve_core path package. No Flutter or third-party dependencies.
+the sibling ve_core path package, which now carries B2's native hook and pinned
+MIT/BSD dependencies. No Flutter dependency or additional service dependency.
 
 See [C3–C7 contracts](../../docs/product/CONTRACTS.md) for exact file/service shapes.
 Real Windows discovery, process execution and repositories arrive in B3.

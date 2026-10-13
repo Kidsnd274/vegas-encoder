@@ -126,6 +126,48 @@ void main() {
     );
   }
   final f = core.fixtures.first;
+  final constructedMedia = MediaDescription(
+    video: VideoMedia(
+      width: f.media.video.width,
+      height: f.media.video.height,
+      fps: f.media.video.fps,
+      pixfmt: f.media.video.pixfmt,
+      sar: f.media.video.sar,
+    ),
+    audio: AudioMedia(
+      rate: f.media.audio!.rate,
+      channels: f.media.audio!.channels,
+      sampleFmt: f.media.audio!.sampleFmt,
+    ),
+    durationSec: f.media.durationSec,
+  );
+  final constructedPaths = CompilePaths(
+    ffmpeg: f.paths.ffmpeg,
+    videoPipe: f.paths.videoPipe,
+    audioPipe: f.paths.audioPipe,
+    output: f.paths.output,
+    project: f.paths.project,
+  );
+  check(
+    core
+            .compile(f.recipe, media: constructedMedia, paths: constructedPaths)
+            .argv
+            .last ==
+        f.paths.output,
+    'empty extensions and absent extensions match across nested media/path constructors',
+  );
+  check(
+    constructedMedia.video.toJson().containsKey('extensions'),
+    'fake matching does not mutate model serialization',
+  );
+  throwsCode(
+    () => core.compile(
+      f.recipe,
+      media: constructedMedia.copyWith(extensions: {'realChange': true}),
+      paths: constructedPaths,
+    ),
+    'B0-FIXTURE-MISSING',
+  );
   final missingEncoder = core.compile(
     f.recipe,
     media: f.media,

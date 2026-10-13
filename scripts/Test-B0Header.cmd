@@ -16,7 +16,7 @@ capi-header-cpp.exe || goto :fail
 cl /nologo /W4 /WX /TC "%VE_B0_ROOT%\tests\core\capi_header.c" /Fe:capi-header-c.exe || goto :fail
 capi-header-c.exe || goto :fail
 popd
-echo B0 ABI HEADER PASSED: C and C++17, x64 /W4 /WX; no runtime core implementation
+echo ABI HEADER PASSED: C and C++17, x64 /W4 /WX; declarations and layout only
 exit /b 0
 :fail
 popd

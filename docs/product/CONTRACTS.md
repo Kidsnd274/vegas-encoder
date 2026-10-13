@@ -1,9 +1,9 @@
-# App/platform contracts v1 — B0
+# App/platform contracts v1 — B2
 
-Updated: 2026-10-12 (Asia/Singapore). **B0 plus additive app-review extensions.** These
+Updated: 2026-10-13 (Asia/Singapore). **B2 core/FFI plus additive B0/F2 extensions.** These
 shapes are the shared contract. Breaking changes require the owner and both
 workstreams; additive fields stay in v1. Native core implementation/build hook is
-B2, real system services are B3. No native payload, popup, progress-window or
+delivered in B2; real system services remain B3. No native payload persistence, popup, progress-window or
 VEGAS compatibility gate is passed by this handoff.
 
 ## Common conventions
@@ -102,7 +102,8 @@ qualification.** B1 owns `schema/encoder-profiles.v1.json` with recaptured facts
 ## C2 — VeCore and the C ABI
 
 Import `package:ve_core/ve_core.dart`. `VeCore` is synchronous and isolate-local;
-create a native instance per isolate in B2. It performs no filesystem or host I/O.
+create `NativeVeCore()` per isolate. The build hook bundles its DLL. Core operations
+perform no filesystem or host I/O (DLL loading happens during facade setup).
 The app must not implement these rules. Types and signatures are in
 [api.dart](../../packages/ve_core/lib/src/api.dart) and
 [models.dart](../../packages/ve_core/lib/src/models.dart).
@@ -134,22 +135,24 @@ Issue {id:string,level:"error"|"warn"|"info"|"hint",field:string,message:string,
 Diagnostic {id,level,message,params,fix as above,start:int,end:int}
 CompileResult {executable:string,argv:string[],display:CommandToken[],commandLine:string,
   advancedTemplate:string,resolved:ResolvedSettings|null,signalPath:SignalPathFacts|null,
-  issues:Issue[],summary:RecipeSummary}
+  issues:Issue[],summary:RecipeSummary,overriddenFields:string[]}
 CommandToken {text:string,role:"exe"|"global"|"input"|"map"|"video"|"audio"|"mux"|"output"|"extra"|"macro",
   field:string|null}
 ResolvedSettings {videoEncoder:string,audioEncoder:string|null,videoMode:string,audioMode:string|null,
-  quality:number|null,speed,profile:string|null,depth:int,pixfmt:string}
-SignalPathFacts {video:StreamSignalFacts|null,audio:StreamSignalFacts[]}
+  quality:number|null,speed,profile:string|null,depth:int,pixfmt:string,gopFrames:int|null}
+SignalPathFacts {video:StreamSignalFacts|null,audio:StreamSignalFacts[],source:SourceSignalFacts|null}
+SourceSignalFacts {video:SignalFormatFacts,audio:SignalFormatFacts|null}
+SignalFormatFacts {format:string,bits:positiveInt|null,chroma:string|null,label,shortLabel:string}
 StreamSignalFacts {inputFormat,outputFormat:string|null,inputBits,outputBits:positiveInt|null,
   inputChroma,outputChroma:string|null,chromaChanged,conversion:bool|null,
-  containerSupport:"ok"|"warn"|"no"|"unknown"}
+  containerSupport:"ok"|"warn"|"no"|"unknown",inputLabel,outputLabel,conversionNote:string|null}
 RecipeSummary {container,video,videoQuality,depth,audio,audioQuality,mode:string,
   videoEncoder:string|null,speed:string|null,command:bool}
 CompletionResult {kind:"none"|"option"|"value",of:string|null,start:int,end:int,items:Suggestion[]}
 Suggestion {value,description:string,type:string|null,defaultValue:JSON value,
   source:string|null,availability:"ok"|"missing"|"failed"|"unknown"|null}
 SizeEstimate {available,approx:bool,videoKbps,audioKbps,bytesPerMinute:number,totalBytes:number|null,
-  minBytesPerMinute,maxBytesPerMinute:number|null,explanation:string}
+  minBytesPerMinute,maxBytesPerMinute,minTotalBytes,maxTotalBytes:number|null,explanation:string}
 FieldDiff {path:string,before:JSON value,after:JSON value}
 Origin {presetId:string,revision:int,name:string}
 TemplateSnapshot {recipe:Recipe,origin:Origin|null,vegasPrefs:VegasPreferences,writtenBy:string}
@@ -163,6 +166,14 @@ come from delivered media; desktop uses the documented sample. `durationSec` for
 estimate is the File node's user-entered duration, not media.durationSec. If absent,
 totalBytes is null. Advanced estimates return available=false. Estimates are core
 results, including range/approximation; Dart must not calculate its own model.
+
+`minTotalBytes` / `maxTotalBytes` are the range for the user-entered length, null if
+there is no length, estimate or range. They are not figures the app scales itself.
+Bitrate estimates have approx=false and no range; container overhead is excluded.
+Filters and conflicting Extra rate-control options can return available=false.
+`resolved.gopFrames` is the final emitted `-g`, including Extra overrides or the
+FFV1 fixed GOP, null if no interval is emitted or established. UI formats the frame
+count alongside the delivered rate; it does not round seconds into frames itself.
 
 Field paths use `audio[0].bitrateK`. Diagnostics and completion start/end/caret are
 **UTF-16 code-unit offsets**, end exclusive, matching Dart text selections. C++ must
@@ -180,6 +191,11 @@ replacements; Advanced text points at `command.template`. Executable, generated
 inputs/maps/globals and output paths have null: no editable recipe field produced
 them. Field is a navigation target, not a complete dependency graph; a derived
 option may depend on other fields too. Missing field in older results reads as null.
+`overriddenFields` lists the generated recipe controls displaced by Basic Extra
+arguments; use it for "set in Extra arguments" without parsing FFmpeg option names.
+It is empty in Advanced mode and defaults empty for older results. Token optional
+`sourceStart`/`sourceEnd` data are UTF-16 spans within the owning Extra/template text;
+apps normally use issue indexes, not these internal provenance spans.
 
 `Issue.tokenIndices` is a unique, ascending list of **zero-based indexes into that
 CompileResult.display**, including the executable at index 0. It identifies actual
@@ -198,6 +214,15 @@ unknown facts. Missing signalPath means facts unavailable (older result), not al
 streams disabled. In Advanced mode core supplies only facts it can establish from
 the active command, with unknown formats/bits/conversion null and unknown mux support.
 It must not present the inactive Basic recipe as resolved command facts.
+For general extra-input selection or multiple outputs, core keeps the delivered
+source node but leaves unestablished stream/output facts unknown. It does not infer
+which source/output FFmpeg's general stream-selection rules will choose.
+`source` describes delivered input even when a stream is disabled. Its format
+labels and the stream's inputLabel/outputLabel/conversionNote are fallback copy,
+with numeric bits/chroma supplied independently. Apps may localize these labels
+without deriving facts from a pixel/sample-format name. Unknown input formats keep
+their raw name as a label and bits/chroma null. Basic `resolved` can also be null
+when Extra arguments select an unknown final format; signalPath retains known facts.
 
 Formats and bits describe the raw data delivered to the encoder **before compression**,
 not the encoded packet format or compressed bitrate. Video uses FFmpeg pixel formats;
@@ -215,10 +240,10 @@ muxes with a playback caveat, `ok` means supported by the selected rule set, and
 this fact to draw a broken stream-to-container wire; no message parsing or local
 compatibility calculation. Default fixture facts remain authored design samples.
 
-Draft [ve_core.h](../../src/core/capi/ve_core.h) defines counted UTF-8 in/out and
+[ve_core.h](../../src/core/capi/ve_core.h) defines counted UTF-8 in/out and
 paired ownership. Windows x64 default C calling convention, no packing override:
 ve_buffer is 16 bytes, data at 0 and uint32 length at 8. Both DLL/static core consumers
-use the same sources in B2. No DLL/build hook is delivered in B0.
+use the same sources in B2. No C++ type, Windows header or host pointer crosses it.
 
 | C entry point | Request | Result |
 | --- | --- | --- |
@@ -232,6 +257,8 @@ use the same sources in B2. No DLL/build hook is delivered in B0.
 | ve_recipe_diff | `{before:Recipe,after:Recipe}` | `{diff:FieldDiff[]}` |
 | ve_payload_encode | TemplateSnapshot | binary envelope |
 | ve_payload_decode | binary envelope | PayloadResult |
+| ve_session_request_validate | C4 EditSessionRequest | `{request:originalObject,issues:Issue[]}` |
+| ve_session_result_validate | C4 EditSessionResult | `{result:originalObject,issues:Issue[]}` |
 
 Transport failure returns ve_status and optional UTF-8 `{error:{code,message}}`;
 output may be empty on allocation failure. Every returned allocation is freed once
@@ -239,7 +266,19 @@ with ve_free, including error output. Input memory is never retained. Semantic
 validation errors return VE_OK with issues. All exceptions are contained at the ABI.
 Payload layout is TECH_ARCHITECTURE §6.2, total draft limit 16 KiB, little endian,
 CRC-32/IEEE of canonical UTF-8. Proof markers are rejected and never migrated. This
-is a design contract only; native placement/persistence stays gated A6/A7.
+is implemented and tested offline; native placement/persistence stays gated A6/A7.
+The two C4 helpers perform pure shape checks and preserve unknown fields. File I/O,
+matching the expected session ID and one-final-result lifetime remain in services/
+adapter. `NativeVeCore.validateSessionRequest/Result` expose these helpers as JSON.
+
+Native reads reject duplicate keys, invalid UTF-8, overflowing integer literals and
+nesting deeper than 64. Text tokenization follows CRT quoting and accepts pasted
+line continuations. No shell expansion runs. Extra arguments cannot override
+encoders or owned inputs/maps/mux/progress controls; choose the control or Advanced
+mode instead. Extra inputs in Advanced mode must follow {inputs} to keep generated
+VEGAS input indexes stable. Macro substitution is one pass: supplied paths/project
+text remain literal, and expanded arguments are bounded to 1 MiB. FFmpeg remains
+the final authority; profile/option bootstrap data is not Windows qualification.
 
 ### Using FakeVeCore
 
@@ -263,7 +302,10 @@ these fixture results do not inspect or qualify an actual capability cache.
 `CoreFixture.compileIssues` supplies capability-specific compile issues with display
 indexes separately from standalone validations. Injected fixtures that omit it retain
 the earlier fallback to their validations; provide it when highlights are needed.
-Payload injection copies input/output bytes. A native core instance is B2 work.
+Payload injection copies input/output bytes. Fake matching ignores only empty
+`extensions` objects at any nesting level; it preserves source JSON and still
+rejects genuine edits. No edited-state fixture sweep is added. `NativeVeCore` accepts
+edits and supplied contexts directly, with no fixture lookup.
 
 ## C3 — System service APIs and fakes
 
@@ -506,7 +548,9 @@ FakeVeCore.fixtures contexts, or inject edited-state fixtures for widget/golden
 tests. The app owns display formatting, workflow, focus/window behavior, and skins;
 platform owns domain/system rules. No app or design files changed for B0.
 
-Run `scripts/Test-B0.ps1` for dependency-free Dart contract tests, recipe/fixture
-bounds checks and MSVC C/C++ ABI-header checks. Dart pub resolution is offline;
-there are no third-party package dependencies. Existing fake-host/fake-installer
+Run `scripts/Test-B0.ps1` for Dart model/fake contract tests, recipe/fixture bounds
+and MSVC C/C++ ABI-header checks. `scripts/Test-B2.ps1 -Asan -Aot -Encoder` adds
+static/DLL/FFI, sanitizer, bundled AOT and synthetic encoder checks. Dart pub
+resolution uses the cached, pinned MIT/BSD dependencies; notices are in ve_core.
+Existing fake-host/fake-installer
 regression summaries and remaining gates are in platform.md and docs/STATUS.md.

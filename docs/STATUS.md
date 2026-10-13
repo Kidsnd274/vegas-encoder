@@ -1,6 +1,6 @@
 # Vegas Encoder status
 
-Updated: 2026-10-12 (Asia/Singapore). Installed version: 0.1.2-config-proof.
+Updated: 2026-10-13 (Asia/Singapore). Installed version: 0.1.2-config-proof.
 
 ## Current progress
 
@@ -13,8 +13,25 @@ and render progress through a VEGAS status line (if a real-host test allows it) 
 small progress window. The project license is still open. The platform B0 contracts,
 draft recipe schema/C ABI and pure Dart packages with fakes are now implemented;
 see [contracts](product/CONTRACTS.md) and [platform handoff](product/workstreams/platform.md).
-No native product-core implementation, real services or new VEGAS runtime claim
-is included, and the adapter gates below are unchanged.
+The B2 native product core is now implemented below. Real services and adapter
+integration remain later milestones; the VEGAS gates below are unchanged.
+
+**B2 core/FFI (2026-10-13):** master through F2 (`ab7e7ab`) is in ws/platform.
+Portable C++17 normalize/validate/compile/lint/complete/estimate/diff/payload and
+pure session checks are implemented, with a Dart `NativeVeCore()` facade and native
+asset hook, DLL/static builds, token/stream facts and the additive F2 result fields.
+The app still explicitly selects its fake provider; the app agent switches it after
+merge. Profiles/options are B0/Linux bootstrap data pending B1 Windows recapture.
+
+**B2 validation:** MSVC x64 `/W4 /WX`; 2,900 native checks, also under AddressSanitizer;
+171 real-FFI checks per native-asset, explicit-DLL and bundled-AOT route. Warm
+end-to-end compile mean about 0.6–0.95 ms for 500-call samples. Both packages analyze
+cleanly; 173 core-fake, 57 service-fake and 281 fixture checks plus ABI layout checks
+pass. Native-generated argv also pass 60-frame fractional-rate synthetic FFV1/PCM
+and H.264/AAC encodes/FFprobe checks with existing gyan FFmpeg 5.1.2; lossless checks
+compare all ten meaningful P010 sample bits and exact PCM float bytes. **Offline
+files/real core, no new fake-host or real VEGAS test.** No installed DLL changed.
+See [platform handoff](product/workstreams/platform.md) for limits and app wiring.
 
 **B0 app review additions (Windows x64):** master including B0 and F0/F1 is merged
 into ws/platform. Contract v1 now includes token field provenance/issue display
@@ -32,8 +49,8 @@ Existing 24 helper, 9 boundary, 67 configuration checks, default fake-host suite
 11-case/20-render proof/recovery suite and fake-tree installer tests pass with
 gyan FFmpeg 5.1.2. This is offline/fake-host validation, not a new real VEGAS test.
 
-**Next:** stop at this contract milestone for owner merge, then B2 real core/FFI
-before B1 to unblock live editing. B1 downloads are approved into this worktree's
+**Next:** stop at B2 for owner merge, then keep B1 Windows recapture tight and do
+B3 real services, including the remaining F2 requests. B1 downloads are approved into this worktree's
 ignored build/ only (source URL/version recorded), with existing `C:\ffmpeg` gyan
 5.1.2 as the older case. No installation or PATH change. Workstream split:
 [docs/product/WORKSTREAMS.md](product/WORKSTREAMS.md).
@@ -41,7 +58,7 @@ ignored build/ only (source URL/version recorded), with existing `C:\ffmpeg` gya
 **Scope boundary:** product work is now authorized on ws/app and ws/platform.
 The owner asks platform to commit each milestone and stop for merging. The deferred real
 two-template/restart test and controlled real failure recovery remain qualification
-limits; B0's fixtures do not pass A5–A7. No installed DLL or rollback backup changed.
+limits; core/fake/offline tests do not pass A5–A7. No installed DLL or rollback backup changed.
 
 First real Vegas Encoder render passes decoded checks: 182 1080p frames at
 30000/1001 and 291,491 float32 stereo sample frames, S_OK/encoder exit zero,
@@ -227,8 +244,8 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 ## Next task
 
-Platform stops after the additive app-review contract milestone for owner merge.
-B2 core/FFI is next, then the approved tight B1 Windows recapture (existing gyan
+Platform stops after B2 for owner merge; app switches its provider/mappings to the
+real core through its own workstream. Next is approved tight B1 Windows recapture (existing gyan
 5.1.2 plus current gyan.dev/BtbN builds in ignored build/, no installation/PATH change),
 then B3–B4. Order and rationale are in
 [platform.md](product/workstreams/platform.md).

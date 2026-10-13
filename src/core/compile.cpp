@@ -1,0 +1,298 @@
+#include "core.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <map>
+#include <regex>
+#include <sstream>
+
+namespace ve {
+namespace {
+std::string Number(double value) {
+    std::ostringstream out; out.imbue(std::locale::classic()); out.precision(15); out << value; return out.str();
+}
+void Push(Json& tokens, const std::string& role, const Json& field, const std::vector<std::string>& args) {
+    for (const auto& arg : args) tokens.push_back(Json{{"text",arg},{"role",role},{"field",field}});
+}
+void Pair(Json& tokens, const std::string& role, const std::string& field, const std::string& flag, const Json& value) {
+    if (value.is_null() || flag.empty()) return;
+    Push(tokens,role,field,{flag,value.is_string() ? value.get<std::string>() : value.is_number() ? Number(value.get<double>()) : value.dump()});
+}
+std::vector<std::string> Args(const Json& value) {
+    std::vector<std::string> args; if (value.is_array()) for (const auto& v : value) args.push_back(v.get<std::string>()); return args;
+}
+void Extra(Json& tokens, const std::string& text, const std::string& field, Json& overridden) {
+    std::vector<Word> words;
+    try { words = Tokenize(text); } catch (const Error&) { return; } // Lint emits the blocking syntax issue.
+    const auto offsets = Utf16Map(text);
+    std::map<std::string, bool> names;
+    auto owned = [](const std::string& key) { return key == "c" || key == "i" || key == "f" || key == "map" || key == "vn" || key == "an" || key == "progress"; };
+    for (const auto& word : words) if (IsOption(word.text) && !owned(OptionKey(word.text))) names[OptionKey(word.text)] = true;
+    Json retained = Json::array();
+    for (size_t i = 0; i < tokens.size(); ++i) {
+        if (IsOption(Str(tokens[i],"text")) && names.count(OptionKey(Str(tokens[i],"text")))) {
+            const auto source = Str(tokens[i],"field");
+            if (!source.empty() && std::find(overridden.begin(),overridden.end(),Json(source)) == overridden.end()) overridden.push_back(source);
+            if (i + 1 < tokens.size() && !IsOption(Str(tokens[i+1],"text"))) ++i;
+        } else retained.push_back(tokens[i]);
+    }
+    tokens = std::move(retained);
+    for (size_t i = 0; i < words.size(); ++i) {
+        const auto& word = words[i];
+        if (IsOption(word.text) && owned(OptionKey(word.text))) {
+            if (i + 1 < words.size() && !IsOption(words[i+1].text)) ++i;
+            continue;
+        }
+        tokens.push_back(Json{{"text",word.text},{"role","extra"},{"field",field},
+            {"sourceStart",offsets[word.start]},{"sourceEnd",offsets[word.end]}});
+    }
+}
+double Bitrate(const std::string& text, double fallback) {
+    try {
+        size_t used = 0; double value = std::stod(text,&used);
+        const auto unit = text.substr(used);
+        if (unit == "k" || unit == "K") return value;
+        if (unit == "m" || unit == "M") return value * 1000;
+        if (unit.empty()) return value / 1000;
+    } catch (const std::exception&) {}
+    return fallback;
+}
+void ReadStream(const Json& tokens, Json& resolved, bool video) {
+    for (size_t i = 0; i + 1 < tokens.size(); ++i) {
+        const auto key = OptionKey(Str(tokens[i],"text")); const auto value = Str(tokens[i+1],"text");
+        if (!IsOption(Str(tokens[i],"text"))) continue;
+        const std::string prefix = video ? "video" : "audio";
+        if (key == "pix_fmt" && video) resolved["pixfmt"] = value;
+        if (key == "profile" && video) resolved["profile"] = value;
+        if ((key == "crf" || key == "cq" || key == "global_quality" || key == "qp_i") && video) {
+            try { resolved["quality"] = std::stod(value); } catch (const std::exception&) {}
+        }
+        if (key == "qp" && video) { try { resolved["qp"] = std::stod(value); } catch (const std::exception&) {} }
+        if (key == "preset" && video) resolved["speed"] = value;
+        if (key == "tune" && video) resolved["tune"] = value;
+        if (key == "b") resolved[prefix + "BitrateK"] = Bitrate(value,Num(resolved,prefix + "BitrateK"));
+        if (key == "g" && video) { try { size_t used = 0; const auto frames = std::stoll(value,&used); resolved["gopFrames"] = used == value.size() && frames >= 1 && frames <= 2147483647 ? Json(frames) : Json(nullptr); } catch (const std::exception&) { resolved["gopFrames"] = nullptr; } }
+        if (key == "sample_fmt" && !video) resolved["audioSampleFormat"] = value;
+        if (key == "ar" && !video) { try { resolved["audioRate"] = std::stod(value); } catch (const std::exception&) {} }
+        if (key == "ac" && !video) { try { resolved["audioChannels"] = std::stod(value); } catch (const std::exception&) {} }
+        if (key == "vf" || key == "filter_complex") resolved["videoFilter"] = true;
+        if (key == "af" || key == "filter_complex") resolved["audioFilter"] = true;
+    }
+}
+Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
+    const auto& v = r.at("video"); const auto& a = r.at("audio")[0]; const auto& c = r.at("container");
+    // ordered_json object storage can move when reflected values add keys to res.
+    // Keep profiles owned across ReadStream instead of borrowing its object entries.
+    const Json p = res.at("videoProfile"); const Json ap = res.at("audioProfile");
+    const auto mode = Str(res,"videoMode"); const auto amode = Str(res,"audioMode");
+    Json out = Json::array(), video = Json::array(), audio = Json::array();
+    if (Bool(v,"enabled",true)) Push(out,"map",nullptr,{"-map","0:v:0"});
+    if (Bool(a,"enabled",true) && media.contains("audio") && !media.at("audio").is_null()) Push(out,"map",nullptr,{"-map","1:a:0"});
+    if (Bool(v,"enabled",true)) {
+        Pair(video,"video","video.encoder","-c:v",Str(res,"videoEncoder"));
+        if (p.contains("speed")) Pair(video,"video","video.speed",Str(p.at("speed"),"flag"),res.at("speed"));
+        if (Str(p,"id") == "libvpx-vp9") { Pair(video,"video","video.encoder","-deadline","good"); Pair(video,"video","video.encoder","-row-mt",1); }
+        if (p.contains("tune")) Pair(video,"video","video.tune",Str(p.at("tune"),"flag"),res.at("tune"));
+        const auto bitrate = Num(v,"bitrateK",Num(p.value("bitrate",Json::object()),"def",12000));
+        const bool nv = Str(p,"hw") == "NVIDIA";
+        if (mode == "crf") {
+            Pair(video,"video","video.quality",Str(p.value("quality",Json::object()),"flag","-crf"),res.at("quality"));
+            if (Str(p,"id") == "libvpx-vp9") Pair(video,"video","video.mode","-b:v",0);
+        } else if (mode == "cq") {
+            if (nv) { Pair(video,"video","video.mode","-rc","vbr"); Pair(video,"video","video.quality","-cq",res.at("quality")); Pair(video,"video","video.mode","-b:v",0); }
+            else Pair(video,"video","video.quality",Str(p.value("quality",Json::object()),"flag","-global_quality"),res.at("quality"));
+        } else if (mode == "abr" || mode == "cbr") {
+            if (nv) Pair(video,"video","video.mode","-rc",mode == "cbr" ? "cbr" : "vbr");
+            Pair(video,"video","video.bitrateK","-b:v",Number(bitrate) + "k");
+            if (mode == "cbr") { Pair(video,"video","video.bitrateK","-minrate",Number(bitrate) + "k"); Pair(video,"video","video.bitrateK","-maxrate",Number(bitrate) + "k"); Pair(video,"video","video.bitrateK","-bufsize",Number(bitrate * 2) + "k"); }
+            else if (Num(v,"maxrateK") > 0) { Pair(video,"video","video.maxrateK","-maxrate",Number(Num(v,"maxrateK")) + "k"); Pair(video,"video","video.maxrateK","-bufsize",Number(Num(v,"maxrateK") * 2) + "k"); }
+        } else if (mode == "cqp") {
+            if (nv) Pair(video,"video","video.mode","-rc","constqp");
+            Pair(video,"video","video.qp",Str(p.value("qp",Json::object()),"flag","-qp"),Num(v,"qp",Num(p.value("qp",Json::object()),"def",20)));
+        } else if (mode == "profile") {
+            Pair(video,"video","video.profile","-profile:v",res.at("profile"));
+            if (p.contains("vendor")) Pair(video,"video","video.encoder","-vendor",p.at("vendor"));
+        } else if (mode == "lossless") Push(video,"video","video.mode",Args(p.value("fixedArgs",Json::array())));
+        if (p.contains("multipass")) Pair(video,"video","video.multipass",Str(p.at("multipass"),"flag"),v.value("multipass",Json(nullptr)));
+        if (mode != "profile") Pair(video,"video","video.profile","-profile:v",res.at("profile"));
+        Pair(video,"video",mode == "profile" ? "video.profile" : "video.depth","-pix_fmt",Str(res,"pixfmt"));
+        if (Num(v,"gopSec") > 0 && mode != "profile" && mode != "lossless") {
+            const auto& fps = media.at("video").at("fps"); const double frames = std::round(Num(v,"gopSec") * fps[0].get<double>() / fps[1].get<double>());
+            if (std::isfinite(frames) && frames >= 1 && frames <= 2147483647) Pair(video,"video","video.gopSec","-g",frames);
+        }
+        if (Str(v,"color","bt709") == "bt709") for (const auto& flag : {"-color_primaries","-color_trc","-colorspace","-color_range"}) Pair(video,"video","video.color",flag,std::string(flag) == "-color_range" ? "tv" : "bt709");
+        if (p.contains("appleTag") && (Str(c,"format") == "mp4" || Str(c,"format") == "mov")) Pair(video,"video","video.encoder","-tag:v",p.at("appleTag"));
+        Extra(video,Str(v,"extra"),"video.extra",overridden); ReadStream(video,res,true);
+    } else Push(video,"video","video.enabled",{"-vn"});
+    if (Bool(a,"enabled",true) && media.contains("audio") && !media.at("audio").is_null()) {
+        Pair(audio,"audio","audio[0].encoder","-c:a",Str(a,"encoder"));
+        if (amode == "bitrate") {
+            Pair(audio,"audio","audio[0].bitrateK","-b:a",Number(Num(a,"bitrateK",Num(ap.value("bitrate",Json::object()),"def",320))) + "k");
+            if (ap.contains("vbrMode")) Pair(audio,"audio","audio[0].mode","-vbr",ap.at("vbrMode"));
+        } else if (amode == "vbr") Pair(audio,"audio","audio[0].vbr",Str(ap.value("vbr",Json::object()),"flag","-q:a"),Num(a,"vbr",Num(ap.value("vbr",Json::object()),"def")));
+        if (ap.contains("level")) Pair(audio,"audio","audio[0].level",Str(ap.at("level"),"flag","-compression_level"),Num(a,"level",Num(ap.at("level"),"def")));
+        if (a.contains("sampleRate") && a.at("sampleRate").is_number()) Pair(audio,"audio","audio[0].sampleRate","-ar",a.at("sampleRate"));
+        if (Str(a,"channels","source") != "source") Pair(audio,"audio","audio[0].channels","-ac",Str(a,"channels") == "mono" ? 1 : 2);
+        Extra(audio,Str(a,"extra"),"audio[0].extra",overridden); ReadStream(audio,res,false);
+    } else Push(audio,"audio","audio[0].enabled",{"-an"});
+    for (const auto& token : video) out.push_back(token); for (const auto& token : audio) out.push_back(token);
+    if (Str(c,"format") == "mp4" && Bool(c,"faststart")) Pair(out,"mux","container.faststart","-movflags","+faststart");
+    const auto container = FindContainer(Str(c,"format"));
+    if (container) Pair(out,"mux","container.format","-f",Str(*container,"muxer"));
+    return out;
+}
+std::string Expand(const std::string& token, const Json& media, const Json& paths, Json& issues) {
+    const auto& v = media.at("video"); const auto& fps = v.at("fps");
+    const Json a = media.value("audio",Json(nullptr));
+    const std::map<std::string,std::string> macros{{"{v}","0:v:0"},{"{a}","1:a:0"},
+        {"{output}",Str(paths,"output")},{"{project}",Str(paths,"project")},
+        {"{width}",Number(Num(v,"width"))},{"{height}",Number(Num(v,"height"))},
+        {"{fps}",fps[0].dump() + "/" + fps[1].dump()},{"{sample_rate}",a.is_null() ? "" : Number(Num(a,"rate"))}};
+    std::string result;
+    auto append = [&](const std::string& value) {
+        if (value.size() > VE_CORE_JSON_LIMIT || result.size() > VE_CORE_JSON_LIMIT - value.size()) throw Error(VE_LIMIT_EXCEEDED,"COMMAND-LIMIT","Expanded command token exceeds 1 MiB.");
+        result += value;
+    };
+    for (size_t i = 0; i < token.size();) {
+        if (token[i] != '{') { if (result.size() >= VE_CORE_JSON_LIMIT) throw Error(VE_LIMIT_EXCEEDED,"COMMAND-LIMIT","Expanded command token exceeds 1 MiB."); result += token[i++]; continue; }
+        const auto end = token.find('}',i+1);
+        if (end == std::string::npos) { append(token.substr(i)); break; }
+        const auto macro = token.substr(i,end-i+1); const auto known = macros.find(macro);
+        if (known != macros.end()) append(known->second);
+        else if (macro.rfind("{gop:",0) == 0 && macro.size() > 7 && macro[macro.size()-2] == 's') {
+            const auto value = macro.substr(5,macro.size()-7); double seconds = 0;
+            try { size_t used = 0; seconds = std::stod(value,&used); if (used != value.size()) seconds = 0; } catch (const std::exception&) {}
+            const auto frames = std::round(seconds * fps[0].get<double>() / fps[1].get<double>());
+            if (!(frames >= 1 && frames <= 2147483647)) { issues.push_back(Issue("L-GOP","error","command.template","Keyframe macro is outside FFmpeg's frame-count bounds.")); append(macro); }
+            else append(Number(frames));
+        } else append(macro);
+        i = end+1;
+    }
+    return result;
+}
+void Reflected(const Json& tokens, Json& res) {
+    Json video = Json::array(), audio = Json::array();
+    std::string kind = "video";
+    for (size_t i = 0; i < tokens.size(); ++i) {
+        const auto option = Str(tokens[i],"text"), key = IsOption(option) ? OptionKey(option) : "";
+        if (option == "-vn") res["videoEnabled"] = false;
+        if (option == "-an") res["audioEnabled"] = false;
+        if (option.find(":a") != std::string::npos || option == "-acodec" || key == "ar" || key == "ac" || key == "af" || key == "sample_fmt") kind = "audio";
+        if (option.find(":v") != std::string::npos || option == "-vcodec" || key == "pix_fmt" || key == "vf") kind = "video";
+        if (key == "c" && i + 1 < tokens.size()) {
+            const auto encoder = Str(tokens[i+1],"text"); res[kind + "Encoder"] = encoder;
+            const auto p = FindProfile(kind,encoder); res[kind + "Profile"] = p ? *p : Json{{"family","unknown"}};
+        }
+        if (key == "f" && i + 1 < tokens.size()) {
+            const auto muxer = Str(tokens[i+1],"text");
+            for (const auto& c : Profiles().at("containers")) if (Str(c,"muxer") == muxer) res["container"] = Str(c,"id");
+        }
+        (kind == "video" ? video : audio).push_back(tokens[i]);
+    }
+    ReadStream(video,res,true); ReadStream(audio,res,false);
+}
+}
+Json InputTokens(const Json& r, const Json& media, const Json& paths) {
+    const auto& v = media.at("video"); const auto& fps = v.at("fps"); Json result = Json::array();
+    Push(result,"input",nullptr,{"-f","rawvideo","-pix_fmt",Str(v,"pixfmt","p010le"),"-s",Number(Num(v,"width")) + "x" + Number(Num(v,"height")),
+         "-r",fps[0].dump() + "/" + fps[1].dump(),"-thread_queue_size","64","-i",Str(paths,"videoPipe")});
+    if (Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null()) {
+        const auto& a = media.at("audio");
+        Push(result,"input",nullptr,{"-f",Str(a,"sampleFmt","f32le"),"-ar",Number(Num(a,"rate")),"-ac",Number(Num(a,"channels")),"-thread_queue_size","64","-i",Str(paths,"audioPipe")});
+    }
+    return result;
+}
+Json Compile(const Json& request) {
+    const auto& r = request.at("recipe"); const auto& media = request.at("media"); const auto& paths = request.at("paths");
+    CheckMedia(media);
+    if (!paths.is_object() || Str(paths,"ffmpeg","ffmpeg").empty() || Str(paths,"videoPipe").empty() || Str(paths,"output").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Executable, video pipe and output path must be nonempty strings.");
+    Json issues = Validate(request); const auto exe = Str(paths,"ffmpeg","ffmpeg");
+    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()}};
+    if (HasErrors(Structural(r))) return result;
+    const bool audioInput = Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null();
+    if (audioInput && Str(paths,"audioPipe").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Enabled audio needs a pipe path.");
+    Json tokens = Json::array(); Push(tokens,"exe",nullptr,{exe});
+    Push(tokens,"global",nullptr,{"-hide_banner","-nostdin","-loglevel","info","-stats_period","0.5","-progress","pipe:1"});
+    const auto input = InputTokens(r,media,paths); Json res = Resolve(r); res["gopFrames"] = nullptr;
+    const bool advanced = Str(r.at("command"),"mode") == "template";
+    if (!advanced) {
+        for (const auto& token : input) tokens.push_back(token);
+        const auto basic = Basic(r,media,res,result["overriddenFields"]); for (const auto& token : basic) tokens.push_back(token);
+        std::string seed = "{inputs}\n"; std::string lastRole;
+        for (const auto& token : basic) {
+            const auto role = Str(token,"role"); if (!lastRole.empty()) seed += lastRole == role ? " " : "\n";
+            seed += Quote(Str(token,"text")); lastRole = role;
+        }
+        result["advancedTemplate"] = seed + "\n{output}";
+        Push(tokens,"output",nullptr,{Str(paths,"output")});
+    } else {
+        const auto text = Str(r.at("command"),"template"); result["advancedTemplate"] = text;
+        const auto offsets = Utf16Map(text);
+        // Reflect only the active command; inactive Basic fields are never claimed as command facts.
+        res = Json{{"videoEncoder",""},{"audioEncoder",""},{"videoProfile",{{"family","unknown"}}},{"audioProfile",{{"family","unknown"}}},
+                   {"videoMode",""},{"audioMode",""},{"pixfmt",""},{"depth",0},{"container",""},{"gopFrames",nullptr},
+                   {"quality",nullptr},{"speed",nullptr},{"tune",nullptr},{"profile",nullptr},{"videoEnabled",true},{"audioEnabled",audioInput}};
+        std::vector<Word> words;
+        try { words = Tokenize(text); } catch (const Error&) {} // Lint already contains the blocking quote issue.
+        Json reflected = Json::array();
+        size_t expandedBytes = 0;
+        for (size_t i = 0; i < words.size(); ++i) {
+            const auto& word = words[i];
+            if (i == 0 && (word.text == "ffmpeg" || word.text == "ffmpeg.exe")) continue;
+            if (word.text == "-hide_banner" || word.text == "-nostdin") continue;
+            if (word.text == "{inputs}") {
+                for (auto token : input) { expandedBytes += Str(token,"text").size(); token["sourceStart"] = offsets[word.start]; token["sourceEnd"] = offsets[word.end]; tokens.push_back(token); }
+                if (expandedBytes > VE_CORE_JSON_LIMIT) throw Error(VE_LIMIT_EXCEEDED,"COMMAND-LIMIT","Expanded command exceeds 1 MiB.");
+                continue;
+            }
+            const auto prior = issues.size(); const auto expanded = Expand(word.text,media,paths,issues);
+            expandedBytes += expanded.size();
+            if (expandedBytes > VE_CORE_JSON_LIMIT) throw Error(VE_LIMIT_EXCEEDED,"COMMAND-LIMIT","Expanded command exceeds 1 MiB.");
+            for (size_t j = prior; j < issues.size(); ++j) { issues[j]["params"]["start"] = offsets[word.start]; issues[j]["params"]["end"] = offsets[word.end]; }
+            auto token = Json{{"text",expanded},{"role",word.text == "{output}" ? "output" : "extra"},{"field","command.template"},
+                              {"sourceStart",offsets[word.start]},{"sourceEnd",offsets[word.end]}};
+            tokens.push_back(token); reflected.push_back(token);
+        }
+        Reflected(reflected,res);
+        const bool extraInputs = std::any_of(issues.begin(),issues.end(),[](const Json& issue) { return Str(issue,"id") == "L-INPUT"; });
+        const bool extraOutputs = std::any_of(issues.begin(),issues.end(),[](const Json& issue) { return Str(issue,"id") == "L-OUTPUTS"; });
+        if (extraInputs || extraOutputs) {
+            // General stream selection/output scoping needs FFmpeg. Keep the
+            // source node, but do not label another input/output as the VG stream.
+            res["pixfmt"] = ""; res["videoEncoder"] = ""; res["audioEncoder"] = "";
+            res["videoProfile"] = Json{{"family","unknown"}}; res["audioProfile"] = Json{{"family","unknown"}};
+            res["container"] = ""; res["unknownInputSource"] = extraInputs; res["unknownOutputScope"] = true;
+            for (const auto& key : {"audioSampleFormat","audioRate","audioChannels"}) res.erase(key);
+        }
+        result["resolved"] = nullptr;
+    }
+    auto signal = Signal(r,media,res);
+    const bool unknownVideo = !signal.at("video").is_null() && signal.at("video").at("outputBits").is_null();
+    if (!signal.at("video").is_null()) res["depth"] = unknownVideo ? Json(0) : signal.at("video").at("outputBits");
+    if (!advanced) {
+        Json publicRes = res; publicRes.erase("videoProfile"); publicRes.erase("audioProfile");
+        result["resolved"] = unknownVideo ? Json(nullptr) : publicRes;
+        if (!signal.at("video").is_null()) {
+            const auto& fact = signal.at("video");
+            if (!fact.at("inputBits").is_null() && !fact.at("outputBits").is_null() && fact.at("inputBits").get<int>() > fact.at("outputBits").get<int>()) issues.push_back(Issue("V-DEPTH-DOWN","info","video.depth","Precision is reduced before encoding.",{{"inputBits",fact.at("inputBits")},{"outputBits",fact.at("outputBits")}}));
+            if (fact.at("chromaChanged") == true) issues.push_back(Issue("V-CHROMA-UP","info","video.depth","Chroma sampling changes; added color resolution is interpolated, not recovered.",{{"inputChroma",fact.at("inputChroma")},{"outputChroma",fact.at("outputChroma")}}));
+        }
+    }
+    for (auto& issue : issues) {
+        Json refs = Json::array(); const auto field = Str(issue,"field"); const auto params = issue.value("params",Json::object()); const auto stream = Str(params,"stream");
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            const auto tokenField = Str(tokens[i],"field"); bool match = !field.empty() && tokenField == field;
+            if (!stream.empty() && tokenField == stream + ".encoder") match = true;
+            if (field == "video.depth" && i > 0 && (Str(tokens[i],"text") == "-pix_fmt" || Str(tokens[i-1],"text") == "-pix_fmt") && Str(tokens[i],"role") != "input") match = true;
+            if (advanced && params.contains("start") && tokens[i].contains("sourceStart")) match = Num(tokens[i],"sourceStart") < Num(params,"end") && Num(tokens[i],"sourceEnd") > Num(params,"start");
+            if (!advanced && field.find(".extra") != std::string::npos && params.contains("start")) match = tokenField == field && tokens[i].contains("sourceStart") && Num(tokens[i],"sourceStart") < Num(params,"end") && Num(tokens[i],"sourceEnd") > Num(params,"start");
+            if (match) refs.push_back(i);
+        }
+        issue["tokenIndices"] = refs;
+    }
+    std::string commandLine;
+    for (size_t i = 0; i < tokens.size(); ++i) { if (i) commandLine += " "; commandLine += Quote(Str(tokens[i],"text")); if (i) result["argv"].push_back(Str(tokens[i],"text")); }
+    result["display"] = tokens; result["commandLine"] = commandLine; result["signalPath"] = signal; result["issues"] = issues; result["summary"] = Summary(r,res);
+    return result;
+}
+} // namespace ve
