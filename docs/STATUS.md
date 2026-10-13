@@ -248,9 +248,8 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 Platform B2 is merged; the next platform agent continues with approved tight B1
 Windows recapture. App switches its provider/mappings to the real core through its
-own workstream. B1 uses existing gyan
-5.1.2 plus current gyan.dev/BtbN builds in ignored build/, no installation/PATH change),
-then B3–B4. Order and rationale are in
+own workstream. B1 uses existing gyan 5.1.2 plus current gyan.dev/BtbN builds in
+ignored build/, with no installation or PATH change. B3–B4 follow. Order and rationale are in
 [platform.md](product/workstreams/platform.md).
 B5/B6 require the owner at the real host. Controlled failure/recovery and deferred
 persistence qualification remain open per [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).
