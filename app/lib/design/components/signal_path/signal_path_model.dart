@@ -75,6 +75,7 @@ class SignalStream {
     this.inputLabel,
     this.outputLabel,
     this.muxProblem = false,
+    this.conversionKnown = true,
   });
 
   /// "x264", "AAC".
@@ -103,6 +104,10 @@ class SignalStream {
   /// The container can't hold this codec: the wire into it turns red and
   /// dashed and says "Can't mux".
   final bool muxProblem;
+
+  /// False when the core hasn't said whether a conversion happens (no
+  /// compile result): the wire then claims neither a pip nor "No conversion".
+  final bool conversionKnown;
 }
 
 @immutable
@@ -167,11 +172,12 @@ class SignalPathModel {
 
   bool get containerProblem => (video?.muxProblem ?? false) || (audio?.muxProblem ?? false);
 
-  /// Nodes that can be selected, in arrow-key order.
+  /// Nodes that can be selected, in arrow-key order. Audio stays selectable
+  /// when it is off, so its settings can turn it back on.
   List<SignalNode> get selectable => [
     SignalNode.source,
     if (video != null) SignalNode.video,
-    if (audio != null) SignalNode.audio,
+    SignalNode.audio,
     SignalNode.container,
     SignalNode.file,
   ];

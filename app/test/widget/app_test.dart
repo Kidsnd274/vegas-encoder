@@ -6,6 +6,7 @@ import 'package:vegas_encoder/app/launch.dart';
 import 'package:vegas_encoder/design/components/title_bar.dart';
 import 'package:vegas_encoder/design/tokens.dart';
 import 'package:vegas_encoder/features/gallery/gallery_page.dart';
+import 'package:vegas_encoder/features/presets/presets_page.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
 
@@ -47,12 +48,12 @@ void main() {
     testWidgets('Windows "Animation effects" off disables animations app-wide, live', (tester) async {
       final window = FakeWindowController();
       await pumpApp(tester, overrides: [windowControllerProvider.overrideWithValue(window)]);
-      final context = tester.element(find.byType(GalleryPage));
+      final context = tester.element(find.byType(PresetsPage));
       expect(MediaQuery.disableAnimationsOf(context), isFalse);
       expect(VeTokens.motion(context, VeDurations.wire), VeDurations.wire);
       window.emit(const WindowState(reducedMotion: true));
       await tester.pumpAndSettle();
-      final after = tester.element(find.byType(GalleryPage));
+      final after = tester.element(find.byType(PresetsPage));
       expect(MediaQuery.disableAnimationsOf(after), isTrue);
       expect(VeTokens.motion(after, VeDurations.wire), Duration.zero);
     });
@@ -62,7 +63,7 @@ void main() {
     testWidgets('title bar sections, Ctrl+1–4 and window buttons', (tester) async {
       final window = FakeWindowController();
       await pumpApp(tester, overrides: [windowControllerProvider.overrideWithValue(window)]);
-      expect(find.text('Design system'), findsOneWidget);
+      expect(find.byType(PresetsPage), findsOneWidget);
       await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
@@ -70,7 +71,7 @@ void main() {
       expect(find.text('This screen is built in milestone F3.'), findsOneWidget);
       await tester.tap(find.text('Presets'));
       await tester.pumpAndSettle();
-      expect(find.text('Design system'), findsOneWidget);
+      expect(find.byType(PresetsPage), findsOneWidget);
 
       await tester.tap(find.bySemanticsLabel('Minimize'));
       await tester.tap(find.bySemanticsLabel('Maximize'));
@@ -78,6 +79,21 @@ void main() {
       expect(find.bySemanticsLabel('Restore'), findsOneWidget, reason: 'the button follows the window state');
       await tester.tap(find.bySemanticsLabel('Close'));
       expect(window.calls, ['minimize', 'toggleMaximize', 'close']);
+    });
+
+    testWidgets('Ctrl+Shift+D shows the design system gallery in debug builds', (tester) async {
+      await pumpApp(tester, overrides: [windowControllerProvider.overrideWithValue(FakeWindowController())]);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyD);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(find.byType(GalleryPage), findsOneWidget);
+      expect(find.text('Design system'), findsOneWidget);
+      await tester.tap(find.text('Presets'));
+      await tester.pumpAndSettle();
+      expect(find.byType(PresetsPage), findsOneWidget);
     });
 
     testWidgets('dragging the title bar moves the window; double-click maximizes', (tester) async {

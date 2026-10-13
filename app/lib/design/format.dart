@@ -51,6 +51,14 @@ abstract final class VeFormat {
     return out.toString();
   }
 
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  /// "12 Oct 2026", in local time.
+  static String date(DateTime value) {
+    final d = value.toLocal();
+    return '${d.day} ${_months[d.month - 1]} ${d.year}';
+  }
+
   /// Parses a typed length: "10:00", "1:02:03", or plain minutes ("12.5").
   /// Returns seconds, or null if the text is not a length (UI_SPEC §2).
   static int? parseLength(String text) {

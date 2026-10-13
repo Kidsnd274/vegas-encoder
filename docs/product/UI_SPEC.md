@@ -1,7 +1,8 @@
 # UI behaviour specification
 
 Updated: 2026-10-12 (Asia/Singapore). Status: proposal, updated for the chosen
-direction; §1, §9, §10 and §11 now record what the app workstream built in F0 and F1.
+direction; §1, §9, §10 and §11 record what the app workstream built in F0 and F1, and
+§2 what F2 built (on the platform fakes; open items are in workstreams/app.md).
 
 This document covers the behaviour Flutter will implement: states, flows, the signal
 path, the size card, theme, keyboard, copy and the token structure. The chosen
@@ -16,8 +17,9 @@ The vocabulary is fixed in the brief §2.
 | Popup editor | 1120×740 | 960×640 | Centred on its VEGAS owner; resizable; remembers size, not position |
 | Native page | Host-defined | — | Win32 inside VEGAS; see the mock |
 
-Below 1280 px width the desktop app collapses the library to an icon rail, and the
-popup moves the command preview into a collapsible bottom strip.
+Below 1280 px width the desktop app collapses the library to an icon rail (library and
+Ctrl+K buttons; the library opens over the editor and closes on a choice, Esc or a click
+outside), and the popup moves the command preview into a collapsible bottom strip.
 
 ### Theme
 
@@ -45,14 +47,17 @@ popup moves the command preview into a collapsible bottom strip.
   error-coloured mark plus a tooltip such as "Needs x264: not in FFmpeg 8.0 LGPL").
 - **Context menu:** Duplicate, Rename, Export…, Copy share string, Delete (user
   presets only), Show in folder.
-- **Empty search:** "No presets match 'xyz'." plus a **New preset** action.
+- **Empty search:** "No presets match 'xyz'." plus a **New preset** action (a preset in
+  Mine started from the first built-in, named "New preset") and **Show all presets**.
+- **Error mark:** a preset the core finds errors in, for the chosen FFmpeg, shows an
+  error icon whose tooltip lists the core's messages.
 
 ### Editor states
 
 | State | Trigger | Behaviour |
 | --- | --- | --- |
 | Clean | Loaded or just saved | Save disabled |
-| Dirty | Any change | Title shows "Edited"; Save, Revert enabled; leaving asks "Save changes to '<name>'?" (Save / Don't save / Cancel) |
+| Dirty | Any change | Title shows "Edited" and the library row a dot; Save, Revert (with Undo) enabled. Other presets can be opened meanwhile; each keeps its changes. Closing the window asks "Save changes to '<name>'?" (Save / Don't save / Cancel), or "Save changes to N presets?" (Save all) |
 | Built-in | Built-in preset selected | Editing allowed as a draft; Save becomes **Save as new preset**; a note says "Built-in presets can't be changed. Your changes will be saved as a new preset." |
 | Errors | Validation has errors | Save still allowed (presets can be work in progress); the preset shows an error mark in the library |
 | Updated elsewhere | File changed by the popup or another window | Banner: "This preset changed in another window." **Reload** / **Keep editing** (save then asks to overwrite or save as new) |
@@ -76,6 +81,11 @@ settings below it; arrow keys move between nodes.
   "Revision 6" marks show local and library differences in the popup.
 - **Advanced mode** draws the nodes dashed, read back from the command. They don't
   open settings; clicking one focuses the editor.
+- **Audio off** leaves a dashed audio node ("Audio is off. The file has video only.").
+  It still opens the audio settings, where audio is turned back on.
+- **Only the core's facts.** Pips, notes and depths come from the core's compile result.
+  When the core gives none (an edit beyond the B0 fake core), the wire keeps VEGAS's
+  depth and claims neither a pip nor "No conversion".
 
 ### Basic editor
 
@@ -114,8 +124,11 @@ The estimate appears only in the File node's panel, never in the command column.
   - Popup: starts at the project length when VEGAS shares it with the native page
     (**gated** on A5); otherwise it is empty and says "Type a length".
 - **Figures.** The total ("About 537 MB"), the rate per minute, and for quality modes a
-  typical range ("Typically 322 MB to 859 MB for 10:00"). Bitrate modes give a plain
-  figure. See SETTINGS_AND_COMMANDS §7.
+  typical range. Bitrate modes give a plain figure. Every figure is the core's (see
+  SETTINGS_AND_COMMANDS §7); the card works out none. Until the core gives the range
+  for a typed length, the range is per minute: "About 53.7 MB per minute, typically
+  32.2 MB to 85.9 MB." When a length is typed but the core gives no total, the figure
+  reads "Total not available yet".
 - **Split bar** for video and audio bitrate, then plain-language consequences of the
   rate mode and bit depth (from D5's card).
 - **Advanced mode** shows no estimate: a custom command can do anything.
@@ -134,8 +147,9 @@ encoder profile.
 - Mark a recommended band per resolution where the encoder profile provides one (for
   example x264 CRF 18–23 at 1080p).
 - Arrow keys step by 1; Page Up and Page Down step by 5.
-- Bitrate modes switch the control to Mb/s or kb/s with common values, and an
-  optional peak.
+- Bitrate modes switch the control to Mb/s with common values (2 to 80 Mb/s; any value
+  can be typed), and an optional peak. The read-out says "8 Mb/s average, 12 Mb/s
+  peak", "no peak cap", or "8 Mb/s constant".
 
 ### Defaults, changes and reset
 
@@ -160,7 +174,8 @@ This catches failing hardware encoders and bad extra arguments early. Voukoder P
 - Always reachable; visible by default on the desktop.
 - `{inputs}` is collapsed into a "VEGAS video + audio" chip; it expands on click.
 - Supports copy (Ctrl+Shift+C) and a toggle between single-line and grouped multi-line
-  layouts. In the multi-line layout each `^` continuation stays at the end of its line.
+  layouts ("One line" / "Grouped" beside Copy). In the multi-line layout each `^`
+  continuation stays at the end of its line.
 - The group for the selected node is highlighted. Clicking a token focuses the control
   that produced it; hovering a control highlights its tokens (StaxRip's click-to-jump).
 - Options replaced by Extra arguments show a small "set in Extra arguments" note at
@@ -307,9 +322,10 @@ Sliders support arrows, Page Up/Down, and Home/End.
   State changes still update instantly. The runner reads `SPI_GETCLIENTAREAANIMATION`
   and reports changes; the app sets `MediaQuery.disableAnimations`, and every
   duration goes through `VeTokens.motion`.
-- Text scales up to 150% without clipping, within each window's minimum size. Known
-  gap: signal path nodes have fixed sizes from the mockup, so their text clips at large
-  scales (F2 sizes the diagram from the text scale).
+- Text scales up to 150% without clipping, within each window's minimum size. The
+  diagram's height and node heights follow the text scale (F2); node widths stay so the
+  wire labels keep their room, and node text that doesn't fit ends in an ellipsis. The
+  header grows too.
 
 ## 10. Design tokens (Flutter `ThemeExtension`)
 
@@ -365,8 +381,11 @@ abstract final class VeDurations { short 150 ms, medium 300 ms, wire 400 ms, wir
 Built in F1 (`app/lib/design/components/`), with sample data in the design-system
 gallery and goldens in both themes: `VeButton`, `VeIconButton`, `VeLinkButton`, `VeKbd`,
 `VeTextField`, `VeNumberField`, `VeSegmented`, `VeSwitch`, `VeSlider`, `VeSelect`,
-`VePopover`/`VeListbox`, `VeStatusTag`, `VeField`/`VeReadout`, `VeTitleBar`, and the
-rows marked F1 below. Components take display models; values come from `ve_core` and
+`VePopover`/`VeListbox`, `VeStatusTag`, `VeField`/`VeReadout` (with the modified dot and
+Reset since F2), `VeTitleBar`, and the rows marked F1 below. F2 added `showVeDialog`
+and `showVeTextDialog` (modal questions and names), `VeToast` (confirmations, with
+Undo), and in `features/presets/`: the Ctrl+K palette, `BitrateField`, and
+`FieldAnchor` (how "Show setting" finds a field's control). Components take display models; values come from `ve_core` and
 `ve_services` through the app state, never computed in the design layer.
 
 | Component | Notes |
@@ -375,11 +394,11 @@ rows marked F1 below. Components take display models; values come from `ve_core`
 | `RateModeSwitch` | F1 as `VeSegmented`. Segmented; only the encoder's modes |
 | `QualityControl` | F1 (`VeQualityControl`): slider, field, marks, recommended band. Bitrate and profile-steps variants in F2 |
 | `SignalPath` | F1. Full and strip layouts; nodes, wires sized by bit depth, conversion pips, marks; keyboard navigation (`CustomPainter` for wires) |
-| `ExtraArgumentsField` | F1 as a mono `VeTextField` with `VeMessage` warnings; the option check comes from the core in F2 |
+| `ExtraArgumentsField` | F2 (`features/presets/panels/extra_field.dart`): mono field per stream; the core's warnings for the field show under it |
 | `CommandView` | F1. Tokens with roles; collapsed inputs chip; copy; multi-line |
 | `CommandEditor` | `TextEditingController.buildTextSpan` highlighting, macro chips, lint underlines; autocomplete overlay last |
 | `MessageList` / `InlineMessage` | F1 (`VeCheckList`, `VeMessage`). Levels, field focus |
-| `SizeQualityCard` | F1. Length field; total, per-minute rate and range; video/audio split; consequences |
+| `SizeQualityCard` | F1, reworked in F2 to take the core's figures (per minute, total for the typed length, range). Length field; video/audio split; consequences |
 | `OriginBanner` | Popup origin states and actions |
 | `DiffList` | Field label, from → to |
 | `InstallationCard`, `CapabilityTable` | FFmpeg screen |

@@ -11,6 +11,11 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_riverpod: ^3.4.3
+  # Platform contracts (C2, C3): pure Dart, no third-party dependencies.
+  ve_core:
+    path: ../packages/ve_core
+  ve_services:
+    path: ../packages/ve_services
 
 dev_dependencies:
   flutter_test:

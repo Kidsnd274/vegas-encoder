@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ve_services/ve_services.dart' show ServiceException;
 
 import '../app/launch.dart';
 import '../platform/window_channel.dart';
+import 'services.dart';
 
 /// How the process was started. Overridden in `main` and in tests.
 final launchModeProvider = Provider<LaunchMode>((ref) => const DesktopLaunch());
@@ -26,14 +28,21 @@ class WindowStateNotifier extends Notifier<WindowState> {
   }
 }
 
-/// Settings > Theme (UI_SPEC §1). Both windows use the same choice.
+/// Settings > Theme (UI_SPEC §1). Both windows use the same choice, stored as
+/// C7 `theme` in machine settings (`system` is Follow Windows).
 enum ThemePreference {
-  followWindows('Follow Windows'),
-  light('Light'),
-  dark('Dark');
+  followWindows('Follow Windows', 'system'),
+  light('Light', 'light'),
+  dark('Dark', 'dark');
 
-  const ThemePreference(this.label);
+  const ThemePreference(this.label, this.stored);
   final String label;
+
+  /// The C7 value.
+  final String stored;
+
+  static ThemePreference fromStored(String? value) =>
+      values.where((p) => p.stored == value).firstOrNull ?? ThemePreference.followWindows;
 
   ThemeMode get themeMode => switch (this) {
     ThemePreference.followWindows => ThemeMode.system,
@@ -42,13 +51,23 @@ enum ThemePreference {
   };
 }
 
-/// Held in memory until the machine settings service exists (ve_services, C3/C7);
-/// see docs/product/workstreams/app.md, Needs.
 final themePreferenceProvider = NotifierProvider<ThemePreferenceNotifier, ThemePreference>(ThemePreferenceNotifier.new);
 
 class ThemePreferenceNotifier extends Notifier<ThemePreference> {
   @override
-  ThemePreference build() => ThemePreference.followWindows;
+  ThemePreference build() => ThemePreference.fromStored(ref.watch(machineSettingsProvider).value?.theme);
 
-  void set(ThemePreference value) => state = value;
+  /// Applies at once and saves to machine settings. A save that loses to a
+  /// change made elsewhere leaves that change in place.
+  Future<void> set(ThemePreference value) async {
+    state = value;
+    final repository = ref.read(machineSettingsRepositoryProvider);
+    final current = await repository.read();
+    if (current.theme == value.stored) return;
+    try {
+      await repository.save(current.copyWith(theme: value.stored), expectedRevision: current.revision);
+    } on ServiceException {
+      ref.invalidateSelf();
+    }
+  }
 }

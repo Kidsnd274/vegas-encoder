@@ -1,0 +1,385 @@
+// Maps core and service results to the design system's display models. This is
+// display work only: labels, grouping and formatting. Facts come from the core
+// (compile, resolved settings, summary, issues, estimates) and from the profile
+// catalog's tables; nothing here decides what FFmpeg does.
+
+import 'package:ve_services/ve_services.dart' as core;
+
+import '../../design/components/command_view.dart';
+import '../../design/components/message.dart';
+import '../../design/components/select.dart';
+import '../../design/components/signal_path/signal_path_model.dart';
+import '../../design/components/slider.dart';
+import '../../design/components/status.dart';
+import '../../design/format.dart';
+
+// ------------------------------------------------------------ vocabulary
+
+/// Preset categories (SETTINGS_AND_COMMANDS §2), in library order.
+const presetCategories = <String, String>{
+  'web': 'Web upload',
+  'edit': 'Editing intermediate',
+  'master': 'Master and archive',
+  'review': 'Review',
+  'social': 'Social',
+  'custom': 'Custom command',
+};
+
+String categoryLabel(String id) => presetCategories[id] ?? 'Other';
+
+/// Display labels for what VEGAS delivers. The adapter sends P010 frames and
+/// 32-bit float samples (ARCHITECTURE); other values show as FFmpeg names.
+const _deliveredVideo = <String, ({String label, String short, int depth})>{
+  'p010le': (label: 'P010, 10-bit 4:2:0', short: '10-bit', depth: 10),
+};
+const _deliveredAudio = <String, ({String label, String short, int bits})>{
+  'f32le': (label: '32-bit float', short: 'float', bits: 32),
+};
+
+String deliveredPixelFormat(String pixfmt) => _deliveredVideo[pixfmt]?.label ?? pixfmt;
+int? deliveredDepth(String pixfmt) => _deliveredVideo[pixfmt]?.depth;
+String deliveredSampleFormat(String fmt) => _deliveredAudio[fmt]?.label ?? fmt;
+
+String channelsLabel(int channels) => switch (channels) {
+  1 => 'mono',
+  2 => 'stereo',
+  6 => '5.1',
+  8 => '7.1',
+  _ => '$channels channels',
+};
+
+String kiloHertz(int rate) {
+  final k = rate / 1000;
+  return '${k == k.roundToDouble() ? k.round() : k} kHz';
+}
+
+/// "1920×1080, 29.97 fps, 48 kHz stereo"
+String mediaSummary(core.MediaDescription media) {
+  final v = media.video;
+  final a = media.audio;
+  return [
+    '${v.width}×${v.height}',
+    VeFormat.fps(v.fps[0], v.fps[1]),
+    if (a != null) '${kiloHertz(a.rate)} ${channelsLabel(a.channels)}',
+  ].join(', ');
+}
+
+/// "10 minutes", "1:30" for the preview context line.
+String lengthPhrase(int seconds) =>
+    seconds % 60 == 0 ? '${seconds ~/ 60} ${seconds == 60 ? 'minute' : 'minutes'}' : VeFormat.duration(seconds);
+
+// ------------------------------------------------------------ catalog lookups
+
+extension CatalogLookup on core.ProfileCatalog {
+  core.EncoderProfile? videoEncoder(String id) => video.where((e) => e.id == id).firstOrNull;
+  core.EncoderProfile? audioEncoder(String id) => audio.where((e) => e.id == id).firstOrNull;
+  core.ContainerProfile? container(String id) => containers.where((c) => c.id == id).firstOrNull;
+
+  /// The codec-to-container table: "ok", "warn" or "no"; null if not listed.
+  String? compatibilityOf({required bool video, required String family, required String container}) {
+    final table = core.jsonMap(compatibility[video ? 'video' : 'audio'] ?? <String, Object?>{});
+    final row = table[family];
+    return row is Map ? row[container] as String? : null;
+  }
+
+  Map<String, Object?> rateMode(String id) => core.jsonMap(rateModes[id] ?? <String, Object?>{});
+  String rateModeShort(String id) => rateMode(id)['short'] as String? ?? id;
+  String rateModeLabel(String id) => rateMode(id)['label'] as String? ?? id;
+  String rateModeBlurb(String id) => rateMode(id)['blurb'] as String? ?? '';
+}
+
+/// "CRF", "CQ", "QP" from a quality control's flag.
+String qualityUnit(String flag) => switch (flag) {
+  '-crf' => 'CRF',
+  '-cq' => 'CQ',
+  '-qp' || '-qp_i' => 'QP',
+  '-global_quality' => 'Quality',
+  _ => flag.replaceFirst('-', '').toUpperCase(),
+};
+
+/// "MP4", "MKV" from the container's extension.
+String containerShortName(core.ContainerProfile? c, String id) =>
+    c == null ? id.toUpperCase() : c.ext.replaceFirst('.', '').toUpperCase();
+
+String runsOn(core.EncoderProfile? p) => p?.hw == null ? 'CPU' : '${p!.hw} GPU';
+
+VeAvailability availabilityOf(core.FFmpegInstallation? installation, String encoder) {
+  if (installation == null) return VeAvailability.ready;
+  final raw = installation.availability[encoder];
+  if (raw is! Map) return VeAvailability.missing;
+  return switch (raw['state']) {
+    'ok' => VeAvailability.ready,
+    'failed' => VeAvailability.failed,
+    'missing' => VeAvailability.missing,
+    _ => VeAvailability.testing,
+  };
+}
+
+String? availabilityReason(core.FFmpegInstallation? installation, String encoder) {
+  final raw = installation?.availability[encoder];
+  if (raw is! Map) return installation == null ? null : 'Not in ${installation.label}.';
+  final reason = raw['reason'] as String?;
+  return reason == null || reason.isEmpty ? null : reason;
+}
+
+// ------------------------------------------------------------ encoder pickers
+
+List<VeEncoderGroup> encoderGroups(
+  core.ProfileCatalog catalog, {
+  required bool video,
+  core.FFmpegInstallation? installation,
+}) {
+  final order = core.jsonMap(video ? catalog.videoOrder : catalog.audioOrder);
+  final groups = (order['groups'] as List? ?? const []).cast<Map>();
+  return [
+    for (final g in groups)
+      VeEncoderGroup(video ? g['group'] as String : '${g['group']} audio', [
+        for (final id in (g['ids'] as List).cast<String>())
+          if ((video ? catalog.videoEncoder(id) : catalog.audioEncoder(id)) case final p?)
+            VeEncoderChoice(
+              id: id,
+              label: p.label,
+              detail: video ? _videoChoiceDetail(p) : p.codec,
+              availability: availabilityOf(installation, id),
+              reason: availabilityReason(installation, id),
+            ),
+      ]),
+  ];
+}
+
+String _videoChoiceDetail(core.EncoderProfile p) {
+  final depths = p.depths.keys.map(int.parse).toList()..sort();
+  final bits = depths.contains(10) ? (depths.contains(8) ? '10-bit' : '10-bit only') : '8-bit only';
+  return '${p.codec}, ${runsOn(p)}, $bits';
+}
+
+// ------------------------------------------------------------ quality scale
+
+VeQualityScale qualityScale(core.NumericControl q, {VeRange? recommended}) => VeQualityScale(
+  unit: qualityUnit(q.flag),
+  min: q.min.round(),
+  max: q.max.round(),
+  lowerIsBetter: q.lowerIsBetter,
+  marks: [
+    for (final m in q.marks)
+      if (m.length >= 2 && m[0] is num && m[1] is String) VeQualityMark((m[0] as num).round(), m[1] as String),
+  ],
+  recommended: recommended,
+);
+
+/// Speed values from slowest to fastest, so the slider reads "Smaller file"
+/// at the left and "Faster encode" at the right.
+List<String> speedOrder(core.ChoiceControl speed) => speed.slowFirst ? speed.values : speed.values.reversed.toList();
+
+String choiceName(core.ChoiceControl c, String value) => c.names[value] as String? ?? value;
+
+// ------------------------------------------------------------ command
+
+/// Groups the core's display tokens the way the command view draws them:
+/// the VEGAS inputs collapse into a chip, `-map` joins the program line, and
+/// each stage gets its own line. Extra arguments stay with their stream.
+CommandDisplay commandDisplay(core.CompileResult result, {required bool audio}) {
+  final inputs = <CommandToken>[];
+  final lines = <CommandRole, List<CommandToken>>{for (final r in CommandRole.values) r: []};
+  var program = result.executable;
+  var lastStream = CommandRole.video;
+  for (final t in result.display) {
+    final token = CommandToken(_quote(t.text), extra: t.role == core.TokenRole.extra);
+    switch (t.role) {
+      case core.TokenRole.exe:
+        program = t.text;
+      case core.TokenRole.global || core.TokenRole.input:
+        inputs.add(token);
+      case core.TokenRole.map:
+        lines[CommandRole.inputs]!.add(token);
+      case core.TokenRole.video:
+        lines[CommandRole.video]!.add(token);
+        lastStream = CommandRole.video;
+      case core.TokenRole.audio:
+        lines[CommandRole.audio]!.add(token);
+        lastStream = CommandRole.audio;
+      case core.TokenRole.extra || core.TokenRole.macro:
+        lines[lastStream]!.add(token);
+      case core.TokenRole.mux:
+        lines[CommandRole.mux]!.add(token);
+      case core.TokenRole.output:
+        lines[CommandRole.output]!.add(token);
+    }
+  }
+  return CommandDisplay(
+    program: program,
+    inputs: inputs,
+    inputsLabel: audio ? 'VEGAS video + audio' : 'VEGAS video',
+    lines: [
+      for (final r in CommandRole.values)
+        if (lines[r]!.isNotEmpty) CommandLine(r, lines[r]!),
+    ],
+    copyText: result.commandLine,
+  );
+}
+
+String _quote(String arg) => arg.isEmpty || RegExp(r'[\s"]').hasMatch(arg) ? '"${arg.replaceAll('"', r'\"')}"' : arg;
+
+// ------------------------------------------------------------ checks
+
+VeLevel levelOf(core.IssueLevel level) => switch (level) {
+  core.IssueLevel.error => VeLevel.error,
+  core.IssueLevel.warn => VeLevel.warning,
+  core.IssueLevel.info => VeLevel.info,
+  core.IssueLevel.hint => VeLevel.hint,
+};
+
+/// Which diagram node holds the control for an issue's field.
+SignalNode? nodeForField(String field) {
+  if (field.startsWith('video')) return SignalNode.video;
+  if (field.startsWith('audio')) return SignalNode.audio;
+  if (field.startsWith('container')) return SignalNode.container;
+  if (field.startsWith('output')) return SignalNode.file;
+  return null;
+}
+
+// ------------------------------------------------------------ signal path
+
+/// Builds the diagram from the core's compile result when there is one, and
+/// from the recipe and catalog alone when the core couldn't work it out.
+/// Gaps until platform adds per-stream facts (workstreams/app.md, B0 review):
+/// audio sample-format conversions aren't drawn, and conversion notes come
+/// only from the core's V-DEPTH-DOWN and V-CHROMA-UP issues.
+SignalPathModel signalPathModel({
+  required core.Recipe recipe,
+  required core.ProfileCatalog catalog,
+  required core.MediaDescription media,
+  core.CompileResult? compiled,
+  core.FFmpegInstallation? installation,
+  int? lengthSec,
+}) {
+  final summary = compiled?.summary ?? const <String, Object?>{};
+  final resolved = compiled?.resolved;
+  final issues = compiled?.issues ?? const <core.Issue>[];
+  final v = recipe.video;
+  final a = recipe.audio.first;
+  final vp = catalog.videoEncoder(v.encoder);
+  final ap = catalog.audioEncoder(a.encoder);
+  final cp = catalog.container(recipe.container.format);
+  final inDepth = deliveredDepth(media.video.pixfmt) ?? 8;
+  final audioIn = _deliveredAudio[media.audio?.sampleFmt];
+
+  SignalStream? video;
+  if (v.enabled) {
+    // Without the core's resolved settings the wire keeps VEGAS's depth: the
+    // depth chosen in the panel isn't a fact about this path until compiled.
+    final outDepth = resolved?.depth ?? inDepth;
+    final outPixfmt = resolved?.pixfmt;
+    final converts = outPixfmt != null && outPixfmt != media.video.pixfmt;
+    final notes = [
+      if (issues.any((i) => i.id == 'V-DEPTH-DOWN')) 'precision lost',
+      if (issues.any((i) => i.id == 'V-CHROMA-UP')) 'color interpolated',
+    ];
+    video = SignalStream(
+      encoder: summary['videoEncoder'] as String? ?? vp?.label ?? v.encoder,
+      detail: compiled != null ? _videoDetail(summary) : _videoDetailFromRecipe(v, vp),
+      codec: vp?.codec ?? summary['video'] as String? ?? v.encoder,
+      inputBits: inDepth,
+      outputBits: outDepth,
+      availability: availabilityOf(installation, v.encoder),
+      runsOn: runsOn(vp),
+      conversion: converts
+          ? SignalConversion(
+              label: '${media.video.pixfmt} to $outPixfmt',
+              shortLabel: outDepth != inDepth ? '$inDepth to $outDepth-bit' : 'Format change',
+              note: notes.isEmpty ? null : _capitalize(notes.join(', ')),
+            )
+          : null,
+      formatLabel: '$outDepth-bit',
+      inputLabel: '$inDepth-bit',
+      outputLabel: '$outDepth-bit',
+      muxProblem:
+          vp != null &&
+          catalog.compatibilityOf(video: true, family: vp.family, container: recipe.container.format) == 'no',
+      conversionKnown: resolved != null,
+    );
+  }
+
+  SignalStream? audio;
+  if (a.enabled && media.audio != null) {
+    final bits = audioIn?.bits ?? 32;
+    audio = SignalStream(
+      encoder: summary['audio'] as String? ?? ap?.label ?? a.encoder,
+      detail: compiled != null ? (summary['audioQuality'] as String? ?? '') : _audioDetailFromRecipe(a, ap),
+      codec: ap?.codec ?? a.encoder,
+      inputBits: bits,
+      outputBits: bits,
+      availability: availabilityOf(installation, a.encoder),
+      formatLabel: audioIn == null ? media.audio!.sampleFmt : '${audioIn.bits}-bit ${audioIn.short}',
+      muxProblem:
+          ap != null &&
+          catalog.compatibilityOf(video: false, family: ap.family, container: recipe.container.format) == 'no',
+    );
+  }
+
+  final ext = cp?.ext ?? '';
+  final mediaAudio = media.audio;
+  return SignalPathModel(
+    source: SignalSource(
+      frameSize: '${media.video.width}×${media.video.height}',
+      frameRate: VeFormat.fps(media.video.fps[0], media.video.fps[1]),
+      pixelFormat: deliveredPixelFormat(media.video.pixfmt),
+      audio: mediaAudio == null
+          ? 'No audio'
+          : '${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt} ${channelsLabel(mediaAudio.channels)}',
+      stripVideo:
+          '${VeFormat.fps(media.video.fps[0], media.video.fps[1])}, ${_deliveredVideo[media.video.pixfmt]?.short ?? media.video.pixfmt}',
+      stripAudio: mediaAudio == null
+          ? 'No audio'
+          : '${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt}',
+      depth: inDepth,
+      spokenSummary:
+          '${media.video.width} by ${media.video.height}, ${VeFormat.fps(media.video.fps[0], media.video.fps[1])}',
+    ),
+    video: video,
+    audio: audio,
+    container: SignalContainer(
+      label: containerShortName(cp, recipe.container.format),
+      detail: recipe.container.faststart && recipe.container.format == 'mp4' ? 'Fast start' : ext,
+      spokenLabel: cp?.label,
+    ),
+    fileName: 'Sample project$ext',
+    contextLabel: 'Preview with: ${mediaSummary(media)}${lengthSec == null ? '' : ', ${lengthPhrase(lengthSec)}'}',
+    fromCommand: recipe.command.mode == 'template',
+  );
+}
+
+String _capitalize(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+
+String _videoDetail(Map<String, Object?> summary) =>
+    [summary['videoQuality'], summary['speed']].whereType<String>().where((s) => s.isNotEmpty).join(', ');
+
+/// The node's detail line from the recipe, when the core couldn't compile it.
+String _videoDetailFromRecipe(core.VideoSettings v, core.EncoderProfile? p) {
+  final parts = <String>[];
+  final mode = v.mode;
+  final q = p?.quality;
+  if ((mode == 'crf' || mode == 'cq') && q != null) {
+    final value = v.quality ?? q.def;
+    if (value != null) parts.add('${qualityUnit(q.flag)} ${_num(value)}');
+  } else if ((mode == 'abr' || mode == 'cbr') && v.bitrateK != null) {
+    parts.add(VeFormat.rate(v.bitrateK!));
+  } else if (mode == 'cqp' && v.qp != null) {
+    parts.add('QP ${_num(v.qp!)}');
+  } else if (mode == 'profile' && p?.profileQuality != null && v.profile != null) {
+    parts.add(choiceName(p!.profileQuality!, v.profile!));
+  } else if (mode == 'lossless') {
+    parts.add('Lossless');
+  }
+  final speed = v.speed ?? p?.speed?.def;
+  if (speed != null && p?.speed != null) parts.add(choiceName(p!.speed!, speed));
+  return parts.join(', ');
+}
+
+String _audioDetailFromRecipe(core.AudioSettings a, core.EncoderProfile? p) {
+  if (a.bitrateK != null && (a.mode == null || a.mode == 'bitrate')) return VeFormat.rate(a.bitrateK!);
+  if (p != null && p.modes.contains('lossless')) return 'Lossless';
+  return '';
+}
+
+String _num(num v) => v == v.roundToDouble() ? '${v.round()}' : '$v';
