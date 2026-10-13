@@ -17,6 +17,7 @@ The B2 native product core is now implemented below. Real services and adapter
 integration remain later milestones; the VEGAS gates below are unchanged.
 
 **B2 core/FFI (2026-10-13):** master through F2 (`ab7e7ab`) is in ws/platform.
+The later F2 platform-fact/UI-state merge (`230c724`) is also incorporated.
 Portable C++17 normalize/validate/compile/lint/complete/estimate/diff/payload and
 pure session checks are implemented, with a Dart `NativeVeCore()` facade and native
 asset hook, DLL/static builds, token/stream facts and the additive F2 result fields.

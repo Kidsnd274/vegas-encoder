@@ -2,7 +2,9 @@
 
 Updated: 2026-10-13 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
 branch `ws/platform`. **B2 complete; stop for owner merge.** Master through `ab7e7ab`
-(F2) was merged before continuing. The earlier B0 additions are already in master.
+(F2) was merged before continuing. After B2 commit `d7f0605`, master through
+`230c724` (F2 token/fact/UI-state integration) was also merged into this branch.
+The app still selects FakeVeCore until its provider switch after B2 merge.
 
 ## Delivered
 
