@@ -4,9 +4,8 @@ import 'package:ve_core/ve_core.dart';
 /// documented sample (CONTRACTS C2: "desktop uses the documented sample") and
 /// labels it as a sample. A real render uses the project's own size and rate.
 ///
-/// Built from JSON rather than the model constructors: the constructors add
-/// `extensions: {}` at every level, and B0's FakeVeCore matches its fixtures on
-/// exact JSON, so an added empty object would miss every fixture.
+/// Built from JSON, as the fixtures have it: tests run on FakeVeCore, which
+/// matches its fixtures on exact JSON (since B2 it ignores empty `extensions`).
 abstract final class SamplePreview {
   static final MediaDescription media = MediaDescription.fromJson({
     'video': {

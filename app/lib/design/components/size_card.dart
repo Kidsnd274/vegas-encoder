@@ -20,6 +20,8 @@ class SizeEstimate {
     this.totalBytes,
     this.minBytesPerMinute,
     this.maxBytesPerMinute,
+    this.minTotalBytes,
+    this.maxTotalBytes,
     this.consequences = const [],
     this.totalNote,
   });
@@ -39,6 +41,11 @@ class SizeEstimate {
   /// Typical range per minute, for quality modes.
   final double? minBytesPerMinute;
   final double? maxBytesPerMinute;
+
+  /// Typical range for the typed length, for quality modes; null without a
+  /// length. The core's figures, not the per-minute range scaled here.
+  final double? minTotalBytes;
+  final double? maxTotalBytes;
 
   /// Plain-language results of the rate mode and bit depth.
   final List<String> consequences;
@@ -116,8 +123,12 @@ class _SizeQualityCardState extends State<SizeQualityCard> {
     final len = widget.lengthSeconds;
     final about = e.approximate ? 'About ' : '';
     final low = e.minBytesPerMinute, high = e.maxBytesPerMinute;
+    final totalLow = e.minTotalBytes, totalHigh = e.maxTotalBytes;
     final String tail;
-    if (low != null && high != null) {
+    if (len != null && e.totalBytes != null && totalLow != null && totalHigh != null) {
+      // The range for the typed length (the mockup's wording).
+      tail = '. Typically ${VeFormat.bytes(totalLow)} to ${VeFormat.bytes(totalHigh)} for ${VeFormat.duration(len)}.';
+    } else if (low != null && high != null) {
       tail = ', typically ${VeFormat.bytes(low)} to ${VeFormat.bytes(high)}.';
     } else {
       tail = e.approximate ? '.' : ', set by the bitrate.';

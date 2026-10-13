@@ -230,6 +230,7 @@ void main() {
       cache = FakeCapabilityCache();
       container = ProviderContainer(
         overrides: [
+          veCoreProvider.overrideWithValue(FakeVeCore()),
           ffmpegDiscoveryProvider.overrideWithValue(discovery),
           machineSettingsRepositoryProvider.overrideWithValue(machine),
           capabilityCacheProvider.overrideWithValue(cache),

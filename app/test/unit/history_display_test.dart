@@ -112,7 +112,7 @@ void main() {
 
   group('history state', () {
     test('the filter keeps its status; the selection falls back to the first shown', () async {
-      final container = ProviderContainer();
+      final container = ProviderContainer(overrides: [veCoreProvider.overrideWithValue(FakeVeCore())]);
       addTearDown(container.dispose);
       container.listen(historyViewProvider, (_, _) {});
       await container.read(jobsProvider.future);
@@ -132,7 +132,9 @@ void main() {
 
     test('Open settings as new preset makes a preset in Mine, named after the template', () async {
       final library = FakePresetLibrary(now: () => '2026-10-14T00:00:00Z');
-      final container = ProviderContainer(overrides: [presetLibraryProvider.overrideWithValue(library)]);
+      final container = ProviderContainer(
+        overrides: [veCoreProvider.overrideWithValue(FakeVeCore()), presetLibraryProvider.overrideWithValue(library)],
+      );
       addTearDown(container.dispose);
       container.listen(presetsProvider, (_, _) {});
       await container.read(presetsProvider.future);

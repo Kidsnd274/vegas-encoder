@@ -243,13 +243,16 @@ class FilePanel extends StatelessWidget {
       left: [
         if (advanced)
           const PanelStatic('Advanced mode shows no estimate: a custom command can do anything.')
-        else if (perMinute == null || !perMinute.available)
+        else if (perMinute == null)
           PanelStatic(
             d.perMinute.notInPreviewCore
                 ? 'The size estimate for this edit needs the real core (platform milestone B2). '
                       'The built-in presets as shipped show theirs.'
-                : 'No estimate for these settings.',
+                : 'The core couldn’t work out an estimate: ${d.perMinute.error?.message}',
           )
+        else if (!perMinute.available)
+          // Filters or conflicting rate options in Extra arguments: the core says why.
+          PanelStatic(perMinute.explanation.isEmpty ? 'No estimate for these settings.' : perMinute.explanation)
         else
           SizeQualityCard(
             estimate: SizeEstimate(
@@ -260,6 +263,8 @@ class FilePanel extends StatelessWidget {
               totalBytes: total?.totalBytes,
               minBytesPerMinute: perMinute.minBytesPerMinute,
               maxBytesPerMinute: perMinute.maxBytesPerMinute,
+              minTotalBytes: total?.minTotalBytes,
+              maxTotalBytes: total?.maxTotalBytes,
               consequences: [if (perMinute.explanation.isNotEmpty) perMinute.explanation],
               totalNote: 'Total not available yet',
             ),
@@ -301,9 +306,11 @@ class FilePanel extends StatelessWidget {
             ),
           ),
         if (lengthSec != null && d.total != null && !d.total!.ok && perMinute != null)
-          const PanelBlurb(
-            'The total for a typed length comes from the real core (platform milestone B2). '
-            'The rate per minute is from the preview core.',
+          PanelBlurb(
+            d.total!.notInPreviewCore
+                ? 'The total for a typed length comes from the real core (platform milestone B2). '
+                      'The rate per minute is from the preview core.'
+                : 'The core couldn’t work out the total: ${d.total!.error?.message}',
           ),
       ],
     );

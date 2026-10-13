@@ -1,12 +1,67 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
 
-// The app's only ways into the core (C2) and the system (C3). Each defaults to
-// the platform fake until the real core (B2) and services (B3) land; tests
-// override them. Nothing in the app implements compile, validate, lint,
-// completion, estimates or diffs itself (TECH_ARCHITECTURE T1).
+// The app's only ways into the core (C2) and the system (C3). The core is the
+// real C++ core (B2); the services default to the platform fakes until B3
+// lands. Tests override them. Nothing in the app implements compile, validate,
+// lint, completion, estimates or diffs itself (TECH_ARCHITECTURE T1).
 
-final veCoreProvider = Provider<VeCore>((ref) => FakeVeCore());
+/// The product core through `dart:ffi`, one per isolate; ve_core's build hook
+/// bundles its DLL. If it can't load, [UnavailableCore] carries why, and
+/// nothing falls back to the fake core.
+final veCoreProvider = Provider<VeCore>((ref) {
+  try {
+    return NativeVeCore();
+  } on CoreException catch (e) {
+    return UnavailableCore(e);
+  }
+});
+
+/// Why the core couldn't load, or null when it did.
+final coreLoadErrorProvider = Provider<CoreException?>(
+  (ref) => switch (ref.watch(veCoreProvider)) {
+    UnavailableCore(:final error) => error,
+    _ => null,
+  },
+);
+
+/// The core that didn't load (a missing or mismatched DLL). Every call throws
+/// the load failure, so results stay explicit failures; the desktop window
+/// shows it in place of the screens that need the core.
+final class UnavailableCore implements VeCore {
+  const UnavailableCore(this.error);
+  final CoreException error;
+
+  @override
+  CoreVersion get version => throw error;
+  @override
+  ProfileCatalog profiles() => throw error;
+  @override
+  NormalizeResult normalize(Map<String, Object?> json) => throw error;
+  @override
+  List<Issue> validate(Recipe recipe, {MediaDescription? media, CoreCapabilities? capabilities}) => throw error;
+  @override
+  CompileResult compile(
+    Recipe recipe, {
+    required MediaDescription media,
+    required CompilePaths paths,
+    CoreCapabilities? capabilities,
+  }) => throw error;
+  @override
+  List<Diagnostic> lint(String text, {CoreCapabilities? capabilities}) => throw error;
+  @override
+  CompletionResult complete(String text, int caret, {CoreCapabilities? capabilities}) => throw error;
+  @override
+  SizeEstimate estimate(Recipe recipe, {required MediaDescription media, double? durationSec}) => throw error;
+  @override
+  List<FieldDiff> diff(Recipe before, Recipe after) => throw error;
+  @override
+  Uint8List encodePayload(TemplateSnapshot snapshot) => throw error;
+  @override
+  PayloadResult decodePayload(Uint8List bytes) => throw error;
+}
 
 final presetLibraryProvider = Provider<PresetLibrary>((ref) {
   final library = FakePresetLibrary();
