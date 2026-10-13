@@ -14,7 +14,11 @@
 // channel (lib/platform/window_channel.dart).
 //
 // Dart -> runner:
-//   configure {ownerHwnd?: int, keepOnTop?: bool} -> {ownerSet: bool}
+//   configure {ownerHwnd?: int, keepOnTop?: bool,
+//              bounds?: {x, y, width, height}, maximized?: bool}
+//     -> {ownerSet: bool, boundsSet: bool}   (bounds: desktop, before show)
+//   getBounds -> {x, y, width, height, maximized}   (restored outer rect,
+//     physical screen pixels)
 //   startDrag, minimize, toggleMaximize, close
 //   setKeepOnTop {value: bool}
 //   getState -> {maximized, active, reducedMotion, keepOnTop, kind}

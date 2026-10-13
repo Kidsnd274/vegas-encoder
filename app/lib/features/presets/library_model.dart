@@ -78,7 +78,10 @@ class LibraryGroup {
 /// Every preset as a library row, using drafts where there are any.
 final libraryEntriesProvider = Provider<List<LibraryEntry>>((ref) {
   final presets = ref.watch(presetsProvider).value ?? const <Preset>[];
-  final state = ref.watch(presetsControllerProvider);
+  // Only what changes a row: drafts and session favorites. Search, filters
+  // and selection reuse the rows.
+  final (drafts, builtinFavorites) = ref.watch(presetsControllerProvider.select((s) => (s.drafts, s.builtinFavorites)));
+  final state = PresetsState(drafts: drafts, builtinFavorites: builtinFavorites);
   final core = ref.watch(veCoreProvider);
   final catalog = ref.watch(profilesProvider);
   final settings = ref.watch(machineSettingsProvider).value;

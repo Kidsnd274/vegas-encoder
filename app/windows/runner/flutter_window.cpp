@@ -138,8 +138,26 @@ void FlutterWindow::HandleMethodCall(
     if (auto keep_on_top = AsBool(Find(args, "keepOnTop"))) {
       SetKeepOnTop(*keep_on_top);
     }
-    result->Success(EncodableValue(
-        EncodableMap{{EncodableValue("ownerSet"), EncodableValue(owner_set)}}));
+    bool bounds_set = false;
+    if (const auto* value = Find(args, "bounds")) {
+      if (const auto* bounds = std::get_if<EncodableMap>(value)) {
+        const auto x = AsInt(Find(*bounds, "x"));
+        const auto y = AsInt(Find(*bounds, "y"));
+        const auto width = AsInt(Find(*bounds, "width"));
+        const auto height = AsInt(Find(*bounds, "height"));
+        if (x && y && width && height) {
+          RECT rect{static_cast<LONG>(*x), static_cast<LONG>(*y),
+                    static_cast<LONG>(*x + *width),
+                    static_cast<LONG>(*y + *height)};
+          bounds_set = RestoreBounds(
+              rect, AsBool(Find(args, "maximized")).value_or(false));
+        }
+      }
+    }
+    result->Success(EncodableValue(EncodableMap{
+        {EncodableValue("ownerSet"), EncodableValue(owner_set)},
+        {EncodableValue("boundsSet"), EncodableValue(bounds_set)},
+    }));
   } else if (method == "startDrag") {
     // Reply first: the move loop runs until the button is released.
     result->Success();
@@ -164,6 +182,18 @@ void FlutterWindow::HandleMethodCall(
         {EncodableValue("keepOnTop"), EncodableValue(keep_on_top())},
         {EncodableValue("kind"),
          EncodableValue(std::string(KindName(options().kind)))},
+    }));
+  } else if (method == "getBounds") {
+    bool maximized = false;
+    const RECT rect = RestoredBounds(&maximized);
+    result->Success(EncodableValue(EncodableMap{
+        {EncodableValue("x"), EncodableValue(static_cast<int64_t>(rect.left))},
+        {EncodableValue("y"), EncodableValue(static_cast<int64_t>(rect.top))},
+        {EncodableValue("width"),
+         EncodableValue(static_cast<int64_t>(rect.right - rect.left))},
+        {EncodableValue("height"),
+         EncodableValue(static_cast<int64_t>(rect.bottom - rect.top))},
+        {EncodableValue("maximized"), EncodableValue(maximized)},
     }));
   } else if (method == "trace") {
     if (const auto* label = Find(args, "label")) {

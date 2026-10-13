@@ -50,6 +50,17 @@ class Win32Window {
   void SetKeepOnTop(bool keep_on_top);
   bool keep_on_top() const { return keep_on_top_; }
 
+  // Desktop window only, before Show: puts the window at |bounds| (the outer
+  // rectangle in physical screen pixels, as RestoredBounds reported it) and
+  // shows it maximized if |maximized|. Bounds that no longer touch a monitor
+  // are ignored; the rest are clamped to that monitor's work area and the
+  // minimum size. Returns whether the bounds were used.
+  bool RestoreBounds(RECT bounds, bool maximized);
+
+  // The outer rectangle the window has when restored (not maximized or
+  // minimized), in physical screen pixels, and whether it is maximized.
+  RECT RestoredBounds(bool* maximized);
+
   // Starts a system move loop, as if the caption were dragged.
   void StartDrag();
   void Minimize();
@@ -107,6 +118,7 @@ class Win32Window {
   bool quit_on_close_ = false;
   bool keep_on_top_ = false;
   bool was_maximized_ = false;
+  bool start_maximized_ = false;
   HWND owner_ = nullptr;
 
   // window handle for top level window.

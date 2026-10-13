@@ -49,15 +49,18 @@ class LibraryPane extends ConsumerWidget {
       favoritesOnly: state.favoritesOnly,
     );
 
-    final rows = <Widget>[];
+    // Built lazily (ListView.builder), for libraries of hundreds of presets
+    // (TECH_ARCHITECTURE §9.3).
+    final rows = <Widget Function()>[];
     for (var gi = 0; gi < groups.length; gi++) {
       final g = groups[gi];
-      rows.add(_GroupHeader(title: g.title, count: g.count, first: gi == 0));
+      final first = gi == 0;
+      rows.add(() => _GroupHeader(title: g.title, count: g.count, first: first));
       for (final sub in g.subgroups) {
-        rows.add(_SubHeader(sub.title));
+        rows.add(() => _SubHeader(sub.title));
         for (final e in sub.entries) {
           rows.add(
-            _LibraryRow(
+            () => _LibraryRow(
               key: ValueKey('preset-${e.id}'),
               entry: e,
               selected: e.id == state.selectedId,
@@ -124,7 +127,11 @@ class LibraryPane extends ConsumerWidget {
                 ? const SizedBox.shrink()
                 : rows.isEmpty
                 ? _NoMatch(query: state.query, onClear: controller.showAll, onNewPreset: onNewPreset)
-                : ListView(padding: const EdgeInsets.fromLTRB(8, 0, 8, 14), children: rows),
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
+                    itemCount: rows.length,
+                    itemBuilder: (context, i) => rows[i](),
+                  ),
           ),
         ],
       ),

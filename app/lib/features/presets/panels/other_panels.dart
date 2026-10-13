@@ -218,10 +218,19 @@ class _ContainerOption extends StatelessWidget {
 /// File: where the render goes, and how big it will be. The estimate lives
 /// only here (UI_SPEC §2).
 class FilePanel extends StatelessWidget {
-  const FilePanel({super.key, required this.scope, required this.lengthSec, required this.onLengthChanged});
+  const FilePanel({
+    super.key,
+    required this.scope,
+    required this.lengthSec,
+    required this.lengthText,
+    required this.onLengthTextChanged,
+  });
   final PanelScope scope;
   final int? lengthSec;
-  final ValueChanged<int?> onLengthChanged;
+
+  /// Exactly as typed (C7 remembers it); [lengthSec] is what it means.
+  final String lengthText;
+  final ValueChanged<String> onLengthTextChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +264,9 @@ class FilePanel extends StatelessWidget {
               totalNote: 'Total not available yet',
             ),
             lengthSeconds: lengthSec,
-            onLengthChanged: onLengthChanged,
+            lengthText: lengthText,
+            onLengthTextChanged: onLengthTextChanged,
+            onLengthChanged: (_) {},
           ),
       ],
       right: [
