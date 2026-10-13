@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'models.dart';
 
-/// Synchronous, deterministic calls. NativeVeCore and its build hook arrive in B2.
+/// Synchronous, deterministic calls. NativeVeCore uses the bundled B2 native asset.
 /// Implementations never inspect the filesystem, run FFmpeg, or access VEGAS.
 abstract interface class VeCore {
   CoreVersion get version;

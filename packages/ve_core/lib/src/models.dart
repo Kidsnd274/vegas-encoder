@@ -648,6 +648,7 @@ class ResolvedSettings extends JsonModel {
     String? profile = null,
     required int depth,
     required String pixfmt,
+    int? gopFrames = null,
     JsonMap extensions = const {},
   }) : super({
          'videoEncoder': videoEncoder,
@@ -659,6 +660,7 @@ class ResolvedSettings extends JsonModel {
          'profile': profile,
          'depth': depth,
          'pixfmt': pixfmt,
+         'gopFrames': gopFrames,
          'extensions': extensions,
        });
   ResolvedSettings.fromJson(super.json);
@@ -671,6 +673,7 @@ class ResolvedSettings extends JsonModel {
   String? get profile => data['profile'] as String?;
   int get depth => data['depth'] as int;
   String get pixfmt => data['pixfmt'] as String;
+  int? get gopFrames => data['gopFrames'] as int?;
   ResolvedSettings copyWith({
     Object? videoEncoder = absent,
     Object? audioEncoder = absent,
@@ -681,6 +684,7 @@ class ResolvedSettings extends JsonModel {
     Object? profile = absent,
     Object? depth = absent,
     Object? pixfmt = absent,
+    Object? gopFrames = absent,
     Object? extensions = absent,
   }) => ResolvedSettings.fromJson(
     changed({
@@ -693,6 +697,7 @@ class ResolvedSettings extends JsonModel {
       if (!identical(profile, absent)) 'profile': profile,
       if (!identical(depth, absent)) 'depth': depth,
       if (!identical(pixfmt, absent)) 'pixfmt': pixfmt,
+      if (!identical(gopFrames, absent)) 'gopFrames': gopFrames,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -710,6 +715,9 @@ class StreamSignalFacts extends JsonModel {
     bool? chromaChanged = null,
     bool? conversion = null,
     String containerSupport = 'unknown',
+    String? inputLabel = null,
+    String? outputLabel = null,
+    String? conversionNote = null,
     JsonMap extensions = const {},
   }) : super({
          'inputFormat': inputFormat,
@@ -721,6 +729,9 @@ class StreamSignalFacts extends JsonModel {
          'chromaChanged': chromaChanged,
          'conversion': conversion,
          'containerSupport': containerSupport,
+         'inputLabel': inputLabel,
+         'outputLabel': outputLabel,
+         'conversionNote': conversionNote,
          'extensions': extensions,
        });
   StreamSignalFacts.fromJson(super.json);
@@ -734,6 +745,9 @@ class StreamSignalFacts extends JsonModel {
   bool? get conversion => data['conversion'] as bool?;
   String get containerSupport =>
       data['containerSupport'] as String? ?? 'unknown';
+  String? get inputLabel => data['inputLabel'] as String?;
+  String? get outputLabel => data['outputLabel'] as String?;
+  String? get conversionNote => data['conversionNote'] as String?;
   StreamSignalFacts copyWith({
     Object? inputFormat = absent,
     Object? outputFormat = absent,
@@ -744,6 +758,9 @@ class StreamSignalFacts extends JsonModel {
     Object? chromaChanged = absent,
     Object? conversion = absent,
     Object? containerSupport = absent,
+    Object? inputLabel = absent,
+    Object? outputLabel = absent,
+    Object? conversionNote = absent,
     Object? extensions = absent,
   }) => StreamSignalFacts.fromJson(
     changed({
@@ -757,6 +774,81 @@ class StreamSignalFacts extends JsonModel {
       if (!identical(conversion, absent)) 'conversion': conversion,
       if (!identical(containerSupport, absent))
         'containerSupport': containerSupport,
+      if (!identical(inputLabel, absent)) 'inputLabel': inputLabel,
+      if (!identical(outputLabel, absent)) 'outputLabel': outputLabel,
+      if (!identical(conversionNote, absent)) 'conversionNote': conversionNote,
+      if (!identical(extensions, absent)) 'extensions': extensions,
+    }),
+  );
+}
+
+class SignalFormatFacts extends JsonModel {
+  SignalFormatFacts({
+    required String format,
+    int? bits = null,
+    String? chroma = null,
+    String label = '',
+    String shortLabel = '',
+    JsonMap extensions = const {},
+  }) : super({
+         'format': format,
+         'bits': bits,
+         'chroma': chroma,
+         'label': label,
+         'shortLabel': shortLabel,
+         'extensions': extensions,
+       });
+  SignalFormatFacts.fromJson(super.json);
+  String get format => data['format'] as String;
+  int? get bits => data['bits'] as int?;
+  String? get chroma => data['chroma'] as String?;
+  String get label => data['label'] as String? ?? '';
+  String get shortLabel => data['shortLabel'] as String? ?? '';
+  SignalFormatFacts copyWith({
+    Object? format = absent,
+    Object? bits = absent,
+    Object? chroma = absent,
+    Object? label = absent,
+    Object? shortLabel = absent,
+    Object? extensions = absent,
+  }) => SignalFormatFacts.fromJson(
+    changed({
+      if (!identical(format, absent)) 'format': format,
+      if (!identical(bits, absent)) 'bits': bits,
+      if (!identical(chroma, absent)) 'chroma': chroma,
+      if (!identical(label, absent)) 'label': label,
+      if (!identical(shortLabel, absent)) 'shortLabel': shortLabel,
+      if (!identical(extensions, absent)) 'extensions': extensions,
+    }),
+  );
+}
+
+class SourceSignalFacts extends JsonModel {
+  SourceSignalFacts({
+    required SignalFormatFacts video,
+    SignalFormatFacts? audio = null,
+    JsonMap extensions = const {},
+  }) : super({
+         'video': video.toJson(),
+         'audio': audio?.toJson(),
+         'extensions': extensions,
+       });
+  SourceSignalFacts.fromJson(super.json);
+  SignalFormatFacts get video =>
+      SignalFormatFacts.fromJson(jsonMap(data['video']));
+  SignalFormatFacts? get audio => data['audio'] == null
+      ? null
+      : SignalFormatFacts.fromJson(jsonMap(data['audio']));
+  SourceSignalFacts copyWith({
+    Object? video = absent,
+    Object? audio = absent,
+    Object? extensions = absent,
+  }) => SourceSignalFacts.fromJson(
+    changed({
+      if (!identical(video, absent))
+        'video': (video as SignalFormatFacts).toJson(),
+      if (!identical(audio, absent))
+        'audio': (audio as SignalFormatFacts?)?.toJson(),
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -766,10 +858,12 @@ class SignalPathFacts extends JsonModel {
   SignalPathFacts({
     StreamSignalFacts? video = null,
     List<StreamSignalFacts> audio = const [],
+    SourceSignalFacts? source = null,
     JsonMap extensions = const {},
   }) : super({
          'video': video?.toJson(),
          'audio': audio.map((v) => v.toJson()).toList(),
+         'source': source?.toJson(),
          'extensions': extensions,
        });
   SignalPathFacts.fromJson(super.json);
@@ -779,9 +873,13 @@ class SignalPathFacts extends JsonModel {
   List<StreamSignalFacts> get audio => List<StreamSignalFacts>.unmodifiable(
     jsonMaps(data['audio'] ?? []).map(StreamSignalFacts.fromJson),
   );
+  SourceSignalFacts? get source => data['source'] == null
+      ? null
+      : SourceSignalFacts.fromJson(jsonMap(data['source']));
   SignalPathFacts copyWith({
     Object? video = absent,
     Object? audio = absent,
+    Object? source = absent,
     Object? extensions = absent,
   }) => SignalPathFacts.fromJson(
     changed({
@@ -791,6 +889,8 @@ class SignalPathFacts extends JsonModel {
         'audio': (audio as List<StreamSignalFacts>)
             .map((v) => v.toJson())
             .toList(),
+      if (!identical(source, absent))
+        'source': (source as SourceSignalFacts?)?.toJson(),
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -807,6 +907,7 @@ class CompileResult extends JsonModel {
     SignalPathFacts? signalPath = null,
     List<Issue> issues = const [],
     JsonMap summary = const {},
+    List<String> overriddenFields = const [],
     JsonMap extensions = const {},
   }) : super({
          'executable': executable,
@@ -818,6 +919,7 @@ class CompileResult extends JsonModel {
          'signalPath': signalPath?.toJson(),
          'issues': issues.map((v) => v.toJson()).toList(),
          'summary': summary,
+         'overriddenFields': overriddenFields,
          'extensions': extensions,
        });
   CompileResult.fromJson(super.json);
@@ -839,6 +941,9 @@ class CompileResult extends JsonModel {
     jsonMaps(data['issues'] ?? []).map(Issue.fromJson),
   );
   JsonMap get summary => jsonMap(data['summary'] ?? <String, Object?>{});
+  List<String> get overriddenFields => List<String>.unmodifiable(
+    (data['overriddenFields'] as List? ?? []).cast<String>(),
+  );
   CompileResult copyWith({
     Object? executable = absent,
     Object? argv = absent,
@@ -849,6 +954,7 @@ class CompileResult extends JsonModel {
     Object? signalPath = absent,
     Object? issues = absent,
     Object? summary = absent,
+    Object? overriddenFields = absent,
     Object? extensions = absent,
   }) => CompileResult.fromJson(
     changed({
@@ -868,6 +974,8 @@ class CompileResult extends JsonModel {
       if (!identical(issues, absent))
         'issues': (issues as List<Issue>).map((v) => v.toJson()).toList(),
       if (!identical(summary, absent)) 'summary': summary,
+      if (!identical(overriddenFields, absent))
+        'overriddenFields': overriddenFields,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1002,6 +1110,8 @@ class SizeEstimate extends JsonModel {
     double? totalBytes = null,
     double? minBytesPerMinute = null,
     double? maxBytesPerMinute = null,
+    double? minTotalBytes = null,
+    double? maxTotalBytes = null,
     String explanation = '',
     JsonMap extensions = const {},
   }) : super({
@@ -1013,6 +1123,8 @@ class SizeEstimate extends JsonModel {
          'totalBytes': totalBytes,
          'minBytesPerMinute': minBytesPerMinute,
          'maxBytesPerMinute': maxBytesPerMinute,
+         'minTotalBytes': minTotalBytes,
+         'maxTotalBytes': maxTotalBytes,
          'explanation': explanation,
          'extensions': extensions,
        });
@@ -1028,6 +1140,8 @@ class SizeEstimate extends JsonModel {
       (data['minBytesPerMinute'] as num?)?.toDouble();
   double? get maxBytesPerMinute =>
       (data['maxBytesPerMinute'] as num?)?.toDouble();
+  double? get minTotalBytes => (data['minTotalBytes'] as num?)?.toDouble();
+  double? get maxTotalBytes => (data['maxTotalBytes'] as num?)?.toDouble();
   String get explanation => data['explanation'] as String? ?? '';
   SizeEstimate copyWith({
     Object? available = absent,
@@ -1038,6 +1152,8 @@ class SizeEstimate extends JsonModel {
     Object? totalBytes = absent,
     Object? minBytesPerMinute = absent,
     Object? maxBytesPerMinute = absent,
+    Object? minTotalBytes = absent,
+    Object? maxTotalBytes = absent,
     Object? explanation = absent,
     Object? extensions = absent,
   }) => SizeEstimate.fromJson(
@@ -1052,6 +1168,8 @@ class SizeEstimate extends JsonModel {
         'minBytesPerMinute': minBytesPerMinute,
       if (!identical(maxBytesPerMinute, absent))
         'maxBytesPerMinute': maxBytesPerMinute,
+      if (!identical(minTotalBytes, absent)) 'minTotalBytes': minTotalBytes,
+      if (!identical(maxTotalBytes, absent)) 'maxTotalBytes': maxTotalBytes,
       if (!identical(explanation, absent)) 'explanation': explanation,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),

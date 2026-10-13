@@ -66,11 +66,17 @@ const signalFacts = (recipe, ctx) => {
   if (ctx.video.pixfmt !== 'p010le' || ctx.audio?.sampleFmt !== 'f32le') throw new Error('New media needs authored signal facts');
   const [pixfmt,depth,chroma,convertVideo,sampleFmt,bits,convertAudio] = authoredSignals[recipe.id];
   return {
+    source:{video:{format:'p010le',bits:10,chroma:'4:2:0',label:'P010, 10-bit 4:2:0',shortLabel:'10-bit'},
+      audio:{format:'flt',bits:32,chroma:null,label:'32-bit float',shortLabel:'float'}},
     video: recipe.video.enabled ? {inputFormat:'p010le',outputFormat:pixfmt,inputBits:10,outputBits:depth,
       inputChroma:'4:2:0',outputChroma:chroma,chromaChanged:chroma !== '4:2:0',conversion:convertVideo,
+      inputLabel:'P010, 10-bit 4:2:0',outputLabel:`${depth}-bit ${chroma}`,
+      conversionNote:chroma !== '4:2:0' ? 'Chroma sampling changes; added color resolution is interpolated, not recovered.' : depth < 10 ? 'Precision is reduced before encoding.' : null,
       containerSupport:ve.compat.video[ve.videoEncoders[recipe.video.encoder].family][recipe.container.format]} : null,
     audio: recipe.audio[0].enabled ? [{inputFormat:'flt',outputFormat:sampleFmt,inputBits:32,outputBits:bits,
       inputChroma:null,outputChroma:null,chromaChanged:null,conversion:convertAudio,
+      inputLabel:'32-bit float',outputLabel:`${bits}-bit ${sampleFmt.startsWith('flt') ? 'float' : 'integer'}`,
+      conversionNote:bits < 32 ? 'Precision is reduced before encoding.' : null,
       containerSupport:ve.compat.audio[ve.audioEncoders[recipe.audio[0].encoder].family][recipe.container.format]}] : [],
   };
 };
@@ -115,6 +121,7 @@ const makeFixture = (r, ctx = ve.sampleContext) => {
   const output = tokens.at(-1).text;
   const advancedTemplate = ['{inputs}', ve.commandText(tokens.filter((x) => !['exe', 'global', 'input', 'output'].includes(x.role))), '{output}'].join('\n');
   const est = ve.estimate(r, { ...ctx, durationSec: 60 });
+  const gop = tokens.findIndex((token) => token.role !== 'input' && token.text === '-g');
   const perMinute = est.bytes;
   return {
     recipe,
@@ -125,9 +132,11 @@ const makeFixture = (r, ctx = ve.sampleContext) => {
     paths: { ...paths, videoPipe: `\\\\.\\pipe\\vegas-encoder-${ctx.pipeId}-video`, audioPipe: `\\\\.\\pipe\\vegas-encoder-${ctx.pipeId}-audio`, project: ctx.project?.replace(/\.veg$/, '') ?? paths.project, output },
     normalize: { recipe, issues: [] },
     compile: { executable: 'ffmpeg', argv: tokens.slice(1).map((x) => x.text), display: tokens,
+      overriddenFields:[],
       commandLine: ve.commandText(tokens), advancedTemplate,
       resolved: { videoEncoder: res.enc.id, audioEncoder: res.aenc.id, videoMode: res.mode, audioMode: res.amode,
-        quality: res.quality ?? null, speed: res.speed ?? null, profile: res.profile ?? null, depth: res.depth, pixfmt: res.pixfmt },
+        quality: res.quality ?? null, speed: res.speed ?? null, profile: res.profile ?? null, depth: res.depth, pixfmt: res.pixfmt,
+        gopFrames:gop < 0 ? null : Number(tokens[gop+1].text) },
       signalPath: signalFacts(recipe, ctx),
       issues: [...ve.validate(r, 'gyan-8.1', ctx).map((issue) => mapIssue(issue, tokens)), issueNotice], summary: ve.summary(r) },
     validations: Object.fromEntries(ve.installations.map((inst) => [inst.id, [...ve.validate(r, inst.id, ctx).map((issue) => mapIssue(issue)), issueNotice]])),
@@ -135,6 +144,7 @@ const makeFixture = (r, ctx = ve.sampleContext) => {
     estimate: { available: true, approx: est.approx, videoKbps: est.videoKbps, audioKbps: est.audioKbps,
       bytesPerMinute: perMinute, totalBytes: null, minBytesPerMinute: est.approx ? perMinute * .6 : null,
       maxBytesPerMinute: est.approx ? perMinute * 1.6 : null,
+      minTotalBytes:null,maxTotalBytes:null,
       explanation: 'Design fixture: size depends on how busy the footage is.' },
   };
 };

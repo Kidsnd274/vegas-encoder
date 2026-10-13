@@ -1,86 +1,79 @@
 # Platform workstream
 
-Updated: 2026-10-12 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
-branch `ws/platform`. **B0 app-review additions complete; stop for owner merge.**
-Merged master through `c4edb57` (B0 and F0/F1) by fast-forward before this work.
+Updated: 2026-10-13 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
+branch `ws/platform`. **B2 complete; stop for owner merge.** Master through `ab7e7ab`
+(F2) was merged before continuing. After B2 commit `d7f0605`, master through
+`230c724` (F2 token/fact/UI-state integration) was also merged into this branch.
+The app still selects FakeVeCore until its provider switch after B2 merge.
 
 ## Delivered
 
-- C1–C7 exact shapes in [CONTRACTS.md](../CONTRACTS.md); draft recipe JSON Schema
-  and portable `src/core/capi/ve_core.h` (no runtime core/build hook until B2).
-- Pure Dart ve_core: immutable models with unknown-field preservation, synchronous
-  VeCore API, FakeVeCore and injectable fixtures. Six built-in presets plus popup;
-  normalize/compile/validate, per-minute estimates, seeded lint/completion, identical
-  diffs and payload round trips. Unmatched edited-state requests fail explicitly.
-- Pure Dart ve_services: ten service APIs, models and a fake for each. Mockup's three
-  FFmpeg installations/options/hardware availability; six library presets with
-  revisions; machine preferences; five History records; popup Apply/Cancel; all
-  seven live render states as JSON files and injectable reader snapshots.
-- `scripts/Test-B0.ps1`: offline contract runner. Fixture generator reads design
-  files without editing them; `--check` checks reproducibility. No third-party Dart
-  dependency, SDK upgrade, FFmpeg download, real-host install, or app/design edit.
-- App-review additions, all additive in contract v1:
-  `CommandToken.field` and `Issue.tokenIndices` (zero-based display indexes);
-  `CompileResult.signalPath` with raw video/audio format, useful bits, conversion,
-  chroma change and `containerSupport=ok|warn|no|unknown`; C5 `hostHwnd` as a decimal
-  string for VEGAS's main window; C7 `uiState` with physical restored desktop bounds,
-  maximize state and exact last size-card length text. KeepOnTop remains false.
-- Models, existing six preset/popup fixtures and service fakes expose those fields.
-  Capability-specific compile highlights use `CoreFixture.compileIssues`; standalone
-  validations carry no indexes. No edited-state fixture sweep or Dart domain rules.
-- Owner-approved reconciliation applied to TECH_ARCHITECTURE/SETTINGS_AND_COMMANDS:
-  one jobs root, `{presetId,revision,name}` origin, session file I/O outside core,
-  one-element recipe audio list. Native implementation/FFI remains B2.
+- Portable C++17 core and C ABI: structural normalize (preserves unknown fields and
+  absent/null defaults), validate, Basic compile with Extra overrides, Advanced CRT
+  parsing/macros/lint/completion, estimates, field diff, payload bounds/CRC, pure C4
+  session shape checks. No filesystem, process, Windows or VEGAS calls in the core.
+- DLL/static build from the same sources; `NativeVeCore()` with counted-buffer FFI,
+  paired frees on success/error and a Windows x64 native-asset build hook. Fakes stay
+  explicit; no automatic fallback after a native error. Dependency/source notices
+  are included (pinned MIT/BSD packages, nlohmann/json 3.12.0 MIT).
+- F2 core additions: `SizeEstimate.minTotalBytes/maxTotalBytes`, final
+  `ResolvedSettings.gopFrames`, source format/bit/chroma labels and conversion notes,
+  `CompileResult.overriddenFields` for "set in Extra arguments". Existing B0 token
+  provenance/issue indexes, mux facts, C5 host HWND and C7 UI state remain additive.
+- Fake matching tolerates absent vs empty `extensions` without changing stored JSON;
+  real changes still need injected fixtures. Existing six presets/popup only: no
+  edited-state sweep or Dart domain compiler. Models and fixtures expose new fields.
+- `schema/encoder-profiles.v1.json` and embedded options are explicitly **B2 bootstrap
+  B0/Linux design facts, not Windows-qualified**. B1 replaces/recaptures them. Real
+  supplied capabilities drive installation availability and private option checks.
 
 ## Validation
 
-- Current app-review milestone: `scripts/Test-B0.ps1` passes on Windows x64 with
-  installed Dart 3.13.5: both packages analyze cleanly; **170 core / 57 service /
-  281 fixture checks**, plus C/C++17 ABI header x64 `/W4 /WX`. New checks cover
-  token field/index bounds, capability-specific highlights, unknown/disabled facts,
-  P010 and float no-conversion paths, 24-bit PCM in a 32-bit carrier, per-stream mux
-  facts, HWND string precision, UI-state watch/revision conflicts and old JSON.
-- Prior B0 foundation checks: **fakes only** unknown nested fields/default/null round
-  trips, immutable copies, no stale compile results, payload buffer copies,
-  per-listener stream snapshots, concurrent revision conflicts, 20-revision bound,
-  probe/hardware cancellation, live sequence and session mismatch/apply/cancel.
-- Offline fixture checks include sample envelope lengths/CRC and generated data
-  consistency. Design-time Linux option facts and authored signal facts are explicitly
-  illustrative, **not Windows qualification**.
-- C/C++17 draft ABI header compiles under MSVC x64 `/W4 /WX`, with layout assertions.
-  Existing default and opt-in configuration-proof native builds passed in B0;
-  they were not rerun for these Dart/model/documentation additions.
-- Prior B0: 24 host-helper, 9 boundary and 67 native configuration checks passed with
-  **fakes/offline windows**. Default `Test-VegasEncoder.ps1` passed decoded repeats,
-  fractional timing, short audio, video-only, cancellation/error cleanup,
-  destination preservation, Unicode and negative checker with the **fake host**.
-  Opt-in Test-ConfigurationProof passed 11 cases / 20 render attempts, including
-  seven same-DLL stop/recovery pairs (**fake host**, gyan FFmpeg 5.1.2). Fake-tree
-  installer suite passed; not rerun for this milestone. Outputs in this worktree's
-  ignored build/test-results/.
-- **No real VEGAS validation in B0.** Installed 0.1.2-config-proof and its main
-  checkout backups remain untouched. Prior real evidence remains limited to its
-  recorded VEGAS 2026.0.3.189 tests; controlled real failure recovery and real
-  two-template/restart persistence remain unverified. A5–A7 features stay gated.
+- `scripts/Test-B2.ps1 -Asan -Aot -Encoder`: MSVC x64 C++17 `/W4 /WX`, DLL/static
+  parity; **2,900 native checks** (ownership, malformed/UTF-8/duplicate/deep/overflow
+  inputs, payload damage, quoting, concurrency), also passing AddressSanitizer.
+- **171 checks per route** through real FFI: native asset, explicit DLL, standalone
+  bundled AOT. Live CRF edits, defaults, Extra overrides/provenance/spans, media and
+  macro bounds, UTF-16 offsets, source/mux facts, size ranges, diff, payload, sessions
+  and four isolate-local consumers. Warm end-to-end compile mean about **0.6–0.95 ms**
+  over 500 calls in each sample; no cold-start or app frame-time claim.
+- Both packages analyze cleanly; retained fakes/models: **173 core / 57 service /
+  281 fixture checks** and C/C++ ABI layout checks. Core-data/fixture generation
+  consistency and changed Python/PowerShell scripts checked.
+- Existing `C:\ffmpeg\bin\ffmpeg.exe`, **5.1.2-full_build-www.gyan.dev**: native-generated
+  FFV1/PCM and H.264/AAC argv encode 60 synthetic 256x144 frames at 30000/1001 with
+  48 kHz stereo; FFprobe checks pass. All meaningful 10-bit P010 samples and PCM
+  float bytes survive the lossless path. P010's unused low six storage bits are
+  excluded from pixel comparison. **Offline files, no fake host or real VEGAS.**
+- No app/design/engine/adapter edits; no installation or PATH changes. Prior native
+  exporter/fake-host suites were not rerun because their implementation is unchanged.
+  Installed 0.1.2-config-proof and main-checkout rollback backups remain untouched.
+  A5–A7 gates, two-template/restart persistence and controlled real failure recovery
+  remain unverified. B2 payload/session tests do not pass those real-host gates.
 
-## Handoff / owner decisions
+## App handoff / needs
 
-- Owner merges this contract milestone before platform resumes. App can map token
-  fields/indexes to its command view and signalPath facts to its display models;
-  no format-name/message parsing. Read C2/C5/C7 for exact null/default semantics.
-  Fakes still require injected edited states until B2.
-- B1 is approved: older case is the existing gyan.dev 5.1.2 at `C:\ffmpeg`; acquire
-  current gyan.dev and BtbN builds into this worktree's ignored `build/`, recording
-  each source URL and version. No installation or PATH change is authorized.
-  Downloads are not needed for this contract milestone and have not started.
+- After merge, run pub get in app and change `veCoreProvider` in
+  `app/lib/state/services.dart` from `FakeVeCore()` to `NativeVeCore()`; keep explicit
+  fake overrides for widget/golden tests. App paths are owned by the app agent, so
+  this switch and UI mapping are not made here. Real services still wait for B3.
+- Map C2 fields directly: token field/indexes, overriddenFields, signalPath source/
+  streams/labels, final GOP frames, typed-length range. No option/pixel-format/message
+  parsing or size arithmetic in the app. `resolved` can be null for unknown final
+  formats; source facts remain available. Core errors must stay visible.
+- Remaining F2 service requests are queued for B3: persisted built-in favorite/pinned
+  preferences; origin for Mine duplicates; a separate Test-this-preset stream for
+  60 synthetic frames + FFprobe + log; export-to-selected-path, reveal location and
+  a versioned share-string format. C3 service APIs are unchanged in B2.
+- Owner architecture follow-up: build hook uses hand-authored bindings for the small
+  C ABI and `native_toolchain_c`, rather than requiring ffigen. Standalone native
+  assets use `dart build cli`; plain `dart compile exe` omits build hooks/assets.
 
 ## Next
 
-**B2 next, before B1**, to unblock the app's live editor. Implement the real C++ core
-and FFI against the now-reviewed C1/C2 shapes using the existing curated profile
-fixtures and supplied capabilities; B1's download/recapture data is not needed to
-implement that boundary. Keep profile provenance illustrative until B1 replaces it
-with Windows facts; B2 tests cannot assert Windows encoder or real-host qualification.
-Then keep approved B1 recapture tight (no edited FakeVeCore fixture sweep), B3 real
-services, B4 engine argv/progress/jobs. B5 status-line probe and B6 gated
-adapter/progress performance check need the owner at real VEGAS.
+Keep **B1 tight**, then B3 services (including F2 requests), B4 engine argv/progress/
+jobs. B1 downloads are already approved: current gyan.dev and BtbN into this
+worktree's ignored build/ only, recording source URLs/versions; existing gyan 5.1.2
+is the older case. Current downloads have not started. No installer/PATH change.
+B5 status-line and B6 gated adapter/progress performance tests need the owner with
+real VEGAS. Stop at this B2 milestone for merge as requested.

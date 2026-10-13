@@ -1,7 +1,7 @@
 #ifndef VEGAS_ENCODER_VE_CORE_H
 #define VEGAS_ENCODER_VE_CORE_H
 
-/* B0 ABI draft, contract 1. Declarations only; implemented/built in B2.
+/* Product core ABI 1, contract 1. Implemented/built in B2.
  * Portable C and C++17. No Windows or VEGAS types cross this boundary. */
 #include <stdint.h>
 
@@ -60,6 +60,11 @@ VE_CORE_API ve_status ve_recipe_diff(const uint8_t* json, uint32_t length, ve_bu
 /* encode returns binary envelope; decode takes binary envelope, returns JSON. */
 VE_CORE_API ve_status ve_payload_encode(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_payload_decode(const uint8_t* bytes, uint32_t length, ve_buffer* result);
+/* Pure C4 structural validation/serialization; never session file I/O.
+ * Results: {request:originalObject,issues:Issue[]} / {result:originalObject,issues:Issue[]}.
+ * Matching sessionId and one-final-result file semantics stay in ve_services/adapter. */
+VE_CORE_API ve_status ve_session_request_validate(const uint8_t* json, uint32_t length, ve_buffer* result);
+VE_CORE_API ve_status ve_session_result_validate(const uint8_t* json, uint32_t length, ve_buffer* result);
 
 #ifdef __cplusplus
 }

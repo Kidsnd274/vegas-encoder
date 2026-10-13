@@ -594,6 +594,7 @@ const String b0FixtureJson = r'''{
             "field": null
           }
         ],
+        "overriddenFields": [],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v libx264 -preset slow -crf 18 -profile:v high -pix_fmt yuv420p -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a aac -b:a 320k -movflags +faststart -f mp4 \"D:\\Renders\\Sample project.mp4\"",
         "advancedTemplate": "{inputs}\n-map 0:v:0 -map 1:a:0 -c:v libx264 -preset slow -crf 18 -profile:v high -pix_fmt yuv420p -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a aac -b:a 320k -movflags +faststart -f mp4\n{output}",
         "resolved": {
@@ -605,9 +606,26 @@ const String b0FixtureJson = r'''{
           "speed": "slow",
           "profile": "high",
           "depth": 8,
-          "pixfmt": "yuv420p"
+          "pixfmt": "yuv420p",
+          "gopFrames": 60
         },
         "signalPath": {
+          "source": {
+            "video": {
+              "format": "p010le",
+              "bits": 10,
+              "chroma": "4:2:0",
+              "label": "P010, 10-bit 4:2:0",
+              "shortLabel": "10-bit"
+            },
+            "audio": {
+              "format": "flt",
+              "bits": 32,
+              "chroma": null,
+              "label": "32-bit float",
+              "shortLabel": "float"
+            }
+          },
           "video": {
             "inputFormat": "p010le",
             "outputFormat": "yuv420p",
@@ -617,6 +635,9 @@ const String b0FixtureJson = r'''{
             "outputChroma": "4:2:0",
             "chromaChanged": false,
             "conversion": true,
+            "inputLabel": "P010, 10-bit 4:2:0",
+            "outputLabel": "8-bit 4:2:0",
+            "conversionNote": "Precision is reduced before encoding.",
             "containerSupport": "ok"
           },
           "audio": [
@@ -629,6 +650,9 @@ const String b0FixtureJson = r'''{
               "outputChroma": null,
               "chromaChanged": null,
               "conversion": true,
+              "inputLabel": "32-bit float",
+              "outputLabel": "32-bit float",
+              "conversionNote": null,
               "containerSupport": "ok"
             }
           ]
@@ -907,6 +931,8 @@ const String b0FixtureJson = r'''{
         "totalBytes": null,
         "minBytesPerMinute": 32202197.8021978,
         "maxBytesPerMinute": 85872527.47252747,
+        "minTotalBytes": null,
+        "maxTotalBytes": null,
         "explanation": "Design fixture: size depends on how busy the footage is."
       }
     },
@@ -1554,6 +1580,7 @@ const String b0FixtureJson = r'''{
             "field": null
           }
         ],
+        "overriddenFields": [],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v hevc_nvenc -preset p5 -tune hq -rc vbr -cq 20 -b:v 0 -profile:v main10 -pix_fmt p010le -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -tag:v hvc1 -c:a aac -b:a 320k -movflags +faststart -f mp4 \"D:\\Renders\\Sample project.mp4\"",
         "advancedTemplate": "{inputs}\n-map 0:v:0 -map 1:a:0 -c:v hevc_nvenc -preset p5 -tune hq -rc vbr -cq 20 -b:v 0 -profile:v main10 -pix_fmt p010le -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -tag:v hvc1 -c:a aac -b:a 320k -movflags +faststart -f mp4\n{output}",
         "resolved": {
@@ -1565,9 +1592,26 @@ const String b0FixtureJson = r'''{
           "speed": "p5",
           "profile": "main10",
           "depth": 10,
-          "pixfmt": "p010le"
+          "pixfmt": "p010le",
+          "gopFrames": 60
         },
         "signalPath": {
+          "source": {
+            "video": {
+              "format": "p010le",
+              "bits": 10,
+              "chroma": "4:2:0",
+              "label": "P010, 10-bit 4:2:0",
+              "shortLabel": "10-bit"
+            },
+            "audio": {
+              "format": "flt",
+              "bits": 32,
+              "chroma": null,
+              "label": "32-bit float",
+              "shortLabel": "float"
+            }
+          },
           "video": {
             "inputFormat": "p010le",
             "outputFormat": "p010le",
@@ -1577,6 +1621,9 @@ const String b0FixtureJson = r'''{
             "outputChroma": "4:2:0",
             "chromaChanged": false,
             "conversion": false,
+            "inputLabel": "P010, 10-bit 4:2:0",
+            "outputLabel": "10-bit 4:2:0",
+            "conversionNote": null,
             "containerSupport": "ok"
           },
           "audio": [
@@ -1589,6 +1636,9 @@ const String b0FixtureJson = r'''{
               "outputChroma": null,
               "chromaChanged": null,
               "conversion": true,
+              "inputLabel": "32-bit float",
+              "outputLabel": "32-bit float",
+              "conversionNote": null,
               "containerSupport": "ok"
             }
           ]
@@ -1854,6 +1904,8 @@ const String b0FixtureJson = r'''{
         "totalBytes": null,
         "minBytesPerMinute": 20362378.746424265,
         "maxBytesPerMinute": 54299676.657131374,
+        "minTotalBytes": null,
+        "maxTotalBytes": null,
         "explanation": "Design fixture: size depends on how busy the footage is."
       }
     },
@@ -2438,6 +2490,7 @@ const String b0FixtureJson = r'''{
             "field": null
           }
         ],
+        "overriddenFields": [],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v libsvtav1 -preset 6 -crf 32 -pix_fmt yuv420p10le -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a libopus -b:a 160k -vbr on -f matroska \"D:\\Renders\\Sample project.mkv\"",
         "advancedTemplate": "{inputs}\n-map 0:v:0 -map 1:a:0 -c:v libsvtav1 -preset 6 -crf 32 -pix_fmt yuv420p10le -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a libopus -b:a 160k -vbr on -f matroska\n{output}",
         "resolved": {
@@ -2449,9 +2502,26 @@ const String b0FixtureJson = r'''{
           "speed": "6",
           "profile": null,
           "depth": 10,
-          "pixfmt": "yuv420p10le"
+          "pixfmt": "yuv420p10le",
+          "gopFrames": 60
         },
         "signalPath": {
+          "source": {
+            "video": {
+              "format": "p010le",
+              "bits": 10,
+              "chroma": "4:2:0",
+              "label": "P010, 10-bit 4:2:0",
+              "shortLabel": "10-bit"
+            },
+            "audio": {
+              "format": "flt",
+              "bits": 32,
+              "chroma": null,
+              "label": "32-bit float",
+              "shortLabel": "float"
+            }
+          },
           "video": {
             "inputFormat": "p010le",
             "outputFormat": "yuv420p10le",
@@ -2461,6 +2531,9 @@ const String b0FixtureJson = r'''{
             "outputChroma": "4:2:0",
             "chromaChanged": false,
             "conversion": true,
+            "inputLabel": "P010, 10-bit 4:2:0",
+            "outputLabel": "10-bit 4:2:0",
+            "conversionNote": null,
             "containerSupport": "ok"
           },
           "audio": [
@@ -2473,6 +2546,9 @@ const String b0FixtureJson = r'''{
               "outputChroma": null,
               "chromaChanged": null,
               "conversion": false,
+              "inputLabel": "32-bit float",
+              "outputLabel": "32-bit float",
+              "conversionNote": null,
               "containerSupport": "ok"
             }
           ]
@@ -2580,6 +2656,8 @@ const String b0FixtureJson = r'''{
         "totalBytes": null,
         "minBytesPerMinute": 6891522.135867418,
         "maxBytesPerMinute": 18377392.362313118,
+        "minTotalBytes": null,
+        "maxTotalBytes": null,
         "explanation": "Design fixture: size depends on how busy the footage is."
       }
     },
@@ -3131,6 +3209,7 @@ const String b0FixtureJson = r'''{
             "field": null
           }
         ],
+        "overriddenFields": [],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v prores_ks -profile:v hq -vendor apl0 -pix_fmt yuv422p10le -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a pcm_s24le -f mov \"D:\\Renders\\Sample project.mov\"",
         "advancedTemplate": "{inputs}\n-map 0:v:0 -map 1:a:0 -c:v prores_ks -profile:v hq -vendor apl0 -pix_fmt yuv422p10le -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a pcm_s24le -f mov\n{output}",
         "resolved": {
@@ -3142,9 +3221,26 @@ const String b0FixtureJson = r'''{
           "speed": null,
           "profile": "hq",
           "depth": 10,
-          "pixfmt": "yuv422p10le"
+          "pixfmt": "yuv422p10le",
+          "gopFrames": null
         },
         "signalPath": {
+          "source": {
+            "video": {
+              "format": "p010le",
+              "bits": 10,
+              "chroma": "4:2:0",
+              "label": "P010, 10-bit 4:2:0",
+              "shortLabel": "10-bit"
+            },
+            "audio": {
+              "format": "flt",
+              "bits": 32,
+              "chroma": null,
+              "label": "32-bit float",
+              "shortLabel": "float"
+            }
+          },
           "video": {
             "inputFormat": "p010le",
             "outputFormat": "yuv422p10le",
@@ -3154,6 +3250,9 @@ const String b0FixtureJson = r'''{
             "outputChroma": "4:2:2",
             "chromaChanged": true,
             "conversion": true,
+            "inputLabel": "P010, 10-bit 4:2:0",
+            "outputLabel": "10-bit 4:2:2",
+            "conversionNote": "Chroma sampling changes; added color resolution is interpolated, not recovered.",
             "containerSupport": "ok"
           },
           "audio": [
@@ -3166,6 +3265,9 @@ const String b0FixtureJson = r'''{
               "outputChroma": null,
               "chromaChanged": null,
               "conversion": true,
+              "inputLabel": "32-bit float",
+              "outputLabel": "24-bit integer",
+              "conversionNote": "Precision is reduced before encoding.",
               "containerSupport": "ok"
             }
           ]
@@ -3336,6 +3438,8 @@ const String b0FixtureJson = r'''{
         "totalBytes": null,
         "minBytesPerMinute": 1000368990.00099,
         "maxBytesPerMinute": 2667650640.0026402,
+        "minTotalBytes": null,
+        "maxTotalBytes": null,
         "explanation": "Design fixture: size depends on how busy the footage is."
       }
     },
@@ -3875,6 +3979,7 @@ const String b0FixtureJson = r'''{
             "field": null
           }
         ],
+        "overriddenFields": [],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v dnxhd -profile:v dnxhr_hq -pix_fmt yuv422p -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a pcm_s16le -f mxf \"D:\\Renders\\Sample project.mxf\"",
         "advancedTemplate": "{inputs}\n-map 0:v:0 -map 1:a:0 -c:v dnxhd -profile:v dnxhr_hq -pix_fmt yuv422p -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a pcm_s16le -f mxf\n{output}",
         "resolved": {
@@ -3886,9 +3991,26 @@ const String b0FixtureJson = r'''{
           "speed": null,
           "profile": "dnxhr_hq",
           "depth": 8,
-          "pixfmt": "yuv422p"
+          "pixfmt": "yuv422p",
+          "gopFrames": null
         },
         "signalPath": {
+          "source": {
+            "video": {
+              "format": "p010le",
+              "bits": 10,
+              "chroma": "4:2:0",
+              "label": "P010, 10-bit 4:2:0",
+              "shortLabel": "10-bit"
+            },
+            "audio": {
+              "format": "flt",
+              "bits": 32,
+              "chroma": null,
+              "label": "32-bit float",
+              "shortLabel": "float"
+            }
+          },
           "video": {
             "inputFormat": "p010le",
             "outputFormat": "yuv422p",
@@ -3898,6 +4020,9 @@ const String b0FixtureJson = r'''{
             "outputChroma": "4:2:2",
             "chromaChanged": true,
             "conversion": true,
+            "inputLabel": "P010, 10-bit 4:2:0",
+            "outputLabel": "8-bit 4:2:2",
+            "conversionNote": "Chroma sampling changes; added color resolution is interpolated, not recovered.",
             "containerSupport": "ok"
           },
           "audio": [
@@ -3910,6 +4035,9 @@ const String b0FixtureJson = r'''{
               "outputChroma": null,
               "chromaChanged": null,
               "conversion": true,
+              "inputLabel": "32-bit float",
+              "outputLabel": "16-bit integer",
+              "conversionNote": "Precision is reduced before encoding.",
               "containerSupport": "ok"
             }
           ]
@@ -4143,6 +4271,8 @@ const String b0FixtureJson = r'''{
         "totalBytes": null,
         "minBytesPerMinute": 996912990.00099,
         "maxBytesPerMinute": 2658434640.0026402,
+        "minTotalBytes": null,
+        "maxTotalBytes": null,
         "explanation": "Design fixture: size depends on how busy the footage is."
       }
     },
@@ -4715,6 +4845,7 @@ const String b0FixtureJson = r'''{
             "field": null
           }
         ],
+        "overriddenFields": [],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 1920x1080 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-0000-audio -map 0:v:0 -map 1:a:0 -c:v ffv1 -level 3 -g 1 -slices 16 -slicecrc 1 -pix_fmt yuv420p10le -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a pcm_f32le -f matroska \"D:\\Renders\\Sample project.mkv\"",
         "advancedTemplate": "{inputs}\n-map 0:v:0 -map 1:a:0 -c:v ffv1 -level 3 -g 1 -slices 16 -slicecrc 1 -pix_fmt yuv420p10le -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a pcm_f32le -f matroska\n{output}",
         "resolved": {
@@ -4726,9 +4857,26 @@ const String b0FixtureJson = r'''{
           "speed": null,
           "profile": null,
           "depth": 10,
-          "pixfmt": "yuv420p10le"
+          "pixfmt": "yuv420p10le",
+          "gopFrames": 1
         },
         "signalPath": {
+          "source": {
+            "video": {
+              "format": "p010le",
+              "bits": 10,
+              "chroma": "4:2:0",
+              "label": "P010, 10-bit 4:2:0",
+              "shortLabel": "10-bit"
+            },
+            "audio": {
+              "format": "flt",
+              "bits": 32,
+              "chroma": null,
+              "label": "32-bit float",
+              "shortLabel": "float"
+            }
+          },
           "video": {
             "inputFormat": "p010le",
             "outputFormat": "yuv420p10le",
@@ -4738,6 +4886,9 @@ const String b0FixtureJson = r'''{
             "outputChroma": "4:2:0",
             "chromaChanged": false,
             "conversion": true,
+            "inputLabel": "P010, 10-bit 4:2:0",
+            "outputLabel": "10-bit 4:2:0",
+            "conversionNote": null,
             "containerSupport": "ok"
           },
           "audio": [
@@ -4750,6 +4901,9 @@ const String b0FixtureJson = r'''{
               "outputChroma": null,
               "chromaChanged": null,
               "conversion": false,
+              "inputLabel": "32-bit float",
+              "outputLabel": "32-bit float",
+              "conversionNote": null,
               "containerSupport": "ok"
             }
           ]
@@ -4857,6 +5011,8 @@ const String b0FixtureJson = r'''{
         "totalBytes": null,
         "minBytesPerMinute": 900288886.4648863,
         "maxBytesPerMinute": 2400770363.906364,
+        "minTotalBytes": null,
+        "maxTotalBytes": null,
         "explanation": "Design fixture: size depends on how busy the footage is."
       }
     }
@@ -5455,6 +5611,7 @@ const String b0FixtureJson = r'''{
             "field": null
           }
         ],
+        "overriddenFields": [],
         "commandLine": "ffmpeg -hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1 -f rawvideo -pix_fmt p010le -s 3840x2160 -r 30000/1001 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-7f3a-video -f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\\\.\\pipe\\vegas-encoder-7f3a-audio -map 0:v:0 -map 1:a:0 -c:v libx264 -preset slower -crf 17 -profile:v high -pix_fmt yuv420p -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a aac -b:a 256k -movflags +faststart -f mp4 \"D:\\Renders\\Lakeside wedding final.mp4\"",
         "advancedTemplate": "{inputs}\n-map 0:v:0 -map 1:a:0 -c:v libx264 -preset slower -crf 17 -profile:v high -pix_fmt yuv420p -g 60 -color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv -c:a aac -b:a 256k -movflags +faststart -f mp4\n{output}",
         "resolved": {
@@ -5466,9 +5623,26 @@ const String b0FixtureJson = r'''{
           "speed": "slower",
           "profile": "high",
           "depth": 8,
-          "pixfmt": "yuv420p"
+          "pixfmt": "yuv420p",
+          "gopFrames": 60
         },
         "signalPath": {
+          "source": {
+            "video": {
+              "format": "p010le",
+              "bits": 10,
+              "chroma": "4:2:0",
+              "label": "P010, 10-bit 4:2:0",
+              "shortLabel": "10-bit"
+            },
+            "audio": {
+              "format": "flt",
+              "bits": 32,
+              "chroma": null,
+              "label": "32-bit float",
+              "shortLabel": "float"
+            }
+          },
           "video": {
             "inputFormat": "p010le",
             "outputFormat": "yuv420p",
@@ -5478,6 +5652,9 @@ const String b0FixtureJson = r'''{
             "outputChroma": "4:2:0",
             "chromaChanged": false,
             "conversion": true,
+            "inputLabel": "P010, 10-bit 4:2:0",
+            "outputLabel": "8-bit 4:2:0",
+            "conversionNote": "Precision is reduced before encoding.",
             "containerSupport": "ok"
           },
           "audio": [
@@ -5490,6 +5667,9 @@ const String b0FixtureJson = r'''{
               "outputChroma": null,
               "chromaChanged": null,
               "conversion": true,
+              "inputLabel": "32-bit float",
+              "outputLabel": "32-bit float",
+              "conversionNote": null,
               "containerSupport": "ok"
             }
           ]
@@ -5768,6 +5948,8 @@ const String b0FixtureJson = r'''{
         "totalBytes": null,
         "minBytesPerMinute": 139269598.22221217,
         "maxBytesPerMinute": 371385595.25923246,
+        "minTotalBytes": null,
+        "maxTotalBytes": null,
         "explanation": "Design fixture: size depends on how busy the footage is."
       }
     }

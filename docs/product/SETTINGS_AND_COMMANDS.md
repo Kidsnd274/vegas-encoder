@@ -3,6 +3,12 @@
 Updated: 2026-10-12 (Asia/Singapore). Status: proposal (schema v1 draft). Basic and
 Advanced are the round 1 Guided and Command modes, renamed by the owner.
 
+B2 implementation note (2026-10-13): the portable C++ core and Dart FFI now implement
+these rules. The embedded encoder/profile facts are B0 design bootstrap data until
+B1 Windows recapture; FFmpeg remains the final authority. Exact additive result
+fields (token provenance, overridden controls, stream/source facts, GOP frames and
+typed-length estimate ranges) are in [CONTRACTS.md](CONTRACTS.md).
+
 This document specifies:
 
 - what a recipe contains;
@@ -169,6 +175,10 @@ format the encoder accepts:
   This matches StaxRip's "Custom" behaviour (research/REFERENCE_PRODUCTS.md), and the
   preview marks replaced fields as "set in Extra arguments". The encoder itself
   (`-c:v`/`-c:a`) can't be overridden this way; use the picker.
+  B2 rejects owned input/map/mux/progress options in these per-stream boxes as well;
+  use the relevant control or Advanced mode. `CompileResult.overriddenFields`
+  identifies displaced controls. A syntax/value issue points to the actual emitted
+  tokens after overrides, when any exist.
 - **Output.** The engine writes `<dir>\<name>.ve-partial-<job>.<ext>`. It always passes
   `-f <muxer>` explicitly, then publishes by rename after exit 0 and successful output
   verification.
@@ -209,7 +219,8 @@ ffmpeg -hide_banner {inputs}
 - **No shell.** Pipes (`|`), redirections and environment expansion are literal
   characters passed to FFmpeg.
 - **Extra inputs** (`-i logo.png`) are allowed. They are numbered from 2, because the
-  VEGAS inputs are 0 and 1. A lint hint says so.
+  VEGAS inputs are 0 and 1 when audio is present (from 1 without generated audio).
+  Put extra inputs after `{inputs}` so they do not renumber the VEGAS streams.
 
 ### Lint (live, in the editor; repeated by the DLL before render)
 
@@ -306,5 +317,7 @@ Shown only on the File node (UI_SPEC §2).
   (for constant quality, 0.6× to 1.6× of the figure) and the explanation "the size
   depends on how busy the footage is".
 - **Advanced mode:** no estimate.
+- **Extra arguments:** no estimate when filters or conflicting rate-control options
+  prevent a reliable interpretation. The app shows the core's explanation.
 - **History (v1+):** completed jobs record actual sizes per recipe, so the card can show
   "Your last 5 renders with this preset averaged 21 Mb/s", which beats any formula.
