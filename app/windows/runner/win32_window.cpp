@@ -233,14 +233,14 @@ bool Win32Window::Show() {
                     start_maximized_ ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL);
 }
 
-bool Win32Window::RestoreBounds(RECT bounds, bool maximized) {
+std::optional<RECT> Win32Window::ClampBounds(RECT bounds) {
   if (window_handle_ == nullptr || options_.kind != LaunchKind::kDesktop ||
       bounds.right <= bounds.left || bounds.bottom <= bounds.top) {
-    return false;
+    return std::nullopt;
   }
   HMONITOR monitor = MonitorFromRect(&bounds, MONITOR_DEFAULTTONULL);
   if (monitor == nullptr) {
-    return false;  // That monitor is gone: keep the default placement.
+    return std::nullopt;  // That monitor is gone: keep the default placement.
   }
   const RECT work = WorkAreaOf(monitor);
   const UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
@@ -267,13 +267,20 @@ bool Win32Window::RestoreBounds(RECT bounds, bool maximized) {
       static_cast<int>(work.top),
       std::min(static_cast<int>(bounds.top),
                static_cast<int>(work.bottom) + border_y - height));
-  // Move first, so a monitor with another DPI rescales before the size is set.
-  SetWindowPos(window_handle_, nullptr, x, y, 0, 0,
-               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-  SetWindowPos(window_handle_, nullptr, x, y, width, height,
-               SWP_NOZORDER | SWP_NOACTIVATE);
+  return RECT{x, y, x + width, y + height};
+}
+
+void Win32Window::RestoreBounds(RECT bounds, bool maximized) {
+  if (window_handle_ == nullptr) {
+    return;
+  }
   start_maximized_ = maximized && options_.resizable;
-  return true;
+  // Move first, so a monitor with another DPI rescales before the size is set.
+  SetWindowPos(window_handle_, nullptr, bounds.left, bounds.top, 0, 0,
+               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+  SetWindowPos(window_handle_, nullptr, bounds.left, bounds.top,
+               bounds.right - bounds.left, bounds.bottom - bounds.top,
+               SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 RECT Win32Window::RestoredBounds(bool* maximized) {

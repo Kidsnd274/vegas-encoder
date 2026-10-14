@@ -3,8 +3,9 @@
 Updated: 2026-10-14 (Asia/Singapore). Branch `ws/app`. Status: **F0 and F1 done; F2
 and F3 done except the parts waiting on platform** (listed under Needs). **The app runs
 on the native core (B2)**: edits update the command, checks, signal path and estimate
-(the core part of F7). The services are still the platform fakes (B3). Master through
-F3 (`0be99dc`) is merged. Next: F4, the Advanced editor.
+(the core part of F7), and the desktop starts in ~540 ms (runner fix, 2026-10-14).
+The services are still the platform fakes (B3). Master through F3 (`0be99dc`) is
+merged. Next: F4, the Advanced editor.
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
@@ -160,9 +161,12 @@ debug builds, and the goldens use it.
   used by `pumpApp`/`pumpThemed`, and the unit tests' containers), so the F2/F3 goldens
   keep the fake's fixtures. The tests that need the native core pass `core:
   NativeVeCore()`.
-- Built with two parallel agents: one wrote the native goldens and unit tests (the
-  parent reviewed every image and fixed the layout bug it found in the new notice); one
-  looked for the cause of the desktop's start time in its own worktree (Spike results).
+- Desktop start: the runner replies to `configure` before restoring remembered bounds,
+  which removed ~220 ms of engine waits (649 → 537 ms; see Spike results).
+- Built with parallel agents: one wrote the native goldens and unit tests (the parent
+  reviewed every image and fixed the layout bug it found in the new notice); one found
+  the start-time cause and wrote the runner fix in its own worktree; a third verified
+  that fix here.
 
 ## Tests
 
@@ -306,6 +310,41 @@ later. The core costs about 10 ms in all. The desktop's extra time is the runner
 `configure` reply, which F2's window-bounds change introduced (F2's baseline had 33 ms
 from Dart main to first frame); the popup's `configure` returns at once.
 
+**Cause and fix (2026-10-14).** B0's settings fixture remembers desktop bounds at
+(-1280, 80), 1200×800, which on this PC is a 100% monitor beside the 125% primary.
+`RestoreBounds` moved, then sized the hidden window; each resize reached the Flutter view,
+and the engine (`FlutterWindowsView::OnWindowSizeChanged`) blocked the platform thread up
+to ~100 ms waiting for a frame of the new size. That frame couldn't come, since Dart
+awaits the `configure` reply before `runApp`, so both waits timed out (113 ms and 212 ms
+in a per-message trace). Any real remembered size that differs from the default costs one
+wait; another-DPI monitor costs two. The runner now replies first, then restores
+(`ClampBounds` / `RestoreBounds` in `win32_window.cpp`); a first frame that arrives while
+the window is being placed waits for placement before Show. No Dart or channel change.
+
+| Start, warm, median of 10 (125% primary + 100% left monitor) | Before | After |
+| --- | --- | --- |
+| Skia desktop shown (Dart main to first frame) | 649 ms (253) | **537 ms (32)** |
+| Skia popup shown | 379 ms | 351 ms |
+| Impeller desktop / popup shown | 1,664 / 1,370 ms | 1,413 / 1,297 ms |
+
+- Owner window (3 runs): owner set, centred within 4 px, hidden and restored with the
+  owner, re-enabled after Close; "owner foreground after Close" missed once in 3 (the
+  popup doesn't use the changed code; likely focus noise, unproven). No-activate progress
+  window: fake VEGAS stayed foreground, `WS_EX_NOACTIVATE`, not topmost, 20 px from the
+  corner. `flutter test` 348 passing; release build without C++ warnings (`/W4 /WX`).
+- A scratch probe (outside the repo) recorded the window's rect and visibility and
+  captured the screen after show: the window is placed while hidden, appears only at its
+  final rect and never moves (7 Skia, 3 Impeller runs); no stretched frame on restore.
+  The old build showed a white window for 33–150 ms on Skia; the fix shortens it.
+- A same-DPI remembered size (temporary override, reverted) takes one wait, which now
+  runs while Dart starts; shown in place.
+- The monitor layout changed during these checks (the 125% monitor went away), so the
+  fixture's bounds now miss every monitor and later desktop runs take the bounds-ignored
+  path (default placement, `boundsSet: false`).
+- Still about 150 ms between desktop and popup: the desktop's first frame reaches the
+  screen 90 or 205 ms after Dart draws it (popup ~42 ms), with or without a restore.
+  Cause not established.
+
 - **Renderer: deferred.** The runner defaults to Skia for start time;
   `RendererFromEnvironment` in `windows/runner/main.cpp` is the one place to change, and
   `VEGAS_ENCODER_RENDERER=impeller` tries Impeller. Re-measure on each Flutter upgrade
@@ -370,6 +409,17 @@ clicked through in the running app. Small display points seen on the native core
   a later design choice.
 - The native core loads at the first build of the desktop shell; a load failure is
   shown, not retried (it is permanent for the process).
+
+Window start (runner), unverified or not fixed:
+
+- **Popup over a VEGAS window on another-DPI monitor** (F5): `PlaceOnOwner` likely pays
+  the same ~100 ms engine wait before its `configure` reply, and centres with the size
+  from before the DPI change, so it could land off-centre. Split it like
+  `ClampBounds`/`RestoreBounds`, reuse the deferred show, re-centre after the change.
+- **Restoring maximized** shows a stretched first frame for ~20–40 ms (the restored-size
+  frame scaled up). Present before the fix too. Sizing the hidden window to the maximized
+  client size before the first frame may avoid it (untested).
+- The remaining ~150 ms desktop-only first-frame delay (Spike results); cold start.
 
 ## Handoff for the next app agent
 
