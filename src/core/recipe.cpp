@@ -84,7 +84,17 @@ Json Structural(const Json& recipe) {
 Json Normalize(const Json& request) {
     const auto& recipe = request.at("recipe");
     if (!recipe.is_object()) throw Error(VE_INVALID_ARGUMENT,"RECIPE-OBJECT","Expected a recipe object.");
-    return Json{{"recipe",recipe},{"issues",Structural(recipe)}}; // Defaults are resolved at compile time only.
+    const auto issues = Structural(recipe);
+    Json required = nullptr;
+    // Library metadata uses the same recipe rules. Arbitrary Advanced output
+    // scopes/default codecs cannot be established without executing FFmpeg.
+    if (!HasErrors(issues) && Str(recipe.at("command"),"mode") == "structured") {
+        required = Json::array();
+        const auto& video = recipe.at("video"); const auto& audio = recipe.at("audio").at(0);
+        if (Bool(video,"enabled",true)) required.push_back(Str(video,"encoder"));
+        if (Bool(audio,"enabled",true) && std::find(required.begin(),required.end(),Json(Str(audio,"encoder"))) == required.end()) required.push_back(Str(audio,"encoder"));
+    }
+    return Json{{"recipe",recipe},{"issues",issues},{"requiredEncoders",required}}; // Defaults are resolved at compile time only.
 }
 Json Resolve(const Json& recipe) {
     const auto& video = recipe.at("video"); const auto& audio = recipe.at("audio").at(0);

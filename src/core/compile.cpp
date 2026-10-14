@@ -231,10 +231,12 @@ void Reflected(const Json& tokens, Json& res) {
 Json InputTokens(const Json& r, const Json& media, const Json& paths) {
     const auto& v = media.at("video"); const auto& fps = v.at("fps"); Json result = Json::array();
     Push(result,"input",nullptr,InputColorTags(r));
+    if (Bool(paths,"liveInputs")) Push(result,"input",nullptr,{"-probesize","32","-analyzeduration","0"});
     Push(result,"input",nullptr,{"-f","rawvideo","-pix_fmt",Str(v,"pixfmt","p010le"),"-s",Number(Num(v,"width")) + "x" + Number(Num(v,"height")),
          "-r",fps[0].dump() + "/" + fps[1].dump(),"-i",Str(paths,"videoPipe")});
     if (Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null()) {
         const auto& a = media.at("audio");
+        if (Bool(paths,"liveInputs")) Push(result,"input",nullptr,{"-probesize","32","-analyzeduration","0"});
         Push(result,"input",nullptr,{"-f",Str(a,"sampleFmt","f32le"),"-ar",Number(Num(a,"rate")),"-ac",Number(Num(a,"channels")),"-i",Str(paths,"audioPipe")});
     }
     return result;
@@ -244,12 +246,14 @@ Json Compile(const Json& request) {
     CheckMedia(media);
     if (!paths.is_object() || Str(paths,"ffmpeg","ffmpeg").empty() || Str(paths,"videoPipe").empty() || Str(paths,"output").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Executable, video pipe and output path must be nonempty strings.");
     Json issues = Validate(request); const auto exe = Str(paths,"ffmpeg","ffmpeg");
-    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()}};
+    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr}};
     if (HasErrors(Structural(r))) return result;
     const bool audioInput = Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null();
+    result["inputStreams"] = audioInput ? Json::array({"video","audio"}) : Json::array({"video"});
     if (audioInput && Str(paths,"audioPipe").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Enabled audio needs a pipe path.");
     Json tokens = Json::array(); Push(tokens,"exe",nullptr,{exe});
     Push(tokens,"global",nullptr,{"-hide_banner","-nostdin","-loglevel","info","-stats_period","0.5","-progress","pipe:1"});
+    if (Bool(paths,"overwriteOutput")) Push(tokens,"global",nullptr,{"-y"});
     const auto input = InputTokens(r,media,paths); Json res = Resolve(r); res["gopFrames"] = nullptr;
     const bool advanced = Str(r.at("command"),"mode") == "template";
     if (!advanced) {
@@ -353,6 +357,70 @@ Json Compile(const Json& request) {
     std::string commandLine;
     for (size_t i = 0; i < tokens.size(); ++i) { if (i) commandLine += " "; commandLine += Quote(Str(tokens[i],"text")); if (i) result["argv"].push_back(Str(tokens[i],"text")); }
     result["display"] = tokens; result["commandLine"] = commandLine; result["signalPath"] = signal; result["issues"] = issues; result["summary"] = Summary(r,res);
+    bool expectedScope = !Bool(res,"unknownOutputScope");
+    bool expectedVideo = Bool(res,"videoEnabled",Bool(r.at("video"),"enabled",true));
+    bool expectedAudio = Bool(res,"audioEnabled",audioInput);
+    if (advanced && expectedScope) {
+        size_t videoMaps = 0, audioMaps = 0; bool mapped = false;
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            if (Str(tokens[i],"field") != "command.template") continue;
+            if (!IsOption(Str(tokens[i],"text"))) continue;
+            const auto key = OptionKey(Str(tokens[i],"text"));
+            if (key == "filter_complex") expectedScope = false;
+            if (key != "map") continue;
+            mapped = true;
+            if (i + 1 >= tokens.size()) { expectedScope = false; continue; }
+            auto source = Str(tokens[++i],"text");
+            if (!source.empty() && source.back() == '?') source.pop_back();
+            if (source == "0:v:0") ++videoMaps;
+            else if (source == "1:a:0" && audioInput) ++audioMaps;
+            else expectedScope = false;
+        }
+        // General maps, duplicate streams and complex-filter outputs need FFmpeg
+        // to establish their output scope. Never infer them from Basic controls.
+        if (mapped) {
+            expectedScope = expectedScope && videoMaps <= 1 && audioMaps <= 1;
+            expectedVideo = expectedVideo && videoMaps == 1;
+            expectedAudio = expectedAudio && audioMaps == 1;
+        }
+    }
+    if (expectedScope) {
+        Json expected = Json::array();
+        for (const auto& kind : {std::string("video"),std::string("audio")}) {
+            if (!(kind == "video" ? expectedVideo : expectedAudio)) continue;
+            const auto encoder = Str(res,kind + "Encoder"); const auto& profile = res.at(kind + "Profile");
+            std::string codec; const auto supplied = EncoderOptions(caps,encoder);
+            if (supplied) codec = Str(*supplied,"codec");
+            if (codec.empty()) {
+                const auto family = Str(profile,"family");
+                if (family == "pcm" || family == "pcmf") codec = encoder;
+                else if (family == "dnxhr") codec = "dnxhd";
+                else if (family != "unknown") codec = family;
+            }
+            expected.push_back({{"kind",kind},{"encoder",encoder.empty() ? Json(nullptr) : Json(encoder)},{"codec",codec.empty() ? Json(nullptr) : Json(codec)}});
+        }
+        result["expectedStreams"] = expected;
+    }
+    return result;
+}
+Json ErrorTokenIndices(const Json& compiled, const std::string& stderrTail) {
+    Json result = Json::array();
+    if (!compiled.contains("argv")) return result;
+    const auto& argv = compiled.at("argv");
+    for (const auto* prefix : {"Unrecognized option '","Error setting option ","Error applying option '"}) {
+        size_t offset = 0;
+        while ((offset = stderrTail.find(prefix,offset)) != std::string::npos) {
+            offset += strlen(prefix); const auto end = stderrTail.find_first_of("' \r\n",offset);
+            const auto name = stderrTail.substr(offset,end == std::string::npos ? end : end-offset);
+            if (name.empty() || name.size() > 256) continue;
+            for (size_t i = 0; i < argv.size(); ++i) {
+                const auto text = argv[i].get<std::string>();
+                if (text == "-" + name || text == name) {
+                    if (std::find(result.begin(),result.end(),Json(i)) == result.end()) result.push_back(i);
+                }
+            }
+        }
+    }
     return result;
 }
 } // namespace ve

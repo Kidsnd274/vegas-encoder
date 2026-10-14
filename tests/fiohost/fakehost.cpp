@@ -61,8 +61,11 @@ class Counted : public I {
   ULONG STDMETHODCALLTYPE AddRef() override { return (ULONG)InterlockedIncrement(&ref); }
   ULONG STDMETHODCALLTYPE Release() override { return (ULONG)InterlockedDecrement(&ref); }
   LONG ref = 1;
+  LONGLONG callerThreadErrors = 0;
+  void Caller() { if (GetCurrentThreadId() != callerThread_) ++callerThreadErrors; }
 
  protected:
+  DWORD callerThread_ = GetCurrentThreadId();
   HRESULT Qi(REFIID riid, void** ppv, std::initializer_list<GUID> ids) {
     if (!ppv) return E_POINTER;
     for (const GUID& g : ids)
@@ -125,6 +128,7 @@ class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
   }
   HRESULT STDMETHODCALLTYPE GetRenderFrame(LONGLONG frame, SFMEMORYTOKEN* token, LONG_PTR* lock, void* info,
                                            LONG* cb) override {
+    Caller();
     if (!token || !lock || !info || !cb) return E_POINTER;
     if (frame < 0 || frame >= frames_ || !Supported()) return E_INVALIDARG;
     if (outstanding) lockErrors++;  // the captured exporter always released first
@@ -167,6 +171,7 @@ class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
     return S_OK;
   }
   HRESULT STDMETHODCALLTYPE ReleaseRenderFrame(LONG_PTR lock) override {
+    Caller();
     if (outstanding <= 0 || lock != lastLock_) {
       lockErrors++;
       return E_INVALIDARG;
@@ -253,6 +258,7 @@ class FakeAudio final : public Counted<ISfReadAudioStream> {
   HRESULT STDMETHODCALLTYPE GetFormat12(void*) override { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE SetFormat13(void*) override { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE Read(LONGLONG pos, const SFMEMORYTOKEN* t, LONG count, LONG* got) override {
+    Caller();
     if (!t || !got) return E_POINTER;
     LONG align = (LONG)channels_ * (format_ == SFAUDIO_FORMAT_FLOAT32 ? 4 : 2);
     // Exporter-filled token as captured: {0, buf, bytes, bytes, 0, 0, mode 0, PID}.
@@ -315,10 +321,12 @@ class FakeProgress final : public Counted<ISfProgress> {
   HRESULT STDMETHODCALLTYPE Slot3(LPCWSTR, LONGLONG) override { return S_OK; }
   HRESULT STDMETHODCALLTYPE Slot4(LPCWSTR) override { return S_OK; }
   HRESULT STDMETHODCALLTYPE SetTotal(LONGLONG t) override {
+    Caller();
     total = t;
     return S_OK;
   }
   HRESULT STDMETHODCALLTYPE SetPosition(LONGLONG p) override {
+    Caller();
     if (position != p) callsAtPosition_ = 0;
     callsAtPosition_++;
     position = p;
@@ -327,6 +335,7 @@ class FakeProgress final : public Counted<ISfProgress> {
     return (cancelAt_ >= 0 && p >= cancelAt_) ? SF_E_PROGRESS_CANCELLED : S_OK;
   }
   HRESULT STDMETHODCALLTYPE CheckCancel() override {
+    Caller();
     checks++;
     return FailNow(7) ? E_ACCESSDENIED : S_OK;
   }
@@ -478,6 +487,21 @@ bool ConfigureAndReload(ISfRenderFileClass* renderClass, ISfHostAllocator* alloc
 }
 
 }  // namespace
+
+RecipeHostResult ExerciseRecipeHost(const RenderTestOptions& o,
+  const std::function<HRESULT(ISfReadVideoRenderStream*,ISfReadAudioStream*,ISfProgress*)>& render) {
+  const double fps = o.deliveredFps ? o.deliveredFps : o.fps;
+  FakeVideo video(o.frames,o.width,o.height,MAKEFOURCC('P','0','1','0'),fps);
+  FakeAudio audio(48000,2,SFAUDIO_FORMAT_FLOAT32,static_cast<LONGLONG>(llround(o.frames*48000/fps)),fps,o.shortRead);
+  FakeProgress progress(o.cancelAt,o.progressFailureSlot,o.progressFailureAt,o.progressFailureCall,nullptr);
+  RecipeHostResult result;
+  result.returned = render(&video,o.videoOnly ? nullptr : &audio,&progress);
+  result.served = video.served; result.released = video.released; result.outstanding = video.outstanding;
+  result.lockErrors = video.lockErrors; result.samples = audio.samples; result.reads = audio.reads; result.tokenErrors = audio.tokenErrors;
+  result.callerThreadErrors = video.callerThreadErrors + audio.callerThreadErrors + progress.callerThreadErrors;
+  if (video.ref != 1 || audio.ref != 1 || progress.ref != 1) ++result.lockErrors;
+  return result;
+}
 
 int RunRenderTest(ISfRenderFileClass* rc, ISfHostAllocator* alloc, const RenderTestOptions& o) {
   g_failures = 0;

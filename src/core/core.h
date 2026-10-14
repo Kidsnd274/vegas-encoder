@@ -28,6 +28,8 @@ Json Structural(const Json& recipe);
 Json Validate(const Json& request);
 Json Normalize(const Json& request);
 Json Compile(const Json& request);
+// Conservative runtime diagnostic provenance: argv indexes, executable excluded.
+Json ErrorTokenIndices(const Json& compiled, const std::string& stderrTail);
 Json Estimate(const Json& request);
 Json Diff(const Json& request);
 Json Lint(const Json& request);

@@ -257,7 +257,7 @@ std::string FileVersion(const std::string& path) {
   return s;
 }
 
-std::string Sha256File(const std::wstring& path) {
+std::string Sha256File(const std::wstring& path, const std::function<bool()>& poll) {
   struct FileHandle {
     HANDLE value;
     ~FileHandle() noexcept { if (value != INVALID_HANDLE_VALUE) CloseHandle(value); }
@@ -278,6 +278,7 @@ std::string Sha256File(const std::wstring& path) {
     std::vector<BYTE> buf(1 << 20);
     DWORD got = 0;
     for (;;) {
+      if (poll && !poll()) return "?";
       if (!ReadFile(file.value, buf.data(), (DWORD)buf.size(), &got, nullptr)) return "?";
       if (!got) break;
       if (BCryptHashData(handles.hash, buf.data(), got, 0) != 0) return "?";

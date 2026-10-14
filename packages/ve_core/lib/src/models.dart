@@ -901,6 +901,18 @@ class SignalPathFacts extends JsonModel {
   );
 }
 
+class ExpectedStream extends JsonModel {
+  ExpectedStream({
+    required String kind,
+    String? encoder = null,
+    String? codec = null,
+  }) : super({'kind': kind, 'encoder': encoder, 'codec': codec});
+  ExpectedStream.fromJson(super.json);
+  String get kind => data['kind'] as String;
+  String? get encoder => data['encoder'] as String?;
+  String? get codec => data['codec'] as String?;
+}
+
 class CompileResult extends JsonModel {
   CompileResult({
     required String executable,
@@ -913,6 +925,7 @@ class CompileResult extends JsonModel {
     List<Issue> issues = const [],
     JsonMap summary = const {},
     List<String> overriddenFields = const [],
+    List<ExpectedStream>? expectedStreams = null,
     JsonMap extensions = const {},
   }) : super({
          'executable': executable,
@@ -925,6 +938,7 @@ class CompileResult extends JsonModel {
          'issues': issues.map((v) => v.toJson()).toList(),
          'summary': summary,
          'overriddenFields': overriddenFields,
+         'expectedStreams': expectedStreams?.map((v) => v.data).toList(),
          'extensions': extensions,
        });
   CompileResult.fromJson(super.json);
@@ -935,6 +949,18 @@ class CompileResult extends JsonModel {
     jsonMaps(data['display'] ?? []).map(CommandToken.fromJson),
   );
   String get commandLine => data['commandLine'] as String? ?? '';
+
+  /// Native compiler input facts; absent in historical fake fixtures.
+  List<String>? get inputStreams => data['inputStreams'] == null
+      ? null
+      : List<String>.unmodifiable(
+          (data['inputStreams'] as List).cast<String>(),
+        );
+  List<ExpectedStream>? get expectedStreams => data['expectedStreams'] == null
+      ? null
+      : List.unmodifiable(
+          jsonMaps(data['expectedStreams']).map(ExpectedStream.fromJson),
+        );
   String get advancedTemplate => data['advancedTemplate'] as String? ?? '';
   ResolvedSettings? get resolved => data['resolved'] == null
       ? null
@@ -960,6 +986,7 @@ class CompileResult extends JsonModel {
     Object? issues = absent,
     Object? summary = absent,
     Object? overriddenFields = absent,
+    Object? expectedStreams = absent,
     Object? extensions = absent,
   }) => CompileResult.fromJson(
     changed({
@@ -981,6 +1008,10 @@ class CompileResult extends JsonModel {
       if (!identical(summary, absent)) 'summary': summary,
       if (!identical(overriddenFields, absent))
         'overriddenFields': overriddenFields,
+      if (!identical(expectedStreams, absent))
+        'expectedStreams': (expectedStreams as List<ExpectedStream>?)
+            ?.map((v) => v.data)
+            .toList(),
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -990,26 +1021,38 @@ class NormalizeResult extends JsonModel {
   NormalizeResult({
     required Recipe recipe,
     List<Issue> issues = const [],
+    List<String>? requiredEncoders = null,
     JsonMap extensions = const {},
   }) : super({
          'recipe': recipe.toJson(),
          'issues': issues.map((v) => v.toJson()).toList(),
+         'requiredEncoders': requiredEncoders,
          'extensions': extensions,
        });
   NormalizeResult.fromJson(super.json);
   Recipe get recipe => Recipe.fromJson(jsonMap(data['recipe']));
+
+  /// Core-derived Basic requirements; null means unknown (Advanced/older core).
+  List<String>? get requiredEncoders => data['requiredEncoders'] == null
+      ? null
+      : List<String>.unmodifiable(
+          (data['requiredEncoders'] as List).cast<String>(),
+        );
   List<Issue> get issues => List<Issue>.unmodifiable(
     jsonMaps(data['issues'] ?? []).map(Issue.fromJson),
   );
   NormalizeResult copyWith({
     Object? recipe = absent,
     Object? issues = absent,
+    Object? requiredEncoders = absent,
     Object? extensions = absent,
   }) => NormalizeResult.fromJson(
     changed({
       if (!identical(recipe, absent)) 'recipe': (recipe as Recipe).toJson(),
       if (!identical(issues, absent))
         'issues': (issues as List<Issue>).map((v) => v.toJson()).toList(),
+      if (!identical(requiredEncoders, absent))
+        'requiredEncoders': requiredEncoders,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );

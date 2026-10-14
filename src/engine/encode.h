@@ -1,4 +1,4 @@
-// Fixed-profile external FFmpeg transport. No VEGAS interfaces on worker threads.
+// External FFmpeg transport. No VEGAS interfaces on worker threads.
 #pragma once
 
 #include <windows.h>
@@ -9,6 +9,9 @@
 #include <vector>
 
 namespace vegas_encoder {
+// CreateProcess itself can be slow (large static executables/AV inspection).
+// Only the Windows launch moves to a worker; caller polling stays on Render.
+BOOL CreateProcessPolled(const std::function<BOOL()>& create, const std::function<bool()>& poll, bool& interrupted);
 
 struct EncodeRate {
   DWORD num = 0, den = 1;
@@ -34,14 +37,26 @@ class FfmpegEncoder {
 
   bool Start(const std::wstring& exe, const std::wstring& output, LONG width, LONG height,
              EncodeRate rate, bool audio, DWORD pipeTimeoutMs, DWORD finishTimeoutMs);
+  struct CommandPlan { std::vector<std::wstring> argv; bool audioInput = false; };
+  // The factory compiles after unique pipe/temp names are allocated, before spawn.
+  // argv excludes the executable. The core owns every command/domain decision.
+  using Compile = std::function<CommandPlan(const std::wstring&, const std::wstring&, const std::wstring&)>;
+  using Progress = std::function<void(const char*, size_t)>;
+  bool StartCompiled(const std::wstring& exe, const std::wstring& output,
+                     const std::wstring& log, DWORD pipeTimeoutMs, DWORD finishTimeoutMs,
+                     const Compile& compile, const Progress& progress, const Poll& startupPoll);
   bool Submit(bool audio, std::vector<BYTE> bytes, const Poll& poll);
-  bool Finish(const Poll& poll);
+  bool Finish(const Poll& poll, bool publish = true);
+  bool Publish(); // only after successful Finish(..., false) and verification
+  void RetainPartial();
   void Abort();
   HRESULT Error() const;
   std::string Reason() const;
   EncodeStats Stats() const;  // call after Finish/Abort; workers are joined
 
  private:
+  bool StartImpl(const std::wstring&, const std::wstring&, LONG, LONG, EncodeRate, bool,
+                 DWORD, DWORD, const Compile&, const Progress&, const std::wstring&, const Poll&);
   struct Impl;
   std::unique_ptr<Impl> p_;
 };

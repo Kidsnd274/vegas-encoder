@@ -13,8 +13,30 @@ and render progress through a VEGAS status line (if a real-host test allows it) 
 small progress window. The project license is still open. The platform B0 contracts,
 draft recipe schema/C ABI and pure Dart packages with fakes are now implemented;
 see [contracts](product/CONTRACTS.md) and [platform handoff](product/workstreams/platform.md).
-The B2 native product core is now implemented below. Real services and adapter
-integration remain later milestones; the VEGAS gates below are unchanged.
+The B2 native product core and B3 Windows services are implemented below. Engine/
+progress/job support is now implemented as B4; gated adapter integration follows.
+The VEGAS gates below are unchanged.
+
+**B4 complete (2026-10-14, owner-authorized commit/merge from ws/platform):** engine accepts C++ core
+argv, parses bounded FFmpeg progress, writes C5 live status and C6 jobs/history
+asynchronously, and uses core expectedStreams for bounded FFprobe readback before
+publication. Host polling stays on Render's caller thread during hashes, pipe waits
+and process creation; host frames are copied/released first. Output failure/cancel
+and destination preservation remain distinct. Publication failures are nonfatal
+and cannot make Render wait for the app/file readers. No monitor is launched yet.
+**33,269 fake-host checks / 30 cases** pass, including 12 recipe runs across the
+three B3 FFmpeg builds, fractional 1080p, cancellation/recovery, publication races,
+blocked/slow pipes, probe errors and storage backpressure. Optimized maximum poll
+gap 110 ms, extra parent working set 35.9 MiB, video/audio queue highs 29.7 MiB /
+154.6 KiB, blocked-pipe cancel 375 ms. **23,053 ASan checks / 22 cases** pass on
+gyan 5.1.2; ASan timings are not release measurements. B3 readers accept 29 native
+jobs (**350 checks**). Core normal/ASan each **2,965**, native-asset FFI **196**,
+helper/boundary/configuration **24/9/67** and existing exporter fake-host regression
+pass; both packages analyze cleanly. Readback is not broad media/full-decode
+qualification. See [platform handoff](product/workstreams/platform.md). Existing
+B3 changes are preserved. No app-owned or installed/user state changed; no new
+real VEGAS test. **A5–A7, real two-template/restart persistence, controlled real
+failure recovery and monitor performance remain unverified.**
 
 **B2 core/FFI (2026-10-13):** master through F2 (`ab7e7ab`) is in ws/platform.
 The later F2 platform-fact/UI-state merge (`230c724`) is also incorporated.
@@ -24,6 +46,37 @@ asset hook, DLL/static builds, token/stream facts and the additive F2 result fie
 The app owns switching its fake provider after merge. B1 replaces the native
 bootstrap profiles/options with qualified Windows data below; B0 fakes remain
 historical design samples.
+
+**B3 complete (2026-10-14, owner-authorized commit/merge from ws/platform):** real Windows discovery,
+versioned help parser, streamed curated/lazy probes, bounded four-child process
+pool, GPU/driver-qualified hardware cache, installation-health/C7 updates and
+native-compiled synthetic preset tests are implemented. File-backed presets,
+machine settings, capability cache, job/history reads, live status and edit-session
+I/O. Atomic replacement and bounded Windows byte locks protect concurrent saves;
+built-in preferences persist separately, preset history retains 20 old revisions,
+and transfer/log/location APIs cover the app's storage requests. Core normalize
+supplies Basic requiredEncoders; Advanced requirements remain explicitly unknown.
+Job summaries/command/error/log fields are additive; B4 now supplies the native writers.
+110 real-Windows file/lock/native-core checks pass, including competing processes,
+crash lock release, malformed/future files and failed-write recovery. Final native
+verification facts pass **2,955** native checks including ASan and **194**
+native-asset FFI checks; retained **173 core / 58 service** fake checks pass. Both
+packages analyze cleanly. The service suite passes **4,456** captured-parser/
+fake-FFmpeg/real-Windows-process/DXGI checks. All **24** native-compiled preset
+encodes/readbacks/full decodes pass across the three supplied FFmpeg builds
+(**138** checks), including video-only/Advanced. Hardware smoke uses 320x192;
+preset tests use 320x180/30 fps on Windows 11 Pro 26300, RTX 5070 Ti, driver
+32.0.16.1692. MF is forced to hardware and GPU-only surfaces uploaded explicitly.
+This is default-command smoke qualification, not HDR, other resolutions or
+all-device compatibility. Parser/cache version 2 invalidates earlier commands.
+No new fake-host or real VEGAS run. App-owned files and installed/user state are
+untouched. App F7 injects WindowsServices and removes fake-era installation/cache
+persistence copies; services own C7 installation updates. **61** further native
+checks preserve compact/full compile results for built-ins, Extra arguments and
+disabled audio on all three real probe caches. Basic warm compile is 2.5–2.9 ms
+versus full Advanced 10.5–13.2 ms (50 calls/build); app frame/search/scroll budgets
+remain unqualified. Live
+status publication must remain nonfatal and off Render's waits in B4.
 
 **B1 Windows FFmpeg (2026-10-13):** gyan 5.1.2, gyan static git `615b07170e`
 (2026-10-12), and BtbN GPL shared git `24e860f6d3` (2026-10-13) are recaptured.
@@ -70,15 +123,16 @@ Existing 24 helper, 9 boundary, 67 configuration checks, default fake-host suite
 11-case/20-render proof/recovery suite and fake-tree installer tests pass with
 gyan FFmpeg 5.1.2. This is offline/fake-host validation, not a new real VEGAS test.
 
-**Next:** B2 is merged into master (`bbcbe91`), and ws/platform is synchronized.
-B1 Windows recapture is complete and ready for owner merge, then
-B3 real services, including the remaining F2 requests. Approved B1 downloads stay
+**Next:** B2 is merged into master (`bbcbe91`). B1 and B3 are ready for owner review;
+the owner authorized committing/merging B3/B4 from ws/platform. Next platform work is B5
+status-line analysis and gated B6 adapter/monitor integration with the owner.
+App F7 wires the real providers and measures its budgets. Approved B1 downloads stay
 in this worktree's ignored build/; existing `C:\ffmpeg` gyan 5.1.2 is untouched.
 No installation or PATH change. Workstream split:
 [docs/product/WORKSTREAMS.md](product/WORKSTREAMS.md).
 
 **Scope boundary:** product work is now authorized on ws/app and ws/platform.
-The owner asks platform to commit each milestone and stop for merging. The deferred real
+The owner authorized this B3/B4 commit/master merge; push and installation remain separate. The deferred real
 two-template/restart test and controlled real failure recovery remain qualification
 limits; core/fake/offline tests do not pass A5–A7. No installed DLL or rollback backup changed.
 
@@ -266,10 +320,10 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 ## Next task
 
-Platform B1 is complete and ready for owner merge; B2 is already merged. App switches
-its provider/mappings to the real core through its own workstream. Next is B3
-services, including full-capability transfer performance and remaining F2 needs,
-then B4 engine integration. No installation or PATH change. Order and rationale are in
+Platform B1, B3 and B4 are complete; B2 is already merged. The owner authorized
+committing B3/B4 and merging both workstreams into master. App F7 switches to NativeVeCore/WindowsServices through
+its own workstream. Next is B5 status-line analysis and gated B6 adapter/monitor
+integration. No installation or PATH change. Order and rationale are in
 [platform.md](product/workstreams/platform.md).
 B5/B6 require the owner at the real host. Controlled failure/recovery and deferred
 persistence qualification remain open per [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).

@@ -182,5 +182,59 @@ still describes input/output scope; the tested current executables' help and
 execution errors establish the newer scope difference recorded above.
 
 A5–A7, real two-template/restart persistence and controlled real failure recovery
-remain unverified. The installed exporter/engine is unchanged. The next platform
-milestone is B3 services; the app owns NativeVeCore provider wiring and UI mapping.
+remain unverified. The installed exporter/engine is unchanged. B3 services are
+delivered below; the app owns provider wiring and UI mapping. B4 engine work follows.
+
+## B3 service qualification
+
+The Windows services use the same three supplied builds on Windows 11 Pro 26300,
+RTX 5070 Ti, DXGI driver 32.0.16.1692. `Test-B3Runtime.ps1` performs full real
+probes and eight synthetic native-compiled preset tests per build: six built-ins,
+video-only FFV1 and seeded Advanced FFV1. All **24** encode/readback/full-decode
+cases pass (**138** assertions). No fake host or real VEGAS is used. Tests run at
+320x180/30 fps; this is not another resolution, HDR or throughput qualification.
+
+The service parser uses committed raw help/version/list fixtures and retains B1
+option literal/alias behavior. Canonical muxer counts are **176 / 189 / 188**;
+lookup entries including aliases are **178 / 190 / 189**. The current gyan count
+includes the `caca` device with joined `Ed` flags, missed by the historical B1
+capture parser's spaced-column assumption. Historical captures remain unchanged.
+
+Hardware qualification uses one 320x192 frame, strict pixel format and a separate
+10-bit input test when advertised. Media Foundation is forced with
+`-hw_encoding 1`; its documented default can select software, so unforced successes
+are not reused. Vulkan/D3D12 surface encoders receive explicit device initialization
+and hwupload. Production parser/cache version **2** invalidates earlier smoke
+commands. Eight-bit success survives a failed ten-bit test; all errors retain a
+bounded diagnostic rather than becoming general hardware incompatibility rules.
+GPU/driver/binary identity and a 30-day TTL scope reuse. Local NVIDIA, MF and several
+Vulkan/D3D12 smoke paths pass; Intel/AMD and other failures are command/device-specific.
+These are not all-device, HDR, performance or VEGAS claims.
+
+The standalone B3 service suite also checks parser goldens, fake process failures,
+concurrent cache updates, cancellation and changed-binary checks. Its real Windows
+subtests check shell-free literal argv, timeout/output bounds, four-child pool
+release and stable DXGI enumeration. The helper returns three DXGI entries here;
+that is not a claim of three physical GPUs. Explorer reveal remains implemented
+but unexercised against the desktop (FakeFileReveal covers its app contract).
+
+Use `Test-B3Services.ps1` and `Test-B3Repositories.ps1` sequentially, then
+`Test-B3Runtime.ps1 -FFmpegPaths @(...)` with explicit executable paths. All writes
+stay in isolated ignored build/test-results roots, and output/log artifacts are
+retained for inspection. No user settings, supplied FFmpeg or installed exporter
+is changed. Complete app frame/scroll/search budgets and B4 named-pipe/progress/job
+qualification remain separate work.
+
+Final cached Basic views omit unused hardware diagnostic text while retaining
+native availability state/reason and active option facts. **61** parity/reuse
+checks cover built-ins, Extra arguments and disabled audio on all three caches.
+Warm end-to-end compile means (50 calls/build) are **2.52 / 2.91 / 2.91 ms** for
+27,343 / 32,586 / 31,674-byte Basic maps, versus **10.47 / 13.24 / 12.81 ms** for
+156,163 / 236,118 / 234,172-byte full maps. These are the FFI portion on this busy
+machine, not a complete app edit/frame budget pass. Full probe times in the final
+run are **9.3 / 54.5 / 21.0 s**, including listed hardware smoke tests and identity
+hashing; streamed progress does not promise a two-second cold full probe.
+The retained runtime summary is under ignored
+`build/test-results/b3-runtime-cc92c463/summary.json`; final projection timings are
+in `view-timings.json`. `Test-B3Runtime.ps1 -CachedViewRoot <that-root>` repeats
+parity/timing without invoking FFmpeg. User files/installed binaries are untouched.

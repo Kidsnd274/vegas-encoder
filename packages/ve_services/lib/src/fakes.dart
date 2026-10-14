@@ -61,18 +61,6 @@ FFmpegCapabilities _capabilities(FFmpegInstallation installation) {
   );
 }
 
-extension FFmpegCapabilitiesCoreView on FFmpegCapabilities {
-  CoreCapabilities toCoreCapabilities({String label = ''}) => CoreCapabilities(
-    installationId: installationId,
-    label: label,
-    identityKey: identityKey,
-    version: version,
-    libavformatMajor: libavformatMajor,
-    encoders: encoders,
-    muxers: muxers,
-  );
-}
-
 class FakeFFmpegDiscovery implements FFmpegDiscovery {
   FakeFFmpegDiscovery({
     List<FFmpegInstallation>? installations,
@@ -303,7 +291,8 @@ class FakeCapabilityCache implements CapabilityCache {
   }
 }
 
-class FakePresetLibrary implements PresetLibrary {
+class FakePresetLibrary
+    implements PresetLibrary, PresetPreferences, PresetLocations {
   FakePresetLibrary({List<Preset>? presets, String Function()? now})
     : _store = _Store(
         List.unmodifiable(
@@ -410,6 +399,42 @@ class FakePresetLibrary implements PresetLibrary {
     return jsonEncode(preset.toJson());
   }
 
+  @override
+  Future<String?> location(String id) async {
+    final preset = await get(id);
+    return preset == null || preset.builtin
+        ? null
+        : 'fixture-library/$id.vepreset';
+  }
+
+  @override
+  Future<Preset> setPreferences(
+    String id, {
+    bool? favorite,
+    bool? pinned,
+  }) async {
+    final current = _store.value.where((p) => p.recipe.id == id).firstOrNull;
+    if (current == null)
+      throw const ServiceException('NOT-FOUND', 'Preset not found.');
+    if (!current.builtin) {
+      return save(
+        current.copyWith(
+          favorite: favorite ?? current.favorite,
+          pinned: pinned ?? current.pinned,
+        ),
+        expectedRevision: current.revision,
+      );
+    }
+    final saved = current.copyWith(
+      favorite: favorite ?? current.favorite,
+      pinned: pinned ?? current.pinned,
+    );
+    _store.set(
+      List.unmodifiable(_store.value.map((p) => p.recipe.id == id ? saved : p)),
+    );
+    return saved;
+  }
+
   Future<void> dispose() => _store.dispose();
 }
 
@@ -450,17 +475,21 @@ class FakeMachineSettingsRepository implements MachineSettingsRepository {
   Future<void> dispose() => _store.dispose();
 }
 
-class FakeJobRepository implements JobRepository {
-  FakeJobRepository({List<JobRecord>? records})
-    : _store = _Store(
-        List.unmodifiable(
-          records ??
-              jsonMaps(
-                jsonMap(jsonDecode(b0ServiceFixtureJson))['jobs'],
-              ).map(JobRecord.fromJson),
-        ),
-      );
+class FakeJobRepository implements JobRepository, JobLogs {
+  FakeJobRepository({
+    List<JobRecord>? records,
+    Map<String, String> logs = const {},
+  }) : _store = _Store(
+         List.unmodifiable(
+           records ??
+               jsonMaps(
+                 jsonMap(jsonDecode(b0ServiceFixtureJson))['jobs'],
+               ).map(JobRecord.fromJson),
+         ),
+       ),
+       _logs = Map.of(logs);
   final _Store<List<JobRecord>> _store;
+  final Map<String, String> _logs;
   List<JobIndexEntry> _index(List<JobRecord> records) => List.unmodifiable(
     records.map(
       (r) => JobIndexEntry(
@@ -470,6 +499,11 @@ class FakeJobRepository implements JobRepository {
         status: r.status,
         templateName: r.templateName,
         outputPath: r.outputPath,
+        encoderSummary: r.data['encoderSummary'] as String?,
+        project: r.project,
+        durationSec: r.durationSec ?? r.media.durationSec,
+        elapsedSec: r.elapsedSec,
+        sizeBytes: r.sizeBytes,
       ),
     ),
   );
@@ -480,6 +514,17 @@ class FakeJobRepository implements JobRepository {
   @override
   Future<JobRecord?> get(String id) async =>
       _store.value.where((v) => v.id == id).firstOrNull;
+  @override
+  Stream<String> readLog(String id) async* {
+    final log = _logs[id];
+    if (log == null)
+      throw const ServiceException('NOT-FOUND', 'No fixture log for this job.');
+    yield log;
+  }
+
+  @override
+  Future<String?> logLocation(String id) async =>
+      _logs.containsKey(id) ? 'fixture/$id.ffmpeg.log' : null;
   void publish(JobRecord record) => _store.set(
     List.unmodifiable([
       record,

@@ -9,6 +9,7 @@ if defined VE_BUILD_VCVARS (
   where cl >nul 2>nul || (echo Run from an x64 MSVC developer prompt or pass vcvars64.bat. & exit /b 1)
 )
 set "VE_BUILD_ROOT=%~dp0.."
+call "%~dp0build-core.cmd" "%VE_BUILD_VCVARS%" || exit /b 1
 set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\vegas-encoder"
 set "VE_BUILD_PROOF_FLAGS="
 set "VE_BUILD_PROOF_SOURCES="
@@ -25,8 +26,8 @@ if not exist "%VE_BUILD_PLUGIN%" mkdir "%VE_BUILD_PLUGIN%"
 if not exist "%VE_BUILD_TESTS%" mkdir "%VE_BUILD_TESTS%"
 if not exist "%VE_BUILD_HELPERS%" mkdir "%VE_BUILD_HELPERS%"
 pushd "%VE_BUILD_PLUGIN%" || exit /b 1
-cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi /Fd:vegas-encoder.pdb %VE_BUILD_PROOF_FLAGS% "%VE_BUILD_ROOT%\src\vegas\adapter\plugin.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\render.cpp" "%VE_BUILD_ROOT%\src\support\diagnostics.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" "%VE_BUILD_ROOT%\src\engine\encode.cpp" %VE_BUILD_PROOF_SOURCES% || goto :fail
-link /nologo /DLL /DEBUG /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj %VE_BUILD_PROOF_OBJECTS% ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
+cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 /Zi /Fd:vegas-encoder.pdb %VE_BUILD_PROOF_FLAGS% "%VE_BUILD_ROOT%\src\vegas\adapter\plugin.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\render.cpp" "%VE_BUILD_ROOT%\src\support\diagnostics.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" "%VE_BUILD_ROOT%\src\engine\encode.cpp" "%VE_BUILD_ROOT%\src\engine\progress.cpp" "%VE_BUILD_ROOT%\src\engine\job_store.cpp" "%VE_BUILD_ROOT%\src\engine\recipe_job.cpp" %VE_BUILD_PROOF_SOURCES% || goto :fail
+link /nologo /DLL /DEBUG /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj progress.obj job_store.obj recipe_job.obj "%VE_BUILD_ROOT%\build\core\ve_core_static.lib" %VE_BUILD_PROOF_OBJECTS% ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
 copy /y "%VE_BUILD_ROOT%\config\vegas-encoder.ini" vegas-encoder.ini >nul || goto :fail
 popd
 pushd "%VE_BUILD_TESTS%" || exit /b 1

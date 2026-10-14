@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <cstddef>
 #include <string>
+#include <functional>
 
 namespace vegas_encoder {
 // Best-effort logging: one file per process, flushed per line.
@@ -19,7 +20,7 @@ std::string JsonEscape(const std::string& s);
 double NowMs();  // milliseconds since DLL load
 std::string ModulePath(HMODULE m);
 std::string FileVersion(const std::string& path);
-std::string Sha256File(const std::wstring& path);
+std::string Sha256File(const std::wstring& path, const std::function<bool()>& poll = {});
 
 
 }  // namespace vegas_encoder

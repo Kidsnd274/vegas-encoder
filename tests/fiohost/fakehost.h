@@ -4,6 +4,7 @@
 #include "../../src/vegas/abi/sfio_abi.h"
 
 #include <string>
+#include <functional>
 
 struct RenderTestOptions {
   std::wstring hostTemplate;  // 540-byte host project template (.tpl)
@@ -30,3 +31,13 @@ struct RenderTestOptions {
 // Create/SetStreamReader/SetMetaReader/SetFile/Render/GetFileName/CloseFile
 // with fake streams that deliver the baseline fixture. Returns 0 on success.
 int RunRenderTest(sfio::ISfRenderFileClass* rc, sfio::ISfHostAllocator* alloc, const RenderTestOptions& o);
+
+struct RecipeHostResult {
+  HRESULT returned = E_FAIL;
+  LONGLONG served = 0, released = 0, outstanding = 0, lockErrors = 0;
+  LONGLONG samples = 0, reads = 0, tokenErrors = 0, callerThreadErrors = 0;
+};
+// Reuses the same measured fake stream fixtures without enabling the gated
+// production template/recipe adapter. Callback executes on this caller thread.
+RecipeHostResult ExerciseRecipeHost(const RenderTestOptions& options,
+  const std::function<HRESULT(sfio::ISfReadVideoRenderStream*,sfio::ISfReadAudioStream*,sfio::ISfProgress*)>& render);

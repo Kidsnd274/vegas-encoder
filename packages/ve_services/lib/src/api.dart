@@ -44,6 +44,14 @@ abstract interface class HardwareTests {
   Future<void> cancel(String installationId);
 }
 
+abstract interface class PresetTests {
+  Stream<PresetTestProgress> test(
+    Recipe recipe,
+    FFmpegInstallation installation,
+  );
+  Future<void> cancel(String testId);
+}
+
 abstract interface class CapabilityCache {
   Future<FFmpegCapabilities?> read(String identityKey);
   Future<void> write(FFmpegCapabilities capabilities);
@@ -63,6 +71,16 @@ abstract interface class PresetLibrary {
   Future<String> exportPreset(String id);
 }
 
+/// Stars/pins on built-ins are stored as user metadata without changing recipes
+/// or origin revisions. Existing save remains read-only for built-ins.
+abstract interface class PresetPreferences {
+  Future<Preset> setPreferences(String id, {bool? favorite, bool? pinned});
+}
+
+abstract interface class PresetLocations {
+  Future<String?> location(String id);
+}
+
 abstract interface class MachineSettingsRepository {
   Future<MachineSettings> read();
   Stream<MachineSettings> watch();
@@ -76,6 +94,11 @@ abstract interface class JobRepository {
   Future<List<JobIndexEntry>> list();
   Stream<List<JobIndexEntry>> watch();
   Future<JobRecord?> get(String id);
+}
+
+abstract interface class JobLogs {
+  Stream<String> readLog(String id);
+  Future<String?> logLocation(String id);
 }
 
 abstract interface class LiveRenderStatusReader {

@@ -103,6 +103,8 @@ class FFmpegInstallation extends JsonModel {
     JsonMap counts = const {},
     JsonMap availability = const {},
     bool isFixture = false,
+    String health = 'unknown',
+    String healthMessage = '',
     JsonMap extensions = const {},
   }) : super({
          'id': id,
@@ -119,6 +121,8 @@ class FFmpegInstallation extends JsonModel {
          'counts': counts,
          'availability': availability,
          'isFixture': isFixture,
+         'health': health,
+         'healthMessage': healthMessage,
          'extensions': extensions,
        });
   FFmpegInstallation.fromJson(super.json);
@@ -138,6 +142,8 @@ class FFmpegInstallation extends JsonModel {
   JsonMap get availability =>
       jsonMap(data['availability'] ?? <String, Object?>{});
   bool get isFixture => data['isFixture'] as bool? ?? false;
+  String get health => data['health'] as String? ?? 'unknown';
+  String get healthMessage => data['healthMessage'] as String? ?? '';
   FFmpegInstallation copyWith({
     Object? id = absent,
     Object? label = absent,
@@ -153,6 +159,8 @@ class FFmpegInstallation extends JsonModel {
     Object? counts = absent,
     Object? availability = absent,
     Object? isFixture = absent,
+    Object? health = absent,
+    Object? healthMessage = absent,
     Object? extensions = absent,
   }) => FFmpegInstallation.fromJson(
     changed({
@@ -171,6 +179,8 @@ class FFmpegInstallation extends JsonModel {
       if (!identical(counts, absent)) 'counts': counts,
       if (!identical(availability, absent)) 'availability': availability,
       if (!identical(isFixture, absent)) 'isFixture': isFixture,
+      if (!identical(health, absent)) 'health': health,
+      if (!identical(healthMessage, absent)) 'healthMessage': healthMessage,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -503,14 +513,58 @@ class HardwareTestResult extends JsonModel {
   );
 }
 
+class PresetTestProgress extends JsonModel {
+  PresetTestProgress({
+    required String testId,
+    required String phase,
+    String log = '',
+    String message = '',
+    int framesDone = 0,
+    int framesTotal = 60,
+    String? commandLine = null,
+    String? logPath = null,
+    String? outputPath = null,
+    VerificationResult? verification = null,
+    bool isFixture = false,
+  }) : super({
+         'testId': testId,
+         'phase': phase,
+         'log': log,
+         'message': message,
+         'framesDone': framesDone,
+         'framesTotal': framesTotal,
+         'commandLine': commandLine,
+         'logPath': logPath,
+         'outputPath': outputPath,
+         'verification': verification?.data,
+         'isFixture': isFixture,
+       });
+  PresetTestProgress.fromJson(super.json);
+  String get testId => data['testId'] as String;
+  String get phase => data['phase'] as String;
+  String get log => data['log'] as String? ?? '';
+  String get message => data['message'] as String? ?? '';
+  int get framesDone => data['framesDone'] as int? ?? 0;
+  int get framesTotal => data['framesTotal'] as int? ?? 60;
+  String? get commandLine => data['commandLine'] as String?;
+  String? get logPath => data['logPath'] as String?;
+  String? get outputPath => data['outputPath'] as String?;
+  VerificationResult? get verification => data['verification'] == null
+      ? null
+      : VerificationResult.fromJson(jsonMap(data['verification']));
+  bool get isFixture => data['isFixture'] as bool? ?? false;
+}
+
 class PresetRequirements extends JsonModel {
   PresetRequirements({
     List<String> encoders = const [],
     String? minFFmpegVersion = null,
+    bool known = true,
     JsonMap extensions = const {},
   }) : super({
          'encoders': encoders,
          'minFFmpegVersion': minFFmpegVersion,
+         'known': known,
          'extensions': extensions,
        });
   PresetRequirements.fromJson(super.json);
@@ -518,15 +572,18 @@ class PresetRequirements extends JsonModel {
     (data['encoders'] as List? ?? []).cast<String>(),
   );
   String? get minFFmpegVersion => data['minFFmpegVersion'] as String?;
+  bool get known => data['known'] as bool? ?? true;
   PresetRequirements copyWith({
     Object? encoders = absent,
     Object? minFFmpegVersion = absent,
+    Object? known = absent,
     Object? extensions = absent,
   }) => PresetRequirements.fromJson(
     changed({
       if (!identical(encoders, absent)) 'encoders': encoders,
       if (!identical(minFFmpegVersion, absent))
         'minFFmpegVersion': minFFmpegVersion,
+      if (!identical(known, absent)) 'known': known,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1078,6 +1135,12 @@ class JobRecord extends JsonModel {
     JsonMap timings = const {},
     bool published = false,
     String? retainedPartialPath = null,
+    String? commandLine = null,
+    String? encoderSummary = null,
+    String? logFile = null,
+    double? durationSec = null,
+    double? realtime = null,
+    List<int> errorTokenIndices = const [],
     JsonMap extensions = const {},
   }) : super({
          'job': job,
@@ -1105,6 +1168,12 @@ class JobRecord extends JsonModel {
          'timings': timings,
          'published': published,
          'retainedPartialPath': retainedPartialPath,
+         'commandLine': commandLine,
+         'encoderSummary': encoderSummary,
+         'logFile': logFile,
+         'durationSec': durationSec,
+         'realtime': realtime,
+         'errorTokenIndices': errorTokenIndices,
          'extensions': extensions,
        });
   JobRecord.fromJson(super.json);
@@ -1138,6 +1207,14 @@ class JobRecord extends JsonModel {
   JsonMap get timings => jsonMap(data['timings'] ?? <String, Object?>{});
   bool get published => data['published'] as bool? ?? false;
   String? get retainedPartialPath => data['retainedPartialPath'] as String?;
+  String? get commandLine => data['commandLine'] as String?;
+  String? get encoderSummary => data['encoderSummary'] as String?;
+  String? get logFile => data['logFile'] as String?;
+  double? get durationSec => (data['durationSec'] as num?)?.toDouble();
+  double? get realtime => (data['realtime'] as num?)?.toDouble();
+  List<int> get errorTokenIndices => List<int>.unmodifiable(
+    (data['errorTokenIndices'] as List? ?? []).cast<int>(),
+  );
   JobRecord copyWith({
     Object? job = absent,
     Object? id = absent,
@@ -1164,6 +1241,12 @@ class JobRecord extends JsonModel {
     Object? timings = absent,
     Object? published = absent,
     Object? retainedPartialPath = absent,
+    Object? commandLine = absent,
+    Object? encoderSummary = absent,
+    Object? logFile = absent,
+    Object? durationSec = absent,
+    Object? realtime = absent,
+    Object? errorTokenIndices = absent,
     Object? extensions = absent,
   }) => JobRecord.fromJson(
     changed({
@@ -1196,6 +1279,13 @@ class JobRecord extends JsonModel {
       if (!identical(published, absent)) 'published': published,
       if (!identical(retainedPartialPath, absent))
         'retainedPartialPath': retainedPartialPath,
+      if (!identical(commandLine, absent)) 'commandLine': commandLine,
+      if (!identical(encoderSummary, absent)) 'encoderSummary': encoderSummary,
+      if (!identical(logFile, absent)) 'logFile': logFile,
+      if (!identical(durationSec, absent)) 'durationSec': durationSec,
+      if (!identical(realtime, absent)) 'realtime': realtime,
+      if (!identical(errorTokenIndices, absent))
+        'errorTokenIndices': errorTokenIndices,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1210,6 +1300,11 @@ class JobIndexEntry extends JsonModel {
     required String status,
     required String templateName,
     required String outputPath,
+    String? encoderSummary = null,
+    String? project = null,
+    double? durationSec = null,
+    double? elapsedSec = null,
+    int? sizeBytes = null,
     JsonMap extensions = const {},
   }) : super({
          'index': index,
@@ -1219,6 +1314,11 @@ class JobIndexEntry extends JsonModel {
          'status': status,
          'templateName': templateName,
          'outputPath': outputPath,
+         'encoderSummary': encoderSummary,
+         'project': project,
+         'durationSec': durationSec,
+         'elapsedSec': elapsedSec,
+         'sizeBytes': sizeBytes,
          'extensions': extensions,
        });
   JobIndexEntry.fromJson(super.json);
@@ -1229,6 +1329,11 @@ class JobIndexEntry extends JsonModel {
   String get status => data['status'] as String;
   String get templateName => data['templateName'] as String;
   String get outputPath => data['outputPath'] as String;
+  String? get encoderSummary => data['encoderSummary'] as String?;
+  String? get project => data['project'] as String?;
+  double? get durationSec => (data['durationSec'] as num?)?.toDouble();
+  double? get elapsedSec => (data['elapsedSec'] as num?)?.toDouble();
+  int? get sizeBytes => data['sizeBytes'] as int?;
   JobIndexEntry copyWith({
     Object? index = absent,
     Object? id = absent,
@@ -1237,6 +1342,11 @@ class JobIndexEntry extends JsonModel {
     Object? status = absent,
     Object? templateName = absent,
     Object? outputPath = absent,
+    Object? encoderSummary = absent,
+    Object? project = absent,
+    Object? durationSec = absent,
+    Object? elapsedSec = absent,
+    Object? sizeBytes = absent,
     Object? extensions = absent,
   }) => JobIndexEntry.fromJson(
     changed({
@@ -1247,6 +1357,11 @@ class JobIndexEntry extends JsonModel {
       if (!identical(status, absent)) 'status': status,
       if (!identical(templateName, absent)) 'templateName': templateName,
       if (!identical(outputPath, absent)) 'outputPath': outputPath,
+      if (!identical(encoderSummary, absent)) 'encoderSummary': encoderSummary,
+      if (!identical(project, absent)) 'project': project,
+      if (!identical(durationSec, absent)) 'durationSec': durationSec,
+      if (!identical(elapsedSec, absent)) 'elapsedSec': elapsedSec,
+      if (!identical(sizeBytes, absent)) 'sizeBytes': sizeBytes,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );

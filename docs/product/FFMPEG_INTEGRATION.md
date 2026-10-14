@@ -1,7 +1,7 @@
 # FFmpeg integration: which FFmpeg, and what it can do
 
-Updated: 2026-10-13 (Asia/Singapore). Status: B1 Windows facts delivered; B3 system
-services pending. Distribution is decided:
+Updated: 2026-10-14 (Asia/Singapore). Status: B1 facts and B3 Windows system
+services delivered. Distribution is decided:
 user-supplied FFmpeg, with no download offer for now (owner, 2026-10-12).
 
 This answers the owner's open question: "how the program knows what codecs are
@@ -16,6 +16,24 @@ Supporting material:
   mux/readback/decode cases and 184 native-generated profile plans. The Linux
   design measurements below remain historical context; B1's tables qualify or
   supersede them. These are offline checks, not real VEGAS evidence.
+
+The implementation is `WindowsServices` in packages/ve_services; exact APIs,
+ownership and limits are in [CONTRACTS.md](CONTRACTS.md#b3-windows-ffmpeg-services-and-app-composition).
+Discovery/probe own installation-record writes in machine.json; app providers must
+stop copying fake discovery records/cache results themselves. Reads do not probe.
+The four-process pool, versioned parser, binary/library/FFprobe identity checks,
+DXGI GPU/driver expiry, lazy encoder help and synthetic preset-test stream are real.
+The design cost samples below remain historical and are not runtime promises.
+
+B3 qualifies video hardware at 320x192 with strict pixel format, explicitly forces
+Media Foundation hardware encoding, and uploads GPU-only surfaces for Vulkan/D3D12.
+Separate 10-bit input acceptance is recorded when advertised. Cache reuse needs
+exact binary/parser/GPU/driver identity and age <30 days; expiry/change yields
+unknown on reads, without automatic execution. A failed default-device smoke test
+does not rule out another custom device/filter configuration. Audio wrappers are
+listed encoder facts, not video GPU tests. These tests do not establish HDR or
+render performance. Actual Windows timings/results are in
+[FFMPEG_WINDOWS.md](research/FFMPEG_WINDOWS.md#b3-service-qualification).
 
 ## 1. Choosing the FFmpeg
 

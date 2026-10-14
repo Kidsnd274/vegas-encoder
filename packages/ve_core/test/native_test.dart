@@ -143,6 +143,30 @@ Future<void> main(List<String> args) async {
   );
   final editedResult = core.compile(edited, media: f.media, paths: f.paths);
   check(
+    editedResult.inputStreams?.join(',') == 'video,audio',
+    'typed native input pipe facts',
+  );
+  check(
+    editedResult.copyWith().inputStreams?.join(',') == 'video,audio',
+    'input facts survive typed result copies',
+  );
+  check(
+    editedResult.expectedStreams
+            ?.map((s) => '${s.kind}:${s.codec}')
+            .join(',') ==
+        'video:h264,audio:aac',
+    'typed native output verification facts',
+  );
+  check(
+    editedResult.copyWith().expectedStreams?.first.encoder == 'libx264',
+    'verification facts survive typed result copies',
+  );
+  check(
+    core.normalize(f.recipe.toJson()).requiredEncoders?.join(',') ==
+        'libx264,aac',
+    'typed normalization requirements come from native core',
+  );
+  check(
     after(editedResult.argv, '-crf') == '17' &&
         editedResult.resolved!.quality == 17,
     'live CRF edit reaches native compile',
