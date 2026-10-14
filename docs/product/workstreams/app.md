@@ -711,6 +711,41 @@ Why the request read took longer there is not established.
   with Save anyway (the preset may suit another FFmpeg). UI_SPEC §3. The library's own
   refusal (`RECIPE-INVALID`) matches the first rule, so no platform change is needed.
 - **F6 goes to another app agent** (owner, 2026-10-15); the handoff below is for it.
+- **Plug-in and app versions** (owner, 2026-10-15; not built yet, for a later stage):
+  - The exporter keeps its own static copy of the core (TECH_ARCHITECTURE T1). It does
+    not load the app's `ve_core.dll`: a render must not depend on the app's folder, and
+    sharing the file adds no update guarantee, because updating already replaces the
+    locked plug-in and so already needs VEGAS closed.
+  - The two stay in step through installation and version checks instead. The popup
+    compares the request's `coreVersion`/`dllVersion` (C4) with its own core and warns,
+    for example "VEGAS's plug-in is from a different build; run setup". This is an app
+    task for a later stage; it is not built. The plug-in should check the app's version
+    before launching the popup or the progress window (platform, Needs).
+- **Installer** (owner, 2026-10-15; replaces B7's plan of an agent-built installer):
+  - The owner builds it with **Inno Setup**, hands-on, guided by AI. Agents supply inputs
+    and guidance, not a finished `.iss`. Inputs: the file set per target, install
+    locations, version stamps, what must be closed, VEGAS detection, and the existing
+    reversible installer's rules to carry over (manifest, backups, refusing files changed
+    by hand).
+  - **One release, installed together.** Setup updates the app and every plug-in copy
+    from the same build, or nothing. It requires VEGAS and the app to be closed (Inno's
+    close-applications support or a process check), and never finishes with some targets
+    updated and others not.
+  - **Later: choosing VEGAS versions.** Only VEGAS 2026 (2026.0.3.189) is tested; older
+    versions likely need different plug-in builds (the host interfaces are reverse
+    engineered per version). That is platform research first: per-version interface
+    checks, real-host tests, and where each version records its install in the
+    registry. Setup would then map each VEGAS version to its plug-in build, all sharing
+    one core version.
+  - **Setup owns the set of targets.** It keeps a record of every VEGAS it installed
+    into (VEGAS version, folder, plug-in version), in the registry under its AppId or
+    a manifest beside the app. An update updates every recorded target by default;
+    unticking a previously installed VEGAS removes the plug-in from it, so no copy is
+    left behind stale. Uninstall removes every recorded copy. Check how Inno's uninstall
+    log behaves across repeated installs with the same AppId for files placed in
+    folders chosen at run time.
+  - A stale copy anyway (manual copy, failed install) still renders its saved templates
+    with its own core; the version checks above catch it when the template is edited.
 - **Keep on top off by default**, matching C7 `keepOnTop=false`. The progress window
   starts unpinned; F6 reads the remembered value.
 - **Fake core limits: go to the real core.** Platform adds the four contract requests
@@ -764,6 +799,7 @@ Open (additive):
 
 | Need | Request |
 | --- | --- |
+| Version checks and installer inputs (owner, 2026-10-15; later stage) | See the owner's "Plug-in and app versions" and "Installer" decisions above. (1) Before launching the popup or the progress window, the plug-in checks the installed app's version against its own build and says "run setup" on a mismatch. (2) An "installer inputs" note for the owner's Inno Setup work: the file set per target, install locations, version stamps, what must be closed, and the current reversible installer's rules. (3) Research before supporting older VEGAS versions: per-version host interfaces and where each version records its install |
 | **Library watch cost (F7). Owner priority, 2026-10-15** | `FilePresetLibrary.watch` polls every 250 ms, and each tick calls `list()`, which reads, decodes and normalizes (an FFI call per preset) every preset file on the caller's isolate, the app's UI isolate. Measured with 500 presets: **430–470 ms per tick** (`app/tool/budgets/budgets_test.dart`, real capability caches, JIT), so the poll runs back to back while a screen watches the library; with a handful of presets it is a few ms every 250 ms. Please make an unchanged library cheap to watch: list the folder and compare each file's size and last-write time (and `preferences.json`'s), keep each decoded preset and its requirements, and re-read only added or changed files (or watch the folder with `ReadDirectoryChangesW`, or poll off the caller's isolate). Keep what `watch` promises now: a current snapshot per listener, then a new value only when something changed; added, removed and edited presets and built-in star changes all show, and a malformed file behaves as today. Target: with 500 unchanged presets, a tick costs a few ms at most on the caller's isolate, measured through the real `FilePresetLibrary`. The app needs no change (it re-reads after its own writes, `PresetsController._refresh`) |
 | Open in Vegas Encoder (F5) | UI_SPEC §4: the popup opens the desktop app on the origin preset. No C3 service starts the desktop app (or hands an existing one a preset), and the app starts no processes itself (AGENTS.md). Please add one, for example `DesktopApp.openPreset(presetId)` that starts `VegasEncoder.exe` with a preset argument or asks the running single instance to select it. The button is disabled with that reason until then (`desktopAppLauncherProvider` is null) |
 | Popup size (F5) | UI_SPEC §1: the popup remembers its size, not its position. C7 `uiState` has desktop fields only, so the popup opens at its default size every time. Please add an additive `popupWindowSize` (physical width and height, or logical) to `AppUiState`, or the owner decides the popup keeps the default size |
