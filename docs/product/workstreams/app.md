@@ -5,7 +5,7 @@ done; F2 and F3 done except the parts waiting on platform** (listed under Needs)
 app runs on the native core (B2) and the platform's Windows services (B3)** (F7's
 service part, `0d33d43`), with the §9.3 budgets measured on real data (Tests). Master
 through `a0d33c4` (B1, B3, B4) is merged; the native core carries B1's Windows FFmpeg
-data and its goldens are regenerated (`4829f8e`). **F5, the VEGAS popup, is built**
+data and its goldens are regenerated (`4829f8e`). **F5, the VEGAS popup, is built** (`fe248b5`)
 (`--edit-session`, UI_SPEC §4, S3): the C4 request and result through
 `EditSessionService`, the template header and origin line, the one-row strip, Load preset,
 Show changes, Update from library, Save to library, Apply and Cancel, and Advanced mode
@@ -347,8 +347,14 @@ debug builds, and the goldens use it.
   the work area as `ClampBounds` keeps the desktop window. `configure` replies first and
   then places the window (`RestoreBounds`), with the deferred show, so a VEGAS window on a
   monitor with another DPI no longer centres with the primary monitor's size or blocks the
-  reply. This closes the open item in code; F5 recheck: results pending from the spike
-  run.
+  reply. Measured in the F5 recheck (Spike results): a fake host on a 96-dpi monitor
+  beside the 120-dpi primary gets the popup centred within 4 px at 1120×740 for 96 dpi.
+- **Spike harness** (`tool/spikes/WindowProbe.cs`, `run_window_spikes.ps1`): each popup
+  launch gets its own session folder with the C4 fixture request (owner set to the fake
+  host); the owner check confirms WM_CLOSE leaves a cancel `result.json` and a killed
+  editor leaves none; a new check places the fake host on a monitor with another DPI
+  when there is one; runs use `VEGAS_ENCODER_DATA_ROOT` on `app\build\spikes\data-root`
+  and report whether the user's own folders stayed untouched.
 
 ## Tests
 
@@ -657,10 +663,25 @@ The desktop's first frame no longer waits for the library: the file library deli
 after it. The 20 desktop runs saved their bounds to the scratch `machine.json`
 (revision 20), so window bounds now survive a restart.
 
-**F5 recheck (2026-10-15), the popup's owner from `request.json`.** F5 recheck: results
-pending from the spike run. (Release build, `-Checks start` and `-Checks owner`, fake
-host, `VEGAS_ENCODER_DATA_ROOT` on a scratch folder; the harness writes the session's
-`request.json` with the fake host's HWND.)
+**F5 recheck (2026-10-15), the popup's owner from `request.json`.** Release build (31 s)
+of `fe248b5`, `-Checks owner` then `-Checks start`, fake host, `VEGAS_ENCODER_DATA_ROOT`
+on `app\build\spikes\data-root`; each popup gets the C4 fixture request with the fake
+host's HWND. Monitors now: a 2560×1440 primary at 120 dpi and two 1920×1080 at 96 dpi.
+`%APPDATA%` and `%LOCALAPPDATA%\VegasEncoder` stayed absent before and after both runs.
+
+| Check | Result |
+| --- | --- |
+| Owner from `request.json` (same DPI) | Owner set, centred (offset 0,−4 px), foreground, hidden and restored with the owner, owner re-enabled and foreground after WM_CLOSE. Shown 435 ms (trace), `owner_bounds` 4 ms after Dart main |
+| Result on WM_CLOSE, nothing changed | `result.json` is a cancel with the request's sessionId; no other files besides the request and the writer's lock (also 10 of 10 popup start runs) |
+| Editor killed | No `result.json` (C4: a crash means cancel); the owner doesn't get the foreground back by itself but can take it after re-enabling (as F0–F7) |
+| **Owner on a 96-dpi monitor, primary at 120 dpi** (3 runs) | Owner set; window at 96 dpi; centred within 4 px (0,−4) every run; visible size 1122×741 against 1120×740 expected; `owner_bounds` targets the owner's monitor at 96 dpi. Shown 609, 636, 659 ms (trace) |
+| Start, Skia, warm, median of 10 | Desktop **445 ms** (Dart main to first frame 15); popup **395 ms** (12, request read included). F7: 414 / 360; the extra time is before Dart starts (window created at 324–330 ms vs ~299), on both windows |
+| Start, Impeller | Desktop 1,388 ms, popup 1,403 ms (F7: 1,328 / 1,319) |
+
+Over the other-DPI owner the popup stays within the 0.7 s warm budget but takes about
+200 ms longer than over a same-DPI owner: Dart main to `owner_bounds` was 110–140 ms in
+those runs (4 ms otherwise), and the move to the other monitor then resizes the view.
+Why the request read took longer there is not established.
 
 - **Renderer: deferred.** The runner defaults to Skia for start time;
   `RendererFromEnvironment` in `windows/runner/main.cpp` is the one place to change, and
@@ -758,9 +779,10 @@ F5 points to check in use:
 - **Real VEGAS host.** Ownership, focus, modality and placement were checked against a
   WinForms fake host only; the popup's input and focus inside VEGAS's Custom Template
   dialog are part of the P4 checklist (TECH_ARCHITECTURE §5.2).
-- **Another-DPI owner**: fixed in code (`OwnerBounds`, placed after the `configure`
-  reply). Whether it was measured on a second monitor with another scale is in the F5
-  recheck under Spike results.
+- **Another-DPI owner**: fixed (`OwnerBounds`, placed after the `configure` reply) and
+  measured against a fake host on a 96-dpi monitor beside a 120-dpi primary: centred
+  within 4 px at the right size. It shows about 200 ms later than over a same-DPI
+  owner (609–659 ms); part of that is an unexplained slower request read.
 - **Load preset** reads the library once each time the list opens (no watch), and its
   lines are recipe-based ("x264, AAC") without a compile per preset, so they don't show
   the core's quality summary.
@@ -807,7 +829,9 @@ Window start (runner), unverified or not fixed:
 
 - **Popup over a VEGAS window on another-DPI monitor** (F5): split like
   `ClampBounds`/`RestoreBounds` (`OwnerBounds`, placement after the reply, the deferred
-  show). Closed in code; see the F5 recheck for what was measured.
+  show) and measured with a fake host (F5 recheck): centred and sized right. Still about
+  200 ms slower to show than over a same-DPI owner; cause of the slower request read not
+  established.
 - **Restoring maximized** shows a stretched first frame for ~20–40 ms (the restored-size
   frame scaled up). Present before the fix too. Sizing the hidden window to the maximized
   client size before the first frame may avoid it (untested).
