@@ -82,18 +82,19 @@ class _VeDialog<T> extends StatelessWidget {
                       ],
                       if (content != null) ...[const SizedBox(height: 12), content!],
                       const SizedBox(height: 18),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                      // Long labels wrap to a second row, still right-aligned.
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 8,
                         children: [
-                          for (var i = 0; i < actions.length; i++) ...[
-                            if (i > 0) const SizedBox(width: 8),
+                          for (var i = 0; i < actions.length; i++)
                             VeButton(
                               label: actions[i].label,
                               variant: actions[i].variant,
                               autofocus: i == actions.length - 1,
                               onPressed: () => Navigator.of(context).pop(actions[i].value),
                             ),
-                          ],
                         ],
                       ),
                     ],

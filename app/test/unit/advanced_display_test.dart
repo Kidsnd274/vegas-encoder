@@ -1,0 +1,367 @@
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:ve_services/ve_services.dart' as core;
+import 'package:vegas_encoder/design/components/command_editor.dart';
+import 'package:vegas_encoder/design/components/command_view.dart' show CommandRole;
+import 'package:vegas_encoder/design/components/message.dart' show VeLevel;
+import 'package:vegas_encoder/features/advanced/display.dart';
+import 'package:vegas_encoder/features/presets/display.dart' show signalPathModel;
+import 'package:vegas_encoder/state/preview.dart';
+
+/// Advanced mode's display mapping (F4): every range, role and value comes
+/// from the core's results, built here by hand in the contract's shapes
+/// (CONTRACTS C2), so the mapping is checked without the core.
+void main() {
+  Map<String, Object?> token(String text, String role, [int? start, int? end]) => {
+    'text': text,
+    'role': role,
+    'field': role == 'exe' || role == 'global' || role == 'input' ? null : 'command.template',
+    'sourceStart': ?start,
+    'sourceEnd': ?end,
+  };
+
+  core.CompileResult compiled({
+    List<Map<String, Object?>> display = const [],
+    List<Map<String, Object?>> issues = const [],
+    Map<String, Object?> summary = const {},
+    Map<String, Object?>? signalPath,
+  }) => core.CompileResult.fromJson({
+    'executable': 'ffmpeg',
+    'argv': <String>[],
+    'display': display,
+    'commandLine': 'ffmpeg …',
+    'advancedTemplate': '',
+    'resolved': null,
+    'signalPath': signalPath,
+    'issues': issues,
+    'summary': summary,
+    'overriddenFields': <String>[],
+  });
+
+  Map<String, Object?> issue(String id, String level, String message, {Map<String, Object?> params = const {}}) => {
+    'id': id,
+    'level': level,
+    'field': params.isEmpty ? '' : 'command.template',
+    'message': message,
+    'params': params,
+    'fix': null,
+    'tokenIndices': <int>[],
+  };
+
+  core.Diagnostic diagnostic(String id, String level, int start, int end, String message) =>
+      core.Diagnostic.fromJson({'id': id, 'level': level, 'start': start, 'end': end, 'message': message});
+
+  //                0         1         2         3
+  //                0123456789012345678901234567890123456
+  const command = '{inputs}\n-c:v libx264 -g {gop:2s}\n{output}';
+
+  group('templateEditorModel', () {
+    test('chips from the core\'s input and output spans; option names bold; no stage claimed', () {
+      final result = compiled(
+        display: [
+          token('ffmpeg', 'exe'),
+          token('-hide_banner', 'global'),
+          token('-f', 'input', 0, 8),
+          token('rawvideo', 'input', 0, 8),
+          token('-c:v', 'extra', 9, 13),
+          token('libx264', 'extra', 14, 21),
+          token('-g', 'extra', 22, 24),
+          token('60', 'extra', 25, 33),
+          token(r'D:\out.mp4', 'output', 34, 42),
+        ],
+      );
+      final m = templateEditorModel(command, compiled: result);
+      expect(m.chips.map((c) => (c.start, c.end, c.role)), [(0, 8, CommandRole.inputs), (34, 42, CommandRole.output)]);
+      expect(m.chips.first.message, inputsLockedMessage);
+      expect(m.words.map((w) => (w.start, w.end, w.flag, w.role)), [
+        (9, 13, true, null),
+        (14, 21, false, null),
+        (22, 24, true, null),
+        (25, 33, false, null),
+      ]);
+    });
+
+    test('stage and macro roles show when the core gives them', () {
+      final result = compiled(
+        display: [token('-c:v', 'video', 9, 13), token('-c:a', 'audio', 14, 18), token('60', 'macro', 25, 33)],
+      );
+      final m = templateEditorModel(command, compiled: result);
+      expect(m.words.map((w) => (w.role, w.macro)), [
+        (CommandRole.video, false),
+        (CommandRole.audio, false),
+        (null, true),
+      ]);
+    });
+
+    test('spans outside the text are ignored', () {
+      final result = compiled(display: [token('-x', 'extra', 40, 99), token('-y', 'extra', 5, 5)]);
+      expect(templateEditorModel(command, compiled: result).words, isEmpty);
+    });
+  });
+
+  group('marks and checks', () {
+    final lint = [
+      diagnostic('L-OPTION', 'warn', 22, 24, 'Unknown option.'),
+      diagnostic('L-OUTPUTS', 'warn', 0, command.length, 'Only {output} is published.'),
+      diagnostic('L-INPUTS', 'error', 0, 0, 'Add {inputs}.'),
+    ];
+    final result = compiled(
+      issues: [
+        issue('L-OPTION', 'warn', 'Unknown option.', params: {'start': 22, 'end': 24}),
+        issue('L-GOP', 'error', 'Keyframe macro is out of range.', params: {'start': 25, 'end': 33}),
+        issue('V-UNTESTED', 'info', 'Not tested with VEGAS yet.'),
+      ],
+    );
+
+    test('lint first, then compile issues lint didn\'t repeat; the whole command is not underlined', () {
+      final marks = advancedMarks(command, lint, result);
+      expect(marks.map((m) => (m.message, m.level, m.underlined, m.wholeCommand)), [
+        ('Unknown option.', VeLevel.warning, true, false),
+        ('Only {output} is published.', VeLevel.warning, false, true),
+        ('Add {inputs}.', VeLevel.error, false, false),
+        ('Keyframe macro is out of range.', VeLevel.error, true, false),
+      ]);
+    });
+
+    test('checks in text order with lines, then the whole command, then the recipe', () {
+      final checks = advancedChecks(command, advancedMarks(command, lint, result), result);
+      expect(checks.map((c) => (c.message, c.line, c.start)), [
+        ('Add {inputs}.', 1, 0),
+        ('Unknown option.', 2, 22),
+        ('Keyframe macro is out of range.', 2, 25),
+        ('Only {output} is published.', null, null),
+        ('Not tested with VEGAS yet.', null, null),
+      ]);
+      expect(checkCounts(checks), '2 errors, 2 warnings, 1 note');
+      expect(checkCounts(const []), '');
+    });
+
+    test('lines and columns', () {
+      expect(lineAt(command, 0), 1);
+      expect(lineAt(command, 9), 2);
+      expect(lineAt(command, command.length), 3);
+      expect(caretPosition(command, 0), 'Line 1, column 1');
+      expect(caretPosition(command, 14), 'Line 2, column 6');
+      expect(caretPosition(command, command.length), 'Line 3, column 9');
+    });
+
+    test('the most severe mark at a caret, touching either end', () {
+      final m = CommandEditorModel(text: command, marks: advancedMarks(command, lint, result));
+      expect(m.markAt(22)?.message, 'Unknown option.');
+      expect(m.markAt(24)?.message, 'Unknown option.');
+      expect(m.markAt(28)?.message, 'Keyframe macro is out of range.');
+      expect(m.markAt(5), isNull, reason: 'whole-command marks are listed, not at a caret');
+    });
+  });
+
+  test('the resolved command follows the user\'s lines, quoted, with errors marked', () {
+    final result = core.CompileResult.fromJson({
+      ...compiled().toJson(),
+      'display': [
+        token('ffmpeg', 'exe'),
+        token('-nostdin', 'global'),
+        token('-i', 'input', 0, 8),
+        token(r'\\.\pipe\v', 'input', 0, 8),
+        token('-c:v', 'extra', 9, 13),
+        token('libx264', 'extra', 14, 21),
+        token('-g', 'extra', 22, 24),
+        token('60', 'extra', 25, 33),
+        token(r'D:\Renders\Sample project.mp4', 'output', 34, 42),
+      ],
+      'issues': [
+        {
+          ...issue('L-GOP', 'error', 'x'),
+          'tokenIndices': <int>[7],
+        },
+      ],
+    });
+    final lines = resolvedLines(result, command);
+    expect(lines.map((l) => l.map((t) => t.text).join(' ')), [
+      'ffmpeg -nostdin',
+      r'-i \\.\pipe\v',
+      '-c:v libx264 -g 60',
+      r'"D:\Renders\Sample project.mp4"',
+    ]);
+    expect(lines[0].first.part, ResolvedPart.generated);
+    expect(lines[1].first.part, ResolvedPart.input);
+    expect(lines[3].single.part, ResolvedPart.output);
+    expect(lines[2].map((t) => t.error), [false, false, false, true]);
+  });
+
+  test('macros: the core\'s list with its values; the locked ones say so', () {
+    final offered = core.CompletionResult.fromJson({
+      'kind': 'value',
+      'start': 0,
+      'end': 1,
+      'items': [
+        for (final m in ['{inputs}', '{v}', '{gop:2s}', '{output}', '{new}'])
+          {'value': m, 'description': 'VEGAS media or output macro', 'source': 'Macro'},
+      ],
+    });
+    final probe = macroProbeText(offered);
+    expect(probe, '{inputs} {v} {gop:2s} {output} {new}');
+    final result = compiled(
+      display: [
+        token('-i', 'input', 0, 8),
+        token('0:v:0', 'extra', 9, 12),
+        token('60', 'extra', 13, 21),
+        token(r'D:\x.mp4', 'output', 22, 30),
+        token('{new}', 'extra', 31, 36),
+      ],
+    );
+    final entries = macroEntries(offered, probe, result);
+    expect(entries.map((e) => (e.name, e.value, e.required)), [
+      ('{inputs}', null, true),
+      ('{v}', '0:v:0', false),
+      ('{gop:2s}', '60', false),
+      ('{output}', null, true),
+      ('{new}', null, false),
+    ]);
+    expect(entries[1].description, macroDescriptions['{v}']);
+    expect(
+      entries.last.description,
+      'VEGAS media or output macro',
+      reason: 'the core\'s text for a macro the app has no copy for',
+    );
+  });
+
+  test('the Basic summary line', () {
+    expect(
+      basicSummaryLine({
+        'videoEncoder': 'x264',
+        'speed': 'slow',
+        'videoQuality': 'CRF 18',
+        'depth': '8-bit',
+        'audio': 'AAC',
+        'audioQuality': '320 kb/s',
+        'container': 'MP4',
+      }),
+      'x264 slow, CRF 18, 8-bit. AAC 320 kb/s. MP4.',
+    );
+    expect(basicSummaryLine({'videoEncoder': 'FFV1', 'audio': 'No audio', 'container': 'MKV'}), 'FFV1. No audio. MKV.');
+  });
+
+  group('signal path in Advanced mode', () {
+    final fake = core.FakeVeCore();
+    final catalog = fake.profiles();
+    final basic = fake.fixtures.first.recipe;
+    final recipe = basic.copyWith(
+      command: basic.command.copyWith(mode: 'template', template: command),
+    );
+    Map<String, Object?> stream({int? outBits, bool? conversion, String support = 'unknown'}) => {
+      'inputFormat': 'p010le',
+      'outputFormat': outBits == null ? null : 'yuv420p10le',
+      'inputBits': 10,
+      'outputBits': outBits,
+      'inputChroma': '4:2:0',
+      'outputChroma': outBits == null ? null : '4:2:0',
+      'chromaChanged': outBits == null ? null : false,
+      'conversion': conversion,
+      'containerSupport': support,
+    };
+
+    test('unknown facts stay unknown, and the Basic settings never show', () {
+      final m = signalPathModel(
+        recipe: recipe,
+        catalog: catalog,
+        media: SamplePreview.media,
+        compiled: compiled(
+          summary: {'videoEncoder': '', 'video': 'From command', 'videoQuality': 'From command', 'container': ''},
+          signalPath: {'video': stream(), 'audio': <Object?>[], 'source': null},
+        ),
+      );
+      expect(m.fromCommand, isTrue);
+      expect(m.video!.encoder, 'From command', reason: 'not ${basic.video.encoder}, the inactive Basic encoder');
+      expect(m.video!.availability, isNull);
+      expect(m.video!.conversionKnown, isFalse);
+      expect(m.video!.formatLabel, isNull);
+      expect(m.video!.outputBits, 10, reason: 'the wire keeps VEGAS\'s depth');
+      expect(m.audio, isNull, reason: 'the core has no audio stream');
+      expect(m.container.label, 'From file name');
+    });
+
+    test('known facts fill the nodes', () {
+      final m = signalPathModel(
+        recipe: recipe,
+        catalog: catalog,
+        media: SamplePreview.media,
+        compiled: compiled(
+          summary: {
+            'videoEncoder': 'x265',
+            'video': 'HEVC',
+            'videoQuality': 'From command',
+            'speed': 'slow',
+            'container': catalog.containers.firstWhere((c) => c.id == 'mkv').label,
+          },
+          signalPath: {
+            'video': stream(outBits: 10, conversion: true, support: 'ok'),
+            'audio': <Object?>[],
+            'source': null,
+          },
+        ),
+      );
+      expect(m.video!.encoder, 'x265');
+      expect(m.video!.detail, 'From command, slow');
+      expect(m.video!.conversion?.label, 'p010le to yuv420p10le');
+      expect(m.video!.formatLabel, '10-bit 4:2:0');
+      expect(m.container.label, 'MKV');
+    });
+
+    test('without a compile result only what VEGAS delivers is known', () {
+      final m = signalPathModel(recipe: recipe, catalog: catalog, media: SamplePreview.media);
+      expect(m.video!.encoder, 'From command');
+      expect(m.video!.conversionKnown, isFalse);
+      expect(m.audio, isNotNull);
+      expect(m.audio!.formatLabel, isNull);
+    });
+  });
+
+  group('editing', () {
+    test('the replaced range sits where the edit was', () {
+      TextEditingValue v(String text, int caret) => TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: caret),
+      );
+      expect(replacedRange(v('x}}', 3), v('x}', 2)), (2, 3), reason: 'Backspace after a repeated character');
+      expect(replacedRange(v('}}x', 2), v('}x', 1)), (1, 2));
+      expect(replacedRange(v('a{{b', 1), v('a{b', 1)), (1, 2), reason: 'Delete before a repeated character');
+      expect(replacedRange(v('ab', 1), v('axb', 2)), (1, 1), reason: 'typing inserts');
+      expect(
+        replacedRange(
+          const TextEditingValue(text: 'abcdef', selection: TextSelection(baseOffset: 1, extentOffset: 4)),
+          v('aXef', 2),
+        ),
+        (1, 4),
+        reason: 'typing over a selection',
+      );
+      expect(replacedRange(v('{inputs} x', 10), v('{output} {inputs} x', 9)), (
+        0,
+        0,
+      ), reason: 'a paste before a chip that starts with the same character');
+    });
+
+    test('a caret moved into a chip goes to its edge', () {
+      final controller = CommandEditingController(
+        text: command,
+        describe: (t) => CommandEditorModel(
+          text: t,
+          chips: const [EditorChip(0, 8, role: CommandRole.inputs, message: '')],
+        ),
+      );
+      addTearDown(controller.dispose);
+      controller.selection = const TextSelection.collapsed(offset: 20);
+      controller.selection = const TextSelection.collapsed(offset: 3);
+      expect(controller.selection.baseOffset, 0, reason: 'a click goes to the nearer edge');
+      controller.selection = const TextSelection.collapsed(offset: 1);
+      expect(controller.selection.baseOffset, 8, reason: 'an arrow step carries on');
+      controller.selection = const TextSelection.collapsed(offset: 7);
+      expect(controller.selection.baseOffset, 0, reason: 'and back');
+      controller.selection = const TextSelection(baseOffset: 2, extentOffset: 12);
+      expect(
+        controller.selection,
+        const TextSelection(baseOffset: 2, extentOffset: 12),
+        reason: 'ranges are left alone',
+      );
+    });
+  });
+}

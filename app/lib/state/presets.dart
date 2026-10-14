@@ -144,6 +144,18 @@ class PresetsController extends Notifier<PresetsState> {
     state = state.copyWith(drafts: drafts);
   }
 
+  /// Advanced mode's command text (`command.template`).
+  void setTemplate(String text) => edit((r) => r.copyWith(command: r.command.copyWith(template: text)));
+
+  /// Basic or Advanced (`command.mode` structured or template). Both settings
+  /// are kept (SETTINGS_AND_COMMANDS §5); [template] replaces the command,
+  /// such as the seed from the Basic settings.
+  void setMode({required bool advanced, String? template}) => edit(
+    (r) => r.copyWith(
+      command: r.command.copyWith(mode: advanced ? 'template' : 'structured', template: template ?? r.command.template),
+    ),
+  );
+
   void revert(String id) => state = state.copyWith(drafts: Map.of(state.drafts)..remove(id));
 
   /// "Keep editing" on the changed-elsewhere banner.

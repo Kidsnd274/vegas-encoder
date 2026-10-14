@@ -228,7 +228,7 @@ CommandDisplay commandDisplay(core.CompileResult result, {required bool audio}) 
   for (var index = 0; index < display.length; index++) {
     final t = display[index];
     final token = CommandToken(
-      _quote(t.text),
+      quoteArgument(t.text),
       extra: t.role == core.TokenRole.extra,
       error: errors.contains(index),
       field: t.field,
@@ -266,7 +266,9 @@ CommandDisplay commandDisplay(core.CompileResult result, {required bool audio}) 
   );
 }
 
-String _quote(String arg) => arg.isEmpty || RegExp(r'[\s"]').hasMatch(arg) ? '"${arg.replaceAll('"', r'\"')}"' : arg;
+/// An argument as Windows quotes it, for display.
+String quoteArgument(String arg) =>
+    arg.isEmpty || RegExp(r'[\s"]').hasMatch(arg) ? '"${arg.replaceAll('"', r'\"')}"' : arg;
 
 // ------------------------------------------------------------ checks
 
@@ -301,6 +303,9 @@ SignalPathModel signalPathModel({
   core.FFmpegInstallation? installation,
   int? lengthSec,
 }) {
+  if (recipe.command.mode == 'template') {
+    return _commandSignalPath(recipe: recipe, catalog: catalog, media: media, compiled: compiled, lengthSec: lengthSec);
+  }
   final summary = compiled?.summary ?? const <String, Object?>{};
   final facts = compiled?.signalPath;
   final issues = compiled?.issues ?? const <core.Issue>[];
@@ -317,10 +322,6 @@ SignalPathModel signalPathModel({
   SignalStream? video;
   if (v.enabled) {
     final outDepth = vf?.outputBits ?? inDepth;
-    final chroma = vf?.chromaChanged == true
-        ? '${vf!.inputChroma} to ${vf.outputChroma}${issues.any((i) => i.id == 'V-CHROMA-UP') ? ', interpolated' : ''}'
-        : vf?.outputChroma;
-    final notes = [?chroma, if (outDepth < inDepth) 'precision lost'];
     video = SignalStream(
       encoder: summary['videoEncoder'] as String? ?? vp?.label ?? v.encoder,
       detail: compiled != null ? _videoDetail(summary) : _videoDetailFromRecipe(v, vp),
@@ -329,17 +330,7 @@ SignalPathModel signalPathModel({
       outputBits: outDepth,
       availability: availabilityOf(installation, v.encoder),
       runsOn: runsOn(vp),
-      conversion: vf?.conversion == true
-          ? SignalConversion(
-              label: '${vf!.inputFormat ?? 'VEGAS frames'} to ${vf.outputFormat ?? 'encoder format'}',
-              shortLabel: outDepth != inDepth
-                  ? '$inDepth to $outDepth-bit'
-                  : vf.chromaChanged == true
-                  ? '${vf.inputChroma} to ${vf.outputChroma}'
-                  : 'Layout change',
-              note: notes.isEmpty ? null : notes.join(', '),
-            )
-          : null,
+      conversion: vf?.conversion == true ? _videoConversion(vf!, inDepth, outDepth, issues) : null,
       formatLabel: vf == null ? '$outDepth-bit' : ['$outDepth-bit', ?vf.outputChroma].join(' '),
       inputLabel: '$inDepth-bit',
       outputLabel: '$outDepth-bit',
@@ -374,24 +365,8 @@ SignalPathModel signalPathModel({
   }
 
   final ext = cp?.ext ?? '';
-  final mediaAudio = media.audio;
   return SignalPathModel(
-    source: SignalSource(
-      frameSize: '${media.video.width}×${media.video.height}',
-      frameRate: VeFormat.fps(media.video.fps[0], media.video.fps[1]),
-      pixelFormat: deliveredPixelFormat(media.video.pixfmt),
-      audio: mediaAudio == null
-          ? 'No audio'
-          : '${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt} ${channelsLabel(mediaAudio.channels)}',
-      stripVideo:
-          '${VeFormat.fps(media.video.fps[0], media.video.fps[1])}, ${_deliveredVideo[media.video.pixfmt]?.short ?? media.video.pixfmt}',
-      stripAudio: mediaAudio == null
-          ? 'No audio'
-          : '${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt}',
-      depth: inDepth,
-      spokenSummary:
-          '${media.video.width} by ${media.video.height}, ${VeFormat.fps(media.video.fps[0], media.video.fps[1])}',
-    ),
+    source: _signalSource(media, inDepth),
     video: video,
     audio: audio,
     container: SignalContainer(
@@ -401,7 +376,145 @@ SignalPathModel signalPathModel({
     ),
     fileName: 'Sample project$ext',
     contextLabel: 'Preview with: ${mediaSummary(media)}${lengthSec == null ? '' : ', ${lengthPhrase(lengthSec)}'}',
-    fromCommand: recipe.command.mode == 'template',
+  );
+}
+
+/// The "From VEGAS" node: what the project delivers.
+SignalSource _signalSource(core.MediaDescription media, int depth) {
+  final mediaAudio = media.audio;
+  final audioIn = _deliveredAudio[mediaAudio?.sampleFmt];
+  final fps = VeFormat.fps(media.video.fps[0], media.video.fps[1]);
+  return SignalSource(
+    frameSize: '${media.video.width}×${media.video.height}',
+    frameRate: fps,
+    pixelFormat: deliveredPixelFormat(media.video.pixfmt),
+    audio: mediaAudio == null
+        ? 'No audio'
+        : '${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt} ${channelsLabel(mediaAudio.channels)}',
+    stripVideo: '$fps, ${_deliveredVideo[media.video.pixfmt]?.short ?? media.video.pixfmt}',
+    stripAudio: mediaAudio == null
+        ? 'No audio'
+        : '${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt}',
+    depth: depth,
+    spokenSummary: '${media.video.width} by ${media.video.height}, $fps',
+  );
+}
+
+/// The pip on a video wire, from the core's facts.
+SignalConversion _videoConversion(core.StreamSignalFacts vf, int inDepth, int outDepth, List<core.Issue> issues) {
+  final chroma = vf.chromaChanged == true
+      ? '${vf.inputChroma} to ${vf.outputChroma}${issues.any((i) => i.id == 'V-CHROMA-UP') ? ', interpolated' : ''}'
+      : vf.outputChroma;
+  final notes = [?chroma, if (outDepth < inDepth) 'precision lost'];
+  return SignalConversion(
+    label: '${vf.inputFormat ?? 'VEGAS frames'} to ${vf.outputFormat ?? 'encoder format'}',
+    shortLabel: outDepth != inDepth
+        ? '$inDepth to $outDepth-bit'
+        : vf.chromaChanged == true
+        ? '${vf.inputChroma} to ${vf.outputChroma}'
+        : 'Layout change',
+    note: notes.isEmpty ? null : notes.join(', '),
+  );
+}
+
+/// Advanced mode (UI_SPEC §2, §3): the nodes are read back from the command,
+/// so only the core's facts for the active command fill them (CONTRACTS C2:
+/// in Advanced mode it supplies what it can establish and leaves the rest
+/// null). The inactive Basic settings never appear. An unknown format claims
+/// no conversion either way and no wire label; the wire keeps VEGAS's depth.
+/// Encoder availability isn't shown: the core names the command's encoders by
+/// label only, and lint reports one missing from the chosen FFmpeg.
+SignalPathModel _commandSignalPath({
+  required core.Recipe recipe,
+  required core.ProfileCatalog catalog,
+  required core.MediaDescription media,
+  core.CompileResult? compiled,
+  int? lengthSec,
+}) {
+  String? s(String key) {
+    final v = compiled?.summary[key];
+    return v is String && v.isNotEmpty ? v : null;
+  }
+
+  const fromCommand = 'From command';
+  final facts = compiled?.signalPath;
+  final issues = compiled?.issues ?? const <core.Issue>[];
+  final sourceDepth = facts?.source?.video.bits ?? deliveredDepth(media.video.pixfmt) ?? 8;
+  final audioIn = _deliveredAudio[media.audio?.sampleFmt];
+  // Without a compile result nothing is known but that VEGAS delivers.
+  final vf = facts?.video;
+  final af = facts?.audio.firstOrNull;
+  final hasVideo = facts == null || facts.video != null;
+  final hasAudio = facts == null ? recipe.audio.first.enabled && media.audio != null : facts.audio.isNotEmpty;
+
+  SignalStream? video;
+  if (hasVideo) {
+    final inDepth = vf?.inputBits ?? sourceDepth;
+    final outBits = vf?.outputBits;
+    final outDepth = outBits ?? inDepth;
+    video = SignalStream(
+      encoder: s('videoEncoder') ?? s('video') ?? fromCommand,
+      detail: _videoDetail(compiled?.summary ?? const {}),
+      codec: s('video') ?? fromCommand,
+      inputBits: inDepth,
+      outputBits: outDepth,
+      availability: null,
+      conversion: vf != null && vf.conversion == true ? _videoConversion(vf, inDepth, outDepth, issues) : null,
+      formatLabel: outBits == null ? null : ['$outBits-bit', ?vf?.outputChroma].join(' '),
+      inputLabel: vf?.inputBits == null ? null : '$inDepth-bit',
+      outputLabel: outBits == null ? null : '$outBits-bit',
+      muxProblem: vf?.containerSupport == 'no',
+      conversionKnown: vf?.conversion != null,
+    );
+  }
+
+  SignalStream? audio;
+  if (hasAudio) {
+    final inBits = af?.inputBits ?? audioIn?.bits ?? 32;
+    final outBits = af?.outputBits;
+    final outLabel = outBits == null ? null : '$outBits-bit ${_sampleKind[af?.outputFormat] ?? ''}'.trim();
+    audio = SignalStream(
+      encoder: s('audio') ?? fromCommand,
+      detail: s('audioQuality') ?? '',
+      codec: s('audio') ?? fromCommand,
+      inputBits: inBits,
+      outputBits: outBits ?? inBits,
+      availability: null,
+      conversion: af != null && af.conversion == true
+          ? SignalConversion(
+              label: '${af.inputFormat ?? 'VEGAS samples'} to ${af.outputFormat ?? 'encoder format'}',
+              shortLabel: outBits != null && outBits != inBits ? '$inBits to $outBits-bit' : 'Layout change',
+              note: [?outLabel, if (outBits != null && outBits < inBits) 'precision lost'].join(', '),
+            )
+          : null,
+      formatLabel: outLabel,
+      muxProblem: af?.containerSupport == 'no',
+      conversionKnown: af?.conversion != null,
+    );
+  }
+
+  // The command names a muxer (-f) or FFmpeg picks one from the file name.
+  final ext = catalog.container(recipe.container.format)?.ext ?? '';
+  final muxer = s('container');
+  final cp = muxer == null ? null : catalog.containers.where((c) => c.label == muxer).firstOrNull;
+  return SignalPathModel(
+    source: _signalSource(media, sourceDepth),
+    video: video,
+    audio: audio,
+    container: muxer == null
+        ? SignalContainer(
+            label: 'From file name',
+            detail: ext,
+            spokenLabel: 'Chosen by FFmpeg from the file name${ext.isEmpty ? '' : ', $ext'}',
+          )
+        : SignalContainer(
+            label: cp == null ? muxer : containerShortName(cp, cp.id),
+            detail: fromCommand,
+            spokenLabel: muxer,
+          ),
+    fileName: 'Sample project$ext',
+    contextLabel: 'Preview with: ${mediaSummary(media)}${lengthSec == null ? '' : ', ${lengthPhrase(lengthSec)}'}',
+    fromCommand: true,
   );
 }
 

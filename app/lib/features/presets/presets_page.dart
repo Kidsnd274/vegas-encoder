@@ -16,6 +16,7 @@ import '../../state/editor.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
 import '../../state/ui_state.dart';
+import '../advanced/advanced_workspace.dart';
 import 'command_column.dart';
 import 'display.dart';
 import 'library_model.dart';
@@ -42,6 +43,7 @@ class PresetsPage extends ConsumerStatefulWidget {
 
 class _PresetsPageState extends ConsumerState<PresetsPage> {
   final FocusNode _search = FocusNode(debugLabel: 'library search');
+  final FocusNode _commandEditor = FocusNode(debugLabel: 'command editor');
   final FieldAnchors _anchors = FieldAnchors();
 
   /// The panes F6 and Shift+F6 move between: library, diagram, settings,
@@ -61,6 +63,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
   void dispose() {
     _toastTimer?.cancel();
     _search.dispose();
+    _commandEditor.dispose();
     _anchors.dispose();
     for (final p in _panes) {
       p.dispose();
@@ -200,6 +203,87 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
     _showToast('Command copied');
   }
 
+  /// Basic or Advanced (SETTINGS_AND_COMMANDS §5). Both settings are kept.
+  /// The first switch to Advanced starts the command from the Basic settings
+  /// (the core's `advancedTemplate`); with a command already saved, the user
+  /// chooses. The caret goes to the editor.
+  Future<void> _setMode(EditorMode mode) async {
+    final data = ref.read(editorProvider);
+    final advanced = mode == EditorMode.advanced;
+    if (data == null || advanced == data.advanced) return;
+    if (!advanced) {
+      final inEditor = _commandEditor.hasFocus;
+      _controller.setMode(advanced: false);
+      if (inEditor) {
+        _afterFrame(
+          () => _panes[2].descendants.where((d) => d.canRequestFocus && !d.skipTraversal).firstOrNull?.requestFocus(),
+        );
+      }
+      return;
+    }
+    final seed = data.compiled.value?.advancedTemplate;
+    String? template;
+    if (data.recipe.command.template.trim().isEmpty) {
+      template = seed;
+    } else {
+      final choice = await showVeDialog<_Seed>(
+        context,
+        title: 'Switch to Advanced',
+        message:
+            'This preset already has a command from Advanced mode. Use it, or start again from the current '
+            'Basic settings? The Basic settings are kept either way.',
+        actions: const [
+          VeDialogAction('Cancel', _Seed.cancel),
+          VeDialogAction('Replace it with the current settings', _Seed.replace),
+          VeDialogAction('Use your saved command', _Seed.keep, variant: VeButtonVariant.primary),
+        ],
+      );
+      if (!mounted || choice == null || choice == _Seed.cancel) return;
+      if (choice == _Seed.keep) {
+        _controller.setMode(advanced: true);
+        _afterFrame(_commandEditor.requestFocus);
+        return;
+      }
+      template = seed;
+    }
+    if (template == null) {
+      _showToast(
+        'Advanced mode starts from the command, which the core couldn’t build: '
+        '${data.compiled.error?.message ?? 'unknown error'}',
+      );
+      return;
+    }
+    _controller.setMode(advanced: true, template: template);
+    _afterFrame(_commandEditor.requestFocus);
+  }
+
+  void _toggleMode() {
+    final data = ref.read(editorProvider);
+    if (data != null) unawaited(_setMode(data.advanced ? EditorMode.basic : EditorMode.advanced));
+  }
+
+  /// "Replace with Basic settings": the command starts again from the Basic
+  /// settings, with Undo.
+  void _replaceWithBasic() {
+    final data = ref.read(editorProvider);
+    final seed = data?.basic?.value?.advancedTemplate;
+    if (data == null || seed == null) return;
+    final before = data.recipe.command.template;
+    _controller.setTemplate(seed);
+    _showToast(
+      'Replaced the command with the Basic settings',
+      action: 'Undo',
+      onAction: () {
+        _controller.setTemplate(before);
+        setState(() => _toast = null);
+      },
+    );
+  }
+
+  void _afterFrame(VoidCallback action) => WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (mounted) action();
+  });
+
   /// "Show setting": opens the node that holds [field], then scrolls to its
   /// control and focuses it.
   void _showField(String field) {
@@ -270,6 +354,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
             const SingleActivator(LogicalKeyboardKey.keyF, control: true): () => _searchLibrary(narrow),
             const SingleActivator(LogicalKeyboardKey.keyK, control: true): () => unawaited(_openPalette()),
             const SingleActivator(LogicalKeyboardKey.keyC, control: true, shift: true): _copyCommand,
+            const SingleActivator(LogicalKeyboardKey.keyM, control: true): _toggleMode,
             const SingleActivator(LogicalKeyboardKey.f6): () => _cyclePane(1),
             const SingleActivator(LogicalKeyboardKey.f6, shift: true): () => _cyclePane(-1),
             if (narrow && _libraryOpen)
@@ -312,12 +397,11 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
                             onSave: _save,
                             onRevert: _revert,
                             onDuplicate: () => _duplicate(data.preset.recipe.id),
-                            onMode: (m) {
-                              if (m == EditorMode.advanced) {
-                                _showToast('Advanced mode arrives in milestone F4');
-                              }
-                            },
+                            onMode: (m) => unawaited(_setMode(m)),
                             onShowField: _showField,
+                            commandEditor: _commandEditor,
+                            onReplaceWithBasic: _replaceWithBasic,
+                            onCopy: _copyCommand,
                           ),
                         },
                       ),
@@ -360,6 +444,9 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
 }
 
 enum _Conflict { cancel, saveAsNew, overwrite }
+
+/// The question when switching to Advanced with a command already saved.
+enum _Seed { cancel, replace, keep }
 
 class _Centered extends StatelessWidget {
   const _Centered(this.text);
@@ -425,6 +512,9 @@ class _Editor extends ConsumerWidget {
     required this.onDuplicate,
     required this.onMode,
     required this.onShowField,
+    required this.commandEditor,
+    required this.onReplaceWithBasic,
+    required this.onCopy,
   });
 
   final EditorData data;
@@ -440,6 +530,11 @@ class _Editor extends ConsumerWidget {
   final VoidCallback onDuplicate;
   final ValueChanged<EditorMode> onMode;
   final ValueChanged<String> onShowField;
+
+  /// The Advanced command editor's focus.
+  final FocusNode commandEditor;
+  final VoidCallback onReplaceWithBasic;
+  final VoidCallback onCopy;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -481,6 +576,21 @@ class _Editor extends ConsumerWidget {
               VeButton(label: 'Keep editing', size: VeButtonSize.small, onPressed: () => controller.keepEditing(id)),
             ],
           ),
+        // SETTINGS_AND_COMMANDS §5: back in Basic, the command is kept but
+        // doesn't render.
+        if (!data.advanced && data.recipe.command.template.trim().isNotEmpty)
+          _Banner(
+            text: 'Your command is saved. Renders use these settings until you switch back.',
+            info: true,
+            actions: [
+              VeButton(
+                label: 'Switch to Advanced',
+                size: VeButtonSize.small,
+                tooltip: 'Ctrl+M',
+                onPressed: () => onMode(EditorMode.advanced),
+              ),
+            ],
+          ),
         DecoratedBox(
           decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: c.line)),
@@ -488,65 +598,86 @@ class _Editor extends ConsumerWidget {
           child: Focus(
             focusNode: panes[1],
             child: FocusTraversalGroup(
-              child: SignalPath(model: model, selected: node, onSelect: controller.selectNode),
+              // Advanced nodes are read back from the command: they open no
+              // settings, and selecting one puts the caret in the editor.
+              child: data.advanced
+                  ? SignalPath(model: model, onSelect: (_) => commandEditor.requestFocus())
+                  : SignalPath(model: model, selected: node, onSelect: controller.selectNode),
             ),
           ),
         ),
-        Expanded(
-          child: ColoredBox(
-            color: c.surface,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Focus(
-                    focusNode: panes[2],
-                    child: FocusTraversalGroup(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(22, 16, 22, 22),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _PanelHeader(node: node),
-                            const SizedBox(height: 14),
-                            KeyedSubtree(
-                              key: ValueKey('$id/${node.name}'),
-                              child: switch (node) {
-                                SignalNode.source => SourcePanel(scope: scope),
-                                SignalNode.video => VideoPanel(scope: scope),
-                                SignalNode.audio => AudioPanel(scope: scope),
-                                SignalNode.container => ContainerPanel(scope: scope),
-                                SignalNode.file => FilePanel(
-                                  scope: scope,
-                                  lengthSec: lengthSec,
-                                  lengthText: lengthText,
-                                  onLengthTextChanged: controller.setLengthText,
-                                ),
-                              },
-                            ),
-                          ],
+        if (data.advanced)
+          Expanded(
+            child: ColoredBox(
+              color: c.surface,
+              child: AdvancedWorkspace(
+                key: ValueKey('advanced/$id'),
+                data: data,
+                editorFocus: commandEditor,
+                editorPane: panes[2],
+                sidePane: panes[3],
+                onSwitchToBasic: () => onMode(EditorMode.basic),
+                onReplaceWithBasic: onReplaceWithBasic,
+                onCopy: onCopy,
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ColoredBox(
+              color: c.surface,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Focus(
+                      focusNode: panes[2],
+                      child: FocusTraversalGroup(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(22, 16, 22, 22),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _PanelHeader(node: node),
+                              const SizedBox(height: 14),
+                              KeyedSubtree(
+                                key: ValueKey('$id/${node.name}'),
+                                child: switch (node) {
+                                  SignalNode.source => SourcePanel(scope: scope),
+                                  SignalNode.video => VideoPanel(scope: scope),
+                                  SignalNode.audio => AudioPanel(scope: scope),
+                                  SignalNode.container => ContainerPanel(scope: scope),
+                                  SignalNode.file => FilePanel(
+                                    scope: scope,
+                                    lengthSec: lengthSec,
+                                    lengthText: lengthText,
+                                    onLengthTextChanged: controller.setLengthText,
+                                  ),
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                Focus(
-                  focusNode: panes[3],
-                  child: FocusTraversalGroup(
-                    child: CommandColumn(
-                      data: data,
-                      node: node,
-                      onShowField: onShowField,
-                      multiline: multiline,
-                      onToggleLayout: controller.toggleCommandLayout,
-                      litFields: FieldAnchorScope.maybeOf(context)?.active,
+                  Focus(
+                    focusNode: panes[3],
+                    child: FocusTraversalGroup(
+                      child: CommandColumn(
+                        data: data,
+                        node: node,
+                        onShowField: onShowField,
+                        multiline: multiline,
+                        onToggleLayout: controller.toggleCommandLayout,
+                        litFields: FieldAnchorScope.maybeOf(context)?.active,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -587,11 +718,13 @@ class _PanelHeader extends StatelessWidget {
   }
 }
 
-/// `.banner`: an amber notice across the editor with its actions.
+/// `.banner`: a notice across the editor with its actions; amber for a
+/// warning, quiet for information.
 class _Banner extends StatelessWidget {
-  const _Banner({required this.text, required this.actions});
+  const _Banner({required this.text, required this.actions, this.info = false});
   final String text;
   final List<Widget> actions;
+  final bool info;
 
   @override
   Widget build(BuildContext context) {
@@ -603,12 +736,12 @@ class _Banner extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.fromLTRB(22, 8, 16, 8),
         decoration: BoxDecoration(
-          color: c.bannerBackground,
-          border: Border(bottom: BorderSide(color: c.amberLine)),
+          color: info ? c.lit : c.bannerBackground,
+          border: Border(bottom: BorderSide(color: info ? c.line : c.amberLine)),
         ),
         child: Row(
           children: [
-            VeIcon(VeIcons.warning, color: c.warning),
+            info ? VeIcon(VeIcons.info, color: c.muted) : VeIcon(VeIcons.warning, color: c.warning),
             const SizedBox(width: 8),
             Expanded(child: Text(text, style: t.text.bodyStrong)),
             for (final a in actions) ...[const SizedBox(width: 8), a],

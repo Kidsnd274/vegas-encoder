@@ -300,7 +300,6 @@ class _LibraryRow extends StatelessWidget {
                                   style: t.text.bodyStrong.copyWith(fontWeight: const FontWeight(600), height: 18 / 13),
                                 ),
                               ),
-                              if (e.advanced) ...[const SizedBox(width: 6), const _Tag('Advanced')],
                               if (e.errors.isNotEmpty) ...[
                                 const SizedBox(width: 6),
                                 VeTooltip(
@@ -407,7 +406,16 @@ class _Line extends StatelessWidget {
       style: t.text.caption.copyWith(height: 17 / 12, color: entry.problem != null ? t.colors.error : t.colors.muted),
     );
     final detail = entry.problemDetail;
-    return detail == null ? text : VeTooltip(message: detail, child: text);
+    final line = detail == null ? text : VeTooltip(message: detail, child: text);
+    if (!entry.advanced) return line;
+    // The Advanced tag leads the line, so the name keeps its room.
+    return Row(
+      children: [
+        const _Tag('Advanced'),
+        const SizedBox(width: 6),
+        Flexible(child: line),
+      ],
+    );
   }
 }
 

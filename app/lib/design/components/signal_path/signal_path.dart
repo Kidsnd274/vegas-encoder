@@ -325,9 +325,9 @@ class _SignalPathState extends State<SignalPath> {
           _strip
               ? _oneRow(t, v, m.marks[SignalNode.video])
               : _encoderBody(t, 'Video encoder', v, m.marks[SignalNode.video], showRunsOn: true),
-          spoken: 'Video encoder ${v.encoder}, ${v.detail}. ${v.availability.label}',
+          spoken: _spoken('Video encoder', v),
           stripe: c.videoWire,
-          bad: v.availability.isProblem,
+          bad: v.availability?.isProblem ?? false,
           tooltip: _strip ? '${v.encoder}, ${v.detail}' : null,
         ),
       );
@@ -342,9 +342,9 @@ class _SignalPathState extends State<SignalPath> {
           _strip
               ? _oneRow(t, a, m.marks[SignalNode.audio])
               : _encoderBody(t, 'Audio encoder', a, m.marks[SignalNode.audio], showRunsOn: false),
-          spoken: 'Audio encoder ${a.encoder}, ${a.detail}. ${a.availability.label}',
+          spoken: _spoken('Audio encoder', a),
           stripe: c.audioWire,
-          bad: a.availability.isProblem,
+          bad: a.availability?.isProblem ?? false,
           tooltip: _strip ? '${a.encoder}, ${a.detail}' : null,
         ),
       );
@@ -410,11 +410,17 @@ class _SignalPathState extends State<SignalPath> {
     return out;
   }
 
+  /// "Video encoder x264, CRF 18, slow. Ready"; without a known encoder, no state.
+  String _spoken(String kind, SignalStream s) =>
+      '${[kind, s.encoder].join(' ')}${s.detail.isEmpty ? '' : ', ${s.detail}'}.'
+      '${s.availability == null ? '' : ' ${s.availability!.label}'}';
+
   Widget _encoderBody(VeTokens t, String kind, SignalStream s, SignalMarks? marks, {required bool showRunsOn}) {
     Widget? state;
-    if (s.availability != VeAvailability.ready) {
-      state = VeStatusTag(s.availability);
-    } else if (showRunsOn && s.runsOn != null) {
+    final availability = s.availability;
+    if (availability != null && availability != VeAvailability.ready) {
+      state = VeStatusTag(availability);
+    } else if (availability != null && showRunsOn && s.runsOn != null) {
       state = VeStatusTag(VeAvailability.ready, label: s.runsOn);
     }
     final marksRow = _marks(t, marks);
@@ -474,9 +480,9 @@ class _SignalPathState extends State<SignalPath> {
           const SizedBox(width: 8),
           _RevisionPill(marks!.libraryRevision!, short: true),
         ],
-        if (s.availability != VeAvailability.ready) ...[
+        if (s.availability case final state? when state != VeAvailability.ready) ...[
           const SizedBox(width: 8),
-          VeStatusTag(s.availability, iconOnly: true),
+          VeStatusTag(state, iconOnly: true),
         ],
       ],
     );
