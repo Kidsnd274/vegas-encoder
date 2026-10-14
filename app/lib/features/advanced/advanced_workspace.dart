@@ -111,6 +111,14 @@ class AdvancedWorkspaceState extends ConsumerState<AdvancedWorkspace> {
 
   void _changed(String text) => ref.read(presetsControllerProvider.notifier).setTemplate(text);
 
+  /// The core's suggestions at the caret, for the chosen FFmpeg.
+  EditorCompletion? _complete(String text, int caret, {required bool manual}) {
+    final result = CoreResult.run(
+      () => ref.read(veCoreProvider).complete(text, caret, capabilities: widget.data.capabilities),
+    ).value;
+    return result == null ? null : editorCompletion(result, text, caret, manual: manual);
+  }
+
   /// Puts [name] at the caret (or over the selection), with a space either
   /// side where it would otherwise join a neighbouring argument.
   void insertMacro(String name) {
@@ -159,7 +167,12 @@ class AdvancedWorkspaceState extends ConsumerState<AdvancedWorkspace> {
                   children: [
                     _EditorBar(controller: _controller),
                     const SizedBox(height: 8),
-                    CommandEditor(controller: _controller, focusNode: widget.editorFocus, onChanged: _changed),
+                    CommandEditor(
+                      controller: _controller,
+                      focusNode: widget.editorFocus,
+                      onChanged: _changed,
+                      complete: _complete,
+                    ),
                     const SizedBox(height: 14),
                     _Diagnostics(
                       checks: checks,
@@ -272,6 +285,12 @@ class _EditorBar extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             if (sel.isValid) Text(caretPosition(controller.text, sel.extentOffset), style: muted),
+            const SizedBox(width: 12),
+            const VeKbd('Ctrl'),
+            const SizedBox(width: 3),
+            const VeKbd('Space'),
+            const SizedBox(width: 6),
+            Text('suggestions', style: muted),
           ],
         );
       },

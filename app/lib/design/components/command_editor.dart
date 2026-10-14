@@ -9,6 +9,7 @@ import 'package:flutter/widgets.dart';
 import '../tokens.dart';
 import 'command_view.dart' show CommandRole;
 import 'message.dart' show VeLevel;
+import 'status.dart';
 
 // ------------------------------------------------------------ display model
 
@@ -92,6 +93,50 @@ class CommandEditorModel {
     return best;
   }
 }
+
+/// One suggestion in the autocomplete list.
+@immutable
+class EditorSuggestion {
+  const EditorSuggestion(this.value, {this.description = '', this.detail = '', this.availability});
+
+  /// What is inserted: "-preset", "slow", "libx265".
+  final String value;
+  final String description;
+
+  /// Type and default: "string, default medium".
+  final String detail;
+
+  /// For encoders: ready, not in this FFmpeg, failed its test. Null shows none.
+  final VeAvailability? availability;
+}
+
+/// The autocomplete list for a caret: what it offers and the range of text a
+/// choice replaces (UTF-16, end exclusive).
+@immutable
+class EditorCompletion {
+  const EditorCompletion({
+    required this.title,
+    required this.start,
+    required this.end,
+    required this.items,
+    this.source = '',
+    this.footer = '',
+  });
+
+  /// "Options", "Values for -tune".
+  final String title;
+
+  /// Where the entries come from: "libx264 and FFmpeg".
+  final String source;
+  final int start;
+  final int end;
+  final List<EditorSuggestion> items;
+  final String footer;
+}
+
+/// Asks for the list at [caret]. [manual] is Ctrl+Space; otherwise the list
+/// opens only where the caller says typing should open it. Null: nothing.
+typedef EditorCompleter = EditorCompletion? Function(String text, int caret, {required bool manual});
 
 // ------------------------------------------------------------ controller
 
@@ -271,13 +316,16 @@ class _ChipGuard extends TextInputFormatter {
 /// gutter; option names, macros and locked chips highlighted; diagnostics
 /// underlined (errors red, warnings amber, hints dotted) with the most severe
 /// message of each line at its end and a bubble on hover. Everything drawn
-/// comes from the controller's model.
+/// comes from the controller's model. With [complete], an autocomplete list
+/// opens where it says (and on Ctrl+Space): arrows move, Tab or Enter
+/// inserts, Esc closes.
 class CommandEditor extends StatefulWidget {
   const CommandEditor({
     super.key,
     required this.controller,
     required this.focusNode,
     required this.onChanged,
+    this.complete,
     this.semanticLabel = 'FFmpeg command',
     this.minLines = 4,
   });
@@ -285,6 +333,7 @@ class CommandEditor extends StatefulWidget {
   final CommandEditingController controller;
   final FocusNode focusNode;
   final ValueChanged<String> onChanged;
+  final EditorCompleter? complete;
   final String semanticLabel;
   final int minLines;
 
@@ -328,10 +377,27 @@ class CommandEditorState extends State<CommandEditor> implements TextSelectionGe
     return MatrixUtils.transformRect(editable.getTransformTo(null), local);
   }
 
+  // Autocomplete.
+  final OverlayPortalController _suggestPortal = OverlayPortalController();
+  final ScrollController _suggestScroll = ScrollController();
+  EditorCompletion? _completion;
+  int _active = 0;
+  TextEditingValue _seen = TextEditingValue.empty;
+
+  /// The open autocomplete list, if any.
+  EditorCompletion? get completion => _completion;
+
+  /// The highlighted entry of [completion].
+  int get activeSuggestion => _active;
+
+  static const double _suggestionHeight = 28;
+
   @override
   void initState() {
     super.initState();
     widget.focusNode.addListener(_focusChanged);
+    widget.controller.addListener(_controllerChanged);
+    _seen = widget.controller.value;
   }
 
   @override
@@ -341,16 +407,123 @@ class CommandEditorState extends State<CommandEditor> implements TextSelectionGe
       oldWidget.focusNode.removeListener(_focusChanged);
       widget.focusNode.addListener(_focusChanged);
     }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_controllerChanged);
+      widget.controller.addListener(_controllerChanged);
+    }
   }
 
   @override
   void dispose() {
     widget.focusNode.removeListener(_focusChanged);
+    widget.controller.removeListener(_controllerChanged);
     _bubbleTimer?.cancel();
+    _suggestScroll.dispose();
     super.dispose();
   }
 
-  void _focusChanged() => setState(() {});
+  void _focusChanged() {
+    if (!widget.focusNode.hasFocus) _closeCompletion();
+    setState(() {});
+  }
+
+  /// A caret moved without typing (a click, an arrow, Go to) closes the list.
+  void _controllerChanged() {
+    final value = widget.controller.value;
+    if (_completion != null && value.text == _seen.text && value.selection != _seen.selection) _closeCompletion();
+    _seen = value;
+  }
+
+  void _changed(String text) {
+    widget.onChanged(text);
+    _refreshCompletion(manual: false);
+  }
+
+  void _refreshCompletion({required bool manual}) {
+    final complete = widget.complete;
+    final sel = widget.controller.selection;
+    if (complete == null || !sel.isValid || !sel.isCollapsed) return _closeCompletion();
+    final next = complete(widget.controller.text, sel.baseOffset, manual: manual);
+    if (next == null || next.items.isEmpty) return _closeCompletion();
+    setState(() {
+      _completion = next;
+      _active = 0;
+    });
+    _suggestPortal.show();
+    if (_suggestScroll.hasClients) _suggestScroll.jumpTo(0);
+    // The caret's place is known after this frame's layout.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _completion != null) setState(() {});
+    });
+  }
+
+  void _closeCompletion() {
+    if (_completion == null) return;
+    _suggestPortal.hide();
+    if (mounted) setState(() => _completion = null);
+  }
+
+  void _move(int step) {
+    final c = _completion;
+    if (c == null) return;
+    setState(() => _active = (_active + step) % c.items.length);
+    if (!_suggestScroll.hasClients) return;
+    final top = _active * _suggestionHeight;
+    final view = _suggestScroll.position.viewportDimension;
+    if (top < _suggestScroll.offset) {
+      _suggestScroll.jumpTo(top);
+    } else if (top + _suggestionHeight > _suggestScroll.offset + view) {
+      _suggestScroll.jumpTo(top + _suggestionHeight - view);
+    }
+  }
+
+  /// Puts the chosen entry over the word being completed, then a space, and
+  /// asks again: an option that takes values opens its values next.
+  void accept(int index) {
+    final c = _completion;
+    if (c == null || index < 0 || index >= c.items.length) return;
+    final controller = widget.controller;
+    final text = controller.text;
+    final start = c.start.clamp(0, text.length);
+    final end = c.end.clamp(start, text.length);
+    final model = controller.model;
+    if (model.chips.any((chip) => start < chip.end && end > chip.start)) return _closeCompletion();
+    final value = c.items[index].value;
+    // A space or tab already there is reused; a line break keeps its line.
+    final spaced = end < text.length && const [0x20, 0x09].contains(text.codeUnitAt(end));
+    final next = text.replaceRange(start, end, spaced ? value : '$value ');
+    _closeCompletion();
+    controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: start + value.length + 1),
+    );
+    _changed(next);
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent e) {
+    if (e is! KeyDownEvent && e is! KeyRepeatEvent) return KeyEventResult.ignored;
+    final key = e.logicalKey;
+    if (key == LogicalKeyboardKey.space && HardwareKeyboard.instance.isControlPressed && widget.complete != null) {
+      _refreshCompletion(manual: true);
+      return KeyEventResult.handled;
+    }
+    if (_completion == null) return KeyEventResult.ignored;
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _move(1);
+    } else if (key == LogicalKeyboardKey.arrowUp) {
+      _move(-1);
+    } else if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.tab) {
+      if (HardwareKeyboard.instance.isShiftPressed) return KeyEventResult.ignored;
+      accept(_active);
+    } else if (key == LogicalKeyboardKey.escape) {
+      _closeCompletion();
+    } else {
+      return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
 
   // ------------------------------------------------------------ bubbles
 
@@ -436,7 +609,7 @@ class CommandEditorState extends State<CommandEditor> implements TextSelectionGe
       smartDashesType: SmartDashesType.disabled,
       smartQuotesType: SmartQuotesType.disabled,
       inputFormatters: [_guard],
-      onChanged: widget.onChanged,
+      onChanged: _changed,
       rendererIgnoresPointer: true,
       mouseCursor: MouseCursor.defer,
     );
@@ -478,10 +651,118 @@ class CommandEditorState extends State<CommandEditor> implements TextSelectionGe
                 child: Padding(
                   padding: CommandEditor.padding,
                   child: TextFieldTapRegion(
-                    child: _gestures.buildGestureDetector(behavior: HitTestBehavior.translucent, child: editable),
+                    child: OverlayPortal(
+                      controller: _suggestPortal,
+                      overlayChildBuilder: _buildSuggestions,
+                      // Sees keys before the text-editing shortcuts above it.
+                      child: Focus(
+                        canRequestFocus: false,
+                        skipTraversal: true,
+                        onKeyEvent: _onKey,
+                        child: _gestures.buildGestureDetector(behavior: HitTestBehavior.translucent, child: editable),
+                      ),
+                    ),
                   ),
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// `.ac`: the autocomplete list under the caret (over it without room).
+  Widget _buildSuggestions(BuildContext context) {
+    final c = _completion;
+    final caret = caretRect();
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (c == null || caret == null || overlay == null || !overlay.hasSize) return const SizedBox.shrink();
+    final t = VeTokens.of(context);
+    final colors = t.colors;
+    const width = 400.0;
+    final listHeight = math.min(c.items.length, 8) * _suggestionHeight + 8;
+    final height = listHeight + 64;
+    final at = overlay.globalToLocal(caret.bottomLeft);
+    final top = overlay.globalToLocal(caret.topLeft).dy;
+    final left = (at.dx - 8).clamp(8.0, math.max(8.0, overlay.size.width - width - 8)).toDouble();
+    final below = at.dy + 6 + height <= overlay.size.height - 8;
+    return Positioned(
+      left: left,
+      top: below ? at.dy + 6 : math.max(8.0, top - 6 - height),
+      width: width,
+      child: TextFieldTapRegion(
+        child: Semantics(
+          container: true,
+          label: c.title,
+          explicitChildNodes: true,
+          child: Container(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              border: Border.all(color: colors.line2),
+              borderRadius: BorderRadius.circular(VeRadius.lg),
+              boxShadow: t.popoverShadow,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: colors.line)),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        c.title,
+                        style: t.text.caption.copyWith(color: colors.ink, fontWeight: const FontWeight(600)),
+                      ),
+                      const Spacer(),
+                      Flexible(
+                        child: Text(
+                          c.source,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.text.caption.copyWith(color: colors.muted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: listHeight,
+                  child: ListView.builder(
+                    controller: _suggestScroll,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemExtent: _suggestionHeight,
+                    itemCount: c.items.length,
+                    itemBuilder: (context, i) =>
+                        _SuggestionRow(item: c.items[i], active: i == _active, onTap: () => accept(i)),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    border: Border(top: BorderSide(color: colors.line)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          c.footer,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.text.caption.copyWith(color: colors.muted),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text('Tab or Enter inserts', style: t.text.caption.copyWith(color: colors.muted)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -507,6 +788,88 @@ class CommandEditorState extends State<CommandEditor> implements TextSelectionGe
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(color: t.colors.ink, borderRadius: BorderRadius.circular(VeRadius.md)),
             child: Text(b.text, style: t.text.small.copyWith(color: t.colors.onInk, height: 1.35)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// `.ac-i`: the value, then what it is (description, type and default), and
+/// an encoder's state in the chosen FFmpeg.
+class _SuggestionRow extends StatelessWidget {
+  const _SuggestionRow({required this.item, required this.active, required this.onTap});
+  final EditorSuggestion item;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = VeTokens.of(context);
+    final c = t.colors;
+    final about = [
+      if (item.description.isNotEmpty) item.description,
+      if (item.detail.isNotEmpty) item.detail,
+    ].join(' · ');
+    final availability = item.availability;
+    return Semantics(
+      button: true,
+      selected: active,
+      label: [item.value, if (about.isNotEmpty) about, if (availability != null) availability.label].join(', '),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: ExcludeSemantics(
+            child: Container(
+              color: active ? c.videoTint : null,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  if (active)
+                    Positioned(
+                      left: -12,
+                      top: 4,
+                      bottom: 4,
+                      child: Container(
+                        width: 3,
+                        decoration: BoxDecoration(
+                          color: c.videoWire,
+                          borderRadius: const BorderRadius.horizontal(right: Radius.circular(2)),
+                        ),
+                      ),
+                    ),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 140,
+                        child: Text(
+                          item.value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.text.mono.copyWith(
+                            fontSize: 13,
+                            color: c.videoText,
+                            fontWeight: const FontWeight(600),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          about,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.text.small.copyWith(color: c.muted),
+                        ),
+                      ),
+                      if (availability != null) ...[const SizedBox(width: 8), VeStatusTag(availability)],
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

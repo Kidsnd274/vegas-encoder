@@ -4,6 +4,7 @@ import 'package:ve_services/ve_services.dart' as core;
 import 'package:vegas_encoder/design/components/command_editor.dart';
 import 'package:vegas_encoder/design/components/command_view.dart' show CommandRole;
 import 'package:vegas_encoder/design/components/message.dart' show VeLevel;
+import 'package:vegas_encoder/design/components/status.dart' show VeAvailability;
 import 'package:vegas_encoder/features/advanced/display.dart';
 import 'package:vegas_encoder/features/presets/display.dart' show signalPathModel;
 import 'package:vegas_encoder/state/preview.dart';
@@ -223,6 +224,115 @@ void main() {
       'VEGAS media or output macro',
       reason: 'the core\'s text for a macro the app has no copy for',
     );
+  });
+
+  group('autocomplete', () {
+    core.CompletionResult result(
+      String kind, {
+      String? of,
+      int start = 0,
+      int end = 0,
+      List<Map<String, Object?>>? items,
+    }) => core.CompletionResult.fromJson({
+      'kind': kind,
+      'of': of,
+      'start': start,
+      'end': end,
+      'items':
+          items ??
+          [
+            {
+              'value': '-preset',
+              'description': 'Set the encoding preset',
+              'type': 'string',
+              'defaultValue': 'medium',
+              'source': 'libx264',
+            },
+            {'value': '-b', 'description': 'Bitrate', 'source': 'FFmpeg'},
+          ],
+    });
+
+    test('typing opens options only after "-"; Ctrl+Space opens them anyway', () {
+      const text = '-c:v libx264 -';
+      expect(editorCompletion(result('option', start: 13, end: 14), text, 14, manual: false), isNotNull);
+      const plain = '-c:v libx264 x';
+      expect(editorCompletion(result('option', start: 13, end: 14), plain, 14, manual: false), isNull);
+      expect(editorCompletion(result('option', start: 13, end: 14), plain, 14, manual: true), isNotNull);
+      expect(editorCompletion(result('none', items: const []), text, 14, manual: true), isNull);
+    });
+
+    test('options: the core\'s entries with type, default and where they come from', () {
+      final c = editorCompletion(result('option', start: 13, end: 14), '-c:v libx264 -', 14, manual: false)!;
+      expect(c.title, 'Options');
+      expect(c.source, 'libx264 and FFmpeg');
+      expect((c.start, c.end), (13, 14));
+      expect(c.items.map((s) => (s.value, s.description, s.detail)), [
+        ('-preset', 'Set the encoding preset', 'string, default medium'),
+        ('-b', 'Bitrate', ''),
+      ]);
+    });
+
+    test('values open after their option; encoders carry their state', () {
+      final values = editorCompletion(
+        result(
+          'value',
+          of: '-tune',
+          start: 19,
+          end: 19,
+          items: [
+            {'value': 'film', 'description': 'film', 'source': 'libx264'},
+          ],
+        ),
+        '-c:v libx264 -tune ',
+        19,
+        manual: false,
+      )!;
+      expect(values.title, 'Values for -tune');
+      expect(values.items.single.description, '', reason: 'a description that only repeats the value is dropped');
+      expect(values.footer, 'Values this option takes.');
+
+      final encoders = editorCompletion(
+        result(
+          'value',
+          of: '-c:v',
+          start: 5,
+          end: 5,
+          items: [
+            {'value': 'libx264', 'description': 'x264', 'availability': 'ok'},
+            {'value': 'h264_nvenc', 'description': 'NVENC', 'availability': 'failed'},
+            {'value': 'libsvtav1', 'description': 'SVT-AV1', 'availability': 'missing'},
+            {'value': 'libvpx-vp9', 'description': 'VP9', 'availability': 'unknown'},
+          ],
+        ),
+        '-c:v ',
+        5,
+        manual: false,
+      )!;
+      expect(encoders.items.map((s) => s.availability), [
+        VeAvailability.ready,
+        VeAvailability.failed,
+        VeAvailability.missing,
+        null,
+      ]);
+      expect(encoders.footer, 'Encoders, with their state in the chosen FFmpeg.');
+    });
+
+    test('macros after "{"', () {
+      final c = editorCompletion(
+        result(
+          'value',
+          start: 0,
+          end: 1,
+          items: [
+            {'value': '{v}', 'description': 'VEGAS media or output macro', 'source': 'Macro'},
+          ],
+        ),
+        '{',
+        1,
+        manual: false,
+      )!;
+      expect(c.title, 'Macros');
+    });
   });
 
   test('the Basic summary line', () {

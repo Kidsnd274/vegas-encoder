@@ -9,6 +9,7 @@ import 'package:ve_services/ve_services.dart' as core;
 import '../../design/components/command_editor.dart';
 import '../../design/components/command_view.dart' show CommandRole, CommandToken;
 import '../../design/components/message.dart' show VeLevel;
+import '../../design/components/status.dart' show VeAvailability;
 import '../presets/display.dart' show levelOf, quoteArgument;
 
 /// Shown when typing inside a chip or deleting part of it.
@@ -259,6 +260,63 @@ List<MacroEntry> macroEntries(core.CompletionResult offered, String probeText, c
 
 /// The probe command for [macroEntries]: the offered names, space-separated.
 String macroProbeText(core.CompletionResult offered) => offered.items.map((s) => s.value).join(' ');
+
+// ------------------------------------------------------------ autocomplete
+
+/// The autocomplete list for the core's suggestions at [caret]
+/// (`VeCore.complete`). Typing opens it (UI_SPEC §3) when the core is
+/// completing an option name the user started with "-", or values for the
+/// option before the caret (macros after "{" too); Ctrl+Space ([manual]) opens
+/// whatever the core offers. The entries, their order and the range a choice
+/// replaces are the core's.
+EditorCompletion? editorCompletion(core.CompletionResult r, String text, int caret, {required bool manual}) {
+  if (r.kind == 'none' || r.items.isEmpty) return null;
+  final start = r.start.clamp(0, text.length);
+  final end = r.end.clamp(start, text.length);
+  final typed = text.substring(start, caret.clamp(start, text.length));
+  if (!manual && r.kind == 'option' && !typed.startsWith('-')) return null;
+  final sources = <String>[];
+  for (final s in r.items) {
+    final source = s.source;
+    if (source != null && source.isNotEmpty && !sources.contains(source)) sources.add(source);
+  }
+  // The core gives encoders a state (or "unknown"); nothing else has one.
+  final encoders = r.items.any((s) => s.availability != null);
+  return EditorCompletion(
+    title: r.kind == 'option'
+        ? 'Options'
+        : r.of == null
+        ? 'Macros'
+        : 'Values for ${r.of}',
+    source: sources.join(' and '),
+    start: start,
+    end: end,
+    items: [
+      for (final s in r.items)
+        EditorSuggestion(
+          s.value,
+          description: s.description == s.value ? '' : s.description,
+          detail: [
+            ?s.type,
+            if (s.defaultValue != null && '${s.defaultValue}'.isNotEmpty) 'default ${s.defaultValue}',
+          ].join(', '),
+          availability: switch (s.availability) {
+            'ok' => VeAvailability.ready,
+            'missing' => VeAvailability.missing,
+            'failed' => VeAvailability.failed,
+            _ => null,
+          },
+        ),
+    ],
+    footer: r.kind == 'option'
+        ? 'Options of the encoders in the command, and FFmpeg’s general options.'
+        : r.of == null
+        ? 'Vegas Encoder fills these in when it renders.'
+        : encoders
+        ? 'Encoders, with their state in the chosen FFmpeg.'
+        : 'Values this option takes.',
+  );
+}
 
 // ------------------------------------------------------------ Basic summary
 

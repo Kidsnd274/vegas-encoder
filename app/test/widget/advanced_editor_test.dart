@@ -435,4 +435,126 @@ void main() {
       expect(copied, editor(tester).compiled.value!.commandLine);
     });
   });
+
+  group('autocomplete (VeCore.complete)', () {
+    CommandEditorState state(WidgetTester tester) => tester.state<CommandEditorState>(find.byType(CommandEditor));
+    List<String> offered(WidgetTester tester) => [...?state(tester).completion?.items.map((s) => s.value)];
+    const start = '{inputs}\n-c:v libx264 ';
+
+    /// Types [typed] at the end of [before], as the platform would.
+    Future<void> type(WidgetTester tester, String before, String typed, {String after = '\n{output}'}) async {
+      await setCommand(tester, '$before$after');
+      await userEdit(
+        tester,
+        TextEditingValue(
+          text: '$before$after',
+          selection: TextSelection.collapsed(offset: before.length),
+        ),
+      );
+      await userEdit(
+        tester,
+        TextEditingValue(
+          text: '$before$typed$after',
+          selection: TextSelection.collapsed(offset: before.length + typed.length),
+        ),
+      );
+    }
+
+    Future<void> key(WidgetTester tester, LogicalKeyboardKey k, {bool control = false}) async {
+      if (control) await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(k);
+      if (control) await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('"-" opens the options; arrows move; Enter inserts and opens its values', (tester) async {
+      await pump(tester);
+      await ctrlM(tester);
+      await type(tester, start, '-');
+      final core = NativeVeCore();
+      final expected = core.complete('$start-\n{output}', start.length + 1, capabilities: editor(tester).capabilities);
+      expect(offered(tester), expected.items.map((s) => s.value).toList(), reason: 'the core\'s list, in its order');
+      expect(find.text('Options'), findsOneWidget);
+      expect(find.text('Tab or Enter inserts'), findsOneWidget);
+
+      final second = offered(tester)[1];
+      await key(tester, LogicalKeyboardKey.arrowDown);
+      expect(state(tester).activeSuggestion, 1);
+      await key(tester, LogicalKeyboardKey.enter);
+      expect(template(tester), '$start$second \n{output}', reason: 'the option and a space');
+      expect(text(tester).selection.baseOffset, start.length + second.length + 1);
+      final values = core.complete(template(tester), start.length + second.length + 1);
+      if (values.kind == 'value') {
+        expect(find.text('Values for $second'), findsOneWidget, reason: 'an option with values opens them next');
+      } else {
+        expect(state(tester).completion, isNull);
+      }
+    });
+
+    testWidgets('after an option that takes values, its values; Tab inserts, Esc closes', (tester) async {
+      await pump(tester);
+      await ctrlM(tester);
+      await type(tester, '$start-preset', ' ');
+      expect(find.text('Values for -preset'), findsOneWidget);
+      final first = offered(tester).first;
+      await key(tester, LogicalKeyboardKey.tab);
+      expect(template(tester), '$start-preset $first \n{output}');
+      expect(state(tester).completion, isNull, reason: 'a value opens nothing more');
+
+      await type(tester, '$start-preset', ' ');
+      expect(state(tester).completion, isNotNull);
+      await key(tester, LogicalKeyboardKey.escape);
+      expect(state(tester).completion, isNull);
+      expect(editor(tester).advanced, isTrue, reason: 'Esc only closed the list');
+    });
+
+    testWidgets('typing a value filters; typing elsewhere doesn\'t open it; Ctrl+Space does', (tester) async {
+      await pump(tester);
+      await ctrlM(tester);
+      await type(tester, '$start-preset', ' s');
+      expect(offered(tester), isNotEmpty);
+      expect(offered(tester).every((v) => v.startsWith('s')), isTrue, reason: 'the core filters by what is typed');
+
+      // A space after a value: the core offers every option, but typing
+      // doesn't open them.
+      await type(tester, start, ' ');
+      expect(state(tester).completion, isNull, reason: 'not after "-", not a value');
+      await key(tester, LogicalKeyboardKey.space, control: true);
+      expect(state(tester).completion?.title, 'Options', reason: 'Ctrl+Space asks anyway');
+    });
+
+    testWidgets('a click on an entry inserts it; moving the caret closes the list', (tester) async {
+      await pump(tester);
+      await ctrlM(tester);
+      await type(tester, '$start-preset', ' ');
+      final first = offered(tester).first;
+      await tester.tap(find.text(first).last);
+      await tester.pumpAndSettle();
+      expect(template(tester), contains('-preset $first '));
+
+      await type(tester, '$start-preset', ' ');
+      expect(state(tester).completion, isNotNull);
+      text(tester).selection = const TextSelection.collapsed(offset: 0);
+      await tester.pumpAndSettle();
+      expect(state(tester).completion, isNull);
+    });
+
+    testWidgets('after -c:v, encoders with their state in the chosen FFmpeg', (tester) async {
+      await pump(tester);
+      await ctrlM(tester);
+      await type(tester, '{inputs}\n-c:v', ' ');
+      final c = state(tester).completion!;
+      expect(c.title, 'Values for -c:v');
+      expect(offered(tester), contains('libx264'));
+      final result = NativeVeCore().complete(
+        '{inputs}\n-c:v \n{output}',
+        '{inputs}\n-c:v '.length,
+        capabilities: editor(tester).capabilities,
+      );
+      for (final (i, s) in result.items.indexed) {
+        final shown = c.items[i].availability;
+        expect(shown == null, s.availability == null || s.availability == 'unknown', reason: s.value);
+      }
+    });
+  });
 }

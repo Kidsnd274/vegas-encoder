@@ -106,6 +106,31 @@ void main() {
         await tester.pumpAndSettle(const Duration(milliseconds: 100));
       },
     ),
+    // Autocomplete: a space after -tune opens the core's values for x265.
+    'suggestions': (
+      const Size(1440, 900),
+      (tester) async {
+        await advanced(tester);
+        const before = '{inputs}\n-map {v} -map {a}\n-c:v libx265 -preset slow -crf 18 -tune';
+        const after = '\n-c:a aac -b:a 320k\n{output}';
+        final controller = tester.widget<CommandEditor>(find.byType(CommandEditor)).controller;
+        controller.value = const TextEditingValue(
+          text: '$before$after',
+          selection: TextSelection.collapsed(offset: before.length),
+        );
+        await tester.pumpAndSettle();
+        final editable = find.descendant(of: find.byType(CommandEditor), matching: find.byType(EditableText));
+        await tester.showKeyboard(editable);
+        tester.testTextInput.updateEditingValue(
+          const TextEditingValue(
+            text: '$before $after',
+            selection: TextSelection.collapsed(offset: before.length + 1),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Values for -tune'), findsOneWidget);
+      },
+    ),
     // Back to Advanced with a command saved: the question, its default last.
     'question': (
       const Size(1440, 900),
