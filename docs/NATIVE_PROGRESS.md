@@ -1,9 +1,12 @@
 # B5: native progress text on the selected VEGAS build
 
-Static effects established; opt-in candidate prepared. **The status line is not
-real-host verified.** No VEGAS launch, installation or installed-file edit was
-performed. This does not pass A5–A7, real two-template/restart persistence,
-controlled real failure recovery or monitor performance.
+Static effects established; the authorized slot-4 trial ran on VEGAS 2026.0.3.189.
+The control and repeated text-test renders completed normally; full decode checks
+pass for the control and final text-test output. Slot-4 calls returned S_OK, but
+the owner saw no switching text. **Drop the custom status-line track**, per the
+owner's preference; prioritize useful numeric progress and the separate window.
+This does not pass A5–A7, real two-template/restart persistence, controlled real
+failure recovery or monitor performance.
 
 ## Exact implementation and provenance
 
@@ -123,10 +126,14 @@ retains numeric progress, output, cancellation and lock diagnostics. No formatte
 FFmpeg statistics are claimed by this marker test; add them only after visible
 behavior and retained-string lifetime are qualified.
 
-## Owner checklist — future authorized host test
+## Owner checklist — authorized trial reference
 
-The commands below are a reviewable procedure, **not operations already run**.
-Obtain separate owner authorization for installation and real VEGAS operation.
+The owner authorized candidate replacement and the observed VEGAS trial on
+2026-10-14, with this correction: **retain a healthy candidate; rollback only if
+issues occur.** This supersedes the unconditional restoration step in the original
+checklist. The owner subsequently ended the custom-text track after the slot-4
+observation; no further marker/mode-3 trial is requested. The checklist remains
+the operational reference, not a claim that every qualification step passed.
 
 1. Review the uncommitted source diff, focused results and staged `review.json`.
    Confirm the intended FFmpegPath/log location in each candidate INI. Keep the
@@ -166,7 +173,8 @@ Obtain separate owner authorization for installation and real VEGAS operation.
    does not meet the selected status-line design. If absent/useless or unsafe,
    drop the status-line track and record the observed outcome. Do not enable
    it in production solely because S_OK or fake checks passed.
-8. Close VEGAS and restore the recorded working 0.1.2 candidate; verify all
+8. Retain the healthy tested candidate, per the owner's authorization. If issues
+   occur, close VEGAS and restore the recorded working 0.1.2 candidate; verify
    installer hashes, restart and run one normal render. Preserve a concise
    outcome: candidate DLL/INI identities, exact host, text location/behavior,
    B5 log summary, normal/cancel/recovery outputs and rollback verification.
@@ -178,7 +186,7 @@ After authorization, use the chosen staging directory from `review.json`:
 # Example; substitute the actual reviewed mode directory.
 scripts/Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -Update -BuildDir 'L:\repos\vegas-encoder-platform\build\b5-owner-review\mode-0'
 # Repeat with mode-4 (and optionally mode-3), closing/restarting VEGAS each time.
-# Restore the separately verified prior working build, with VEGAS closed:
+# Only if issues occur: restore the verified prior build, with VEGAS closed:
 scripts/Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -Update -BuildDir 'L:\repos\vegas-encoder\build\candidate-0.1.2-config-proof'
 ```
 
@@ -186,3 +194,49 @@ Do not edit the live INI between trials: its manifest hash would drift. These
 tests neither enable B6 nor measure a monitor. The separate owner performance
 rule remains three real renders with/three without the monitor, about 2% maximum
 render-time cost and under 120 MB, after gated B6 wiring is ready.
+
+## Authorized trial results and owner decision
+
+- Installation of mode 0 completed using the reversible installer. DLL/PDB/INI
+  and discovery hashes match the reviewed candidate/installation manifest. The
+  prior 0.1.2 DLL/PDB/INI still match the separate preserved rollback candidate.
+  Operational installer records are under ignored
+  `build/test-results/b5-host-trial-3cea0e12/`.
+- Exact host: VEGAS **2026.0.3.189**, PID **38892**; native log identifies
+  `0.1.3-progress-text-proof`, DLL
+  `BB3447D10A689895DB8A7652B8397F8B62F03A79BD0CE3D44F8022AECC4F72BF`.
+- Owner rendered `C:/Users/Samuel Tee/Desktop/test_video/test_b4.mkv` from
+  `test.veg` and reports normal completion with steadily advancing progress.
+  Native return S_OK, encoder exit zero/publication, **182** 1920x1080 frames at
+  **30000/1001**, **291,491** float32 stereo sample frames at **48 kHz**, zero
+  outstanding locks. Elapsed native render time **3998.7 ms** is a single control
+  observation, not a throughput/performance qualification.
+- Full decode/readback checks pass: FFV1 10-bit, PCM float, complete frame/sample
+  byte counts and presentation timing. Audio/video duration difference is about
+  **0.004 ms**. B5 summary: zero text calls and no guard failure, as intended for
+  mode 0. No counter/click fixture or cross-render pixel identity is claimed.
+- VEGAS exited after a normal close request. The first mode-4 elevation request
+  was cancelled before installation. The owner authorized a retry; mode 4 is now
+  installed and DLL/PDB/INI/discovery hashes match review. In VEGAS PID **30000**,
+  the owner rendered `b5_text_2.mkv` and `b5_text_2.mkv.mkv` in the same desktop
+  directory. Both returned S_OK, encoder exit zero/publication, **182** frames,
+  **291,491** sample frames and zero outstanding locks; elapsed **3880.6 ms** and
+  **3954.0 ms**. Both logs show `exactTarget=1`, **8** slot-4 calls, S_OK,
+  `maxCallMs=0`, `guardFailed=0`. These short runs do not qualify performance.
+- Full decode/readback of the final `b5_text_2.mkv.mkv` passes the same counts,
+  formats and timing checks as the control; audio/video duration difference is
+  about **0.004 ms**. The first text-test output has native completion diagnostics,
+  not a separate full-decode qualification. No cross-render pixel identity is
+  claimed.
+- Owner reports no apparent text switching; the supplied screenshot shows the
+  normal render dialog at 76%, with no marker. This supports **no useful visible
+  status line in this trial**, not a general claim that the host can never consume
+  the retained description. The owner explicitly does not need dialog text
+  changes and wants somewhat accurate progress. End B5 custom-text testing;
+  mode 3 and this candidate's cancellation/recovery were not tested.
+- Keep the healthy mode-4 proof candidate installed under the owner's policy;
+  no rollback or further install was performed. Retire the optional text calls in
+  a future reviewed normal update. The installed fixed-profile proof does not
+  launch the frontend monitor or use B4's recipe/C5 progress bridge.
+  A5–A7, controlled real failure recovery, deferred persistence and monitor
+  performance remain **unverified**.

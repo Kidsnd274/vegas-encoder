@@ -1,8 +1,45 @@
 # Vegas Encoder status
 
-Updated: 2026-10-14 (Asia/Singapore). Installed version: 0.1.2-config-proof.
+Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.3-progress-text-proof
+(B5 owner-authorized trial completed for normal renders; mode 4 retained).
 
 ## Current progress
+
+**B6 editor transport checkpoint (2026-10-15, offline):** fresh UUID session
+directories, bounded atomic C4 requests, explicit owned-helper launch, creator-thread
+zero-time exit polling and one validated result are implemented. Cancel/crash/
+invalid results preserve the prior draft; direct known-file cleanup retains unknown
+entries and reports incomplete cleanup. Optimized x64 `/W4 /WX` passes **89**
+transport checks with real Windows files/processes and fake children, plus the
+retained **95** recipe/draft checks. Current AddressSanitizer validation is
+**incomplete**: the boundary run stalled at its thread guard after 87 checks.
+The owner reported an antivirus alert during process/thread debugging and asked
+to stop that investigation. Temporary diagnostic test edits are removed; the
+cause is not established, and no sanitizer pass is claimed for this transport.
+There are no exporter/page/Render call sites,
+no real app/monitor launch and no new installation/VEGAS run. Remaining work:
+connect the native page to the actual F5 popup when ready and the owner resumes
+the native gates, then recipe/C5 progress integration. No additional fake-owner
+framework is planned. See [native recipe boundary](NATIVE_RECIPE_BOUNDARY.md).
+**A5–A7, real persistence, controlled real failure recovery and monitor performance
+remain unverified.** B6 is not complete; deferred persistence is not reopened.
+
+**B5 owner-authorized real trial (2026-10-14):** control and two slot-4 renders
+complete normally on the reviewed `0.1.3-progress-text-proof` DLL / VEGAS
+2026.0.3.189. Owner confirms normal advancing control progress. All return S_OK,
+encoder exit zero/publication and zero locks. Full decode of control and final
+text-test output verifies 182 1080p frames at 30000/1001 and 291,491 48 kHz float32
+stereo sample frames. Mode 0 makes zero text calls; both mode-4 renders make eight
+successful guarded calls, but the owner sees no switching text. **Drop custom
+dialog text**, per the owner's preference, and prioritize useful numeric progress
+and the separate frontend window. This candidate's cancel/recovery and mode 3
+were not tested. The frontend window has a shell; live figures remain F6, and
+the installed proof has no B6 monitor/recipe bridge.
+The owner authorized **keeping a healthy candidate, rollback only for issues**;
+the exact prior 0.1.2 rollback remains preserved/verified. No rollback or push.
+See [progress trial](NATIVE_PROGRESS.md). A5–A7, real persistence, controlled
+failure recovery and monitor performance stay unverified. No useful status line
+was established; that product track is dropped, not passed.
 
 **B6 offline boundary checkpoint (2026-10-14):** the owner authorized committing
 B5 as `2bdb44d` and fast-forwarding master; the main checkout's `.claude/` was

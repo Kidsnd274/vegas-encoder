@@ -19,8 +19,13 @@ if not exist "%VE_B6_OUT%" mkdir "%VE_B6_OUT%"
 pushd "%VE_B6_OUT%" || exit /b 1
 cl /nologo %VE_B6_FLAGS% /MT /W4 /WX /EHsc /std:c++17 /utf-8 "%VE_B6_ROOT%\tests\host\recipe_templates.cpp" "%VE_B6_ROOT%\src\vegas\configuration\recipe_template.cpp" "%VE_B6_ROOT%\src\vegas\configuration\native_store.cpp" "%VE_B6_ROOT%\src\vegas\host\template.cpp" "%VE_B6_ROOT%\src\support\diagnostics.cpp" %VE_B6_CORE_SOURCES% %VE_B6_CORE% /link /OUT:recipe-templates.exe ole32.lib oleaut32.lib user32.lib version.lib bcrypt.lib || goto :fail
 recipe-templates.exe "%VE_B6_ROOT%\schema\fixtures\b0\core-and-services.json" || goto :fail
+set VE_B6_SESSION_CORE=%VE_B6_CORE%
+if "%~2"=="asan" set VE_B6_SESSION_CORE=json.obj text.obj recipe.obj signal.obj compile.obj lint.obj payload.obj
+cl /nologo %VE_B6_FLAGS% /MT /W4 /WX /EHsc /std:c++17 /utf-8 "%VE_B6_ROOT%\tests\host\editor_sessions.cpp" "%VE_B6_ROOT%\src\vegas\configuration\editor_session.cpp" "%VE_B6_ROOT%\src\vegas\configuration\recipe_template.cpp" "%VE_B6_ROOT%\src\vegas\host\template.cpp" "%VE_B6_ROOT%\src\support\diagnostics.cpp" %VE_B6_SESSION_CORE% /link /OUT:editor-sessions.exe ole32.lib oleaut32.lib user32.lib version.lib bcrypt.lib || goto :fail
+if not defined VEGAS_ENCODER_B6_TEST_ROOT set "VEGAS_ENCODER_B6_TEST_ROOT=%VE_B6_OUT%"
+editor-sessions.exe "%VE_B6_ROOT%\schema\fixtures\b0\core-and-services.json" "%VEGAS_ENCODER_B6_TEST_ROOT%" || goto :fail
 popd
-echo B6 OFFLINE SNAPSHOT/SESSION CHECKS OK; exporter integration remains disabled
+echo B6 OFFLINE SNAPSHOT/SESSION/FAKE-CHILD TRANSPORT CHECKS OK; exporter integration remains disabled
 exit /b 0
 :fail
 popd

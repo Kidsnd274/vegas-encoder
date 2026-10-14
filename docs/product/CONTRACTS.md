@@ -611,8 +611,13 @@ core validation before accepting a draft, and stored-byte changes only after
 successful host Apply. The existing `VEnc` envelope can be placed/resized in
 owned native template bytes while preserving the host prefix and raw text suffix.
 Core payload encoding remains canonical; key order alone does not dirty a draft.
-These helpers are not linked into exporter discovery/pages/Render. File/process
-transport, modality, native persistence and monitor integration remain gated;
+The offline native transport now writes bounded requests in fresh UUID directories,
+launches an explicitly selected owned helper and polls its exit before consuming
+one core-validated result. Nonzero exit, missing/invalid/foreign results or explicit
+Cancel preserve the draft; no Render wait or app lookup is introduced. Direct
+known-file cleanup preserves unknown entries and reports incomplete cleanup.
+These helpers are not linked into exporter discovery/pages/Render. Actual Flutter
+launch, startup scheduling/modality, native persistence and monitor integration remain gated;
 details/tests are in [NATIVE_RECIPE_BOUNDARY.md](../NATIVE_RECIPE_BOUNDARY.md).
 No C4/C5 shape or C2 API changed for this checkpoint.
 

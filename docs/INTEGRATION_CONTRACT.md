@@ -41,9 +41,11 @@ B5 establishes the exact `CSfRenderProgress` text effects on the unchanged
 2026.0.3.189 executable: slot 3 borrows a description pointer, sets the total and
 resets position; slot 4 only borrows the pointer. An internal helper forwards it
 to a scripting render-status description/title; public SetPosition passes a null
-description. Visible interactive status-line behavior remains unverified. The
-isolated opt-in marker probe and owner/rollback checklist are in
-[NATIVE_PROGRESS.md](NATIVE_PROGRESS.md); no installed exporter was changed.
+description. The authorized slot-4 trial returned S_OK with guarded calls but
+showed no useful text switching. The owner dropped custom dialog text and retained
+the healthy `0.1.3-progress-text-proof` candidate; results and rollback information
+are in [NATIVE_PROGRESS.md](NATIVE_PROGRESS.md). This does not qualify A5–A7,
+persistence, controlled real failure recovery or monitor performance.
 
 Extracted checked templates, frame leases, HRESULT exception containment, product
 identity, generated fixtures and installer checks are authored implementation changes.
