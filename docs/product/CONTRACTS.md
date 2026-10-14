@@ -1,4 +1,4 @@
-# App/platform contracts v1 — B2
+# App/platform contracts v1 — B1/B2
 
 Updated: 2026-10-13 (Asia/Singapore). **B2 core/FFI plus additive B0/F2 extensions.** These
 shapes are the shared contract. Breaking changes require the owner and both
@@ -95,9 +95,14 @@ ChoiceControl {flag:string, values:string[], def:string|null, names:{value:label
 
 Encoder fields not relevant to an encoder may be omitted/null. Profile-specific
 additional facts (e.g. profileQuality.mbps1080/pixfmt, PCM bits, vendor, vbrMode)
-survive in model.data and toJson. B0 embeds the mockup's 12 video/11 audio profiles
-and five containers, including design-time Linux FFmpeg facts. **Not a Windows
-qualification.** B1 owns `schema/encoder-profiles.v1.json` with recaptured facts.
+survive in model.data and toJson. B1's native catalog embeds 12 video/11 audio
+profiles and five containers with measured Windows option/format facts. B0 fakes
+retain their historical design samples. `qualification` identifies the help builds
+and runtime limits; `policy` distinguishes product defaults, curated ranges/marks
+and heuristic estimates from measured encoder defaults. FDK AAC is absent from all
+three GPL builds: its sample format/bits stay unknown. Hardware help is not GPU
+qualification. `compatibilityByAvformatMajor` contains sampled major 59/63 rules;
+`compatibility` is their conservative consensus. See [Windows recapture](research/FFMPEG_WINDOWS.md).
 
 ## C2 — VeCore and the C ABI
 
@@ -128,6 +133,7 @@ VideoMedia {width,height:int,fps:[positiveInt,positiveInt],pixfmt,sar:string}
 AudioMedia {rate,channels:int,sampleFmt:string}
 CompilePaths {ffmpeg:string,videoPipe:string,audioPipe:string|null,output:string,project:string}
 CoreCapabilities {installationId,label,identityKey,version:string,
+  libavformatMajor:positiveInt|null,
   encoders:{name:{kind:"video"|"audio",options:EncoderOption[],availability:EncoderAvailability,...}},
   muxers:{name:ContainerProfile}}
 Issue {id:string,level:"error"|"warn"|"info"|"hint",field:string,message:string,
@@ -137,7 +143,7 @@ CompileResult {executable:string,argv:string[],display:CommandToken[],commandLin
   advancedTemplate:string,resolved:ResolvedSettings|null,signalPath:SignalPathFacts|null,
   issues:Issue[],summary:RecipeSummary,overriddenFields:string[]}
 CommandToken {text:string,role:"exe"|"global"|"input"|"map"|"video"|"audio"|"mux"|"output"|"extra"|"macro",
-  field:string|null}
+  field,replacedField:string|null}
 ResolvedSettings {videoEncoder:string,audioEncoder:string|null,videoMode:string,audioMode:string|null,
   quality:number|null,speed,profile:string|null,depth:int,pixfmt:string,gopFrames:int|null}
 SignalPathFacts {video:StreamSignalFacts|null,audio:StreamSignalFacts[],source:SourceSignalFacts|null}
@@ -194,6 +200,12 @@ option may depend on other fields too. Missing field in older results reads as n
 `overriddenFields` lists the generated recipe controls displaced by Basic Extra
 arguments; use it for "set in Extra arguments" without parsing FFmpeg option names.
 It is empty in Advanced mode and defaults empty for older results. Token optional
+`replacedField` is the displaced control on each replacing Extra option and its
+value, while `field` remains the Extra navigation target. An added option that
+replaces nothing has null; Advanced tokens and older results also read as null.
+This is the additive token-level link requested in F2; the aggregate
+`overriddenFields` remains the simplest way to mark controls.
+Token optional
 `sourceStart`/`sourceEnd` data are UTF-16 spans within the owning Extra/template text;
 apps normally use issue indexes, not these internal provenance spans.
 
@@ -235,10 +247,18 @@ tagging. False explicitly means none; null means unknown. `chromaChanged` compar
 video sampling (`4:2:0`, `4:2:2`, `4:4:4`); audio chroma fields are null.
 
 `containerSupport=no` means the container cannot hold that stream. `warn` means it
-muxes with a playback caveat, `ok` means supported by the selected rule set, and
+needs a version/setting/playback caveat, `ok` means supported by the selected rule set, and
 `unknown` means unestablished. None asserts real VEGAS qualification. The app reads
 this fact to draw a broken stream-to-container wire; no message parsing or local
 compatibility calculation. Default fixture facts remain authored design samples.
+
+`CoreCapabilities.libavformatMajor` comes from the probed library version, never
+from parsing vendor version banners in the app. C3 `FFmpegCapabilities` carries
+the same optional field; `toCoreCapabilities()` preserves it. Sampled 59/63 select
+their measured container table; absent/untested majors use the conservative
+consensus, not a guessed nearest version. These tables cover the recorded stream
+settings, not every profile/rate or NLE/player. Generated Basic private-option
+values and output pixel formats are checked against supplied build capabilities.
 
 [ve_core.h](../../src/core/capi/ve_core.h) defines counted UTF-8 in/out and
 paired ownership. Windows x64 default C calling convention, no packing override:

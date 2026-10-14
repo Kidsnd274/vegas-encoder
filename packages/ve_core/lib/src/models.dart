@@ -610,11 +610,13 @@ class CommandToken extends JsonModel {
     required String text,
     TokenRole role = TokenRole.extra,
     String? field = null,
+    String? replacedField = null,
     JsonMap extensions = const {},
   }) : super({
          'text': text,
          'role': role.name,
          'field': field,
+         'replacedField': replacedField,
          'extensions': extensions,
        });
   CommandToken.fromJson(super.json);
@@ -622,16 +624,19 @@ class CommandToken extends JsonModel {
   TokenRole get role =>
       TokenRole.values.byName(data['role'] as String? ?? 'extra');
   String? get field => data['field'] as String?;
+  String? get replacedField => data['replacedField'] as String?;
   CommandToken copyWith({
     Object? text = absent,
     Object? role = absent,
     Object? field = absent,
+    Object? replacedField = absent,
     Object? extensions = absent,
   }) => CommandToken.fromJson(
     changed({
       if (!identical(text, absent)) 'text': text,
       if (!identical(role, absent)) 'role': (role as TokenRole).name,
       if (!identical(field, absent)) 'field': field,
+      if (!identical(replacedField, absent)) 'replacedField': replacedField,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1601,6 +1606,7 @@ class CoreCapabilities extends JsonModel {
     String label = '',
     String identityKey = '',
     String version = '',
+    int? libavformatMajor = null,
     JsonMap encoders = const {},
     JsonMap muxers = const {},
     JsonMap extensions = const {},
@@ -1609,6 +1615,7 @@ class CoreCapabilities extends JsonModel {
          'label': label,
          'identityKey': identityKey,
          'version': version,
+         'libavformatMajor': libavformatMajor,
          'encoders': encoders,
          'muxers': muxers,
          'extensions': extensions,
@@ -1618,6 +1625,7 @@ class CoreCapabilities extends JsonModel {
   String get label => data['label'] as String? ?? '';
   String get identityKey => data['identityKey'] as String? ?? '';
   String get version => data['version'] as String? ?? '';
+  int? get libavformatMajor => data['libavformatMajor'] as int?;
   JsonMap get encoders => jsonMap(data['encoders'] ?? <String, Object?>{});
   JsonMap get muxers => jsonMap(data['muxers'] ?? <String, Object?>{});
   CoreCapabilities copyWith({
@@ -1625,6 +1633,7 @@ class CoreCapabilities extends JsonModel {
     Object? label = absent,
     Object? identityKey = absent,
     Object? version = absent,
+    Object? libavformatMajor = absent,
     Object? encoders = absent,
     Object? muxers = absent,
     Object? extensions = absent,
@@ -1634,6 +1643,8 @@ class CoreCapabilities extends JsonModel {
       if (!identical(label, absent)) 'label': label,
       if (!identical(identityKey, absent)) 'identityKey': identityKey,
       if (!identical(version, absent)) 'version': version,
+      if (!identical(libavformatMajor, absent))
+        'libavformatMajor': libavformatMajor,
       if (!identical(encoders, absent)) 'encoders': encoders,
       if (!identical(muxers, absent)) 'muxers': muxers,
       if (!identical(extensions, absent)) 'extensions': extensions,

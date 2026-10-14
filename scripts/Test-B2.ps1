@@ -20,6 +20,8 @@ Push-Location -LiteralPath $veB2Root
 try {
   Invoke-B2Check $PythonPath @('-I','scripts/Generate-CoreData.py','--check')
   Invoke-B2Check 'cmd.exe' @('/d','/c',(Join-Path $PSScriptRoot 'build-core.cmd'),$VcvarsPath)
+  Invoke-B2Check $PythonPath @('-I','scripts/Generate-CoreGoldens.py','--check')
+  Invoke-B2Check $PythonPath @('-I','scripts/Test-B1Data.py')
   Invoke-B2Check 'cmd.exe' @('/d','/c',(Join-Path $PSScriptRoot 'Test-CoreNative.cmd'),$VcvarsPath)
   if ($Asan) {
     # Explicit quotes retain the empty vcvars argument through cmd.exe.

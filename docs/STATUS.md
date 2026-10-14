@@ -1,6 +1,6 @@
 # Vegas Encoder status
 
-Updated: 2026-10-13 (Asia/Singapore). Installed version: 0.1.2-config-proof.
+Updated: 2026-10-14 (Asia/Singapore). Installed version: 0.1.2-config-proof.
 
 ## Current progress
 
@@ -21,8 +21,28 @@ The later F2 platform-fact/UI-state merge (`230c724`) is also incorporated.
 Portable C++17 normalize/validate/compile/lint/complete/estimate/diff/payload and
 pure session checks are implemented, with a Dart `NativeVeCore()` facade and native
 asset hook, DLL/static builds, token/stream facts and the additive F2 result fields.
-The app still explicitly selects its fake provider; the app agent switches it after
-merge. Profiles/options are B0/Linux bootstrap data pending B1 Windows recapture.
+The app owns switching its fake provider after merge. B1 replaces the native
+bootstrap profiles/options with qualified Windows data below; B0 fakes remain
+historical design samples.
+
+**B1 Windows FFmpeg (2026-10-13):** gyan 5.1.2, gyan static git `615b07170e`
+(2026-10-12), and BtbN GPL shared git `24e860f6d3` (2026-10-13) are recaptured.
+Source URLs, versions, timings and limits are in
+[Windows facts](product/research/FFMPEG_WINDOWS.md). 255 measured mux/readback/
+decode cases and 184 native-generated mode/depth/profile plans replace or qualify
+the bootstrap rules. Windows help is embedded; compatibility uses sampled
+libavformat 59/63 tables and conservative consensus for unknown versions.
+X264 depth/profile and AMF mappings are corrected, current-build-incompatible
+input queue flags are omitted, and Extra tokens expose `replacedField`.
+B1 final checks (2026-10-14) are complete and ready for owner merge: 2,937 native checks (also ASan),
+191 checks per native-asset/explicit-DLL/AOT route, 180 parser/catalog/identity/refusal regressions
+and retained package/fixture checks pass. All three builds pass 60-frame
+fractional-rate lossless pixel/audio parity and H.264/AAC FFprobe checks. Basic
+input/output color tags preserve pixel samples under the chosen tagging policy;
+actual VEGAS source color metadata remains unqualified.
+No installed engine/adapter changes or new VEGAS evidence. Full-capability FFI
+transfer still exceeds the 4 ms editing budget; B3/F7 must reduce/cache it and
+measure app frames. Core-argv named-pipe timing/memory checks remain B4.
 
 **B2 validation:** MSVC x64 `/W4 /WX`; 2,900 native checks, also under AddressSanitizer;
 171 real-FFI checks per native-asset, explicit-DLL and bundled-AOT route. Warm
@@ -51,10 +71,10 @@ Existing 24 helper, 9 boundary, 67 configuration checks, default fake-host suite
 gyan FFmpeg 5.1.2. This is offline/fake-host validation, not a new real VEGAS test.
 
 **Next:** B2 is merged into master (`bbcbe91`), and ws/platform is synchronized.
-Keep B1 Windows recapture tight, then do
-B3 real services, including the remaining F2 requests. B1 downloads are approved into this worktree's
-ignored build/ only (source URL/version recorded), with existing `C:\ffmpeg` gyan
-5.1.2 as the older case. No installation or PATH change. Workstream split:
+B1 Windows recapture is complete and ready for owner merge, then
+B3 real services, including the remaining F2 requests. Approved B1 downloads stay
+in this worktree's ignored build/; existing `C:\ffmpeg` gyan 5.1.2 is untouched.
+No installation or PATH change. Workstream split:
 [docs/product/WORKSTREAMS.md](product/WORKSTREAMS.md).
 
 **Scope boundary:** product work is now authorized on ws/app and ws/platform.
@@ -246,10 +266,10 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 ## Next task
 
-Platform B2 is merged; the next platform agent continues with approved tight B1
-Windows recapture. App switches its provider/mappings to the real core through its
-own workstream. B1 uses existing gyan 5.1.2 plus current gyan.dev/BtbN builds in
-ignored build/, with no installation or PATH change. B3–B4 follow. Order and rationale are in
+Platform B1 is complete and ready for owner merge; B2 is already merged. App switches
+its provider/mappings to the real core through its own workstream. Next is B3
+services, including full-capability transfer performance and remaining F2 needs,
+then B4 engine integration. No installation or PATH change. Order and rationale are in
 [platform.md](product/workstreams/platform.md).
 B5/B6 require the owner at the real host. Controlled failure/recovery and deferred
 persistence qualification remain open per [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).

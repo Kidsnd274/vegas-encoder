@@ -332,6 +332,7 @@ class FFmpegCapabilities extends JsonModel {
     required String identityKey,
     int parser = 1,
     required String version,
+    int? libavformatMajor = null,
     JsonMap encoders = const {},
     JsonMap muxers = const {},
     JsonMap hardware = const {},
@@ -343,6 +344,7 @@ class FFmpegCapabilities extends JsonModel {
          'identityKey': identityKey,
          'parser': parser,
          'version': version,
+         'libavformatMajor': libavformatMajor,
          'encoders': encoders,
          'muxers': muxers,
          'hardware': hardware,
@@ -355,6 +357,7 @@ class FFmpegCapabilities extends JsonModel {
   String get identityKey => data['identityKey'] as String;
   int get parser => data['parser'] as int? ?? 1;
   String get version => data['version'] as String;
+  int? get libavformatMajor => data['libavformatMajor'] as int?;
   JsonMap get encoders => jsonMap(data['encoders'] ?? <String, Object?>{});
   JsonMap get muxers => jsonMap(data['muxers'] ?? <String, Object?>{});
   JsonMap get hardware => jsonMap(data['hardware'] ?? <String, Object?>{});
@@ -365,6 +368,7 @@ class FFmpegCapabilities extends JsonModel {
     Object? identityKey = absent,
     Object? parser = absent,
     Object? version = absent,
+    Object? libavformatMajor = absent,
     Object? encoders = absent,
     Object? muxers = absent,
     Object? hardware = absent,
@@ -377,6 +381,8 @@ class FFmpegCapabilities extends JsonModel {
       if (!identical(identityKey, absent)) 'identityKey': identityKey,
       if (!identical(parser, absent)) 'parser': parser,
       if (!identical(version, absent)) 'version': version,
+      if (!identical(libavformatMajor, absent))
+        'libavformatMajor': libavformatMajor,
       if (!identical(encoders, absent)) 'encoders': encoders,
       if (!identical(muxers, absent)) 'muxers': muxers,
       if (!identical(hardware, absent)) 'hardware': hardware,

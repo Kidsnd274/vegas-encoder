@@ -4,8 +4,10 @@
 #include <sstream>
 
 namespace ve {
-namespace {
-Json VideoFormat(const std::string& format) {
+Json VideoFormat(const std::string& requested) {
+    // '+' selects an exact format; '+' alone leaves it to the input/filtergraph.
+    // Keep that unestablished format unknown rather than guessing a source format.
+    const auto format = !requested.empty() && requested[0] == '+' ? requested.substr(1) : requested;
     int bits = 0; std::string chroma;
     if (format == "p010le" || format == "yuv420p10le") { bits = 10; chroma = "4:2:0"; }
     else if (format == "yuv420p" || format == "nv12") { bits = 8; chroma = "4:2:0"; }
@@ -22,6 +24,7 @@ Json VideoFormat(const std::string& format) {
                 {"chroma",chroma.empty() ? Json(nullptr) : Json(chroma)},
                 {"label",label},{"shortLabel",bits ? std::to_string(bits) + "-bit" : format}};
 }
+namespace {
 Json AudioFormat(std::string format, int usefulBits = 0) {
     if (format == "f32le") format = "flt";
     else if (format == "f64le") format = "dbl";
@@ -39,11 +42,6 @@ Json AudioFormat(std::string format, int usefulBits = 0) {
     return Json{{"format",format},{"bits",bits ? Json(bits) : Json(nullptr)},{"chroma",nullptr},
                 {"label",bits ? std::to_string(bits) + "-bit " + (floating ? "float" : "integer") : format},
                 {"shortLabel",bits ? (floating ? "float" : std::to_string(bits) + "-bit") : format}};
-}
-std::string Support(const std::string& kind, const Json& profile, const std::string& container) {
-    const auto& rules = Profiles().at("compatibility").at(kind);
-    const auto family = Str(profile,"family");
-    return rules.contains(family) ? Str(rules.at(family),container,"unknown") : "unknown";
 }
 Json StreamFacts(const Json& in, const Json& out, const std::string& support) {
     const bool known = !in.at("bits").is_null() && !out.at("bits").is_null();
@@ -68,7 +66,7 @@ std::string Rate(double kbps) {
     return kbps >= 1000 ? FormatNumber(kbps / 1000) + " Mb/s" : FormatNumber(kbps) + " kb/s";
 }
 }
-Json Signal(const Json& r, const Json& media, const Json& res) {
+Json Signal(const Json& r, const Json& media, const Json& res, const Json& caps) {
     const auto& v = media.at("video"); const auto& a = r.at("audio")[0];
     const auto sourceVideo = VideoFormat(Str(v,"pixfmt","p010le"));
     const bool audioInput = media.contains("audio") && !media.at("audio").is_null();
@@ -76,7 +74,7 @@ Json Signal(const Json& r, const Json& media, const Json& res) {
     Json signal{{"source",{{"video",sourceVideo},{"audio",sourceAudio}}},{"video",nullptr},{"audio",Json::array()}};
     const auto container = Str(res,"container",Str(r.at("container"),"format"));
     if (Bool(res,"videoEnabled",Bool(r.at("video"),"enabled",true))) {
-        signal["video"] = StreamFacts(Bool(res,"unknownInputSource") ? VideoFormat("") : sourceVideo,VideoFormat(Str(res,"pixfmt")),Support("video",res.at("videoProfile"),container));
+        signal["video"] = StreamFacts(Bool(res,"unknownInputSource") ? VideoFormat("") : sourceVideo,VideoFormat(Str(res,"pixfmt")),ContainerSupport("video",res.at("videoProfile"),container,caps));
         if (Bool(res,"videoFilter")) signal["video"]["conversion"] = nullptr;
     }
     if (audioInput && Bool(res,"audioEnabled",Bool(a,"enabled",true))) {
@@ -84,7 +82,7 @@ Json Signal(const Json& r, const Json& media, const Json& res) {
         const auto& p = res.at("audioProfile");
         auto output = AudioFormat(Str(res,"audioSampleFormat",Str(p,"sampleFormat")),static_cast<int>(Num(p,"sampleBits")));
         if (res.contains("audioSampleFormat")) output = AudioFormat(Str(res,"audioSampleFormat"));
-        auto facts = StreamFacts(Bool(res,"unknownInputSource") ? AudioFormat("") : sourceAudio,output,Support("audio",p,container));
+        auto facts = StreamFacts(Bool(res,"unknownInputSource") ? AudioFormat("") : sourceAudio,output,ContainerSupport("audio",p,container,caps));
         const auto& delivered = media.at("audio");
         const double rate = Num(res,"audioRate",!advanced && a.contains("sampleRate") && a.at("sampleRate").is_number() ? Num(a,"sampleRate") : Num(delivered,"rate"));
         const double channels = Num(res,"audioChannels",!advanced && Str(a,"channels","source") == "mono" ? 1 : !advanced && Str(a,"channels","source") == "stereo" ? 2 : Num(delivered,"channels"));

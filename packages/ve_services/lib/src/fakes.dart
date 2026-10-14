@@ -67,6 +67,7 @@ extension FFmpegCapabilitiesCoreView on FFmpegCapabilities {
     label: label,
     identityKey: identityKey,
     version: version,
+    libavformatMajor: libavformatMajor,
     encoders: encoders,
     muxers: muxers,
   );

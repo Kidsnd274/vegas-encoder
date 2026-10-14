@@ -21,29 +21,60 @@ void Pair(Json& tokens, const std::string& role, const std::string& field, const
 std::vector<std::string> Args(const Json& value) {
     std::vector<std::string> args; if (value.is_array()) for (const auto& v : value) args.push_back(v.get<std::string>()); return args;
 }
+std::vector<std::string> InputColorTags(const Json& recipe) {
+    // Basic's tagging policy labels the raw input before automatic format
+    // negotiation. Otherwise current swscale converts assumed source colors to
+    // the requested output tags, changing even lossless FFV1 pixel samples.
+    // Advanced uses only its active text, never inactive Basic color settings.
+    if (Str(recipe.at("command"),"mode") == "template" || !Bool(recipe.at("video"),"enabled",true)) return {};
+    const std::vector<std::string> names{"color_primaries","color_trc","colorspace","color_range"};
+    std::map<std::string,std::string> values;
+    if (Str(recipe.at("video"),"color","bt709") == "bt709")
+        for (const auto& name : names) values[name] = name == "color_range" ? "tv" : "bt709";
+    // Final Extra tag replacements are tagging policy too, not an implicit
+    // colorspace transform. A deliberate transform belongs in an explicit filter.
+    try {
+        const auto words = Tokenize(Str(recipe.at("video"),"extra"));
+        for (size_t i = 0; i + 1 < words.size(); ++i) {
+            const auto key = OptionKey(words[i].text);
+            if (IsOption(words[i].text) && std::find(names.begin(),names.end(),key) != names.end() && !IsOption(words[i+1].text)) values[key] = words[++i].text;
+        }
+    } catch (const Error&) {} // Validate already reports malformed Extra text.
+    std::vector<std::string> result;
+    for (const auto& name : names) if (values.count(name)) { result.push_back("-" + name); result.push_back(values.at(name)); }
+    return result;
+}
 void Extra(Json& tokens, const std::string& text, const std::string& field, Json& overridden) {
     std::vector<Word> words;
     try { words = Tokenize(text); } catch (const Error&) { return; } // Lint emits the blocking syntax issue.
     const auto offsets = Utf16Map(text);
     std::map<std::string, bool> names;
+    std::map<std::string, std::string> replaced;
     auto owned = [](const std::string& key) { return key == "c" || key == "i" || key == "f" || key == "map" || key == "vn" || key == "an" || key == "progress"; };
     for (const auto& word : words) if (IsOption(word.text) && !owned(OptionKey(word.text))) names[OptionKey(word.text)] = true;
     Json retained = Json::array();
     for (size_t i = 0; i < tokens.size(); ++i) {
         if (IsOption(Str(tokens[i],"text")) && names.count(OptionKey(Str(tokens[i],"text")))) {
             const auto source = Str(tokens[i],"field");
+            replaced[OptionKey(Str(tokens[i],"text"))] = source;
             if (!source.empty() && std::find(overridden.begin(),overridden.end(),Json(source)) == overridden.end()) overridden.push_back(source);
             if (i + 1 < tokens.size() && !IsOption(Str(tokens[i+1],"text"))) ++i;
         } else retained.push_back(tokens[i]);
     }
     tokens = std::move(retained);
+    std::string replacedField;
     for (size_t i = 0; i < words.size(); ++i) {
         const auto& word = words[i];
         if (IsOption(word.text) && owned(OptionKey(word.text))) {
             if (i + 1 < words.size() && !IsOption(words[i+1].text)) ++i;
             continue;
         }
+        if (IsOption(word.text)) {
+            const auto source = replaced.find(OptionKey(word.text));
+            replacedField = source == replaced.end() ? "" : source->second;
+        }
         tokens.push_back(Json{{"text",word.text},{"role","extra"},{"field",field},
+            {"replacedField",replacedField.empty() ? Json(nullptr) : Json(replacedField)},
             {"sourceStart",offsets[word.start]},{"sourceEnd",offsets[word.end]}});
     }
 }
@@ -62,8 +93,7 @@ void ReadStream(const Json& tokens, Json& resolved, bool video) {
         const auto key = OptionKey(Str(tokens[i],"text")); const auto value = Str(tokens[i+1],"text");
         if (!IsOption(Str(tokens[i],"text"))) continue;
         const std::string prefix = video ? "video" : "audio";
-        if (key == "pix_fmt" && video) resolved["pixfmt"] = value;
-        if (key == "profile" && video) resolved["profile"] = value;
+        if (video) ReflectVideoFormatOption(resolved,key,value);
         if ((key == "crf" || key == "cq" || key == "global_quality" || key == "qp_i") && video) {
             try { resolved["quality"] = std::stod(value); } catch (const std::exception&) {}
         }
@@ -95,6 +125,7 @@ Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
         if (p.contains("tune")) Pair(video,"video","video.tune",Str(p.at("tune"),"flag"),res.at("tune"));
         const auto bitrate = Num(v,"bitrateK",Num(p.value("bitrate",Json::object()),"def",12000));
         const bool nv = Str(p,"hw") == "NVIDIA";
+        const bool amf = Str(p,"id") == "h264_amf";
         if (mode == "crf") {
             Pair(video,"video","video.quality",Str(p.value("quality",Json::object()),"flag","-crf"),res.at("quality"));
             if (Str(p,"id") == "libvpx-vp9") Pair(video,"video","video.mode","-b:v",0);
@@ -103,12 +134,17 @@ Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
             else Pair(video,"video","video.quality",Str(p.value("quality",Json::object()),"flag","-global_quality"),res.at("quality"));
         } else if (mode == "abr" || mode == "cbr") {
             if (nv) Pair(video,"video","video.mode","-rc",mode == "cbr" ? "cbr" : "vbr");
+            if (amf) Pair(video,"video","video.mode","-rc",mode == "cbr" ? "cbr" : "vbr_peak");
             Pair(video,"video","video.bitrateK","-b:v",Number(bitrate) + "k");
             if (mode == "cbr") { Pair(video,"video","video.bitrateK","-minrate",Number(bitrate) + "k"); Pair(video,"video","video.bitrateK","-maxrate",Number(bitrate) + "k"); Pair(video,"video","video.bitrateK","-bufsize",Number(bitrate * 2) + "k"); }
             else if (Num(v,"maxrateK") > 0) { Pair(video,"video","video.maxrateK","-maxrate",Number(Num(v,"maxrateK")) + "k"); Pair(video,"video","video.maxrateK","-bufsize",Number(Num(v,"maxrateK") * 2) + "k"); }
         } else if (mode == "cqp") {
             if (nv) Pair(video,"video","video.mode","-rc","constqp");
-            Pair(video,"video","video.qp",Str(p.value("qp",Json::object()),"flag","-qp"),Num(v,"qp",Num(p.value("qp",Json::object()),"def",20)));
+            const auto qp = Num(v,"qp",Num(p.value("qp",Json::object()),"def",20));
+            if (amf) {
+                Pair(video,"video","video.mode","-rc","cqp");
+                for (const auto& flag : {"-qp_i","-qp_p","-qp_b"}) Pair(video,"video","video.qp",flag,qp);
+            } else Pair(video,"video","video.qp",Str(p.value("qp",Json::object()),"flag","-qp"),qp);
         } else if (mode == "profile") {
             Pair(video,"video","video.profile","-profile:v",res.at("profile"));
             if (p.contains("vendor")) Pair(video,"video","video.encoder","-vendor",p.at("vendor"));
@@ -194,11 +230,12 @@ void Reflected(const Json& tokens, Json& res) {
 }
 Json InputTokens(const Json& r, const Json& media, const Json& paths) {
     const auto& v = media.at("video"); const auto& fps = v.at("fps"); Json result = Json::array();
+    Push(result,"input",nullptr,InputColorTags(r));
     Push(result,"input",nullptr,{"-f","rawvideo","-pix_fmt",Str(v,"pixfmt","p010le"),"-s",Number(Num(v,"width")) + "x" + Number(Num(v,"height")),
-         "-r",fps[0].dump() + "/" + fps[1].dump(),"-thread_queue_size","64","-i",Str(paths,"videoPipe")});
+         "-r",fps[0].dump() + "/" + fps[1].dump(),"-i",Str(paths,"videoPipe")});
     if (Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null()) {
         const auto& a = media.at("audio");
-        Push(result,"input",nullptr,{"-f",Str(a,"sampleFmt","f32le"),"-ar",Number(Num(a,"rate")),"-ac",Number(Num(a,"channels")),"-thread_queue_size","64","-i",Str(paths,"audioPipe")});
+        Push(result,"input",nullptr,{"-f",Str(a,"sampleFmt","f32le"),"-ar",Number(Num(a,"rate")),"-ac",Number(Num(a,"channels")),"-i",Str(paths,"audioPipe")});
     }
     return result;
 }
@@ -218,7 +255,11 @@ Json Compile(const Json& request) {
     if (!advanced) {
         for (const auto& token : input) tokens.push_back(token);
         const auto basic = Basic(r,media,res,result["overriddenFields"]); for (const auto& token : basic) tokens.push_back(token);
-        std::string seed = "{inputs}\n"; std::string lastRole;
+        std::string seed;
+        // Preserve the tagging policy when {inputs} is expanded in Advanced,
+        // where inactive Basic fields deliberately do not alter the source.
+        for (const auto& tag : InputColorTags(r)) seed += Quote(tag) + " ";
+        seed += "{inputs}\n"; std::string lastRole;
         for (const auto& token : basic) {
             const auto role = Str(token,"role"); if (!lastRole.empty()) seed += lastRole == role ? " " : "\n";
             seed += Quote(Str(token,"text")); lastRole = role;
@@ -266,9 +307,28 @@ Json Compile(const Json& request) {
         }
         result["resolved"] = nullptr;
     }
-    auto signal = Signal(r,media,res);
+    const Json noCaps = nullptr;
+    const Json& caps = request.contains("capabilities") ? request.at("capabilities") : noCaps;
+    // Validate actual emitted generated values against this build's private help.
+    // Extra text was linted in Validate; it keeps its own spans and issue fields.
+    if (!advanced && caps.is_object()) for (size_t i = 0; i + 1 < tokens.size(); ++i) {
+        const auto role = Str(tokens[i],"role"), field = Str(tokens[i],"field");
+        if ((role != "video" && role != "audio") || !IsOption(Str(tokens[i],"text")) || IsOption(Str(tokens[i+1],"text"))) continue;
+        const auto encoder = Str(res,role + "Encoder");
+        const auto flag = Str(tokens[i],"text"), value = Str(tokens[i+1],"text");
+        if (!ValidEncoderOption(caps,encoder,role,flag,value))
+            issues.push_back(Issue("V-BUILD-VALUE","error",field,"The selected FFmpeg build does not accept this generated option value.",{{"option",flag},{"value",value},{"encoder",encoder}}));
+    }
+    if (!advanced && Bool(res,"videoEnabled",Bool(r.at("video"),"enabled",true)) && caps.is_object()) {
+        const auto detail = EncoderOptions(caps,Str(res,"videoEncoder"));
+        if (!Str(res,"pixfmt").empty() && detail && detail->contains("pixelFormats") && !detail->at("pixelFormats").empty() &&
+            std::find(detail->at("pixelFormats").begin(),detail->at("pixelFormats").end(),Json(Str(res,"pixfmt"))) == detail->at("pixelFormats").end())
+            issues.push_back(Issue("V-BUILD-PIXFMT","error","video.depth","The selected FFmpeg encoder does not list this output pixel format.",{{"format",Str(res,"pixfmt")}}));
+    }
+    auto signal = Signal(r,media,res,caps);
     const bool unknownVideo = !signal.at("video").is_null() && signal.at("video").at("outputBits").is_null();
     if (!signal.at("video").is_null()) res["depth"] = unknownVideo ? Json(0) : signal.at("video").at("outputBits");
+    if (!advanced && Bool(res,"videoEnabled",Bool(r.at("video"),"enabled",true))) CheckVideoProfile(res,issues);
     if (!advanced) {
         Json publicRes = res; publicRes.erase("videoProfile"); publicRes.erase("audioProfile");
         result["resolved"] = unknownVideo ? Json(nullptr) : publicRes;

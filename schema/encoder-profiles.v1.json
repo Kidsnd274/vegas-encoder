@@ -1,6 +1,6 @@
 {
   "profiles": 1,
-  "provenance": "B2 bootstrap from B0 design data; Linux FFmpeg 8.1.3; NOT Windows-qualified (B1 pending)",
+  "provenance": "B1 measured Windows x64: gyan 5.1.2 (shared); gyan 2026-10-12 git 615b07170e (static); BtbN 2026-10-13 git 24e860f6d3 (shared). Synthetic offline checks, not VEGAS qualification.",
   "video": [
     {
       "id": "libx264",
@@ -33,11 +33,11 @@
           ],
           [
             18,
-            "Visually lossless"
+            "High quality"
           ],
           [
             23,
-            "FFmpeg default"
+            "Reference value"
           ],
           [
             28,
@@ -47,13 +47,15 @@
             35,
             "Rough"
           ]
-        ]
+        ],
+        "defaultSource": "product policy"
       },
       "qp": {
         "flag": "-qp",
         "min": 0,
         "max": 51,
-        "def": 20
+        "def": 20,
+        "defaultSource": "product policy"
       },
       "speed": {
         "flag": "-preset",
@@ -101,7 +103,15 @@
         "10": "yuv420p10le"
       },
       "depthDef": 8,
-      "paramsFlag": "-x264-params"
+      "paramsFlag": "-x264-params",
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "libx265",
@@ -130,7 +140,7 @@
           ],
           [
             16,
-            "Visually lossless"
+            "High quality"
           ],
           [
             20,
@@ -138,19 +148,21 @@
           ],
           [
             28,
-            "FFmpeg default"
+            "Reference value"
           ],
           [
             32,
             "Small"
           ]
-        ]
+        ],
+        "defaultSource": "product policy"
       },
       "qp": {
         "flag": "-qp",
         "min": 0,
         "max": 51,
-        "def": 22
+        "def": 22,
+        "defaultSource": "product policy"
       },
       "speed": {
         "flag": "-preset",
@@ -197,7 +209,15 @@
       },
       "depthDef": 10,
       "paramsFlag": "-x265-params",
-      "appleTag": "hvc1"
+      "appleTag": "hvc1",
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "libsvtav1",
@@ -225,7 +245,7 @@
           ],
           [
             20,
-            "Visually lossless"
+            "High quality"
           ],
           [
             30,
@@ -233,19 +253,21 @@
           ],
           [
             35,
-            "FFmpeg default"
+            "Reference value"
           ],
           [
             45,
             "Small"
           ]
-        ]
+        ],
+        "defaultSource": "product policy"
       },
       "qp": {
         "flag": "-qp",
         "min": 0,
         "max": 63,
-        "def": 30
+        "def": 30,
+        "defaultSource": "product policy"
       },
       "speed": {
         "flag": "-preset",
@@ -277,7 +299,15 @@
         "10": "yuv420p10le"
       },
       "depthDef": 10,
-      "paramsFlag": "-svtav1-params"
+      "paramsFlag": "-svtav1-params",
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "libvpx-vp9",
@@ -301,7 +331,7 @@
         "marks": [
           [
             15,
-            "Visually lossless"
+            "High quality"
           ],
           [
             31,
@@ -311,7 +341,8 @@
             40,
             "Small"
           ]
-        ]
+        ],
+        "defaultSource": "product policy"
       },
       "speed": {
         "flag": "-cpu-used",
@@ -334,7 +365,15 @@
         "8": "yuv420p",
         "10": "yuv420p10le"
       },
-      "depthDef": 8
+      "depthDef": 8,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "h264_nvenc",
@@ -359,7 +398,7 @@
         "marks": [
           [
             16,
-            "Visually lossless"
+            "High quality"
           ],
           [
             21,
@@ -373,13 +412,15 @@
             32,
             "Small"
           ]
-        ]
+        ],
+        "defaultSource": "product policy"
       },
       "qp": {
         "flag": "-qp",
         "min": 0,
         "max": 51,
-        "def": 20
+        "def": 20,
+        "defaultSource": "product policy"
       },
       "speed": {
         "flag": "-preset",
@@ -437,6 +478,14 @@
           "fullres"
         ],
         "def": "disabled"
+      },
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "hardware not qualified"
       }
     },
     {
@@ -462,7 +511,7 @@
         "marks": [
           [
             15,
-            "Visually lossless"
+            "High quality"
           ],
           [
             20,
@@ -476,13 +525,15 @@
             30,
             "Small"
           ]
-        ]
+        ],
+        "defaultSource": "product policy"
       },
       "qp": {
         "flag": "-qp",
         "min": 0,
         "max": 51,
-        "def": 20
+        "def": 20,
+        "defaultSource": "product policy"
       },
       "speed": {
         "flag": "-preset",
@@ -542,7 +593,15 @@
         ],
         "def": "disabled"
       },
-      "appleTag": "hvc1"
+      "appleTag": "hvc1",
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "hardware not qualified"
+      }
     },
     {
       "id": "av1_nvenc",
@@ -567,7 +626,7 @@
         "marks": [
           [
             20,
-            "Visually lossless"
+            "High quality"
           ],
           [
             30,
@@ -581,13 +640,15 @@
             45,
             "Small"
           ]
-        ]
+        ],
+        "defaultSource": "product policy"
       },
       "qp": {
         "flag": "-qp",
         "min": 0,
         "max": 255,
-        "def": 80
+        "def": 80,
+        "defaultSource": "product policy"
       },
       "speed": {
         "flag": "-preset",
@@ -638,6 +699,13 @@
           "fullres"
         ],
         "def": "disabled"
+      },
+      "qualification": {
+        "helpBuilds": [
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "hardware not qualified"
       }
     },
     {
@@ -662,7 +730,7 @@
         "marks": [
           [
             18,
-            "Visually lossless"
+            "High quality"
           ],
           [
             22,
@@ -672,7 +740,8 @@
             28,
             "Small"
           ]
-        ]
+        ],
+        "defaultSource": "product policy"
       },
       "speed": {
         "flag": "-preset",
@@ -703,7 +772,15 @@
         "8": "nv12",
         "10": "p010le"
       },
-      "depthDef": 10
+      "depthDef": 10,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "hardware not qualified"
+      }
     },
     {
       "id": "h264_amf",
@@ -713,29 +790,10 @@
       "hw": "AMD",
       "blurb": "AMD GPU encoding. Needs a Radeon GPU and the AMD driver.",
       "modes": [
-        "cq",
         "abr",
         "cbr",
         "cqp"
       ],
-      "quality": {
-        "flag": "-qp_i",
-        "min": 0,
-        "max": 51,
-        "step": 1,
-        "def": 20,
-        "lowerIsBetter": true,
-        "marks": [
-          [
-            18,
-            "High"
-          ],
-          [
-            26,
-            "Small"
-          ]
-        ]
-      },
       "speed": {
         "flag": "-quality",
         "values": [
@@ -753,7 +811,23 @@
       "depths": {
         "8": "nv12"
       },
-      "depthDef": 8
+      "depthDef": 8,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "hardware not qualified"
+      },
+      "qp": {
+        "flag": "-qp_i",
+        "min": 0,
+        "max": 51,
+        "step": 1,
+        "def": 20,
+        "defaultSource": "product policy"
+      }
     },
     {
       "id": "prores_ks",
@@ -801,7 +875,15 @@
       },
       "depthDef": 10,
       "chroma": "4:2:2",
-      "vendor": "apl0"
+      "vendor": "apl0",
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "dnxhd",
@@ -853,7 +935,15 @@
         "10": "yuv422p10le"
       },
       "depthDef": 8,
-      "chroma": "4:2:2"
+      "chroma": "4:2:2",
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "ffv1",
@@ -882,7 +972,15 @@
         "-slicecrc",
         "1"
       ],
-      "mbpsPerMpix": 95
+      "mbpsPerMpix": 95,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     }
   ],
   "audio": [
@@ -909,12 +1007,30 @@
         "def": 320
       },
       "rates": [
+        7350,
+        8000,
+        11025,
+        12000,
+        16000,
+        22050,
+        24000,
+        32000,
         44100,
         48000,
+        64000,
+        88200,
         96000
       ],
       "sampleFormat": "fltp",
-      "sampleBits": 32
+      "sampleBits": 32,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "libfdk_aac",
@@ -940,14 +1056,19 @@
         "flag": "-vbr",
         "min": 1,
         "max": 5,
-        "def": 5
+        "def": 5,
+        "defaultSource": "product policy"
       },
       "rates": [
         44100,
         48000
       ],
-      "sampleFormat": "s16",
-      "sampleBits": 16
+      "sampleFormat": null,
+      "sampleBits": null,
+      "qualification": {
+        "helpBuilds": [],
+        "runtime": "not captured: absent from all three GPL builds"
+      }
     },
     {
       "id": "libopus",
@@ -972,11 +1093,23 @@
         "def": 160
       },
       "rates": [
+        8000,
+        12000,
+        16000,
+        24000,
         48000
       ],
       "vbrMode": "on",
       "sampleFormat": "flt",
-      "sampleBits": 32
+      "sampleBits": 32,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "flac",
@@ -991,7 +1124,8 @@
         "flag": "-compression_level",
         "min": 0,
         "max": 12,
-        "def": 8
+        "def": 8,
+        "defaultSource": "product policy"
       },
       "rates": [
         44100,
@@ -999,7 +1133,15 @@
         96000
       ],
       "sampleFormat": "s32",
-      "sampleBits": 24
+      "sampleBits": 24,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "alac",
@@ -1016,7 +1158,15 @@
         96000
       ],
       "sampleFormat": "s32p",
-      "sampleBits": 24
+      "sampleBits": 24,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "pcm_s16le",
@@ -1034,7 +1184,15 @@
       ],
       "bits": 16,
       "sampleFormat": "s16",
-      "sampleBits": 16
+      "sampleBits": 16,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "pcm_s24le",
@@ -1052,7 +1210,15 @@
       ],
       "bits": 24,
       "sampleFormat": "s32",
-      "sampleBits": 24
+      "sampleBits": 24,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "pcm_f32le",
@@ -1068,7 +1234,15 @@
       ],
       "bits": 32,
       "sampleFormat": "flt",
-      "sampleBits": 32
+      "sampleBits": 32,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "ac3",
@@ -1090,10 +1264,20 @@
         "def": 448
       },
       "rates": [
+        32000,
+        44100,
         48000
       ],
       "sampleFormat": "fltp",
-      "sampleBits": 32
+      "sampleBits": 32,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "eac3",
@@ -1115,10 +1299,20 @@
         "def": 384
       },
       "rates": [
+        32000,
+        44100,
         48000
       ],
       "sampleFormat": "fltp",
-      "sampleBits": 32
+      "sampleBits": 32,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     },
     {
       "id": "libmp3lame",
@@ -1144,14 +1338,30 @@
         "min": 0,
         "max": 9,
         "def": 0,
-        "lowerIsBetter": true
+        "lowerIsBetter": true,
+        "defaultSource": "product policy"
       },
       "rates": [
+        8000,
+        11025,
+        12000,
+        16000,
+        22050,
+        24000,
+        32000,
         44100,
         48000
       ],
       "sampleFormat": "fltp",
-      "sampleBits": 32
+      "sampleBits": 32,
+      "qualification": {
+        "helpBuilds": [
+          "5.1.2-full_build-www.gyan.dev",
+          "2026-10-12-git-615b07170e-full_build-www.gyan.dev",
+          "N-127507-g24e860f6d3-20261013"
+        ],
+        "runtime": "synthetic P010/float32 checks"
+      }
     }
   ],
   "containers": [
@@ -1416,5 +1626,230 @@
         ]
       }
     ]
+  },
+  "policy": "Control defaults, curated ranges/choices, quality marks and size-model coefficients are product choices, not measured encoder defaults or quality guarantees. AVOption defaults live in Windows probe fixtures.",
+  "compatibilityByAvformatMajor": {
+    "59": {
+      "video": {
+        "h264": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "warn"
+        },
+        "hevc": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "av1": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "no",
+          "webm": "ok",
+          "mxf": "no"
+        },
+        "vp9": {
+          "mp4": "warn",
+          "mkv": "ok",
+          "mov": "no",
+          "webm": "ok",
+          "mxf": "no"
+        },
+        "prores": {
+          "mp4": "no",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "ok"
+        },
+        "dnxhr": {
+          "mp4": "no",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "ok"
+        },
+        "ffv1": {
+          "mp4": "no",
+          "mkv": "ok",
+          "mov": "warn",
+          "webm": "no",
+          "mxf": "no"
+        }
+      },
+      "audio": {
+        "aac": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "opus": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "no",
+          "webm": "ok",
+          "mxf": "no"
+        },
+        "flac": {
+          "mp4": "warn",
+          "mkv": "ok",
+          "mov": "no",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "alac": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "pcm": {
+          "mp4": "no",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "ok"
+        },
+        "pcmf": {
+          "mp4": "no",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "ac3": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "mp3": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        }
+      }
+    },
+    "63": {
+      "video": {
+        "h264": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "warn"
+        },
+        "hevc": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "av1": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "no",
+          "webm": "ok",
+          "mxf": "no"
+        },
+        "vp9": {
+          "mp4": "warn",
+          "mkv": "ok",
+          "mov": "no",
+          "webm": "ok",
+          "mxf": "no"
+        },
+        "prores": {
+          "mp4": "no",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "ok"
+        },
+        "dnxhr": {
+          "mp4": "no",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "ok"
+        },
+        "ffv1": {
+          "mp4": "warn",
+          "mkv": "ok",
+          "mov": "warn",
+          "webm": "no",
+          "mxf": "warn"
+        }
+      },
+      "audio": {
+        "aac": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "opus": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "no",
+          "webm": "ok",
+          "mxf": "no"
+        },
+        "flac": {
+          "mp4": "warn",
+          "mkv": "ok",
+          "mov": "no",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "alac": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "pcm": {
+          "mp4": "warn",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "ok"
+        },
+        "pcmf": {
+          "mp4": "warn",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "ac3": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        },
+        "mp3": {
+          "mp4": "ok",
+          "mkv": "ok",
+          "mov": "ok",
+          "webm": "no",
+          "mxf": "no"
+        }
+      }
+    }
   }
 }
