@@ -191,6 +191,15 @@ final liveStatusReaderProvider = Provider<LiveRenderStatusReader>((ref) => ref.w
 /// The popup's request and result files (C4).
 final editSessionServiceProvider = Provider<EditSessionService>((ref) => ref.watch(servicesProvider).editSessions);
 
+/// Starts the desktop app on a preset ("Open in Vegas Encoder", UI_SPEC §4).
+abstract interface class DesktopAppLauncher {
+  Future<void> openPreset(String presetId);
+}
+
+/// No C3 service starts the desktop app yet (workstreams/app.md, Needs), so
+/// this is null and the popup says why. Tests supply one to check the action.
+final desktopAppLauncherProvider = Provider<DesktopAppLauncher?>((ref) => null);
+
 /// The installations discovery knows about, kept current.
 final discoveredInstallationsProvider = StreamProvider<List<FFmpegInstallation>>(
   (ref) => ref.watch(ffmpegDiscoveryProvider).watch(),

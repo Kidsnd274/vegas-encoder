@@ -56,6 +56,26 @@ CoreResult<CompileResult> compileSample(VeCore core, Recipe recipe, {String? ext
   return result;
 }
 
+/// What the editor's panels change: the desktop's presets and the popup's
+/// template.
+abstract interface class RecipeEditor {
+  void edit(Recipe Function(Recipe r) change);
+}
+
+/// Where the editor's media facts come from (UI_SPEC §4: project facts may be
+/// unknown; sample facts are labelled as samples).
+enum PreviewMedia {
+  /// The documented sample: the desktop app has no project.
+  sample,
+
+  /// The VEGAS project's own facts (the popup, when VEGAS shared them).
+  project,
+
+  /// The popup when VEGAS didn't share the project's facts: they show as
+  /// "Set by the project", and the preview uses the sample.
+  projectUnknown,
+}
+
 /// Everything the editor shows for the selected preset. The size estimates
 /// are worked out when first read (the File node), not on every edit
 /// (TECH_ARCHITECTURE §9.1, §9.3).
@@ -63,6 +83,7 @@ CoreResult<CompileResult> compileSample(VeCore core, Recipe recipe, {String? ext
 class EditorData {
   EditorData({
     required this.preset,
+    required this.saved,
     required this.recipe,
     required this.draft,
     required this.catalog,
@@ -70,18 +91,24 @@ class EditorData {
     required this.installation,
     required this.defaultInstallationId,
     required this.media,
+    required this.paths,
     required this.compiled,
     required this._perMinute,
     required this._total,
     this.capabilities,
     this.lint,
     this.basic,
+    this.preview = PreviewMedia.sample,
   });
 
   final CoreResult<SizeEstimate> Function() _perMinute;
   final CoreResult<SizeEstimate>? Function() _total;
 
   final Preset preset;
+
+  /// What Reset goes back to and changed fields compare with: the saved
+  /// preset, or in the popup the template as it opened.
+  final Recipe saved;
 
   /// What the editor shows: the draft, else the saved recipe.
   final Recipe recipe;
@@ -93,6 +120,10 @@ class EditorData {
   final FFmpegInstallation? installation;
   final String? defaultInstallationId;
   final MediaDescription media;
+
+  /// The paths the command is compiled with (pipes, output, project).
+  final CompilePaths paths;
+  final PreviewMedia preview;
   final CoreResult<CompileResult> compiled;
 
   /// Rate per minute and range (no length).
@@ -177,6 +208,7 @@ final editorProvider = Provider<EditorData?>((ref) {
 
   return EditorData(
     preset: preset,
+    saved: presetRecipe(preset),
     recipe: recipe,
     draft: draft,
     catalog: catalog,
@@ -184,6 +216,7 @@ final editorProvider = Provider<EditorData?>((ref) {
     installation: installation,
     defaultInstallationId: settings?.defaultFFmpegId,
     media: media,
+    paths: paths,
     compiled: compileSample(core, recipe, ext: ext, capabilities: capabilities),
     perMinute: () => CoreResult.run(() => core.estimate(recipe, media: media)),
     total: () => length == null

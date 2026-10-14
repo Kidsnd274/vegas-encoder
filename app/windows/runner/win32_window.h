@@ -21,7 +21,7 @@ class Win32Window {
   // Creates the window, hidden, at its default size. Desktop windows are centred
   // on the primary monitor; progress windows go to the bottom-right of the
   // monitor holding the foreground window (VEGAS when a render starts); popups
-  // are placed when Dart supplies the owner (PlaceOnOwner).
+  // are placed when Dart supplies the owner (OwnerBounds).
   bool Create();
 
   // Shows the window. Progress windows show without activation.
@@ -42,10 +42,13 @@ class Win32Window {
   // Return a RECT representing the bounds of the current client area.
   RECT GetClientArea();
 
-  // Makes |owner| this window's owner (GWLP_HWNDPARENT) and centres the window
-  // on it, inside the owner's monitor work area. Returns false if |owner| is not
-  // a window. Must run before Show to avoid a visible jump.
-  bool PlaceOnOwner(HWND owner);
+  // Makes |owner| this window's owner (GWLP_HWNDPARENT) and returns where the
+  // window goes: centred on the owner at the window's default size for the
+  // owner's monitor and its DPI, inside that monitor's work area. Nullopt if
+  // |owner| is not a window. Put it there with RestoreBounds before Show, so
+  // it never jumps; on a monitor with another DPI that resizes the Flutter
+  // view, so do it after replying to Dart (FlutterWindow::HandleMethodCall).
+  std::optional<RECT> OwnerBounds(HWND owner);
   HWND owner() const { return owner_; }
 
   void SetKeepOnTop(bool keep_on_top);
@@ -57,8 +60,8 @@ class Win32Window {
   // default placement).
   std::optional<RECT> ClampBounds(RECT bounds);
 
-  // Before Show: puts the window at |bounds|, a ClampBounds result, and shows
-  // it maximized if |maximized|.
+  // Before Show: puts the window at |bounds|, a ClampBounds or OwnerBounds
+  // result, and shows it maximized if |maximized|.
   void RestoreBounds(RECT bounds, bool maximized);
 
   // The outer rectangle the window has when restored (not maximized or

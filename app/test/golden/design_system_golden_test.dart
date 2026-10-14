@@ -77,6 +77,8 @@ void main() {
         await expectGolden('window_desktop_$theme');
       });
 
+      // The popup for a session the fakes don't have: the request can't be
+      // read (F5), so it says so and closing it changes nothing.
       testWidgets('window_popup', (tester) async {
         addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
         tester.platformDispatcher.platformBrightnessTestValue = brightness;

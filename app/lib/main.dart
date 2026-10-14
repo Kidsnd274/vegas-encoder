@@ -8,6 +8,7 @@ import 'app/app.dart';
 import 'app/launch.dart';
 import 'platform/window_channel.dart';
 import 'state/app_state.dart';
+import 'state/popup.dart';
 import 'state/services.dart';
 
 /// Mode dispatch: desktop, `--edit-session <dir>` or `--render-monitor <file>`.
@@ -37,8 +38,10 @@ Future<void> main(List<String> args) async {
   // decision); F6 reads the remembered pin from C7 `keepOnTop` here.
   // Only the desktop window restores bounds, so only it reads settings first.
   final remembered = mode is DesktopLaunch ? await _rememberedBounds(container) : null;
+  // The popup is owned by the VEGAS dialog its request names (C4).
+  final owner = mode is EditSessionLaunch ? await _owner(container) : null;
   await window.configure(
-    ownerHwnd: mode is EditSessionLaunch ? mode.ownerHwnd : null,
+    ownerHwnd: owner,
     keepOnTop: mode is RenderMonitorLaunch ? false : null,
     bounds: remembered?.bounds,
     maximized: remembered?.maximized,
@@ -58,6 +61,17 @@ Future<({WindowBounds bounds, bool maximized})?> _rememberedBounds(ProviderConta
     final b = ui?.desktopWindowBounds;
     if (ui == null || b == null) return null;
     return (bounds: (x: b.x, y: b.y, width: b.width, height: b.height), maximized: ui.desktopMaximized);
+  } on Object {
+    return null;
+  }
+}
+
+/// The owner window from the session's request; the popup reads the same
+/// request. A request that can't be read leaves the window unowned, and the
+/// popup shows the problem.
+Future<int?> _owner(ProviderContainer container) async {
+  try {
+    return ownerHwndOf(await container.read(editSessionRequestProvider.future));
   } on Object {
     return null;
   }

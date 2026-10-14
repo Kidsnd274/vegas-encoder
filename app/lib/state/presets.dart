@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
 
 import '../design/components/signal_path/signal_path_model.dart';
+import 'editor.dart' show RecipeEditor;
 import 'recipe_edit.dart';
 import 'services.dart';
 import 'ui_state.dart';
@@ -100,7 +101,7 @@ enum SaveOutcome { saved, savedAsNew, conflict, nothingToSave }
 
 final presetsControllerProvider = NotifierProvider<PresetsController, PresetsState>(PresetsController.new);
 
-class PresetsController extends Notifier<PresetsState> {
+class PresetsController extends Notifier<PresetsState> implements RecipeEditor {
   @override
   PresetsState build() => const PresetsState();
 
@@ -150,6 +151,7 @@ class PresetsController extends Notifier<PresetsState> {
 
   /// Applies an edit to the selected preset. Editing back to the saved recipe
   /// drops the draft, so the preset is clean again.
+  @override
   void edit(Recipe Function(Recipe r) change) {
     final id = state.selectedId;
     final saved = id == null ? null : _find(id);

@@ -1,10 +1,11 @@
 # UI behaviour specification
 
-Updated: 2026-10-14 (Asia/Singapore). Status: proposal, updated for the chosen
+Updated: 2026-10-15 (Asia/Singapore). Status: proposal, updated for the chosen
 direction; §1, §9, §10 and §11 record what the app workstream built in F0 and F1, §2
-what F2 built, and §5, §6 and §6a what F3 built (on the platform fakes; open items
+what F2 built, §3 F4, §4 the popup (F5), and §5, §6 and §6a what F3 built (open items
 are in workstreams/app.md). Since 2026-10-14 the editor runs on the native core (B2)
-and the app on the platform's Windows services (B3, F7).
+and the app on the platform's Windows services (B3, F7). The popup has met only the
+platform's fake session; nothing here ran inside VEGAS.
 
 This document covers the behaviour Flutter will implement: states, flows, the signal
 path, the size card, theme, keyboard, copy and the token structure. The chosen
@@ -16,12 +17,14 @@ The vocabulary is fixed in the brief §2.
 | Window | Default | Minimum | Notes |
 | --- | --- | --- | --- |
 | Desktop app | 1440×900 | 1100×700 | Remembers size, position and maximized (C7 `uiState`; clamped to a current monitor on restore); single instance |
-| Popup editor | 1120×740 | 960×640 | Centred on its VEGAS owner; resizable; remembers size, not position |
+| Popup editor | 1120×740 | 960×640 | Owned by the VEGAS dialog its session names and centred on it, on that monitor's DPI; resizable. Should remember its size, not position: not stored yet (C7 has desktop fields only; workstreams/app.md, Needs) |
 | Native page | Host-defined | — | Win32 inside VEGAS; see the mock |
 
 Below 1280 px width the desktop app collapses the library to an icon rail (library and
 Ctrl+K buttons; the library opens over the editor and closes on a choice, Esc or a click
-outside), and the popup moves the command preview into a collapsible bottom strip.
+outside). Below 1040 px the popup docks its side column (library and command) at the
+bottom as a collapsible "Library and command" strip, collapsed, with a one-line summary
+("Library has revision 6. No errors."), so the signal path keeps its width.
 
 ### Theme
 
@@ -273,8 +276,8 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
   selecting one puts the caret in the editor.
 - **No size estimate** in Advanced mode. The library row's **Advanced** tag leads its
   summary line ("[Advanced] x265, your command") and follows the draft.
-- **Errors** block Save in the popup (Apply, F5) and are allowed in desktop drafts: Save
-  works, and the library marks the preset with an error. *Since F7 the real library
+- **Errors** block Apply in the popup (F5: Basic checks and Advanced lint) and are
+  allowed in desktop drafts: Save works, and the library marks the preset with an error. *Since F7 the real library
   refuses a recipe the core finds errors in (C3 `RECIPE-INVALID`): the toast says
   "Couldn’t save the preset: <the library's reason>" and the draft stays. Errors that
   depend on the chosen FFmpeg still save and are marked. Which rule stands is the
@@ -282,53 +285,133 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
 
 ## 4. VEGAS popup (S3)
 
+Built in F5 (`--edit-session <dir>`, C4) on the native core and the services; checked
+with the platform's fake session only. The page in VEGAS that writes the request and
+commits the result on VEGAS's own Apply/OK is B6 work behind A5–A7.
+
+### Opening
+
+- The app reads the session's `request.json` (C4) before the window shows, and the VEGAS
+  dialog the request names (`ownerHwnd`) owns the window. It is centred on that dialog at
+  the default size for that monitor's DPI, inside its work area.
+- A request that is missing or can't be read: "Vegas Encoder couldn’t open this template:
+  <reason>. Closing this window leaves the template as it was." Apply is off; closing
+  writes nothing, which VEGAS treats as Cancel.
+
 ### Header
 
-- Template name (editable; VEGAS also has its own name field, so a hint says
-  "Rename in VEGAS to change the saved template name").
-- **From VEGAS** facts, shown in the strip's first node.
-- Origin line:
+- The template name. VEGAS has its own name field, so the line under it ends with
+  "Rename in VEGAS to change the saved template name."
+- The origin line, then **Load preset**, **Save to library ▾** and **Basic | Advanced**:
 
-| Origin state | Line | Actions |
+| Origin state | Line | Where its action is |
 | --- | --- | --- |
-| Unchanged from origin | From preset **X**, revision 5 | Load preset, Save to library |
-| Local changes | From **X**, revision 5. 2 changes in this template. | + Show changes |
-| Library is newer | Library has revision 6 | + Update from library |
-| Origin deleted | Preset **X** no longer exists in your library. This template still has all its settings. | Save to library (as new) |
-| No origin | Made in VEGAS | Save to library |
+| Unchanged from origin | From preset **X**, revision 5. | Load preset, Save to library |
+| Local changes | From **X**, revision 5. 2 changes in this template (Show changes). | Show changes, in the line |
+| Library is newer | (as above) and the side column: "Library has revision 6" | Update from library, in the side column |
+| Origin deleted | Preset **X** no longer exists in your library. This template still has all its settings. | Save as new preset…, in the side column and the menu |
+| No origin | Made in VEGAS. | Save to library |
+| Library unreadable | From **X**, revision 5. The library couldn’t be read: <reason>. | — |
+
+The count of changes is the core's diff from the origin revision's own settings (C2
+`diff`). Without a copy of that revision (`baseRecipe` null) the line gives no count.
+Switching mode or editing the command counts as a change.
+
+### Signal path
+
+- The one-row strip. A dot marks each node this template changed from its origin
+  revision; "Rev. 6" marks each node the library changed since. Both come from the core's
+  diff.
+- **From VEGAS** shows the project's facts from the request ("3840×2160", "29.97 fps,
+  10-bit", "48 kHz float"). When VEGAS didn't share them, the node reads "Set by project",
+  "Sample: 29.97 fps" and "Sample: 48 kHz float", and its panel says "Set by the project"
+  for each fact: "VEGAS didn’t share this project’s settings. The command and checks use a
+  sample: 1920×1080, 29.97 fps, 48 kHz stereo."
+- The panels are the desktop's, without the fields' explanations. Reset goes back to the
+  template as it opened. Checks are for the default FFmpeg, from what was last checked
+  (the popup never runs a check). The File node starts with the project's length when
+  VEGAS shared it; it never changes the desktop's remembered length.
+
+### Side column
+
+- **Library**: "Library has revision 6" (amber) with "The library changed “X” after
+  revision 5." and **Update from library**; "Not in the library" with **Save as new
+  preset…**; "Made in VEGAS. Save it to the library to use it in other templates.";
+  otherwise "Up to date with the library preset." **Open in Vegas Encoder** opens the
+  desktop app on the origin preset, for library work. It waits for a platform service
+  and is disabled with that reason.
+- **Command** and **Checks**, as on the desktop (Basic). In Advanced mode: "N diagnostics.
+  Edit it below the diagram."
+- Below 1040 px the side column is the collapsible "Library and command" strip (§1).
+
+### Show changes
+
+A dialog, "Changes in this template": "What this template changed from “X”, revision 5."
+and a table Setting | Rev. 5 | This template ("Quality | CRF 18 | **CRF 17**").
 
 ### Update from library dialog
 
-The dialog has two lists:
+The dialog has two lists, each a table of the settings the core's diff names:
 
-- **Changes in the library since revision 5** (what you get).
-- **Your changes in this template** (what you lose if you replace).
+- **Changes in the library since revision 5** (what you get): Setting | Rev. 5 | Rev. 6.
+- **Your changes in this template** (what you lose if you replace): Setting | Rev. 5 | This
+  template, or "None."
 
 Actions:
 
-- **Replace with revision 6**
-- **Take library changes, keep mine** (enabled only when no field appears in both lists)
+- **Replace with revision 6** (the default): the library's settings; the template keeps
+  its name.
+- **Take library changes, keep mine**: each setting the library changed takes the
+  library's value; the template's own changes stay. Enabled only when no setting is in
+  both lists; otherwise disabled with "Some settings changed in both places."
 - **Cancel**
+
+Either one makes revision 6 the origin and shows an Undo bar ("Replaced with revision 6.",
+"Took the revision 6 changes and kept yours."). Without a copy of revision 5 there is no
+three-way choice: the dialog says "This template doesn’t carry a copy of revision 5, so
+its own changes can’t be told apart from the library’s. Replacing takes all of revision
+6.", lists "This template and revision 6", and offers only Replace and Cancel.
 
 ### Load preset
 
-Choosing a preset replaces the template's settings **immediately**, with an Undo bar
-("Loaded 'Client review, 1080p 8 Mbps'. Undo"). There is no separate "apply the preset"
-step. Voukoder Classic's preset-then-Apply confused users.
+A list of the library's presets (Built-in, then Mine), each with its encoders ("x264,
+AAC") or what it needs on this PC, and the footnote "Loading replaces the template’s
+settings right away. You can undo it." Choosing a preset replaces the template's settings
+**immediately**; the template keeps its name and the preset becomes its origin. An Undo
+bar ("Loaded “Lossless master, FFV1”. Undo") stays 8 seconds. There is no separate "apply
+the preset" step. Voukoder Classic's preset-then-Apply confused users.
 
-**Open in Vegas Encoder** opens the desktop app on the origin preset, for library work.
+### Save to library
 
-### Footer
+A menu under **Save to library ▾**:
 
-- **Cancel** (Esc). Asks only if there are changes: "Discard changes to this template?"
-- **Apply to template** (Ctrl+Enter). Disabled with a reason when errors exist.
+- **Save as new preset…** "Adds it to Mine." Asks for a name (the template's name to
+  start), saves the template's settings as a new preset and makes it the origin.
+- **Update “X” (revision 5 → 7)**: the preset takes the template's settings at the
+  library's next revision and keeps its own name. Disabled for built-in origins
+  ("Built-in presets can’t be changed.") and when the template has no preset in the
+  library.
+
+### Footer and closing
+
 - Note: "Apply updates this render template. Save it in VEGAS to keep it for next time."
+  When Apply is off, the note gives the reason instead: "Fix the errors first. The
+  template can’t render with them." (Basic checks and Advanced lint), or that the core
+  couldn't check the settings.
+- **Cancel** (Esc), the title bar's close (×, labelled Cancel), Alt+F4 and the taskbar ask
+  only if something changed: "Discard changes to this template?" with **Keep editing** and
+  **Discard changes**. Discarding writes a cancel result and closes.
+- **Apply to template** (Ctrl+Enter) writes the complete settings and their origin as the
+  session's result and closes. One final result per session. If it can't be written, the
+  reason shows and the popup stays open.
+- VEGAS changes the template only on its own Apply/OK (TECH_ARCHITECTURE §5.2).
 
-**Save to library** (split button): "Save as new preset…" or "Update '<origin>'
-(revision 5 → 7)". The second is disabled for built-in origins.
+### Advanced mode
 
-**Close (×)** behaves as Cancel, with the same question.
-
+Ctrl+M or the switch, with the desktop's question when a command is already saved. The
+editor, Diagnostics and **Resolved command** (closed to start) sit under the strip; there
+is no Macros panel or "Switching back" card (macros come from autocomplete after "{").
+Lint errors turn Apply off.
 ## 5. FFmpeg screen (S4)
 
 | State | Display |
@@ -440,10 +523,10 @@ toast.
 | Ctrl+K | Open preset… (palette) | Desktop |
 | Ctrl+F | Search the library; on FFmpeg, search the encoders | Desktop |
 | Ctrl+S | Save preset | Desktop |
-| Ctrl+Enter | Apply to template | Popup |
-| Esc | Cancel / close popover | Popup, popovers |
+| Ctrl+Enter | Apply to template (when Apply is off, says why and writes nothing) | Popup |
+| Esc | Cancel (asks first when something changed); closes an open popover, dialog or suggestions first | Popup, popovers |
 | Ctrl+Shift+C | Copy command | Everywhere |
-| Ctrl+M | Switch Basic / Advanced | Editor |
+| Ctrl+M | Switch Basic / Advanced | Editor, popup |
 | Ctrl+Space | Suggestions at the caret | Advanced editor |
 | Arrows, Tab / Enter, Esc | Move, insert, close the suggestions | Advanced editor, while open |
 | Arrow keys | Move between signal path nodes | Diagram |

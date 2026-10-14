@@ -14,10 +14,9 @@ void main() {
       expect(mode.window, LaunchWindow.editSession);
     });
 
-    test('--owner is read as a decimal HWND (provisional until C4)', () {
+    test('the owner comes from the request (C4), not the command line', () {
       final mode = LaunchMode.fromArguments(['--edit-session', 'dir', '--owner', '263568']);
-      expect(mode, const EditSessionLaunch('dir', ownerHwnd: 263568));
-      expect(LaunchMode.fromArguments(['--edit-session', 'dir', '--owner', 'abc']), const EditSessionLaunch('dir'));
+      expect(mode, const EditSessionLaunch('dir'), reason: 'the provisional --owner is gone');
     });
 
     test('--render-monitor takes the live status file', () {

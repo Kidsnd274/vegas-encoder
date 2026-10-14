@@ -21,6 +21,8 @@ class CommandColumn extends StatelessWidget {
     required this.multiline,
     required this.onToggleLayout,
     this.litFields,
+    this.width = defaultWidth,
+    this.leading = const [],
   });
 
   final EditorData data;
@@ -35,7 +37,13 @@ class CommandColumn extends StatelessWidget {
   /// are lit.
   final ValueListenable<List<String>?>? litFields;
 
-  static const double width = 432;
+  /// 432 on the desktop; the popup's side column is narrower.
+  final double width;
+
+  /// Sections above the command (the popup's library section).
+  final List<Widget> leading;
+
+  static const double defaultWidth = 432;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +60,7 @@ class CommandColumn extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 12, 14, 16),
         children: [
+          ...leading,
           Row(
             children: [
               Expanded(child: CommandHeader(onCopy: compiled == null ? null : () => copyCommand(compiled.commandLine))),

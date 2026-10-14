@@ -17,6 +17,7 @@ import '../../state/presets.dart';
 import '../../state/services.dart';
 import '../../state/ui_state.dart';
 import '../advanced/advanced_workspace.dart';
+import '../advanced/mode_switch.dart';
 import 'command_column.dart';
 import 'display.dart';
 import 'library_model.dart';
@@ -242,31 +243,14 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
       }
       return;
     }
-    final seed = data.compiled.value?.advancedTemplate;
-    String? template;
-    if (data.recipe.command.template.trim().isEmpty) {
-      template = seed;
-    } else {
-      final choice = await showVeDialog<_Seed>(
-        context,
-        title: 'Switch to Advanced',
-        message:
-            'This preset already has a command from Advanced mode. Use it, or start again from the current '
-            'Basic settings? The Basic settings are kept either way.',
-        actions: const [
-          VeDialogAction('Cancel', _Seed.cancel),
-          VeDialogAction('Replace it with the current settings', _Seed.replace),
-          VeDialogAction('Use your saved command', _Seed.keep, variant: VeButtonVariant.primary),
-        ],
-      );
-      if (!mounted || choice == null || choice == _Seed.cancel) return;
-      if (choice == _Seed.keep) {
-        _controller.setMode(advanced: true);
-        _afterFrame(_commandEditor.requestFocus);
-        return;
-      }
-      template = seed;
+    final start = await askAdvancedStart(context, data);
+    if (!mounted || start == AdvancedStart.cancel) return;
+    if (start == AdvancedStart.keepSaved) {
+      _controller.setMode(advanced: true);
+      _afterFrame(_commandEditor.requestFocus);
+      return;
     }
+    final template = data.compiled.value?.advancedTemplate;
     if (template == null) {
       _showToast(
         'Advanced mode starts from the command, which the core couldn’t build: '
@@ -467,9 +451,6 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
 
 enum _Conflict { cancel, saveAsNew, overwrite }
 
-/// The question when switching to Advanced with a command already saved.
-enum _Seed { cancel, replace, keep }
-
 class _Centered extends StatelessWidget {
   const _Centered(this.text);
   final String text;
@@ -641,6 +622,7 @@ class _Editor extends ConsumerWidget {
                 onSwitchToBasic: () => onMode(EditorMode.basic),
                 onReplaceWithBasic: onReplaceWithBasic,
                 onCopy: onCopy,
+                onTemplateChanged: controller.setTemplate,
               ),
             ),
           )
@@ -660,7 +642,7 @@ class _Editor extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _PanelHeader(node: node),
+                              NodePanelHeader(node: node),
                               const SizedBox(height: 14),
                               KeyedSubtree(
                                 key: ValueKey('$id/${node.name}'),
@@ -700,41 +682,6 @@ class _Editor extends ConsumerWidget {
               ),
             ),
           ),
-      ],
-    );
-  }
-}
-
-/// `.ip-h`: the node's name and what it does.
-class _PanelHeader extends StatelessWidget {
-  const _PanelHeader({required this.node});
-  final SignalNode node;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = VeTokens.of(context);
-    final c = t.colors;
-    final (title, sub, color) = switch (node) {
-      SignalNode.source => ('From VEGAS', 'What the project delivers', c.faint),
-      SignalNode.video => ('Video encoder', 'Encodes the frames', c.videoWire),
-      SignalNode.audio => ('Audio encoder', 'Encodes the samples', c.audioWire),
-      SignalNode.container => ('Container', 'Joins the streams into one file', c.containerWire),
-      SignalNode.file => ('File', 'Where the render goes, and how big it will be', c.containerWire),
-    };
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
-        ),
-        const SizedBox(width: 8),
-        Semantics(header: true, child: Text(title, style: t.text.panelTitle)),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(sub, style: t.text.small.copyWith(color: c.muted)),
-        ),
       ],
     );
   }

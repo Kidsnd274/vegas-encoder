@@ -1,21 +1,23 @@
 # App workstream
 
-Updated: 2026-10-14 (Asia/Singapore). Branch `ws/app`. Status: **F0, F1 and F4 done;
-F2 and F3 done except the parts waiting on platform** (listed under Needs). **The app
-runs on the native core (B2)**: edits update the command, checks, signal path and
-estimate (the core part of F7), and the desktop starts in ~540 ms (runner fix,
-2026-10-14). **F4, Advanced mode, is built on the native core, autocomplete included**
-(`87af9f0`, `658d0ef`); its highlighting waits on the core for stage and macro roles
-(Needs). Master through `a0d33c4` (B1, B3, B4) is merged; the native core carries B1's
-Windows FFmpeg data and its goldens are regenerated (`4829f8e`). **F7's service part is
-done: the app runs on the platform's Windows services (B3)**, with the §9.3 budgets
-measured on real data (below). Next: F5, the VEGAS popup.
+Updated: 2026-10-15 (Asia/Singapore). Branch `ws/app`. Status: **F0, F1, F4 and F5
+done; F2 and F3 done except the parts waiting on platform** (listed under Needs). **The
+app runs on the native core (B2) and the platform's Windows services (B3)** (F7's
+service part, `0d33d43`), with the §9.3 budgets measured on real data (Tests). Master
+through `a0d33c4` (B1, B3, B4) is merged; the native core carries B1's Windows FFmpeg
+data and its goldens are regenerated (`4829f8e`). **F5, the VEGAS popup, is built**
+(`--edit-session`, UI_SPEC §4, S3): the C4 request and result through
+`EditSessionService`, the template header and origin line, the one-row strip, Load preset,
+Show changes, Update from library, Save to library, Apply and Cancel, and Advanced mode
+in a compact layout. Next: **F6, the render progress window** (C5, `--render-monitor`,
+design S6, UI_SPEC §12).
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
 widget and golden tests on the platform fakes and the native core; the Windows services
-with unit tests on temporary folders. No FFmpeg ran for this work.
-
+with unit tests on temporary folders. No FFmpeg ran for this work. The popup's sessions
+in tests come from the platform's `FakeEditSessionService`; no VEGAS page wrote a
+request, and A5–A7 (page exchange, template persistence) are not claimed.
 ## Done
 
 **F0: project, runner, modes, theme, fonts, spikes.**
@@ -256,13 +258,144 @@ debug builds, and the goldens use it.
   quoting and division; older records keep the fallback.
 - Settings > About names the data folders ("This PC. Settings and presets are in …").
 
+**F5: the VEGAS popup** (2026-10-15; UI_SPEC §4, S3 in `design/signal-flow.html`;
+`state/popup.dart`, `features/popup/`, `main.dart`, `windows/runner/`):
+
+- **Launch.** `--edit-session <dir>`: `main` reads the C4 request through
+  `EditSessionService` (`editSessionRequestProvider`, the same container the app then
+  uses) before `configure`, and takes the owner from the request's `ownerHwnd`
+  (`ownerHwndOf`; the provisional `--owner` argument is gone). A missing or invalid request
+  leaves the window unowned and the popup says "Vegas Encoder couldn’t open this template:
+  <reason>. Closing this window leaves the template as it was."; closing writes nothing
+  (C4: no result means cancel). The session file is read once, with no retries (Riverpod's
+  default retry would hold the popup in loading). A core that didn't load makes the real
+  session service refuse (`CORE-CONTRACT`), shown the same way.
+- **Header.** The template name, then the origin line with the preset's name in bold and
+  "Rename in VEGAS to change the saved template name." (`originLine`,
+  `features/popup/display.dart`): "From preset X, revision 5." (unchanged); "From X,
+  revision 5. 2 changes in this template (Show changes)." (the count is the core's diff from
+  the origin revision); the library's newer revision in the side column with Update from
+  library; "Preset X no longer exists in your library. This template still has all its
+  settings."; "Made in VEGAS."; and "From X, revision 5. The library couldn’t be read:
+  <reason>." Load preset, Save to library ▾ and Basic | Advanced on the right.
+- **Strip.** `SignalPathLayout.strip` with origin marks from C2 `diff`
+  (`originMarks`): a dot on nodes this template changed, "Rev. 6" on nodes the library
+  changed since the template's revision. From VEGAS shows the project's facts from the
+  request ("3840×2160 / 29.97 fps, 10-bit / 48 kHz float"). When VEGAS didn't share them
+  (`context.media` null) the node reads "Set by project" (the strip's short title;
+  `SignalSource.stripTitle`), "Sample: 29.97 fps", "Sample: 48 kHz float"; the From VEGAS
+  panel says "Set by the project" for each fact and that the command and checks use a
+  sample (`PreviewMedia.projectUnknown`). The preview compiles with the project's media
+  when known, else the documented sample.
+- **Editing.** The node panels and the command column are the desktop's, on
+  `popupEditorProvider` (a fresh compile of the template, the default FFmpeg's cached
+  capabilities only: the popup never probes). The panels hide the fields' explanations
+  (S3). Reset goes back to the template as it opened. The File node's length starts at the
+  project's length from the request and is never written to C7's remembered length.
+- **Load preset.** A list of the library's presets (Built-in, then Mine), read once each
+  time it opens (`popupLibraryListProvider`, not a watch), each with its recipe-based
+  line ("x264, AAC", or "Needs …: not in this FFmpeg"; no compile per row). Choosing one
+  replaces the settings at once, keeps the template's name and makes the preset the
+  origin; the Undo bar ("Loaded “X”. Undo") lasts 8 seconds.
+- **Show changes / Update from library** (`popup_dialogs.dart`), both from C2 `diff`
+  with settings named as the controls name them (`fieldLabel`, `fieldValue`: "CRF 17",
+  "320 kb/s", "x264"). Update from library lists "Changes in the library since revision
+  5" (Rev. 5 | Rev. 6) and "Your changes in this template" (Rev. 5 | This template);
+  "Take library changes, keep mine" is enabled only when no setting is in both lists
+  (otherwise disabled, "Some settings changed in both places.") and takes the library's
+  value for each of its paths with the existing `resetField`; "Replace with revision 6"
+  takes the library's settings and keeps the template's name. Both have Undo. Without a
+  `baseRecipe` there is no three-way offer: the dialog lists "This template and revision
+  6" and offers only Replace, and the origin line gives no change count.
+- **Save to library ▾.** "Save as new preset…" asks for a name (the template's name;
+  made unique), saves to Mine with origin `builtin/<id>` or `preset/<id>@<revision>` and
+  makes the new preset the origin. "Update “X” (revision 5 → 7)" saves the template's
+  settings to the origin at the library's next revision (the preset keeps its own name);
+  disabled for built-ins ("Built-in presets can’t be changed.") and without an origin in
+  the library. A revision conflict re-reads the library and says so.
+- **Open in Vegas Encoder** (side column) waits for a platform service: no C3 service
+  starts the desktop app, so `desktopAppLauncherProvider` is null and the button is
+  disabled with that reason (Needs). Tests supply a launcher to check the action.
+- **Footer and closing.** "Apply updates this render template. Save it in VEGAS to keep it
+  for next time." Cancel (Esc), the title bar's close (labelled Cancel), Alt+F4 and the
+  taskbar ask "Discard changes to this template?" (Keep editing / Discard changes) only
+  when the settings or the origin changed. Apply to template (Ctrl+Enter) is disabled
+  while the core finds errors (Basic checks, Advanced lint) or couldn't compile, and the
+  footer shows why ("Fix the errors first. The template can’t render with them."). Apply
+  writes `{action: apply, recipe, origin}`, Cancel `{action: cancel}`, once per session
+  (`PopupState.finished`); then the window closes and a second close request exits at
+  once. A result the service refuses (for example `RECIPE-INVALID`) is shown and the popup
+  stays open; a cancel that can't be written still closes.
+- **Advanced mode** (Ctrl+M or the switch, with the same seed question as the desktop):
+  `AdvancedWorkspace(compact: true)`: the editor, Diagnostics and the resolved command
+  (closed) under the strip, no desktop side column; the popup's side column keeps the
+  library and says "N diagnostics. Edit it below the diagram."
+- **Narrow popup.** Below 1040 px (the minimum is 960) the side column docks at the bottom
+  as a collapsible "Library and command" strip, collapsed, with a summary such as "Library
+  has revision 6. No errors." (UI_SPEC §1).
+- **Shared editor pieces** generalised for the popup: `RecipeEditor` (what the panels
+  edit; `PresetsController` and `PopupController` implement it); `EditorData.saved`,
+  `.paths` and `.preview`; `PanelScope` on `RecipeEditor`; `AdvancedWorkspace`
+  `onTemplateChanged` and `compact`; `CommandColumn` `width` and `leading`;
+  `NodePanelHeader` moved to `panel_kit.dart`; the seed question as `askAdvancedStart`
+  (`features/advanced/mode_switch.dart`). Design system: `VeDialogAction` `enabled` and
+  `tooltip`, `showVeDialog` `width`, `VeBlurbs` (hides field explanations),
+  `SignalPathModel.withMarks`, `SignalSource.stripTitle`.
+- **Runner: placement over the owner** (`win32_window.cpp`, `flutter_window.cpp`).
+  `OwnerBounds` sets the owner and works out the window's rect from the owner's monitor:
+  its DPI, the default size scaled as `Create` scales it, centred on the owner and kept in
+  the work area as `ClampBounds` keeps the desktop window. `configure` replies first and
+  then places the window (`RestoreBounds`), with the deferred show, so a VEGAS window on a
+  monitor with another DPI no longer centres with the primary monitor's size or blocks the
+  reply. This closes the open item in code; F5 recheck: results pending from the spike
+  run.
+
 ## Tests
 
-`flutter test` in `app/`: **416 tests, all passing** (403 before F7, 348 before F4).
-`flutter analyze`: no issues. Platform fakes for services everywhere except the Windows
+`flutter test` in `app/`: **470 tests** (416 before F5, 403 before F7, 348 before F4;
+F5's count is from the test files, to be confirmed by the final run). `flutter analyze`:
+no issues. Platform fakes for services everywhere except the Windows
 services tests below; the fake core for the F0–F3 tests and the native core (B2, through
 `dart:ffi`, in the `flutter test` VM) for the core tests; a fake window controller; for
 F3 two test doubles (`test/ffmpeg_doubles.dart`: a probe and hardware tests that stall).
+
+F5 added (54), on the native core (B2) for everything in the popup, the platform's fake
+services (`FakeEditSessionService`, `FakePresetLibrary` with `yt-h264` at revision 6), a
+fake window controller, no FFmpeg, no VEGAS:
+
+- Widget (`popup_test.dart`, 24): the fake session's name, origin line, strip facts and
+  marks (dot on video, "Rev. 6" on audio) and the library banner; unshared project facts
+  ("Set by the project", "Sample: …", the panel's sample note, still compiled); a missing
+  request shown and closed with no result; `--edit-session` without a directory; the
+  narrow (960 px) dock, collapsed then opened; the owner HWND from the request. Apply
+  (Ctrl+Enter) writes the complete settings and the request's origin once, closes, and a
+  later exit request exits; Cancel with no changes writes a cancel at once; Esc with
+  changes asks, Keep editing keeps it open, Discard writes the cancel; Alt+F4 / the title
+  bar asks the same and returns cancel until the result is written; an Extra-argument
+  error turns Apply off with the reason, and Ctrl+Enter writes nothing. Load preset
+  (popover footnote, settings replaced, name kept, origin, Undo bar and Undo); Update from
+  library (both lists, "keep mine" enabled, merged result, origin revision 6); Replace
+  with revision 6 and Undo; "keep mine" disabled with its reason when a setting changed in
+  both places; Replace only without `baseRecipe`; Show changes; made in VEGAS (nothing to
+  update); a deleted origin; Save as new preset… (name dialog, `builtin/yt-h264`, becomes
+  the origin, Update then offered with "revision 1 → 2"); Update “Client H.264”
+  (revision 3 → 4, the preset keeps its name); Open in Vegas Encoder disabled with its
+  reason, and calling a supplied launcher. Advanced: Ctrl+M, the compact editor, the
+  resolved command closed, "Edit it below the diagram." in the side, no Macros panel, the
+  dashed strip, and a lint error (no `{output}`) turning Apply off.
+- Unit (`popup_display_test.dart`, 11): the origin line in each state (unchanged, local
+  changes and the change sentence, library newer, deleted, made in VEGAS, unreadable) and
+  "revision 5 → 7"; setting labels and values ("CRF 17", "320 kb/s", "12 Mb/s",
+  "8.5 Mb/s", "x265", "10-bit", "2 s", "Encoder default", "None", "Off", "Advanced", "As
+  the project"); the strip's marks; when "Take library changes, keep mine" is possible.
+- Golden (`popup_golden_test.dart`, 9 states × light and dark = 18 images, **on the native
+  core**): `video` (the fake session), `update` (the dialog), `load` (the popover),
+  `unknown` (made in VEGAS, project facts not shared, From VEGAS open), `advanced`,
+  `errors` (Apply off with the reason), `deleted`, `discard` (the question) and `min`
+  (960×640, docked). Each was looked at. `window_popup` (design-system goldens, fake core)
+  was regenerated: its session isn't in the fakes, so it now shows the "couldn’t open this
+  template" state instead of the F0 placeholder. The app shell test (`app_test.dart`) now
+  opens the fake's `b0-session`; `launch_test.dart` checks `--owner` is no longer read.
 
 F7 added (13):
 
@@ -524,6 +657,11 @@ The desktop's first frame no longer waits for the library: the file library deli
 after it. The 20 desktop runs saved their bounds to the scratch `machine.json`
 (revision 20), so window bounds now survive a restart.
 
+**F5 recheck (2026-10-15), the popup's owner from `request.json`.** F5 recheck: results
+pending from the spike run. (Release build, `-Checks start` and `-Checks owner`, fake
+host, `VEGAS_ENCODER_DATA_ROOT` on a scratch folder; the harness writes the session's
+`request.json` with the fake host's HWND.)
+
 - **Renderer: deferred.** The runner defaults to Skia for start time;
   `RendererFromEnvironment` in `windows/runner/main.cpp` is the one place to change, and
   `VEGAS_ENCODER_RENDERER=impeller` tries Impeller. Re-measure on each Flutter upgrade
@@ -574,11 +712,18 @@ Delivered and **not used yet** (app work, Open items): `FFmpegInstallation.healt
 Show in folder, History's Open folder). `PresetTransfer.duplicate` copies the source's
 star; the app keeps its own copy path so a copy starts unstarred and can hold a draft.
 
+Used in F5 with no change: C4 `EditSessionService` (`readRequest`, `writeResult`, the fake's
+`b0-session`), `EditSessionRequest.ownerHwnd`, `origin`, `baseRecipe` and `context`;
+C2 `diff` for the origin line, the strip's marks and both dialogs; C3 `PresetLibrary.get`,
+`list` and `save` for Load preset and Save to library.
+
 Open (additive):
 
 | Need | Request |
 | --- | --- |
-| Library watch cost (F7) | `FilePresetLibrary.watch` re-reads, decodes and normalizes (FFI) every preset file each 250 ms, on the app's UI isolate. Measured with 500 presets: **430–470 ms per tick**, so the poll runs back to back; with a handful of presets it is a few ms every 250 ms. Please list the folder and re-read only files whose size or time changed (keeping the decoded preset and requirements), or watch the folder with `ReadDirectoryChangesW`, or poll off the caller isolate. §9.3's 500-preset budget can't be met while this runs |
+| Open in Vegas Encoder (F5) | UI_SPEC §4: the popup opens the desktop app on the origin preset. No C3 service starts the desktop app (or hands an existing one a preset), and the app starts no processes itself (AGENTS.md). Please add one, for example `DesktopApp.openPreset(presetId)` that starts `VegasEncoder.exe` with a preset argument or asks the running single instance to select it. The button is disabled with that reason until then (`desktopAppLauncherProvider` is null) |
+| Popup size (F5) | UI_SPEC §1: the popup remembers its size, not its position. C7 `uiState` has desktop fields only, so the popup opens at its default size every time. Please add an additive `popupWindowSize` (physical width and height, or logical) to `AppUiState`, or the owner decides the popup keeps the default size |
+| Render As path in the popup (F5) | C4 `context` carries the project but not the file Render As will write, so the popup's command and Advanced's resolved command use the sample path (`D:\Renders\Sample project.mp4`; the resolved command says "for the sample project"). If the page can know the path, an additive `context.outputPath` would let the preview show it; otherwise nothing changes |
 | Capability transfer in Advanced mode (F7) | Lint and compile each serialize the full capability map (156–236K characters) through FFI: **25–32 ms per keystroke** in Advanced mode (budget 4 ms). Please let the core keep a capability map it was given (an ID or handle per identity key) so later calls pass the ID, or offer one call that lints and compiles a template together |
 | Saving a recipe with errors (F7, owner decision) | `FilePresetLibrary.save` refuses a recipe the core finds errors in (`RECIPE-INVALID`); UI_SPEC §3 says desktop drafts with errors can be saved and are marked in the library. The app shows the refusal with the library's reason and keeps the draft. Either the library accepts them (platform change) or UI_SPEC changes to "errors block Save" (app change, already the behaviour). Errors that depend on the chosen FFmpeg still save and are marked |
 | Advanced token roles (F4) | In Advanced mode every user word comes back as role `extra`, so the editor can't colour options by stage (video, audio, mux, global), draw stage stripes or style macros. Please give Advanced tokens the same stage roles Basic tokens have and role `macro` (already in `TokenRole`) for a word that held a macro, keeping `sourceStart`/`sourceEnd`. An option/value marker per token would replace the app's "starts with -[letter]" bold rule. The app reads these with no change; until then only option names (bold) and the chips stand out |
@@ -586,6 +731,7 @@ Open (additive):
 | Encoder IDs in Advanced (F4) | The Advanced summary names the command's encoders by label ("x265", or the raw name), so nodes can't show availability for the chosen FFmpeg (lint's `L-ENCODER` covers a missing one). A `videoEncoderId`/`audioEncoderId` (summary or signal facts) would let the nodes show Ready / Not in this FFmpeg |
 | Temporary output name (F4) | "Resolved command" shows the sample Render As path for `{output}`; SETTINGS_AND_COMMANDS §4 says the engine writes a temporary name. If the preview should show it, C2 needs the naming rule (or a `CompilePaths` helper) |
 | Partial highlighting (F4) | With an unterminated quote, compile returns no tokens, so the editor loses its chips (and their guard) until the quote is closed; lint reports `L-QUOTE` over the whole text. Spans for the words before the open quote, and the quote's position, would keep them |
+
 ## Open items
 
 Waiting on platform (see Needs): the recommended quality band (a product-policy choice,
@@ -602,8 +748,33 @@ and probes were not run from the app: no FFmpeg ran for F7.
 Waiting on platform for F4: Advanced stage and macro roles, a macro list, encoder IDs
 in Advanced mode, the temporary output name, partial highlighting with an open quote.
 
-App side: the popup (F5), including its collapsible command strip and Apply blocked by
-errors (Advanced included). F4 points to check in use:
+Waiting on platform for F5: starting the desktop app (Open in Vegas Encoder), a stored
+popup size, the Render As path in the session context. Gated: the popup has only met
+the platform's fake session; the native page, real requests and VEGAS's own Apply/OK
+commit are B6 work behind A5–A7.
+
+F5 points to check in use:
+
+- **Real VEGAS host.** Ownership, focus, modality and placement were checked against a
+  WinForms fake host only; the popup's input and focus inside VEGAS's Custom Template
+  dialog are part of the P4 checklist (TECH_ARCHITECTURE §5.2).
+- **Another-DPI owner**: fixed in code (`OwnerBounds`, placed after the `configure`
+  reply). Whether it was measured on a second monitor with another scale is in the F5
+  recheck under Spike results.
+- **Load preset** reads the library once each time the list opens (no watch), and its
+  lines are recipe-based ("x264, AAC") without a compile per preset, so they don't show
+  the core's quality summary.
+- **Update “X” (revision 5 → 7)** writes the template's settings over the library's
+  newer revision 6; the label shows both numbers, but nothing else warns about it.
+- The popup's checks use the default FFmpeg's cached capabilities only (never a probe);
+  with nothing cached, the core's curated profile data stands in and says so.
+- Below 1040 px the "Library and command" dock starts collapsed; its summary line names
+  the library state and the error count, so an Update from library offer is one click
+  away rather than in view.
+- Changing the template's mode or command counts as changes in the origin line (the
+  core's diff includes `command.mode` and `command.template`).
+
+F4 points to check in use:
 
 - **Ctrl+Space** is the Windows IME on/off key for some Chinese layouts; with such an
   IME the system may take it first. Not tried on this PC.
@@ -634,10 +805,9 @@ clicked through in the running app. Small display points seen on the native core
 
 Window start (runner), unverified or not fixed:
 
-- **Popup over a VEGAS window on another-DPI monitor** (F5): `PlaceOnOwner` likely pays
-  the same ~100 ms engine wait before its `configure` reply, and centres with the size
-  from before the DPI change, so it could land off-centre. Split it like
-  `ClampBounds`/`RestoreBounds`, reuse the deferred show, re-centre after the change.
+- **Popup over a VEGAS window on another-DPI monitor** (F5): split like
+  `ClampBounds`/`RestoreBounds` (`OwnerBounds`, placement after the reply, the deferred
+  show). Closed in code; see the F5 recheck for what was measured.
 - **Restoring maximized** shows a stretched first frame for ~20–40 ms (the restored-size
   frame scaled up). Present before the fix too. Sizing the hidden window to the maximized
   client size before the first frame may avoid it (untested).
@@ -645,19 +815,37 @@ Window start (runner), unverified or not fixed:
 
 ## Handoff for the next app agent
 
-Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md (C4 for sessions),
-this file and UI_SPEC (§4 popup, §3 Advanced) first. F4 is done; the app runs on the
-native core (B2) with fake services. Next: **F5, the VEGAS popup** (UI_SPEC §4, S3 in
-`design/signal-flow.html`): `--edit-session <dir>` reads the C4 request through
-`EditSessionService` (fake seeds `b0-session`), the template header with the "Rename in
-VEGAS" hint, the one-row strip (`SignalPathLayout.strip`), origin line and Update from
-library (C2 `diff`), Load preset, Apply to template (Ctrl+Enter) blocked by errors and
-Cancel writing the C4 result. Project facts may be null ("Set by the project"); sample
-facts are labelled as samples. The popup's Advanced mode reuses `AdvancedWorkspace`'s
-pieces in a compact layout (resolved command closed, "N diagnostics" in the side).
-Window work (owner HWND, re-centre on another-DPI monitor) needs a release build and
-`tool/spikes/run_window_spikes.ps1`. Nothing runs in VEGAS until B6.
+Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md (C5 for live status, C7
+for `keepOnTop`), TECH_ARCHITECTURE §5.6, this file and UI_SPEC §12 first. F5 is done;
+the app runs on the native core (B2) and the Windows services (B3), with fakes in tests.
+Next: **F6, the render progress window** (UI_SPEC §12, S6 in
+`design/signal-flow.html`), replacing the F0 shell in `features/monitor/monitor_window.dart`:
 
+- `--render-monitor <file>` reads the C5 live file through `liveStatusReaderProvider`
+  (`FileLiveRenderStatusReader.watch`; tests use `FakeLiveRenderStatusReader`, whose
+  `samples()` give one status per state and `publish(file, status)` drives a test). A
+  missing file is null at first; a malformed or stale replacement keeps the last good
+  snapshot and never means the render ended.
+- The window never takes focus (`WS_EX_NOACTIVATE`, already in the runner) and shows
+  near VEGAS: C5 `hostHwnd` names VEGAS's main window for the monitor (the runner places
+  the window on the foreground window's monitor today; use `hostHwnd` when it is valid,
+  else that fallback). Keep on top starts from C7 `keepOnTop`; the pin writes it through
+  `machineSettingsWriterProvider`.
+- It shows state, frames, fps, speed, bitrate, size so far and the estimate, closes a few
+  seconds after `done`, and stays open after `failed` or `cancelled`. Cancelling stays in
+  VEGAS. Nothing in the window may make Render wait (AGENTS.md).
+- The owner's performance rule (TECH_ARCHITECTURE §5.6): if the window costs more than
+  about 2% of render time or 120 MB, it is dropped. Keep its startup to the live file
+  only (the services are built lazily; the window must not load the core or the
+  library).
+- Runner or window changes need a release build and `tool/spikes/run_window_spikes.ps1`
+  (`-Checks monitor`, `start`; never `all` or `theme`), with `VEGAS_ENCODER_DATA_ROOT`
+  on a scratch folder. Nothing runs in VEGAS until B6.
+
+- The popup (F5) lives in `state/popup.dart` (session, controller, `popupEditorProvider`,
+  `popupChangesProvider`, `applyBlocked`) and `features/popup/` (window, editor, dialogs,
+  `display.dart` for the origin line and setting names). Its tests use the native core and
+  a `FakeEditSessionService` per test (`resultFor` reads what was written).
 - Advanced mode (F4) lives in `features/advanced/` (mapping in `display.dart`, the
   workspace, the macro provider) and `design/components/command_editor.dart`. The editor
   asks its controller's `describe` for the model of any text; the workspace answers from
@@ -683,8 +871,10 @@ Window work (owner HWND, re-centre on another-DPI monitor) needs a release build
 - Machine settings writes go through `machineSettingsWriterProvider`
   (`state/settings.dart`); don't call `save` directly.
 - Riverpod 3 retries a failed provider; while it retries, the value is loading with the
-  error, so check `hasError` rather than matching `AsyncError`. Guard state writes after
-  an await with `ref.mounted`.
+  error, so check `hasError` rather than matching `AsyncError`. A provider whose failure
+  won't fix itself (the session file) passes `retry:` returning null. Guard state writes
+  after an await with `ref.mounted`; Riverpod pauses a provider nobody listens to, so
+  listen while awaiting a refreshed stream.
 - `CoreResult` (`state/editor.dart`) keeps a core failure explicit; the editor says
   what's missing instead of showing an old result.
 - Before each commit: `flutter analyze`, `flutter test`; regenerate goldens only for

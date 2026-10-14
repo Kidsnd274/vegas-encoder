@@ -16,21 +16,10 @@ sealed class LaunchMode {
         if (value == null || value.isEmpty || value.startsWith('--')) {
           return LaunchError(arg, '$arg needs a path after it.');
         }
-        return arg == '--edit-session'
-            ? EditSessionLaunch(value, ownerHwnd: _ownerFrom(args))
-            : RenderMonitorLaunch(value);
+        return arg == '--edit-session' ? EditSessionLaunch(value) : RenderMonitorLaunch(value);
       }
     }
     return const DesktopLaunch();
-  }
-
-  /// Provisional `--owner <hwnd>` (decimal). The edit-session contract (C4)
-  /// puts the owner in request.json, read through ve_services; this argument
-  /// lets the window spike and fake hosts run before that exists.
-  static int? _ownerFrom(List<String> args) {
-    final i = args.indexOf('--owner');
-    if (i < 0 || i + 1 >= args.length) return null;
-    return int.tryParse(args[i + 1]);
   }
 
   /// The window kind the runner created for these arguments.
@@ -49,18 +38,17 @@ final class DesktopLaunch extends LaunchMode {
   int get hashCode => 0;
 }
 
-/// `--edit-session <dir>`: the VEGAS popup for one session directory.
+/// `--edit-session <dir>`: the VEGAS popup for one session directory. The
+/// owner window comes from the session's request (C4 `ownerHwnd`).
 final class EditSessionLaunch extends LaunchMode {
-  const EditSessionLaunch(this.sessionDir, {this.ownerHwnd});
+  const EditSessionLaunch(this.sessionDir);
   final String sessionDir;
-  final int? ownerHwnd;
   @override
   LaunchWindow get window => LaunchWindow.editSession;
   @override
-  bool operator ==(Object other) =>
-      other is EditSessionLaunch && other.sessionDir == sessionDir && other.ownerHwnd == ownerHwnd;
+  bool operator ==(Object other) => other is EditSessionLaunch && other.sessionDir == sessionDir;
   @override
-  int get hashCode => Object.hash(sessionDir, ownerHwnd);
+  int get hashCode => sessionDir.hashCode;
 }
 
 /// `--render-monitor <file>`: the progress window for one live status file.

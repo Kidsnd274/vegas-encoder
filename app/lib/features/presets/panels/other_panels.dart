@@ -7,6 +7,7 @@ import '../../../design/components/size_card.dart';
 import '../../../design/components/switch.dart';
 import '../../../design/format.dart';
 import '../../../design/tokens.dart';
+import '../../../state/editor.dart' show PreviewMedia;
 import '../../../state/preview.dart';
 import '../../../state/recipe_edit.dart';
 import '../display.dart';
@@ -23,27 +24,39 @@ class SourcePanel extends StatelessWidget {
     final m = scope.data.media;
     final v = m.video;
     final a = m.audio;
+    final preview = scope.data.preview;
+    const unset = 'Set by the project';
+    final known = preview != PreviewMedia.projectUnknown;
     return PanelColumns(
       left: [
         PanelFacts([
-          ('Frame size', '${v.width}×${v.height}'),
-          ('Frame rate', '${VeFormat.fps(v.fps[0], v.fps[1])} (${v.fps[0]}/${v.fps[1]})'),
-          ('Pixel format', deliveredPixelFormat(v.pixfmt)),
+          ('Frame size', known ? '${v.width}×${v.height}' : unset),
+          ('Frame rate', known ? '${VeFormat.fps(v.fps[0], v.fps[1])} (${v.fps[0]}/${v.fps[1]})' : unset),
+          ('Pixel format', known ? deliveredPixelFormat(v.pixfmt) : unset),
           (
             'Audio',
-            a == null
+            !known
+                ? unset
+                : a == null
                 ? 'None'
                 : '${kiloHertz(a.rate)}, ${deliveredSampleFormat(a.sampleFmt)}, ${channelsLabel(a.channels)}',
           ),
-          ('Length', m.durationSec == null ? 'Set by the project' : VeFormat.duration(m.durationSec!)),
+          ('Length', !known || m.durationSec == null ? unset : VeFormat.duration(m.durationSec!)),
         ]),
       ],
-      right: const [
-        PanelStatic(
+      right: [
+        const PanelStatic(
           'VEGAS renders every frame and sends it to FFmpeg through a pipe. This is read-only; '
           'the project settings in VEGAS decide it.',
         ),
-        PanelBlurb('These are sample values for the preview. A real render uses the project’s own size and rate.'),
+        PanelBlurb(switch (preview) {
+          PreviewMedia.sample =>
+            'These are sample values for the preview. A real render uses the project’s own size and rate.',
+          PreviewMedia.project => 'These are the project’s settings, as VEGAS shared them with this template.',
+          PreviewMedia.projectUnknown =>
+            'VEGAS didn’t share this project’s settings. The command and checks use a sample: '
+                '${mediaSummary(m)}.',
+        }),
       ],
     );
   }

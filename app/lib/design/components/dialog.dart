@@ -6,13 +6,21 @@ import 'button.dart';
 import 'text_field.dart';
 
 /// One button in a [showVeDialog]. The last action is the default and has
-/// focus when the dialog opens.
+/// focus when the dialog opens. A disabled action says why in [tooltip].
 @immutable
 class VeDialogAction<T> {
-  const VeDialogAction(this.label, this.value, {this.variant = VeButtonVariant.secondary});
+  const VeDialogAction(
+    this.label,
+    this.value, {
+    this.variant = VeButtonVariant.secondary,
+    this.enabled = true,
+    this.tooltip,
+  });
   final String label;
   final T value;
   final VeButtonVariant variant;
+  final bool enabled;
+  final String? tooltip;
 }
 
 /// A small modal question (UI_SPEC §2: "Save changes to 'name'?"). Esc and
@@ -23,6 +31,7 @@ Future<T?> showVeDialog<T>(
   String? message,
   Widget? content,
   required List<VeDialogAction<T>> actions,
+  double width = 440,
 }) {
   final t = VeTokens.of(context);
   return showGeneralDialog<T>(
@@ -32,13 +41,14 @@ Future<T?> showVeDialog<T>(
     barrierColor: t.shadow(t.brightness == Brightness.dark ? 0.5 : 0.28),
     transitionDuration: VeTokens.motion(context, VeDurations.short),
     pageBuilder: (dialogContext, _, _) =>
-        _VeDialog<T>(title: title, message: message, content: content, actions: actions),
+        _VeDialog<T>(title: title, message: message, content: content, actions: actions, width: width),
     transitionBuilder: (_, animation, _, child) => FadeTransition(opacity: animation, child: child),
   );
 }
 
 class _VeDialog<T> extends StatelessWidget {
-  const _VeDialog({required this.title, required this.actions, this.message, this.content});
+  const _VeDialog({required this.title, required this.actions, required this.width, this.message, this.content});
+  final double width;
   final String title;
   final String? message;
   final Widget? content;
@@ -61,7 +71,7 @@ class _VeDialog<T> extends StatelessWidget {
               explicitChildNodes: true,
               label: title,
               child: Container(
-                width: 440,
+                width: width,
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
                 decoration: BoxDecoration(
                   color: c.surface,
@@ -92,8 +102,9 @@ class _VeDialog<T> extends StatelessWidget {
                             VeButton(
                               label: actions[i].label,
                               variant: actions[i].variant,
-                              autofocus: i == actions.length - 1,
-                              onPressed: () => Navigator.of(context).pop(actions[i].value),
+                              autofocus: i == actions.length - 1 && actions[i].enabled,
+                              tooltip: actions[i].tooltip,
+                              onPressed: actions[i].enabled ? () => Navigator.of(context).pop(actions[i].value) : null,
                             ),
                         ],
                       ),
