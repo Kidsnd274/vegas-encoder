@@ -357,9 +357,18 @@ debug builds, and the goldens use it.
   when there is one; runs use `VEGAS_ENCODER_DATA_ROOT` on `app\build\spikes\data-root`
   and report whether the user's own folders stayed untouched.
 
+**Saving with errors (owner decision, 2026-10-15)** (`features/presets/save_check.dart`,
+`presets_page.dart`, `shell/desktop_shell.dart`, `popup/popup_window.dart`):
+`saveErrors` splits the core's errors into the settings' own (`VeCore.validate`, no
+FFmpeg) and those only for the chosen FFmpeg (the compile's issues); `checkSave` warns
+before Save, Duplicate, "Save all" on closing and the popup's Save to library. Settings
+errors stop the save ("Fix the errors before saving", Show setting / Keep editing);
+FFmpeg-only errors offer Save anyway. A core that can't check (the fake core in tests)
+leaves the decision to the library, whose refusal still shows its reason.
+
 ## Tests
 
-`flutter test` in `app/`: **470 tests** (416 before F5, 403 before F7, 348 before F4;
+`flutter test` in `app/`: **477 tests** (470 before saving with errors, 416 before F5, 403 before F7, 348 before F4;
 F5's count is from the test files, to be confirmed by the final run). `flutter analyze`:
 no issues. Platform fakes for services everywhere except the Windows
 services tests below; the fake core for the F0–F3 tests and the native core (B2, through
@@ -474,6 +483,12 @@ or VEGAS:
   stage and macro roles.** No F0–F3 image changed. 96 images in all; each new one was
   looked at.
 
+Saving with errors added (7), on the native core: widget (`native_core_test.dart`, 3)
+settings errors stop Ctrl+S with the warning and nothing saved, Show setting; FFmpeg-only
+errors (FFmpeg 8.0 LGPL without x264) warn and Save anyway saves; closing with such a
+draft stays open. Popup (`popup_test.dart`, 1): Save to library warns and asks no name.
+Unit (`popup_display_test.dart`, 1): the split. Golden (`native_golden_test.dart`,
+`presets_native_save_errors`, light and dark), looked at.
 B1 merge (2026-10-14): the 18 native-core goldens (14 Advanced, 4 `presets_native`) were
 regenerated and each compared with its old image. What changed is B1's data only: the
 CRF 18 mark reads "high quality" (was "visually lossless"); the Advanced seed starts with
@@ -690,6 +705,12 @@ Why the request read took longer there is not established.
   and with VEGAS running.
 - **Flutter 3.47.7** at `L:\flutter` is intended. ROADMAP and WORKSTREAMS say so.
 - **Light tokens accepted as the mockup has them**, including UI_SPEC §9's figures.
+- **Presets with errors aren't saved; the app warns first** (owner, 2026-10-15). Errors in
+  the settings themselves stop Save, Duplicate, "Save all" on closing and the popup's Save
+  to library with "Fix the errors before saving"; errors only for the chosen FFmpeg warn
+  with Save anyway (the preset may suit another FFmpeg). UI_SPEC §3. The library's own
+  refusal (`RECIPE-INVALID`) matches the first rule, so no platform change is needed.
+- **F6 goes to another app agent** (owner, 2026-10-15); the handoff below is for it.
 - **Keep on top off by default**, matching C7 `keepOnTop=false`. The progress window
   starts unpinned; F6 reads the remembered value.
 - **Fake core limits: go to the real core.** Platform adds the four contract requests
@@ -747,7 +768,6 @@ Open (additive):
 | Popup size (F5) | UI_SPEC §1: the popup remembers its size, not its position. C7 `uiState` has desktop fields only, so the popup opens at its default size every time. Please add an additive `popupWindowSize` (physical width and height, or logical) to `AppUiState`, or the owner decides the popup keeps the default size |
 | Render As path in the popup (F5) | C4 `context` carries the project but not the file Render As will write, so the popup's command and Advanced's resolved command use the sample path (`D:\Renders\Sample project.mp4`; the resolved command says "for the sample project"). If the page can know the path, an additive `context.outputPath` would let the preview show it; otherwise nothing changes |
 | Capability transfer in Advanced mode (F7) | Lint and compile each serialize the full capability map (156–236K characters) through FFI: **25–32 ms per keystroke** in Advanced mode (budget 4 ms). Please let the core keep a capability map it was given (an ID or handle per identity key) so later calls pass the ID, or offer one call that lints and compiles a template together |
-| Saving a recipe with errors (F7, owner decision) | `FilePresetLibrary.save` refuses a recipe the core finds errors in (`RECIPE-INVALID`); UI_SPEC §3 says desktop drafts with errors can be saved and are marked in the library. The app shows the refusal with the library's reason and keeps the draft. Either the library accepts them (platform change) or UI_SPEC changes to "errors block Save" (app change, already the behaviour). Errors that depend on the chosen FFmpeg still save and are marked |
 | Advanced token roles (F4) | In Advanced mode every user word comes back as role `extra`, so the editor can't colour options by stage (video, audio, mux, global), draw stage stripes or style macros. Please give Advanced tokens the same stage roles Basic tokens have and role `macro` (already in `TokenRole`) for a word that held a macro, keeping `sourceStart`/`sourceEnd`. An option/value marker per token would replace the app's "starts with -[letter]" bold rule. The app reads these with no change; until then only option names (bold) and the chips stand out |
 | Macro list (F4) | The macros panel takes names from `VeCore.complete("{")` (generic description "VEGAS media or output macro") and values from a compile of the names alone. A `VeCore.macros(media, paths)` (name, description, required, expanded value) would replace both; the app keeps its own wording only as fallback |
 | Encoder IDs in Advanced (F4) | The Advanced summary names the command's encoders by label ("x265", or the raw name), so nodes can't show availability for the chosen FFmpeg (lint's `L-ENCODER` covers a missing one). A `videoEncoderId`/`audioEncoderId` (summary or signal facts) would let the nodes show Ready / Not in this FFmpeg |
@@ -758,7 +778,9 @@ Open (additive):
 
 Waiting on platform (see Needs): the recommended quality band (a product-policy choice,
 platform.md); the library watch's cost and the Advanced capability transfer (the §9.3
-budgets); the owner's call on saving recipes with errors.
+budgets). platform.md's queue of 2026-10-15 has the Advanced latency, the F4 token data,
+the popup size, the desktop launch and `context.outputPath`; the library watch's cost is
+not in it yet.
 
 App side, unblocked by B3/B4 (F3 follow-up): installation health on the FFmpeg cards
 (Changed on disk, Missing, No ffprobe); History's list from the index summaries instead

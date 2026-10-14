@@ -8,6 +8,7 @@
 // core_unavailable_<light|dark>.png
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/features/presets/panels/extra_field.dart';
@@ -54,6 +55,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Set in Extra arguments.'), findsNWidgets(2));
       expect(find.text('120 frames at 29.97 fps', findRichText: true), findsOneWidget);
+    },
+    // Save with an error in the settings (owner decision, 2026-10-15): the
+    // warning lists the core's error and nothing is saved.
+    'save_errors': (tester) async {
+      EditableText.debugDeterministicCursor = true;
+      addTearDown(() => EditableText.debugDeterministicCursor = false);
+      final extra = find.descendant(of: find.byType(ExtraArgumentsField), matching: find.byType(TextField));
+      await tester.enterText(extra, '-c:v libx265');
+      await tester.pumpAndSettle();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('Fix the errors before saving'), findsOneWidget);
     },
     // File node at the default 10:00: the core's total and its range for 10:00.
     'file': (tester) async {

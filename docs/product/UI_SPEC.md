@@ -276,12 +276,19 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
   selecting one puts the caret in the editor.
 - **No size estimate** in Advanced mode. The library row's **Advanced** tag leads its
   summary line ("[Advanced] x265, your command") and follows the draft.
-- **Errors** block Apply in the popup (F5: Basic checks and Advanced lint) and are
-  allowed in desktop drafts: Save works, and the library marks the preset with an error. *Since F7 the real library
-  refuses a recipe the core finds errors in (C3 `RECIPE-INVALID`): the toast says
-  "Couldn’t save the preset: <the library's reason>" and the draft stays. Errors that
-  depend on the chosen FFmpeg still save and are marked. Which rule stands is the
-  owner's call (workstreams/app.md, Needs).*
+- **Errors** block Apply in the popup (F5: Basic checks and Advanced lint). Desktop
+  drafts may hold errors while you edit, but **a preset with errors isn't saved, and the
+  app warns first** (owner decision, 2026-10-15). This covers Save, Duplicate, "Save all"
+  when closing, and the popup's Save to library:
+  - Errors in the settings themselves (the core's `validate`, with no FFmpeg): "Fix the
+    errors before saving" lists them (the first three, then "and N more"). Show setting
+    opens the first one; Keep editing (the default) closes the warning. Nothing is
+    saved; the changes stay. On closing the window, it stays open on that preset. The
+    library refuses these too (C3 `RECIPE-INVALID`), and its reason shows if a save
+    reaches it anyway.
+  - Errors only for the FFmpeg the checks are for (an encoder that FFmpeg lacks):
+    "“Name” can’t render with FFmpeg X" explains that the settings are fine for another
+    FFmpeg, with Save anyway or Cancel (the default). The library marks such a preset.
 
 ## 4. VEGAS popup (S3)
 

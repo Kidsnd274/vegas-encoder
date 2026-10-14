@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/design/components/signal_path/signal_path_model.dart';
 import 'package:vegas_encoder/features/popup/display.dart';
+import 'package:vegas_encoder/features/presets/save_check.dart';
 import 'package:vegas_encoder/state/editor.dart' show CoreResult;
 import 'package:vegas_encoder/state/popup.dart';
 
@@ -139,5 +140,21 @@ void main() {
       expect(changes(['video.quality'], []).canMerge, isFalse, reason: 'nothing to take');
       expect(const PopupChanges().canMerge, isFalse);
     });
+  });
+
+  test('saving splits the settings’ own errors from the chosen FFmpeg’s (owner decision, 2026-10-15)', () {
+    final core = NativeVeCore();
+    final bad = b0.recipe.copyWith(video: b0.recipe.video.copyWith(extra: '-c:v libx265'));
+    final ffmpegOnly = Issue(
+      id: 'L-ENCODER-TEST',
+      level: IssueLevel.error,
+      field: 'video.encoder',
+      message: 'Not in this FFmpeg.',
+    );
+    final split = saveErrors(core, bad, [ffmpegOnly]);
+    expect(split.settings, isNotEmpty, reason: 'Extra arguments can’t choose the encoder');
+    expect(split.ffmpeg.map((i) => i.id), ['L-ENCODER-TEST']);
+    expect(saveErrors(core, bad, split.settings).ffmpeg, isEmpty, reason: 'an error in both counts once');
+    expect(saveErrors(core, b0.recipe, const []).settings, isEmpty);
   });
 }

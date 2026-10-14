@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ve_services/ve_services.dart' show Preset, ServiceException;
+import 'package:ve_services/ve_services.dart' show FFmpegInstallation, Issue, Preset, Recipe, ServiceException;
 
 import '../../design/components/button.dart';
 import '../../design/components/command_view.dart';
@@ -29,6 +29,7 @@ import 'panels/other_panels.dart';
 import 'panels/panel_kit.dart';
 import 'panels/video_panel.dart';
 import 'preset_header.dart';
+import 'save_check.dart';
 
 /// Below this window width the library collapses to a rail (UI_SPEC §1).
 const double libraryRailBreakpoint = 1280;
@@ -100,6 +101,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
   Future<void> _saveUnguarded() async {
     final data = ref.read(editorProvider);
     if (data == null || !data.dirty) return;
+    if (!await _checkSave(data.recipe, data.issues, data.installation)) return;
     var overwrite = false;
     if (data.behindLibrary && !data.preset.builtin) {
       final choice = await _askConflict(data.recipe.name);
@@ -130,6 +132,23 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
   Future<void> _saveAsNewUnguarded() async {
     await _controller.saveAsNew();
     if (mounted) _showToast('Saved as a new preset in Mine');
+  }
+
+  /// Warns before saving a preset with errors (owner decision, 2026-10-15):
+  /// settings errors stop the save, errors only for the chosen FFmpeg ask.
+  /// [compiled] are the compile's issues for that FFmpeg, when known.
+  Future<bool> _checkSave(Recipe recipe, List<Issue> compiled, FFmpegInstallation? installation) async {
+    final errors = saveErrors(ref.read(veCoreProvider), recipe, compiled);
+    final check = await checkSave(
+      context,
+      name: recipe.name,
+      settings: errors.settings,
+      ffmpeg: errors.ffmpeg,
+      installation: installation?.label ?? 'this FFmpeg',
+    );
+    if (!mounted) return false;
+    if (check == SaveCheck.showSetting) _showField(errors.settings.first.field);
+    return check == SaveCheck.save;
   }
 
   Future<void> _toggleFavorite(LibraryEntry entry) =>
@@ -163,6 +182,15 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
   }
 
   Future<void> _duplicate(String id) => _write('duplicate it', () async {
+    final recipe = _controller.working(id);
+    final data = ref.read(editorProvider);
+    // The copy is a save too; the chosen FFmpeg's checks are known only for
+    // the preset on screen.
+    final selected = data != null && presetId(data.preset) == id;
+    if (recipe != null &&
+        !await _checkSave(recipe, selected ? data.issues : const [], selected ? data.installation : null)) {
+      return;
+    }
     await _controller.duplicate(id);
     if (mounted) _showToast('Duplicated into Mine');
   });

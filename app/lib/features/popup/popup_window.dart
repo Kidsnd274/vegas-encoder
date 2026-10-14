@@ -21,6 +21,7 @@ import '../advanced/mode_switch.dart';
 import '../presets/display.dart' show nodeForField;
 import '../presets/panels/field_anchor.dart';
 import '../presets/preset_header.dart' show EditorMode;
+import '../presets/save_check.dart';
 import 'popup_dialogs.dart';
 import 'popup_editor.dart';
 
@@ -225,9 +226,28 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
     _afterFrame(() => _anchors.reveal(field));
   }
 
+  /// Warns before a library save of settings with errors (owner decision,
+  /// 2026-10-15), checked as the popup checks them: against the default FFmpeg.
+  Future<bool> _checkSave() async {
+    final s = _state;
+    final data = ref.read(popupEditorProvider);
+    if (s == null || data == null) return false;
+    final errors = saveErrors(ref.read(veCoreProvider), s.recipe, data.issues);
+    final check = await checkSave(
+      context,
+      name: s.templateName,
+      settings: errors.settings,
+      ffmpeg: errors.ffmpeg,
+      installation: data.installation?.label ?? 'this FFmpeg',
+    );
+    if (!mounted) return false;
+    if (check == SaveCheck.showSetting) _showField(errors.settings.first.field);
+    return check == SaveCheck.save;
+  }
+
   Future<void> _saveAsNew() async {
     final s = _state;
-    if (s == null) return;
+    if (s == null || !await _checkSave() || !mounted) return;
     final name = await showVeTextDialog(
       context,
       title: 'Save as new preset',
@@ -246,6 +266,7 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
 
   Future<void> _updateOrigin() async {
     final name = _state?.origin?.name ?? 'the preset';
+    if (!await _checkSave()) return;
     try {
       final saved = await _controller.updateOrigin();
       if (mounted) _showToast('Updated “$name” to revision ${saved.revision}.');

@@ -361,6 +361,18 @@ void main() {
       expect(find.text('Update “Lakeside upload” (revision 1 → 2)'), findsOneWidget);
     });
 
+    testWidgets('Save to library warns first and saves nothing while the settings have errors', (tester) async {
+      await pump(tester);
+      await tester.enterText(extraField(), '-c:v libx265');
+      await tester.pumpAndSettle();
+      await tap(tester, find.widgetWithText(VeButton, 'Save to library'));
+      await tap(tester, find.text('Save as new preset…'));
+      expect(find.text('Fix the errors before saving'), findsOneWidget, reason: 'owner decision, 2026-10-15');
+      await tap(tester, find.text('Keep editing'));
+      expect(find.text('Save as new preset'), findsNothing, reason: 'no name asked for');
+      expect((await library.list()).where((p) => !p.builtin), isEmpty);
+    });
+
     testWidgets('Update “origin” saves the template’s settings at the preset’s next revision', (tester) async {
       final mine = Preset(
         revision: 3,
