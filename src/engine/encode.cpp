@@ -39,6 +39,17 @@ std::wstring Quote(const std::wstring& value) {
 }
 }  // namespace
 
+BOOL CreateProcessPolled(const std::function<BOOL()>& create, const std::function<bool()>& poll, bool& interrupted) {
+  if (!poll) return create();
+  std::atomic<bool> done{false}; BOOL result = FALSE;
+  std::thread launcher([&] { result = create(); done.store(true,std::memory_order_release); });
+  while (!done.load(std::memory_order_acquire)) {
+    try { if (!poll()) interrupted = true; } catch (...) { interrupted = true; }
+    Sleep(20);
+  }
+  launcher.join(); return result;
+}
+
 EncodeRate EncodeRate::FromDouble(double fps) {
   if (!std::isfinite(fps) || fps <= 0) return {};
   for (DWORD n : {24000u, 30000u, 60000u, 120000u})
@@ -71,7 +82,8 @@ struct FfmpegEncoder::Impl {
     uint64_t highWater = 0, written = 0;
   };
   Pipe pipes[2];
-  Handle process, job;
+  Handle process, job, progressRead;
+  std::thread progressWorker;
   std::atomic<bool> stopping{false}, failed{false};
   mutable std::mutex errorMutex;
   HRESULT error = S_OK;
@@ -79,7 +91,7 @@ struct FfmpegEncoder::Impl {
   EncodeStats stats;
   std::wstring output;
   DWORD pipeTimeout = 10000, finishTimeout = 120000;
-  bool withAudio = false, tempOwned = false;
+  bool withAudio = false, tempOwned = false, finished = false, started = false;
 
   void Fail(HRESULT hr, const char* why) {
     {
@@ -194,6 +206,10 @@ struct FfmpegEncoder::Impl {
       pipe.queue.clear();
       pipe.bytes = pipe.blocks = 0;
     }
+    // Closing the kill-on-close job also closes stdout inherited by descendants.
+    job.Close();
+    if (progressWorker.joinable()) progressWorker.join();
+    progressRead.Close();
     if (process.Valid()) GetExitCodeProcess(process.h, &stats.exitCode);
     process.Close();
     job.Close();
@@ -211,7 +227,20 @@ FfmpegEncoder::~FfmpegEncoder() = default;
 
 bool FfmpegEncoder::Start(const std::wstring& exe, const std::wstring& output, LONG width, LONG height,
                           EncodeRate rate, bool audio, DWORD pipeTimeoutMs, DWORD finishTimeoutMs) {
+  return StartImpl(exe, output, width, height, rate, audio, pipeTimeoutMs, finishTimeoutMs, {}, {}, {}, {});
+}
+bool FfmpegEncoder::StartCompiled(const std::wstring& exe, const std::wstring& output,
+                                 const std::wstring& log, DWORD pipeTimeoutMs, DWORD finishTimeoutMs,
+                                 const Compile& compile, const Progress& progress, const Poll& startupPoll) {
+  if (!compile) { p_->Fail(E_INVALIDARG, "missing command compiler"); return false; }
+  return StartImpl(exe, output, 0, 0, {}, true, pipeTimeoutMs, finishTimeoutMs, compile, progress, log, startupPoll);
+}
+bool FfmpegEncoder::StartImpl(const std::wstring& exe, const std::wstring& output, LONG width, LONG height,
+                              EncodeRate rate, bool audio, DWORD pipeTimeoutMs, DWORD finishTimeoutMs,
+                              const Compile& compile, const Progress& progress, const std::wstring& logPath, const Poll& startupPoll) {
   auto& p = *p_;
+  if (p.started) { p.Fail(E_UNEXPECTED, "encoder instances are single-use"); return false; }
+  p.started = true;
   p.output = output;
   p.withAudio = audio;
   p.pipeTimeout = (std::max)((DWORD)100, pipeTimeoutMs);
@@ -229,7 +258,7 @@ bool FfmpegEncoder::Start(const std::wstring& exe, const std::wstring& output, L
   StringFromGUID2(id, nonce, 64);
   std::wstring prefix = L"\\\\.\\pipe\\vegas-encoder-" + std::to_wstring(GetCurrentProcessId()) + nonce;
   p.stats.tempPath = output + L"." + nonce + L".partial";
-  p.stats.stderrPath = output + L".ffmpeg.log";
+  p.stats.stderrPath = logPath.empty() ? output + L".ffmpeg.log" : logPath;
   Handle temp;
   temp.h = CreateFileW(p.stats.tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (!temp.Valid()) { p.Fail(HRESULT_FROM_WIN32(GetLastError()), "cannot create temporary encode output"); return false; }
@@ -261,8 +290,19 @@ bool FfmpegEncoder::Start(const std::wstring& exe, const std::wstring& output, L
   args.insert(args.end(), tail.begin(), tail.end());
   if (audio) { args.emplace_back(L"-c:a"); args.emplace_back(L"pcm_f32le"); }
   args.emplace_back(L"-f"); args.emplace_back(L"matroska"); args.push_back(p.stats.tempPath);
+  if (compile) {
+    auto plan = compile(prefix + L"-video", prefix + L"-audio", p.stats.tempPath);
+    args = {exe};
+    args.insert(args.end(), plan.argv.begin(), plan.argv.end());
+    p.withAudio = plan.audioInput;
+    if (!p.withAudio) p.pipes[1].handle.Close();
+  }
+  for (const auto& a : args) if (a.find(L'\0') != std::wstring::npos) {
+    p.Fail(E_INVALIDARG, "NUL in executable/argv"); return false;
+  }
   for (const auto& a : args) p.stats.command += (p.stats.command.empty() ? L"" : L" ") + Quote(a);
-  Log("FFmpeg exe=%s sha256=%s", Utf8(exe.c_str()).c_str(), Sha256File(exe).c_str());
+  if (p.stats.command.size() >= 32767) { p.Fail(E_INVALIDARG, "Windows command line exceeds 32766 UTF-16 units"); return false; }
+  if (!compile) Log("FFmpeg exe=%s sha256=%s", Utf8(exe.c_str()).c_str(), Sha256File(exe).c_str());
   Log("FFmpeg command: %s", Utf8(p.stats.command.c_str()).c_str());
 
   SECURITY_ATTRIBUTES sa = {sizeof(sa), nullptr, TRUE};
@@ -271,6 +311,13 @@ bool FfmpegEncoder::Start(const std::wstring& exe, const std::wstring& output, L
   nullOut.h = CreateFileW(L"NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, nullptr);
   log.h = CreateFileW(p.stats.stderrPath.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &sa, CREATE_ALWAYS,
                       FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (progress) {
+    nullOut.Close();
+    if (!CreatePipe(&p.progressRead.h, &nullOut.h, &sa, 65536) ||
+        !SetHandleInformation(p.progressRead.h, HANDLE_FLAG_INHERIT, 0)) {
+      p.Fail(HRESULT_FROM_WIN32(GetLastError()), "cannot create FFmpeg progress pipe"); return false;
+    }
+  }
   if (!input.Valid() || !nullOut.Valid() || !log.Valid()) {
     p.Fail(HRESULT_FROM_WIN32(GetLastError()), "cannot open FFmpeg diagnostic handles"); return false;
   }
@@ -294,15 +341,22 @@ bool FfmpegEncoder::Start(const std::wstring& exe, const std::wstring& output, L
   PROCESS_INFORMATION pi{};
   std::vector<wchar_t> command(p.stats.command.begin(), p.stats.command.end());
   command.push_back(0);
-  BOOL created = attrOk && CreateProcessW(exe.c_str(), command.data(), nullptr, nullptr, TRUE,
-    EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, nullptr, &si.StartupInfo, &pi);
-  DWORD createError = GetLastError();
+  DWORD createError = ERROR_INVALID_PARAMETER; bool interrupted = false;
+  BOOL created = attrOk && CreateProcessPolled([&] {
+    const auto result = CreateProcessW(exe.c_str(), command.data(), nullptr, nullptr, TRUE,
+      EXTENDED_STARTUPINFO_PRESENT | CREATE_NO_WINDOW | CREATE_SUSPENDED, nullptr, nullptr, &si.StartupInfo, &pi);
+    createError = GetLastError(); return result;
+  },startupPoll,interrupted);
   DeleteProcThreadAttributeList(attr);
   if (!created) { p.Fail(HRESULT_FROM_WIN32(createError), "cannot start FFmpeg"); return false; }
   p.process.h = pi.hProcess;
   Handle thread;
   thread.h = pi.hThread;
   p.stats.pid = pi.dwProcessId;
+  if (interrupted) {
+    TerminateProcess(p.process.h,1); WaitForSingleObject(p.process.h,2000);
+    p.Fail(E_ABORT,"caller stopped during FFmpeg startup"); return false;
+  }
   p.job.h = CreateJobObjectW(nullptr, nullptr);
   JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
   limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
@@ -316,12 +370,19 @@ bool FfmpegEncoder::Start(const std::wstring& exe, const std::wstring& output, L
     p.Fail(HRESULT_FROM_WIN32(GetLastError()), "cannot resume FFmpeg"); return false;
   }
   input.Close(); nullOut.Close(); log.Close();
-  for (size_t i = 0; i < (audio ? 2u : 1u); i++) p.pipes[i].worker = std::thread([&p, i] { p.WritePipe(i); });
+  if (progress) p.progressWorker = std::thread([&p, progress] {
+    char bytes[4096]; DWORD count = 0;
+    while (ReadFile(p.progressRead.h, bytes, sizeof(bytes), &count, nullptr) && count) {
+      try { progress(bytes, count); } catch (...) { Log("progress observer failed (nonfatal)"); }
+    }
+  });
+  for (size_t i = 0; i < (p.withAudio ? 2u : 1u); i++) p.pipes[i].worker = std::thread([&p, i] { p.WritePipe(i); });
   return true;
 }
 
 bool FfmpegEncoder::Submit(bool audio, std::vector<BYTE> data, const Poll& poll) {
   auto& p = *p_;
+  if (!p.process.Valid() || p.finished) { p.Fail(E_UNEXPECTED, "Submit requires an active encoder"); return false; }
   auto& pipe = p.pipes[audio ? 1 : 0];
   if (data.empty()) return true;
   if (data.size() > pipe.limit || (audio && !p.withAudio)) { p.Fail(E_INVALIDARG, "input exceeds pipe queue limit"); return false; }
@@ -342,8 +403,9 @@ bool FfmpegEncoder::Submit(bool audio, std::vector<BYTE> data, const Poll& poll)
   }
 }
 
-bool FfmpegEncoder::Finish(const Poll& poll) {
+bool FfmpegEncoder::Finish(const Poll& poll, bool publish) {
   auto& p = *p_;
+  if (!p.process.Valid() || p.finished) { p.Fail(E_UNEXPECTED, "Finish requires an active encoder"); return false; }
   if (!poll()) { p.Abort(); return false; }
   for (size_t i = 0; i < (p.withAudio ? 2u : 1u); i++) {
     std::lock_guard<std::mutex> lock(p.pipes[i].mutex);
@@ -362,6 +424,9 @@ bool FfmpegEncoder::Finish(const Poll& poll) {
   }
   for (auto& pipe : p.pipes) if (pipe.worker.joinable()) pipe.worker.join();
   GetExitCodeProcess(p.process.h, &p.stats.exitCode);
+  p.job.Close();
+  if (p.progressWorker.joinable()) p.progressWorker.join();
+  p.progressRead.Close();
   if (p.failed || p.stats.exitCode != 0) {
     p.Fail(E_FAIL, "FFmpeg returned a failing exit code"); p.Abort(); return false;
   }
@@ -369,6 +434,15 @@ bool FfmpegEncoder::Finish(const Poll& poll) {
   if (!GetFileAttributesExW(p.stats.tempPath.c_str(), GetFileExInfoStandard, &file) ||
       (file.nFileSizeHigh == 0 && file.nFileSizeLow == 0)) {
     p.Fail(E_FAIL, "FFmpeg produced no output"); p.Abort(); return false;
+  }
+  p.finished = true;
+  p.process.Close();
+  return !publish || Publish();
+}
+bool FfmpegEncoder::Publish() {
+  auto& p = *p_;
+  if (!p.finished || p.failed || p.stopping || p.stats.published) {
+    p.Fail(E_UNEXPECTED, "publication requires a finished unfailed encoder"); return false;
   }
   // No REPLACE_EXISTING: a destination created during encoding must be preserved.
   if (!MoveFileExW(p.stats.tempPath.c_str(), p.output.c_str(), MOVEFILE_WRITE_THROUGH)) {
@@ -379,6 +453,7 @@ bool FfmpegEncoder::Finish(const Poll& poll) {
   p.process.Close(); p.job.Close();
   return true;
 }
+void FfmpegEncoder::RetainPartial() { p_->tempOwned = false; }
 void FfmpegEncoder::Abort() { p_->Abort(); }
 HRESULT FfmpegEncoder::Error() const { std::lock_guard<std::mutex> lock(p_->errorMutex); return p_->error; }
 std::string FfmpegEncoder::Reason() const { std::lock_guard<std::mutex> lock(p_->errorMutex); return p_->reason; }

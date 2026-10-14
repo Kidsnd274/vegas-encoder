@@ -75,11 +75,6 @@ Json DefaultValue(const Json& settings, const std::string& key, const Json& cont
 bool Includes(const Json& array, const Json& value) {
     return array.is_array() && std::find(array.begin(),array.end(),value) != array.end();
 }
-std::string Support(const std::string& kind, const Json& profile, const std::string& container) {
-    const auto& table = Profiles().at("compatibility").at(kind);
-    const auto family = Str(profile,"family");
-    return table.contains(family) ? Str(table.at(family),container,"unknown") : "unknown";
-}
 }
 Json Structural(const Json& recipe) {
     Json issues = Json::array(); SchemaCheck(recipe,RecipeSchema(),"",issues);
@@ -89,7 +84,17 @@ Json Structural(const Json& recipe) {
 Json Normalize(const Json& request) {
     const auto& recipe = request.at("recipe");
     if (!recipe.is_object()) throw Error(VE_INVALID_ARGUMENT,"RECIPE-OBJECT","Expected a recipe object.");
-    return Json{{"recipe",recipe},{"issues",Structural(recipe)}}; // Defaults are resolved at compile time only.
+    const auto issues = Structural(recipe);
+    Json required = nullptr;
+    // Library metadata uses the same recipe rules. Arbitrary Advanced output
+    // scopes/default codecs cannot be established without executing FFmpeg.
+    if (!HasErrors(issues) && Str(recipe.at("command"),"mode") == "structured") {
+        required = Json::array();
+        const auto& video = recipe.at("video"); const auto& audio = recipe.at("audio").at(0);
+        if (Bool(video,"enabled",true)) required.push_back(Str(video,"encoder"));
+        if (Bool(audio,"enabled",true) && std::find(required.begin(),required.end(),Json(Str(audio,"encoder"))) == required.end()) required.push_back(Str(audio,"encoder"));
+    }
+    return Json{{"recipe",recipe},{"issues",issues},{"requiredEncoders",required}}; // Defaults are resolved at compile time only.
 }
 Json Resolve(const Json& recipe) {
     const auto& video = recipe.at("video"); const auto& audio = recipe.at("audio").at(0);
@@ -104,7 +109,8 @@ Json Resolve(const Json& recipe) {
     const auto depthKey = std::to_string(depth);
     std::string pixfmt = Str(depths,depthKey,Str(depths,std::to_string(static_cast<int>(Num(v,"depthDef",10)))));
     const Json profileControl = v.contains("profileQuality") ? v.at("profileQuality") : v.value("profile",Json::object());
-    const Json profile = DefaultValue(video,"profile",profileControl);
+    Json profile = DefaultValue(video,"profile",profileControl);
+    if (Str(v,"id") == "libx264" && (!video.contains("profile") || video.at("profile").is_null()) && depth == 10) profile = "high10";
     if (profile.is_string() && profileControl.is_object() && profileControl.contains("pixfmt")) pixfmt = Str(profileControl.at("pixfmt"),profile.get<std::string>(),pixfmt);
     if (Str(v,"id") == "prores_ks" && profile.is_string() && profile.get<std::string>().rfind("4444",0) == 0) pixfmt = "yuv444p10le";
     const int actualDepth = pixfmt.find("10") != std::string::npos || pixfmt == "p010le" ? 10 : pixfmt.find("12") != std::string::npos ? 12 : depth;
@@ -115,6 +121,21 @@ Json Resolve(const Json& recipe) {
                 {"tune",DefaultValue(video,"tune",v.value("tune",Json::object()))},
                 {"profile",profile},{"depth",actualDepth},{"pixfmt",pixfmt},
                 {"videoProfile",v},{"audioProfile",a}};
+}
+void ReflectVideoFormatOption(Json& resolved, const std::string& key, const std::string& value) {
+    if (key == "profile") resolved["profile"] = value;
+    if (key == "pix_fmt") {
+        const auto format = VideoFormat(value);
+        resolved["pixfmt"] = format.at("format");
+        resolved["depth"] = format.at("bits").is_null() ? Json(0) : format.at("bits");
+    }
+}
+void CheckVideoProfile(const Json& resolved, Json& issues) {
+    const auto profile = Str(resolved,"profile");
+    if (Str(resolved,"videoEncoder") == "libx264" && Num(resolved,"depth") > 8 &&
+        (profile == "baseline" || profile == "main" || profile == "high") &&
+        std::none_of(issues.begin(),issues.end(),[](const Json& issue) { return Str(issue,"id") == "V-PROFILE-DEPTH"; }))
+        issues.push_back(Issue("V-PROFILE-DEPTH","error","video.profile","This H.264 profile requires 8-bit pixels; use High 10 or another 10-bit profile."));
 }
 void CheckMedia(const Json& media) {
     if (!media.is_object() || !media.contains("video") || !media.at("video").is_object()) throw Error(VE_INVALID_ARGUMENT,"MEDIA","Expected delivered video facts.");
@@ -138,7 +159,8 @@ Json Validate(const Json& request) {
     const auto& r = request.at("recipe"); Json issues = Structural(r);
     if (HasErrors(issues)) return issues;
     const auto& v = r.at("video"); const auto& a = r.at("audio")[0]; const auto& c = r.at("container");
-    const auto media = request.value("media",Json(nullptr)); const auto caps = request.value("capabilities",Json(nullptr));
+    const auto media = request.value("media",Json(nullptr)); const Json noCaps = nullptr;
+    const Json& caps = request.contains("capabilities") ? request.at("capabilities") : noCaps;
     if (!media.is_null()) CheckMedia(media);
     const bool withVideo = Bool(v,"enabled",true), withAudio = Bool(a,"enabled",true);
     if (!withVideo && !withAudio) issues.push_back(Issue("V-STREAMS","error","video.enabled","Turn on video, audio, or both."));
@@ -150,7 +172,15 @@ Json Validate(const Json& request) {
         }
         issues.push_back(Issue("V-UNTESTED","info","","Not tested with VEGAS yet.")); return issues;
     }
-    const Json res = Resolve(r);
+    Json res = Resolve(r);
+    // Extra replaces generated profile/pixel options. Standalone validation and
+    // compilation must check the same final combination, not displaced controls.
+    if (withVideo) try {
+        const auto words = Tokenize(Str(v,"extra"));
+        for (size_t i = 0; i + 1 < words.size(); ++i) if (IsOption(words[i].text) && !IsOption(words[i+1].text)) {
+            ReflectVideoFormatOption(res,OptionKey(words[i].text),words[i+1].text); ++i;
+        }
+    } catch (const Error&) {} // Extra lint reports malformed text below.
     auto stream = [&](const Json& settings, const Json& profile, const std::string& kind, const std::string& field) {
         const auto encoder = Str(settings,"encoder");
         if (!FindProfile(kind,encoder)) issues.push_back(Issue("V-UNCURATED","warn",field + ".encoder","Using generic bitrate controls for an uncurated encoder.",{{"encoder",encoder}}));
@@ -181,9 +211,9 @@ Json Validate(const Json& request) {
                 if (control.is_object() && control.contains("values") && !Includes(control.at("values"),settings.at(name))) issues.push_back(Issue("V-VALUE","error",field + "." + name,"Value is not one of this encoder's supported choices."));
             }
         }
-        const auto support = Support(kind,profile,Str(c,"format"));
+        const auto support = ContainerSupport(kind,profile,Str(c,"format"),caps);
         if (support == "no" || support == "warn") issues.push_back(Issue(kind == "video" ? "V-CONTAINER-VIDEO" : "V-CONTAINER-AUDIO",support == "no" ? "error" : "warn","container.format",
-            support == "no" ? "The container cannot hold this stream." : "This stream muxes, but some players cannot open it.",{{"stream",field},{"support",support},{"encoder",encoder},{"container",Str(c,"format")}}));
+            support == "no" ? "The container cannot hold this stream in the measured FFmpeg rule set." : "Compatibility depends on FFmpeg version, stream settings or player support; check this combination before rendering.",{{"stream",field},{"support",support},{"encoder",encoder},{"container",Str(c,"format")}}));
         const auto extra = Str(settings,"extra");
         if (!extra.empty()) {
             for (const auto& d : Lint(Json{{"text",extra},{"capabilities",caps},{"extra",true},{"encoder",encoder},{"kind",kind}})) {
@@ -195,6 +225,7 @@ Json Validate(const Json& request) {
     if (!FindContainer(Str(c,"format"))) issues.push_back(Issue("V-CONTAINER","error","container.format","Choose a supported container."));
     if (withVideo) {
         stream(v,res.at("videoProfile"),"video","video");
+        CheckVideoProfile(res,issues);
         const auto& p = res.at("videoProfile");
         if (v.contains("depth") && !v.at("depth").is_null() && (Num(v,"depth") > 64 || !p.at("depths").contains(v.at("depth").dump()))) issues.push_back(Issue("V-DEPTH","error","video.depth","This encoder does not support the selected bit depth."));
         if (Num(v,"gopSec") > 0 && !media.is_null()) {
@@ -212,7 +243,9 @@ Json Validate(const Json& request) {
         else {
             const auto rate = a.contains("sampleRate") && a.at("sampleRate").is_number() ? a.at("sampleRate") : !media.is_null() ? media.at("audio").at("rate") : Json(nullptr);
             const auto& profile = res.at("audioProfile");
-            if (!rate.is_null() && profile.contains("rates") && !Includes(profile.at("rates"),rate)) issues.push_back(Issue("V-RATE","error","audio[0].sampleRate","This encoder does not support the selected audio sample rate.",{{"rate",rate}}));
+            const auto detail = EncoderOptions(caps,Str(a,"encoder"));
+            const auto rates = detail && detail->contains("sampleRates") && !detail->at("sampleRates").empty() ? detail->at("sampleRates") : profile.value("rates",Json::array());
+            if (!rate.is_null() && !rates.empty() && !Includes(rates,rate)) issues.push_back(Issue("V-RATE","error","audio[0].sampleRate","This encoder does not support the selected audio sample rate.",{{"rate",rate}}));
         }
     }
     if (Str(c,"format") == "mp4" && Bool(c,"faststart")) issues.push_back(Issue("V-FASTSTART","info","container.faststart","Fast start rewrites the file after encoding so playback can begin before download finishes."));

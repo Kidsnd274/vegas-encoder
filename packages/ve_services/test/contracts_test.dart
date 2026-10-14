@@ -60,6 +60,20 @@ Future<void> main() async {
     'core capability view',
   );
   check(
+    capabilities
+                .copyWith(libavformatMajor: 63)
+                .toCoreCapabilities()
+                .libavformatMajor ==
+            63 &&
+        capabilities
+                .copyWith(libavformatMajor: 63)
+                .copyWith(libavformatMajor: null)
+                .toCoreCapabilities()
+                .libavformatMajor ==
+            null,
+    'probed library major is preserved and can explicitly return to unknown',
+  );
+  check(
     (await probe.encoderDetails(
       installations.first,
       'hevc_nvenc',

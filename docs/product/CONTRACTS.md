@@ -1,9 +1,10 @@
-# App/platform contracts v1 — B2
+# App/platform contracts v1 — B1/B2/B3
 
-Updated: 2026-10-13 (Asia/Singapore). **B2 core/FFI plus additive B0/F2 extensions.** These
+Updated: 2026-10-14 (Asia/Singapore). **B3 Windows services delivered.** These
 shapes are the shared contract. Breaking changes require the owner and both
 workstreams; additive fields stay in v1. Native core implementation/build hook is
-delivered in B2; real system services remain B3. No native payload persistence, popup, progress-window or
+delivered in B2; B3 discovery, probe, hardware tests, preset tests and repositories
+are delivered below. No native payload persistence, popup, progress-window or
 VEGAS compatibility gate is passed by this handoff.
 
 ## Common conventions
@@ -95,9 +96,14 @@ ChoiceControl {flag:string, values:string[], def:string|null, names:{value:label
 
 Encoder fields not relevant to an encoder may be omitted/null. Profile-specific
 additional facts (e.g. profileQuality.mbps1080/pixfmt, PCM bits, vendor, vbrMode)
-survive in model.data and toJson. B0 embeds the mockup's 12 video/11 audio profiles
-and five containers, including design-time Linux FFmpeg facts. **Not a Windows
-qualification.** B1 owns `schema/encoder-profiles.v1.json` with recaptured facts.
+survive in model.data and toJson. B1's native catalog embeds 12 video/11 audio
+profiles and five containers with measured Windows option/format facts. B0 fakes
+retain their historical design samples. `qualification` identifies the help builds
+and runtime limits; `policy` distinguishes product defaults, curated ranges/marks
+and heuristic estimates from measured encoder defaults. FDK AAC is absent from all
+three GPL builds: its sample format/bits stay unknown. Hardware help is not GPU
+qualification. `compatibilityByAvformatMajor` contains sampled major 59/63 rules;
+`compatibility` is their conservative consensus. See [Windows recapture](research/FFMPEG_WINDOWS.md).
 
 ## C2 — VeCore and the C ABI
 
@@ -111,7 +117,7 @@ The app must not implement these rules. Types and signatures are in
 ```text
 version -> CoreVersion {core:string,abi:1,schemaMax:1,contracts:1,isFake:bool}
 profiles() -> ProfileCatalog
-normalize(JsonMap) -> NormalizeResult {recipe:Recipe,issues:Issue[]}
+normalize(JsonMap) -> NormalizeResult {recipe:Recipe,issues:Issue[],requiredEncoders:string[]|null}
 validate(Recipe,{MediaDescription? media,CoreCapabilities? capabilities}) -> Issue[]
 compile(Recipe,{required media,required CompilePaths paths,capabilities?}) -> CompileResult
 lint(String text,{capabilities?}) -> Diagnostic[]
@@ -128,6 +134,7 @@ VideoMedia {width,height:int,fps:[positiveInt,positiveInt],pixfmt,sar:string}
 AudioMedia {rate,channels:int,sampleFmt:string}
 CompilePaths {ffmpeg:string,videoPipe:string,audioPipe:string|null,output:string,project:string}
 CoreCapabilities {installationId,label,identityKey,version:string,
+  libavformatMajor:positiveInt|null,
   encoders:{name:{kind:"video"|"audio",options:EncoderOption[],availability:EncoderAvailability,...}},
   muxers:{name:ContainerProfile}}
 Issue {id:string,level:"error"|"warn"|"info"|"hint",field:string,message:string,
@@ -135,9 +142,11 @@ Issue {id:string,level:"error"|"warn"|"info"|"hint",field:string,message:string,
 Diagnostic {id,level,message,params,fix as above,start:int,end:int}
 CompileResult {executable:string,argv:string[],display:CommandToken[],commandLine:string,
   advancedTemplate:string,resolved:ResolvedSettings|null,signalPath:SignalPathFacts|null,
-  issues:Issue[],summary:RecipeSummary,overriddenFields:string[]}
+  issues:Issue[],summary:RecipeSummary,overriddenFields:string[],expectedStreams:ExpectedStream[]|null,
+  inputStreams:("video"|"audio")[]|null}
+ExpectedStream {kind:"video"|"audio",encoder:string|null,codec:string|null}
 CommandToken {text:string,role:"exe"|"global"|"input"|"map"|"video"|"audio"|"mux"|"output"|"extra"|"macro",
-  field:string|null}
+  field,replacedField:string|null}
 ResolvedSettings {videoEncoder:string,audioEncoder:string|null,videoMode:string,audioMode:string|null,
   quality:number|null,speed,profile:string|null,depth:int,pixfmt:string,gopFrames:int|null}
 SignalPathFacts {video:StreamSignalFacts|null,audio:StreamSignalFacts[],source:SourceSignalFacts|null}
@@ -167,6 +176,15 @@ estimate is the File node's user-entered duration, not media.durationSec. If abs
 totalBytes is null. Advanced estimates return available=false. Estimates are core
 results, including range/approximation; Dart must not calculate its own model.
 
+B4 adds native `inputStreams` facts for allocating/draining host input pipes;
+historical fakes may omit them (Dart exposes null). Output verification continues
+to use `expectedStreams`, including unknown codecs/scope. The engine passes two
+optional native CompilePaths flags: `liveInputs:true` supplies bounded raw-input
+startup probing (`-probesize 32 -analyzeduration 0`), and `overwriteOutput:true`
+supplies `-y` for its exclusively created temporary output. Defaults remain false
+for existing previews/file tests. These are transport context, not recipe settings;
+the core still produces every argv token. No rejected input queue flag is restored.
+
 `minTotalBytes` / `maxTotalBytes` are the range for the user-entered length, null if
 there is no length, estimate or range. They are not figures the app scales itself.
 Bitrate estimates have approx=false and no range; container overhead is excluded.
@@ -194,6 +212,12 @@ option may depend on other fields too. Missing field in older results reads as n
 `overriddenFields` lists the generated recipe controls displaced by Basic Extra
 arguments; use it for "set in Extra arguments" without parsing FFmpeg option names.
 It is empty in Advanced mode and defaults empty for older results. Token optional
+`replacedField` is the displaced control on each replacing Extra option and its
+value, while `field` remains the Extra navigation target. An added option that
+replaces nothing has null; Advanced tokens and older results also read as null.
+This is the additive token-level link requested in F2; the aggregate
+`overriddenFields` remains the simplest way to mark controls.
+Token optional
 `sourceStart`/`sourceEnd` data are UTF-16 spans within the owning Extra/template text;
 apps normally use issue indexes, not these internal provenance spans.
 
@@ -235,10 +259,18 @@ tagging. False explicitly means none; null means unknown. `chromaChanged` compar
 video sampling (`4:2:0`, `4:2:2`, `4:4:4`); audio chroma fields are null.
 
 `containerSupport=no` means the container cannot hold that stream. `warn` means it
-muxes with a playback caveat, `ok` means supported by the selected rule set, and
+needs a version/setting/playback caveat, `ok` means supported by the selected rule set, and
 `unknown` means unestablished. None asserts real VEGAS qualification. The app reads
 this fact to draw a broken stream-to-container wire; no message parsing or local
 compatibility calculation. Default fixture facts remain authored design samples.
+
+`CoreCapabilities.libavformatMajor` comes from the probed library version, never
+from parsing vendor version banners in the app. C3 `FFmpegCapabilities` carries
+the same optional field; `toCoreCapabilities()` preserves it. Sampled 59/63 select
+their measured container table; absent/untested majors use the conservative
+consensus, not a guessed nearest version. These tables cover the recorded stream
+settings, not every profile/rate or NLE/player. Generated Basic private-option
+values and output pixel formats are checked against supplied build capabilities.
 
 [ve_core.h](../../src/core/capi/ve_core.h) defines counted UTF-8 in/out and
 paired ownership. Windows x64 default C calling convention, no packing override:
@@ -312,7 +344,8 @@ edits and supplied contexts directly, with no fixture lookup.
 Import `package:ve_services/ve_services.dart` (also exports C2 types). Pure Dart,
 no Flutter dependencies. Futures do one operation. watch() produces a current
 snapshot for **each** listener, then updates, without implicit scans/probes. Lists
-and model data are immutable. Real services will use files/processes in B3.
+and model data are immutable. Windows file/process services are implemented below;
+the app explicitly injects them and keeps fakes in UI tests.
 
 | API | Operations | Fake |
 | --- | --- | --- |
@@ -320,6 +353,7 @@ and model data are immutable. Real services will use files/processes in B3.
 | FFmpegProbe | probe(installation) -> Stream<ProbeProgress>; encoderDetails; cancel(id) | FakeFFmpegProbe |
 | FFmpegHelpParser | version; parseEncoderHelp/parseEncoders/parseMuxers(text) | FakeFFmpegHelpParser |
 | HardwareTests | test(installation,{encoders?,force}) -> Stream<HardwareTestResult>; cancel(id) | FakeHardwareTests |
+| PresetTests | test(recipe,installation) -> Stream<PresetTestProgress>; cancel(testId) | FakePresetTests |
 | CapabilityCache | read(identityKey)/write(capabilities)/invalidate(identityKey) | FakeCapabilityCache |
 | PresetLibrary | list/watch/get(id,{revision?})/save({expectedRevision?})/delete(id,{expectedRevision})/importPreset(jsonText,{newId})/exportPreset(id) | FakePresetLibrary |
 | MachineSettingsRepository | read/watch/save(settings,{expectedRevision}) | FakeMachineSettingsRepository |
@@ -331,15 +365,16 @@ and model data are immutable. Real services will use files/processes in B3.
 BinaryIdentity {sha256:string,key:string,size:int,mtime:UTC,libraries:{dllFileName:sha256}}
 FFmpegInstallation {id,label,path,ffprobePath,source,version,build,license:string,
   identity:BinaryIdentity,probedAt:UTC|null,probeMs:int|null,
-  counts:{video,audio,muxers:int},availability:{encoder:EncoderAvailability},isFixture:bool}
+  counts:{video,audio,muxers:int},availability:{encoder:EncoderAvailability},isFixture:bool,
+  health:"unknown"|"unchanged"|"changed"|"missing"|"ffprobe-missing",healthMessage:string}
 EncoderAvailability {state:"ok"|"missing"|"failed"|"unknown",reason,detail,note:string}
 EncoderDetails {name:string,kind:"video"|"audio",pixelFormats,sampleFormats:string[],
   sampleRates:int[],options:EncoderOption[]}
 EncoderOption {name:string,aliases:string[],type,description:string,min,max,defaultValue:string|null,
   constants:OptionConstant[]}
 OptionConstant {name:string,value:string|null,description:string}
-parseEncoders result: {encoderName:{kind:"video"|"audio",flags:string,description:string}}
-parseMuxers result: {muxerName:{flags:string,description:string}}
+parseEncoders result: {encoderName:{name:string,kind:"video"|"audio"|"subtitle",flags:string,description:string,codec?:string}}
+parseMuxers result: {muxerName:{flags:string,description:string,canonical:string,aliases:string[]}}
 FFmpegCapabilities {installationId,identityKey:string,parser:int,version:string,
   encoders:map as CoreCapabilities,muxers:map as CoreCapabilities,
   hardware:{encoder:EncoderAvailability},gpuFingerprint:string,probedAt:UTC}
@@ -348,9 +383,12 @@ ProbeProgress {installationId:string,phase:"identity"|"lists"|"details"|"hardwar
 HardwareTestResult {encoder:string,state:"ok"|"missing"|"failed"|"unknown",tenBit:bool,
   failureClass:"runtime-missing"|"no-device"|"unsupported-format"|"timeout"|"unknown"|null,
   reason,stderr:string,testedAt:UTC,identityKey,gpuFingerprint:string}
+PresetTestProgress {testId:string,phase:"preparing"|"encoding"|"verifying"|"done"|"failed"|"cancelled",
+  log,message:string,framesDone,framesTotal:int,commandLine,logPath,outputPath:string|null,
+  verification:VerificationResult|null,isFixture:bool}
 Preset {vepreset:1,revision:positiveInt,favorite,pinned,builtin:bool,updatedAt:UTC,
   origin:string|null,requires:PresetRequirements,recipe:Recipe}
-PresetRequirements {encoders:string[],minFFmpegVersion:string|null}
+PresetRequirements {encoders:string[],minFFmpegVersion:string|null,known:bool}
 ```
 
 source is `ini|path|winget|scoop|chocolatey|manual`. identity.key combines executable
@@ -373,9 +411,167 @@ under `.history\<id>\<revision>.vepreset`. expectedRevision=null creates only;
 conflicting saves fail. get(id) means current; get(id,revision:N) may return history.
 Built-ins are read-only. Duplicate/import requires a new ID and writes a user
 preset, origin `builtin/<id>` when duplicated from a built-in. Import/export JSON
-round-trips unknown keys. Real import/save uses core validation in B3; the fake
+round-trips unknown keys. Real import/save uses core validation; the fake
 stores supplied snapshots without claiming semantic validation. requirements are
-derived by the real service, not by the app. favorites/pinned changes also Save.
+derived from native normalization, not by the app. Basic returns the enabled
+encoders; Advanced returns null, so the repository records known=false and an
+empty encoder list rather than claiming inactive Basic codecs are requirements.
+No minimum FFmpeg version is inferred. Missing `requiredEncoders` (older core/fake)
+also means unknown. Stars/pins use `PresetPreferences` below; normal user-recipe
+Save can still update metadata.
+
+### B3 persistent services and additive app APIs
+
+`FilePresetLibrary(core: VeCore, paths?: ServicePaths)` implements PresetLibrary,
+PresetPreferences and PresetLocations. `FileMachineSettingsRepository(paths?)`,
+`FileCapabilityCache(paths?, parserVersion:1)`, `FileJobRepository(core, paths?)`,
+`FileLiveRenderStatusReader()` and `FileEditSessionService(core: NativeVeCore)`
+implement their existing C3 interfaces. The app injects these explicitly; platform
+does not change app providers. Production uses NativeVeCore. No repository invokes
+FFmpeg or VEGAS. FileReveal launches Explorer only on an explicit reveal call.
+
+ServicePaths defaults to the C3/C6/C7 Windows user roots; injectable roaming/local
+roots keep tests isolated. Cache files are `%LOCALAPPDATA%\VegasEncoder\cache\<identityKey>.json`,
+with `{cache:1,capabilities:FFmpegCapabilities}`. Parser mismatch is a cache miss;
+future envelope versions fail without overwriting their bytes. Identity keys must
+be safe IDs; the identity producer emits a SHA-256 hex digest. Production uses
+the parser-version-2 cache and GPU-aware view composed by WindowsServices below.
+
+| Additive API | Operations | Fake |
+| --- | --- | --- |
+| PresetPreferences | setPreferences(id,{favorite?,pinned?}) -> Preset | FakePresetLibrary |
+| PresetLocations | location(id) -> absolute path or null for built-in/missing | FakePresetLibrary (illustrative location) |
+| PresetTransfer(library) | duplicate(id,{newId,name?}); fromJob(record,{newId,name?}); exportTo(id,selectedPath); shareString(id); importShareString(text,{newId}) | FakePresetTransfer (export captured in memory) |
+| JobLogs | readLog(id) -> Stream<String> UTF-8 chunks; logLocation(id) -> path or null | FakeJobRepository(logs:{id:text}) |
+| FileReveal | reveal(absolutePath) | FakeFileReveal |
+
+Built-in stars/pins live in `library\preferences.json` as
+`{preferences:1,presets:{lowercaseId:{favorite:bool,pinned:bool}}}`. The overlay
+preserves unknown metadata and changes neither the built-in recipe nor its origin
+revision. Save/delete remain READ-ONLY for built-ins. User preference updates copy
+the latest metadata under the writer lock, increment the preset revision and keep
+history. Duplicate origin is `builtin/<id>` or `preset/<id>@<revision>`; History
+copies use `job/<id>`. Imports retain their supplied origin (built-ins are relabelled
+`builtin/<id>`). Transfers always require a caller-chosen new ID.
+
+Share format is `vepreset:1:<base64url UTF-8 exported preset JSON>` (padded). It is
+plain portable preset data, not encrypted or signed. Decoded data is bounded and
+validated through the same import path. Export writes only the user-selected path,
+atomically. Six packaged built-ins adopt the original recipe snapshots at product
+revision 1; design-time installation identities/results are never packaged with them.
+
+Adjacent temp files are flushed then atomically renamed; the old destination is
+never deleted before replacement. Separate persistent lock files serialize Windows
+writers across processes/isolates, with nonblocking byte locks and a five-second
+deadline. Compare-and-swap happens while locked. A crashed process releases its OS
+lock. Transient Windows sharing violations on repository replacement retry for at
+most 500 ms; other errors fail immediately. These helpers are app storage code and
+must never become waits in Render. B4 uses a separate native worker with bounded
+sharing/access-denied retries; publication failures are nonfatal. The live reader
+holds only short-lived file handles.
+
+Reads reject invalid UTF-8, duplicate keys, >64 nesting levels, nonfinite numbers,
+overflowing signed integers, unsafe Windows IDs and invalid known field types.
+Unknown fields and arbitrary JSON inside extensions survive. A newer major fails
+and leaves bytes intact. Watches poll at 250 ms, emit a current value per listener,
+pause reads when paused and close their in-flight read on cancellation. C5 retains
+its last valid snapshot on malformed/stale/missing replacement. Large-library/app
+scroll/search timing budgets remain app-side F7 measurements.
+
+Preset history keeps the last 20 old revisions (post-commit pruning is best effort
+and retries on the next save). Delete retains the final snapshot for recovery.
+An ID with retained history cannot be recreated at revision 1; use a new ID.
+Storage adds `INVALID-DATA`, `INVALID-ID`, `UNSUPPORTED-VERSION`, `FILE-LIMIT`,
+`FILE-READ`, `FILE-WRITE`, `STORE-BUSY` and `RECIPE-INVALID` service errors.
+
+### B3 Windows FFmpeg services and app composition
+
+Construct one `WindowsServices(core: NativeVeCore(), paths?: ServicePaths)` for the
+app's providers. It supplies machineSettings, discovery, probe, hardwareTests,
+capabilityCache, presetTests, library, jobs, liveStatus, editSessions, presetTransfer
+and fileReveal. Construction does not scan, execute FFmpeg or write default files.
+The Windows x64 native-asset hook builds a bounded DXGI GPU/driver helper alongside
+ve_core; there is no Flutter dependency. Exact pinned dependencies and notices
+are in packages/ve_services/THIRD_PARTY_NOTICES.md.
+
+**C7 ownership:** discovery add/scan/remove and completed probe/hardware tests own
+installation-record writes. The app must remove its fake-era discovery-to-machine
+copy and manual capability-cache writes when switching providers. Default selection,
+theme, UI bounds and other preferences still use revision-checked settings writes;
+on REVISION-CONFLICT re-read and reapply only the intended preference. Services
+do this internally (eight attempts) and preserve unrelated fields. Removing the
+current default fails DEFAULT-IN-USE. Vanished installations stay listed with health.
+
+Discovery explicitly scans legacy INI, PATH, WinGet links/package folders, Scoop
+paths/shims and Chocolatey package executables. Package walking is bounded to
+4,000 entries and six levels. Scoop .shim text resolves to the target exe; shims
+are never executed. Paths/symlinks are canonicalized and deduplicated; Windows
+environment names are case-insensitive. The default INI is beside the app;
+WindowsFFmpegCandidateFinder accepts explicit iniPaths/environment for other roots.
+Candidate failures are exposed through discovery.scanProblems. Nothing downloads
+FFmpeg, edits PATH or chooses a default automatically.
+
+Identification requires Windows x64 PE executables, FFprobe beside FFmpeg, and
+matching full version/configuration/loaded-library facts. SHA-256 covers FFmpeg and
+sorted sibling av*/sw*/postproc* DLLs plus parser version; extensions retain their
+file stats and FFprobe hash/stats. Reads/list/watch use stats for health without
+executing FFmpeg or hashing entire binaries. Explicit probe/test operations rehash
+and refuse changed/incomplete installations. Installation IDs are stable per
+canonical path; capability identities change with bytes, libraries or parser.
+
+Probe streams identity, lists, curated details, hardware and a terminal phase.
+Generic codec AVOptions come from the AVCodecContext section of -h full; version,
+encoder/muxer lists and curated encoder help are parsed off the caller isolate.
+Other encoder help is fetched lazily and merged under the cache lock. The parser
+preserves literal bounds/defaults/constants, merges duplicate options/aliases, and
+detects unknown encoder help even with exit 0. Muxer aliases are individual lookup
+keys but counts deduplicate canonical implementations; joined device flag Ed is
+accepted. Production parser version is **2**, invalidating earlier qualification
+commands/cache entries. Existing parser-1 fakes remain historical fixtures.
+
+One shared pool allows at most four direct, shell-free hidden Windows children.
+Help/identity/hardware timeout is 10 s per child; stdout is bounded (1 MiB normally,
+4 MiB for full help), combined output 8 MiB and returned stderr tail 64 KiB.
+Timeout/cancellation kills and reaps owned children and removes queued work.
+Probe/hardware cancel uses installation ID; preset-test cancel uses testId.
+Await cancel/subscription cancellation before disposal. Failure/cancellation never
+emits probe done; a completed catalog or previous qualified result can remain cached.
+
+Hardware tests qualify listed **video** wrappers with one 320x192 frame, forced
+pixel format, and a second 10-bit input test when advertised. Media Foundation
+uses -hw_encoding 1 to prevent software fallback. Vulkan/D3D12-only surfaces use
+explicit device initialization and hwupload. A failed 10-bit test does not discard
+an 8-bit success; tenBit requires its own success. Results retain bounded stderr,
+failure class, binary identity, DXGI adapter/driver fingerprint and testedAt, and
+persist in cache/C7. Reuse requires exact identity/fingerprint and age <30 days;
+force bypasses reuse. Unknown driver identity is not reusable. GPU changes/expiry
+make availability unknown on reads without launching a test. These are smoke
+results for the tested default device/command, not HDR, resolution/performance or
+all possible custom device/filter configurations. Audio wrappers are listed facts,
+not GPU qualification results.
+
+PresetTests generates 60 320x180 P010 testsrc2 frames at 30 fps and two seconds of
+48 kHz stereo float sine in a unique local tests directory. Only core.compile
+produces argv and expectedStreams: canonical codec comes from captured capabilities
+or curated native family facts; unestablished codecs stay null. Basic and seeded
+Advanced commands are supported. General extra input/output/map/filter scope is
+explicitly refused by this small synthetic test. There is no Dart command parsing.
+Encoding (60 s), FFprobe count/readback (15 s) and full decode (30 s) are bounded,
+with streamed stderr and an 8 MiB persisted log. A passed result needs matching
+stream kinds/count/known codecs, readable video and full decode. Cancellation/log
+failure releases resources; terminal results follow log close/input cleanup.
+Output/log are retained for inspection; generated inputs are removed. Tests do
+not publish render outputs or create History jobs (B4).
+
+`capabilities.toCoreCapabilities(label: ..., recipe: recipe)` reuses immutable
+views across edits. Basic retains all encoder names/kinds/codecs/availability and
+active encoders' full option facts; Advanced or omitted recipe retains the full
+map. Availability state/reason are retained; unused hardware diagnostics stay in
+the full service data. Native compile results match across these views for the six
+built-ins, Extra arguments and disabled audio on all three supplied builds (61
+parity/reuse checks). Warm Basic FFI compile means are 2.5–2.9 ms with 27–33 KiB
+maps, versus 10.5–13.2 ms full-map means (50 calls/build). App frames and the complete 4 ms edit budget still
+need F7 measurements; the full Advanced map remains materially slower.
 
 ## C4 — Edit sessions
 
@@ -476,10 +672,13 @@ JobRecord {
   hresult:string,message,stderrTail:string,
   verification:{state:"passed"|"failed"|"skipped",message:string,
     expectedCodecs:string[],actualCodecs:string[],ffprobeVersion:string|null},
-  timings:{phase:seconds},published:bool,retainedPartialPath:string|null
+  timings:{phase:seconds},published:bool,retainedPartialPath:string|null,
+  commandLine,encoderSummary,logFile:string|null,durationSec,realtime:number|null,
+  errorTokenIndices:nonnegativeInt[]
 }
 JobIndexEntry {index:1,id:string,recordFile:relativeBasename,startedAt:UTC,
-  status:"succeeded"|"failed"|"cancelled",templateName:string,outputPath:string}
+  status:"succeeded"|"failed"|"cancelled",templateName:string,outputPath:string,
+  encoderSummary,project:string|null,durationSec,elapsedSec:number|null,sizeBytes:int|null}
 ```
 
 argv excludes the executable (ffmpeg.path supplies it) and includes actual temp
@@ -491,6 +690,22 @@ must validate before History reads it. Five sample records reflect the mockup's
 success, cancellation and failure, **all with illustrative installation identities**.
 FakeJobRepository.publish(record) updates History test snapshots. No real job was
 recorded by B0.
+
+B3 reads and validates records; B4's native RecipeJob now writes them. Optional summary
+fields keep old records readable; absent values stay unknown. B4 writes the core's
+commandLine, encoder summary, duration/realtime facts and errorTokenIndices;
+indexes refer to recorded argv (zero-based, executable excluded), not display
+tokens. The app never parses stderr to produce them. `logFile` is the relative
+basename `<id>.ffmpeg.log` under the jobs root. JobLogs streams the full UTF-8 log
+without the 1 MiB JSON allocation limit; a missing historical log is NOT-FOUND.
+
+FileJobRepository reads the bounded lines of jobs.jsonl without reading every
+record. It ignores an incomplete final line and rejects malformed complete lines
+or unsafe recordFile references. Missing index can be reconstructed read-only from
+complete per-job files. `rebuildIndex()` explicitly replaces an interrupted/corrupt
+index under the index lock. Watches never repair files as a side effect. Stopped
+jobs cannot claim publication or published bytes; success requires zero exit,
+publication and a passed/explicitly skipped output check.
 
 ## C7 — machine.json
 

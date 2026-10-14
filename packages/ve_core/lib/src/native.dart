@@ -134,7 +134,8 @@ class NativeVeCore implements VeCore {
     _call('validate', {
       'recipe': recipe.toJson(),
       'media': media?.toJson(),
-      'capabilities': capabilities?.toJson(),
+      // Already deeply immutable; serialization does not need a mutable copy.
+      'capabilities': capabilities?.data,
     })['issues'],
   ).map(Issue.fromJson).toList(growable: false);
   @override
@@ -148,7 +149,7 @@ class NativeVeCore implements VeCore {
       'recipe': recipe.toJson(),
       'media': media.toJson(),
       'paths': paths.toJson(),
-      'capabilities': capabilities?.toJson(),
+      'capabilities': capabilities?.data,
     }),
   );
   @override
@@ -156,7 +157,7 @@ class NativeVeCore implements VeCore {
       jsonMaps(
         _call('lint', {
           'text': text,
-          'capabilities': capabilities?.toJson(),
+          'capabilities': capabilities?.data,
         })['diagnostics'],
       ).map(Diagnostic.fromJson).toList(growable: false);
   @override
@@ -168,7 +169,7 @@ class NativeVeCore implements VeCore {
     _call('complete', {
       'text': text,
       'caret': caret,
-      'capabilities': capabilities?.toJson(),
+      'capabilities': capabilities?.data,
     }),
   );
   @override

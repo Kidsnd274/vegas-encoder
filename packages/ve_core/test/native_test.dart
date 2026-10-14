@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:ve_core/ve_core.dart';
+import 'b1_argv.dart';
 
 int checks = 0;
 void check(bool condition, String message) {
@@ -31,21 +32,23 @@ Future<void> main(List<String> args) async {
   check(!core.version.isFake && core.version.abi == 1, 'real native version');
   check(
     core.profiles().video.length == 12 && core.profiles().audio.length == 11,
-    'native curated catalog with explicit bootstrap provenance',
+    'native curated catalog with measured Windows provenance',
   );
   check(
-    core.profiles().provenance.contains('NOT Windows-qualified'),
-    'unqualified profile provenance',
+    core.profiles().provenance.contains('B1 measured Windows x64') &&
+        core.profiles().provenance.contains('not VEGAS qualification'),
+    'Windows facts retain native-host qualification limits',
   );
-  for (final f in fake.fixtures) {
+  for (final entry in fake.fixtures.asMap().entries) {
+    final f = entry.value;
     final result = core.compile(f.recipe, media: f.media, paths: f.paths);
     check(
       !errors(result.issues),
       'built-in compile has no errors: ${f.recipe.id}: ${result.issues.map((i) => i.toJson()).toList()}',
     );
     check(
-      result.argv.join('\n') == f.compiled.argv.join('\n'),
-      'B0 argv parity ${f.recipe.id}',
+      result.argv.join('\n') == b1CoreArgv[entry.key].join('\n'),
+      'B1 real-core argv parity ${f.recipe.id}',
     );
     check(
       result.argv.last == f.paths.output &&
@@ -56,6 +59,20 @@ Future<void> main(List<String> args) async {
       result.display.skip(1).map((t) => t.text).join('\n') ==
           result.argv.join('\n'),
       'display/argv parity',
+    );
+    final seeded = core.compile(
+      f.recipe.copyWith(
+        command: f.recipe.command.copyWith(
+          mode: 'template',
+          template: result.advancedTemplate,
+        ),
+      ),
+      media: f.media,
+      paths: f.paths,
+    );
+    check(
+      seeded.argv.join('\n') == result.argv.join('\n'),
+      'Basic seed preserves input metadata and argv in Advanced',
     );
     check(
       result.display
@@ -126,6 +143,30 @@ Future<void> main(List<String> args) async {
   );
   final editedResult = core.compile(edited, media: f.media, paths: f.paths);
   check(
+    editedResult.inputStreams?.join(',') == 'video,audio',
+    'typed native input pipe facts',
+  );
+  check(
+    editedResult.copyWith().inputStreams?.join(',') == 'video,audio',
+    'input facts survive typed result copies',
+  );
+  check(
+    editedResult.expectedStreams
+            ?.map((s) => '${s.kind}:${s.codec}')
+            .join(',') ==
+        'video:h264,audio:aac',
+    'typed native output verification facts',
+  );
+  check(
+    editedResult.copyWith().expectedStreams?.first.encoder == 'libx264',
+    'verification facts survive typed result copies',
+  );
+  check(
+    core.normalize(f.recipe.toJson()).requiredEncoders?.join(',') ==
+        'libx264,aac',
+    'typed normalization requirements come from native core',
+  );
+  check(
     after(editedResult.argv, '-crf') == '17' &&
         editedResult.resolved!.quality == 17,
     'live CRF edit reaches native compile',
@@ -173,6 +214,119 @@ Future<void> main(List<String> args) async {
       'video.quality',
     ]),
     'core identifies overridden settings without app option parsing',
+  );
+  check(
+    override.display
+            .where((t) => t.text == '-crf' || t.text == '16')
+            .every((t) => t.replacedField == 'video.quality') &&
+        override.display
+            .where((t) => t.text == '-preset' || t.text == 'slower')
+            .every((t) => t.replacedField == 'video.speed'),
+    'extra option and value retain their replaced control',
+  );
+  final incompatibleProfile = f.recipe.copyWith(
+    video: f.recipe.video.copyWith(depth: 10, profile: 'high'),
+  );
+  for (final extra in ['-profile:v high10', '-pix_fmt yuv420p']) {
+    final replaced = incompatibleProfile.copyWith(
+      video: incompatibleProfile.video.copyWith(extra: extra),
+    );
+    final result = core.compile(replaced, media: f.media, paths: f.paths);
+    check(
+      !errors(core.validate(replaced, media: f.media)) &&
+          !errors(result.issues),
+      'final Extra profile/pixel replacement permits a valid command',
+    );
+    check(
+      extra == '-profile:v high10'
+          ? result.resolved!.profile == 'high10' && result.resolved!.depth == 10
+          : result.resolved!.profile == 'high' && result.resolved!.depth == 8,
+      'resolved profile/depth uses the Extra replacement',
+    );
+  }
+  final introducedMismatch = f.recipe.copyWith(
+    video: f.recipe.video.copyWith(
+      depth: 8,
+      profile: 'high',
+      extra: '-pix_fmt yuv420p10le',
+    ),
+  );
+  check(
+    errors(core.validate(introducedMismatch, media: f.media)) &&
+        errors(
+          core
+              .compile(introducedMismatch, media: f.media, paths: f.paths)
+              .issues,
+        ),
+    'Extra pixel override can introduce an incompatible final H.264 profile',
+  );
+  final exactFormatCaps = CoreCapabilities(
+    installationId: 'exact-format',
+    encoders: {
+      'libx264': {
+        'kind': 'video',
+        'options': [],
+        'pixelFormats': ['yuv420p', 'yuv420p10le'],
+      },
+      'aac': {'kind': 'audio', 'options': []},
+    },
+  );
+  final exactFormatRecipe = f.recipe.copyWith(
+    video: f.recipe.video.copyWith(
+      profile: 'high10',
+      extra: '-vf scale=320:180,format=yuv420p10le -pix_fmt +yuv420p10le',
+    ),
+  );
+  final exactFormat = core.compile(
+    exactFormatRecipe,
+    media: f.media,
+    paths: f.paths,
+    capabilities: exactFormatCaps,
+  );
+  check(
+    !errors(
+          core.validate(
+            exactFormatRecipe,
+            media: f.media,
+            capabilities: exactFormatCaps,
+          ),
+        ) &&
+        !errors(exactFormat.issues),
+    'exact pixel-format modifier is accepted with build capabilities',
+  );
+  check(
+    after(exactFormat.argv, '-pix_fmt') == '+yuv420p10le' &&
+        exactFormat.resolved!.pixfmt == 'yuv420p10le' &&
+        exactFormat.signalPath!.video!.outputBits == 10,
+    'literal plus syntax is preserved while format facts use the name',
+  );
+  for (final format in ['+', '+ve_unknown_format']) {
+    final recipe = exactFormatRecipe.copyWith(
+      video: exactFormatRecipe.video.copyWith(extra: '-pix_fmt $format'),
+    );
+    final result = core.compile(recipe, media: f.media, paths: f.paths);
+    check(
+      !errors(core.validate(recipe, media: f.media)) &&
+          result.resolved == null &&
+          result.signalPath!.video!.outputBits == null,
+      'automatic or unmodeled exact pixel format remains unknown',
+    );
+  }
+  final tags = core.compile(
+    f.recipe.copyWith(
+      video: f.recipe.video.copyWith(extra: '-colorspace smpte170m'),
+    ),
+    media: f.media,
+    paths: f.paths,
+  );
+  check(
+    tags.display.where((t) => t.text == '-colorspace').length == 2 &&
+        tags.argv
+            .asMap()
+            .entries
+            .where((e) => e.value == '-colorspace')
+            .every((e) => tags.argv[e.key + 1] == 'smpte170m'),
+    'Extra color tags remain metadata on raw input and output',
   );
   final badExtra = core.compile(
     f.recipe.copyWith(video: f.recipe.video.copyWith(extra: '-c:v ffv1')),
@@ -293,6 +447,41 @@ Future<void> main(List<String> args) async {
     'direct P010 path',
   );
   final profiles = core.profiles();
+  final pcmRecipe = f.recipe.copyWith(
+    audio: [
+      f.recipe.audio.first.copyWith(encoder: 'pcm_s24le', mode: 'lossless'),
+    ],
+  );
+  final buildCaps = CoreCapabilities(
+    installationId: 'b1',
+    libavformatMajor: 59,
+    encoders: {
+      'libx264': {'kind': 'video', 'options': []},
+      'pcm_s24le': {'kind': 'audio', 'options': []},
+    },
+  );
+  final oldPcm = core.compile(
+    pcmRecipe,
+    media: f.media,
+    paths: f.paths,
+    capabilities: buildCaps,
+  );
+  final newPcm = core.compile(
+    pcmRecipe,
+    media: f.media,
+    paths: f.paths,
+    capabilities: buildCaps.copyWith(libavformatMajor: 63),
+  );
+  check(
+    errors(oldPcm.issues) &&
+        oldPcm.signalPath!.audio.single.containerSupport == 'no',
+    'old build MP4 PCM rejection reaches FFI',
+  );
+  check(
+    !errors(newPcm.issues) &&
+        newPcm.signalPath!.audio.single.containerSupport == 'warn',
+    'new build MP4 PCM playback caveat reaches FFI',
+  );
   final caps = CoreCapabilities(
     installationId: 'test',
     encoders: {

@@ -1,9 +1,14 @@
 name: ve_services
-description: Vegas Encoder system service contracts and in-memory fakes.
-version: 0.1.0
+description: Vegas Encoder Windows system services, repositories and test fakes.
+version: 0.3.0
 publish_to: none
 environment:
   sdk: '>=3.10.0 <4.0.0'
 dependencies:
+  crypto: 3.0.7
+  ffi: 2.2.0
+  hooks: 2.0.2
+  code_assets: 1.2.1
+  native_toolchain_c: 0.19.2
   ve_core:
     path: ../ve_core

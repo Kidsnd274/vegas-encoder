@@ -28,6 +28,8 @@ Json Structural(const Json& recipe);
 Json Validate(const Json& request);
 Json Normalize(const Json& request);
 Json Compile(const Json& request);
+// Conservative runtime diagnostic provenance: argv indexes, executable excluded.
+Json ErrorTokenIndices(const Json& compiled, const std::string& stderrTail);
 Json Estimate(const Json& request);
 Json Diff(const Json& request);
 Json Lint(const Json& request);
@@ -49,8 +51,15 @@ bool IsOption(const std::string& text);
 const Json* FindProfile(const std::string& kind, const std::string& encoder);
 const Json* FindContainer(const std::string& container);
 const Json* EncoderOptions(const Json& capabilities, const std::string& encoder);
+bool ValidEncoderOption(const Json& capabilities, const std::string& encoder,
+                        const std::string& kind, const std::string& flag, const std::string& value);
+std::string ContainerSupport(const std::string& kind, const Json& profile,
+                             const std::string& container, const Json& capabilities);
 Json Resolve(const Json& recipe);
-Json Signal(const Json& recipe, const Json& media, const Json& resolved);
+Json VideoFormat(const std::string& format);
+void ReflectVideoFormatOption(Json& resolved, const std::string& key, const std::string& value);
+void CheckVideoProfile(const Json& resolved, Json& issues);
+Json Signal(const Json& recipe, const Json& media, const Json& resolved, const Json& capabilities = Json(nullptr));
 Json Summary(const Json& recipe, const Json& resolved);
 Json InputTokens(const Json& recipe, const Json& media, const Json& paths);
 void CheckMedia(const Json& media);

@@ -6,6 +6,11 @@ Updated: 2026-10-11. Research for the Vegas Encoder configurator (Flutter) and e
 design-time record; P1 recaptures them with Windows FFmpeg builds, and those captures
 become the fixtures. Linux-only paths (VAAPI, `mkfifo`) are kept for reference only.
 
+**B1 update (2026-10-13):** [Windows recapture](FFMPEG_WINDOWS.md) now provides the
+measured gyan/BtbN facts used by the native core. It supersedes the Linux-derived
+defaults/compatibility/timing assumptions where they differ. Labels and results
+below remain the original design research; no native VEGAS gate changed.
+
 **Evidence labels used below**
 
 - **[L]** = verified with FFmpeg 8.1.3 on Linux (Fedora build `/usr/bin/ffmpeg`, `--enable-shared --enable-gpl

@@ -1,0 +1,860 @@
+
+
+  -b                 <int64>      E..VA...... set bitrate (in bits/s) (from 0 to I64_MAX) (default 200000)
+
+  -ab                <int64>      E...A...... set bitrate (in bits/s) (from 0 to INT_MAX) (default 128000)
+
+  -bt                <int>        E..VA...... Set video bitrate tolerance (in bits/s). In 1-pass mode, bitrate tolerance specifies how far ratecontrol is willing to deviate from the target average bitrate value. This is not related to minimum/maximum bitrate. Lowering tolerance too much has an adverse effect on quality. (from 0 to INT_MAX) (default 4000000)
+
+  -flags             <flags>      ED.VAS..... (default 0)
+
+     unaligned                    .D.V....... allow decoders to produce unaligned output
+
+     mv4                          E..V....... use four motion vectors per macroblock (MPEG-4)
+
+     qpel                         E..V....... use 1/4-pel motion compensation
+
+     loop                         E..V....... use loop filter
+
+     gray                         ED.V....... only decode/encode grayscale
+
+     psnr                         E..V....... error[?] variables will be set during encoding
+
+     ildct                        E..V....... use interlaced DCT
+
+     low_delay                    ED.V....... force low delay
+
+     global_header                E..VA...... place global headers in extradata instead of every keyframe
+
+     bitexact                     ED.VAS..... use only bitexact functions (except (I)DCT)
+
+     aic                          E..V....... H.263 advanced intra coding / MPEG-4 AC prediction
+
+     ilme                         E..V....... interlaced motion estimation
+
+     cgop                         E..V....... closed GOP
+
+     output_corrupt               .D.V....... Output even potentially corrupted frames
+
+  -flags2            <flags>      ED.VAS..... (default 0)
+
+     fast                         E..V....... allow non-spec-compliant speedup tricks
+
+     noout                        E..V....... skip bitstream encoding
+
+     ignorecrop                   .D.V....... ignore cropping information from sps
+
+     local_header                 E..V....... place global headers at every keyframe instead of in extradata
+
+     chunks                       .D.V....... Frame data might be split into multiple chunks
+
+     showall                      .D.V....... Show all frames before the first keyframe
+
+     export_mvs                   .D.V....... export motion vectors through frame side data
+
+     skip_manual                  .D..A...... do not skip samples and export skip information as frame side data
+
+     ass_ro_flush_noop              .D...S..... do not reset ASS ReadOrder field on flush
+
+     icc_profiles                 .D...S..... generate/parse embedded ICC profiles from/to colorimetry tags
+
+     fixed_frame_size              E...A...... Force a fixed frame size
+
+  -export_side_data  <flags>      ED.VAS..... Export metadata as side data (default 0)
+
+     mvs                          .D.V....... export motion vectors through frame side data
+
+     prft                         E..VAS..... export Producer Reference Time through packet side data
+
+     venc_params                  .D.V....... export video encoding parameters through frame side data
+
+     film_grain                   .D.V....... export film grain parameters through frame side data
+
+     enhancements                 .D.V....... export picture enhancement metadata through frame side data
+
+  -g                 <int>        E..V....... set the group of picture (GOP) size (from INT_MIN to INT_MAX) (default 12)
+
+  -ar                <int>        ED..A...... set audio sampling rate (in Hz) (from 0 to INT_MAX) (default 0)
+
+  -cutoff            <int>        E...A...... set cutoff bandwidth (from INT_MIN to INT_MAX) (default 0)
+
+  -frame_size        <int>        E...A...... (from 0 to INT_MAX) (default 0)
+
+  -qcomp             <float>      E..V....... video quantizer scale compression (VBR). Constant of ratecontrol equation. Recommended range for default rc_eq: 0.0-1.0 (from -FLT_MAX to FLT_MAX) (default 0.5)
+
+  -qblur             <float>      E..V....... video quantizer scale blur (VBR) (from -1 to FLT_MAX) (default 0.5)
+
+  -qmin              <int>        E..V....... minimum video quantizer scale (VBR) (from -1 to 69) (default 2)
+
+  -qmax              <int>        E..V....... maximum video quantizer scale (VBR) (from -1 to 1024) (default 31)
+
+  -qdiff             <int>        E..V....... maximum difference between the quantizer scales (VBR) (from INT_MIN to INT_MAX) (default 3)
+
+  -bf                <int>        E..V....... set maximum number of B-frames between non-B-frames (from -1 to INT_MAX) (default 0)
+
+  -b_qfactor         <float>      E..V....... QP factor between P- and B-frames (from -FLT_MAX to FLT_MAX) (default 1.25)
+
+  -bug               <flags>      .D.V....... work around not autodetected encoder bugs (default autodetect)
+
+     autodetect                   .D.V.......
+
+     xvid_ilace                   .D.V....... Xvid interlacing bug (autodetected if FOURCC == XVIX)
+
+     ump4                         .D.V....... (autodetected if FOURCC == UMP4)
+
+     no_padding                   .D.V....... padding bug (autodetected)
+
+     amv                          .D.V.......
+
+     qpel_chroma                  .D.V.......
+
+     std_qpel                     .D.V....... old standard qpel (autodetected per FOURCC/version)
+
+     qpel_chroma2                 .D.V.......
+
+     direct_blocksize              .D.V....... direct-qpel-blocksize bug (autodetected per FOURCC/version)
+
+     edge                         .D.V....... edge padding bug (autodetected per FOURCC/version)
+
+     hpel_chroma                  .D.V.......
+
+     dc_clip                      .D.V.......
+
+     ms                           .D.V....... work around various bugs in Microsoft's broken decoders
+
+     trunc                        .D.V....... truncated frames
+
+     iedge                        .D.V.......
+
+     h264_dp_nnz                  .D.V....... H.264 nC derivation for partitioned slices (autodetected)
+
+  -strict            <int>        ED.VA...... how strictly to follow the standards (from INT_MIN to INT_MAX) (default normal)
+
+     very            2            ED.VA...... strictly conform to a older more strict version of the spec or reference software
+
+     strict          1            ED.VA...... strictly conform to all the things in the spec no matter what the consequences
+
+     normal          0            ED.VA......
+
+     unofficial      -1           ED.VA...... allow unofficial extensions
+
+     experimental    -2           ED.VA...... allow non-standardized experimental things
+
+  -b_qoffset         <float>      E..V....... QP offset between P- and B-frames (from -FLT_MAX to FLT_MAX) (default 1.25)
+
+  -err_detect        <flags>      ED.VAS..... set error detection flags (default 0)
+
+     crccheck                     ED.VAS..... verify embedded CRCs
+
+     bitstream                    ED.VAS..... detect bitstream specification deviations
+
+     buffer                       ED.VAS..... detect improper bitstream length
+
+     explode                      ED.VAS..... abort decoding on minor error detection
+
+     ignore_err                   ED.VAS..... ignore errors
+
+     careful                      ED.VAS..... consider things that violate the spec, are fast to check and have not been seen in the wild as errors
+
+     compliant                    ED.VAS..... consider all spec non compliancies as errors
+
+     aggressive                   ED.VAS..... consider things that a sane encoder should not do as an error
+
+  -maxrate           <int64>      E..VA...... maximum bitrate (in bits/s). Used for VBV together with bufsize. (from 0 to INT_MAX) (default 0)
+
+  -minrate           <int64>      E..VA...... minimum bitrate (in bits/s). Most useful in setting up a CBR encode. It is of little use otherwise. (from INT_MIN to INT_MAX) (default 0)
+
+  -bufsize           <int>        E..VA...... set ratecontrol buffer size (in bits) (from INT_MIN to INT_MAX) (default 0)
+
+  -i_qfactor         <float>      E..V....... QP factor between P- and I-frames (from -FLT_MAX to FLT_MAX) (default -0.8)
+
+  -i_qoffset         <float>      E..V....... QP offset between P- and I-frames (from -FLT_MAX to FLT_MAX) (default 0)
+
+  -dct               <int>        E..V....... DCT algorithm (from 0 to INT_MAX) (default auto)
+
+     auto            0            E..V....... autoselect a good one
+
+     fastint         1            E..V....... fast integer
+
+     int             2            E..V....... accurate integer
+
+     mmx             3            E..V.......
+
+     altivec         5            E..V.......
+
+     faan            6            E..V....... floating point AAN DCT
+
+     neon            7            E..V.......
+
+     rvv             8            E..V.......
+
+  -lumi_mask         <float>      E..V....... compresses bright areas stronger than medium ones (from -FLT_MAX to FLT_MAX) (default 0)
+
+  -tcplx_mask        <float>      E..V....... temporal complexity masking (from -FLT_MAX to FLT_MAX) (default 0)
+
+  -scplx_mask        <float>      E..V....... spatial complexity masking (from -FLT_MAX to FLT_MAX) (default 0)
+
+  -p_mask            <float>      E..V....... inter masking (from -FLT_MAX to FLT_MAX) (default 0)
+
+  -dark_mask         <float>      E..V....... compresses dark areas stronger than medium ones (from -FLT_MAX to FLT_MAX) (default 0)
+
+  -idct              <int>        ED.V....... select IDCT implementation (from 0 to INT_MAX) (default auto)
+
+     auto            0            ED.V.......
+
+     int             1            ED.V.......
+
+     simple          2            ED.V.......
+
+     simplemmx       3            ED.V.......
+
+     arm             7            ED.V.......
+
+     altivec         8            ED.V.......
+
+     simplearm       10           ED.V.......
+
+     simplearmv5te   16           ED.V.......
+
+     simplearmv6     17           ED.V.......
+
+     simpleneon      22           ED.V.......
+
+     xvid            14           ED.V.......
+
+     xvidmmx         14           ED.V....... deprecated, for compatibility only
+
+     faani           20           ED.V....... floating point AAN IDCT
+
+     simpleauto      128          ED.V.......
+
+  -ec                <flags>      .D.V....... set error concealment strategy (default guess_mvs+deblock)
+
+     guess_mvs                    .D.V....... iterative motion vector (MV) search (slow)
+
+     deblock                      .D.V....... use strong deblock filter for damaged MBs
+
+     favor_inter                  .D.V....... favor predicting from the previous frame
+
+  -aspect            <rational>   E..V....... sample aspect ratio (from 0 to 10) (default 0/1)
+
+  -sar               <rational>   E..V....... sample aspect ratio (from 0 to 10) (default 0/1)
+
+  -debug             <flags>      ED.VAS..... print specific debug info (default 0)
+
+     pict                         .D.V....... picture info
+
+     rc                           E..V....... rate control
+
+     bitstream                    .D.V.......
+
+     mb_type                      .D.V....... macroblock (MB) type
+
+     qp                           .D.V....... per-block quantization parameter (QP)
+
+     dct_coeff                    .D.V.......
+
+     green_metadata               .D.V.......
+
+     skip                         .D.V.......
+
+     startcode                    .D.V.......
+
+     er                           .D.V....... error recognition
+
+     mmco                         .D.V....... memory management control operations (H.264)
+
+     bugs                         .D.V.......
+
+     buffers                      .D.V....... picture buffer allocations
+
+     thread_ops                   .D.VA...... threading operations
+
+     nomc                         .D.VA...... skip motion compensation
+
+  -dia_size          <int>        E..V....... diamond type & size for motion estimation (from INT_MIN to INT_MAX) (default 0)
+
+  -last_pred         <int>        E..V....... amount of motion predictors from the previous frame (from INT_MIN to INT_MAX) (default 0)
+
+  -pre_dia_size      <int>        E..V....... diamond type & size for motion estimation pre-pass (from INT_MIN to INT_MAX) (default 0)
+
+  -subq              <int>        E..V....... sub-pel motion estimation quality (from INT_MIN to INT_MAX) (default 8)
+
+  -me_range          <int>        E..V....... limit motion vectors range (1023 for DivX player) (from INT_MIN to INT_MAX) (default 0)
+
+  -global_quality    <int>        E..VA...... (from INT_MIN to INT_MAX) (default 0)
+
+  -mbd               <int>        E..V....... macroblock decision algorithm (high quality mode) (from 0 to 2) (default simple)
+
+     simple          0            E..V....... use mbcmp
+
+     bits            1            E..V....... use fewest bits
+
+     rd              2            E..V....... use best rate distortion
+
+  -rc_init_occupancy <int>        E..V....... number of bits which should be loaded into the rc buffer before decoding starts (from INT_MIN to INT_MAX) (default 0)
+
+  -threads           <int>        ED.VA...... set the number of threads (from 0 to INT_MAX) (default 1)
+
+     auto            0            ED.V....... autodetect a suitable number of threads to use
+
+  -dc                <int>        E..V......P deprecated; use intra_dc_precision for MPEG-2 instead (from -8 to 16) (default 0)
+
+  -nssew             <int>        E..V....... nsse weight (from INT_MIN to INT_MAX) (default 8)
+
+  -skip_top          <int>        .D.V....... number of macroblock rows at the top which are skipped (from INT_MIN to INT_MAX) (default 0)
+
+  -skip_bottom       <int>        .D.V....... number of macroblock rows at the bottom which are skipped (from INT_MIN to INT_MAX) (default 0)
+
+  -profile           <int>        E..VA...... (from INT_MIN to INT_MAX) (default unknown)
+
+     unknown         -99          E..VA......
+
+     main10          2            E..V.......
+
+  -level             <int>        E..VA...... encoding level, usually corresponding to the profile level, codec-specific (from INT_MIN to INT_MAX) (default unknown)
+
+     unknown         -99          E..VA......
+
+  -lowres            <int>        .D.VA...... decode at 1= 1/2, 2=1/4, 3=1/8 resolutions (from 0 to INT_MAX) (default 0)
+
+  -cmp               <int>        E..V....... full-pel ME compare function (from INT_MIN to INT_MAX) (default sad)
+
+     sad             0            E..V....... sum of absolute differences, fast
+
+     sse             1            E..V....... sum of squared errors
+
+     satd            2            E..V....... sum of absolute Hadamard transformed differences
+
+     dct             3            E..V....... sum of absolute DCT transformed differences
+
+     psnr            4            E..V....... sum of squared quantization errors (avoid, low quality)
+
+     bit             5            E..V....... number of bits needed for the block
+
+     rd              6            E..V....... rate distortion optimal, slow
+
+     zero            7            E..V....... 0
+
+     vsad            8            E..V....... sum of absolute vertical differences
+
+     vsse            9            E..V....... sum of squared vertical differences
+
+     nsse            10           E..V....... noise preserving sum of squared differences
+
+     w53             11           E..V....... 5/3 wavelet, only used in snow
+
+     w97             12           E..V....... 9/7 wavelet, only used in snow
+
+     dctmax          13           E..V.......
+
+     chroma          256          E..V.......
+
+     msad            15           E..V....... sum of absolute differences, median predicted
+
+  -subcmp            <int>        E..V....... sub-pel ME compare function (from INT_MIN to INT_MAX) (default sad)
+
+     sad             0            E..V....... sum of absolute differences, fast
+
+     sse             1            E..V....... sum of squared errors
+
+     satd            2            E..V....... sum of absolute Hadamard transformed differences
+
+     dct             3            E..V....... sum of absolute DCT transformed differences
+
+     psnr            4            E..V....... sum of squared quantization errors (avoid, low quality)
+
+     bit             5            E..V....... number of bits needed for the block
+
+     rd              6            E..V....... rate distortion optimal, slow
+
+     zero            7            E..V....... 0
+
+     vsad            8            E..V....... sum of absolute vertical differences
+
+     vsse            9            E..V....... sum of squared vertical differences
+
+     nsse            10           E..V....... noise preserving sum of squared differences
+
+     w53             11           E..V....... 5/3 wavelet, only used in snow
+
+     w97             12           E..V....... 9/7 wavelet, only used in snow
+
+     dctmax          13           E..V.......
+
+     chroma          256          E..V.......
+
+     msad            15           E..V....... sum of absolute differences, median predicted
+
+  -mbcmp             <int>        E..V....... macroblock compare function (from INT_MIN to INT_MAX) (default sad)
+
+     sad             0            E..V....... sum of absolute differences, fast
+
+     sse             1            E..V....... sum of squared errors
+
+     satd            2            E..V....... sum of absolute Hadamard transformed differences
+
+     dct             3            E..V....... sum of absolute DCT transformed differences
+
+     psnr            4            E..V....... sum of squared quantization errors (avoid, low quality)
+
+     bit             5            E..V....... number of bits needed for the block
+
+     rd              6            E..V....... rate distortion optimal, slow
+
+     zero            7            E..V....... 0
+
+     vsad            8            E..V....... sum of absolute vertical differences
+
+     vsse            9            E..V....... sum of squared vertical differences
+
+     nsse            10           E..V....... noise preserving sum of squared differences
+
+     w53             11           E..V....... 5/3 wavelet, only used in snow
+
+     w97             12           E..V....... 9/7 wavelet, only used in snow
+
+     dctmax          13           E..V.......
+
+     chroma          256          E..V.......
+
+     msad            15           E..V....... sum of absolute differences, median predicted
+
+  -ildctcmp          <int>        E..V....... interlaced DCT compare function (from INT_MIN to INT_MAX) (default vsad)
+
+     sad             0            E..V....... sum of absolute differences, fast
+
+     sse             1            E..V....... sum of squared errors
+
+     satd            2            E..V....... sum of absolute Hadamard transformed differences
+
+     dct             3            E..V....... sum of absolute DCT transformed differences
+
+     psnr            4            E..V....... sum of squared quantization errors (avoid, low quality)
+
+     bit             5            E..V....... number of bits needed for the block
+
+     rd              6            E..V....... rate distortion optimal, slow
+
+     zero            7            E..V....... 0
+
+     vsad            8            E..V....... sum of absolute vertical differences
+
+     vsse            9            E..V....... sum of squared vertical differences
+
+     nsse            10           E..V....... noise preserving sum of squared differences
+
+     w53             11           E..V....... 5/3 wavelet, only used in snow
+
+     w97             12           E..V....... 9/7 wavelet, only used in snow
+
+     dctmax          13           E..V.......
+
+     chroma          256          E..V.......
+
+     msad            15           E..V....... sum of absolute differences, median predicted
+
+  -precmp            <int>        E..V....... pre motion estimation compare function (from INT_MIN to INT_MAX) (default sad)
+
+     sad             0            E..V....... sum of absolute differences, fast
+
+     sse             1            E..V....... sum of squared errors
+
+     satd            2            E..V....... sum of absolute Hadamard transformed differences
+
+     dct             3            E..V....... sum of absolute DCT transformed differences
+
+     psnr            4            E..V....... sum of squared quantization errors (avoid, low quality)
+
+     bit             5            E..V....... number of bits needed for the block
+
+     rd              6            E..V....... rate distortion optimal, slow
+
+     zero            7            E..V....... 0
+
+     vsad            8            E..V....... sum of absolute vertical differences
+
+     vsse            9            E..V....... sum of squared vertical differences
+
+     nsse            10           E..V....... noise preserving sum of squared differences
+
+     w53             11           E..V....... 5/3 wavelet, only used in snow
+
+     w97             12           E..V....... 9/7 wavelet, only used in snow
+
+     dctmax          13           E..V.......
+
+     chroma          256          E..V.......
+
+     msad            15           E..V....... sum of absolute differences, median predicted
+
+  -mblmin            <int>        E..V....... minimum macroblock Lagrange factor (VBR) (from 1 to 32767) (default 236)
+
+  -mblmax            <int>        E..V....... maximum macroblock Lagrange factor (VBR) (from 1 to 32767) (default 3658)
+
+  -skip_loop_filter  <int>        .D.V....... skip loop filtering process for the selected frames (from INT_MIN to INT_MAX) (default default)
+
+     none            -16          .D.V....... discard no frame
+
+     default         0            .D.V....... discard useless frames
+
+     noref           8            .D.V....... discard all non-reference frames
+
+     bidir           16           .D.V....... discard all bidirectional frames
+
+     nointra         24           .D.V....... discard all frames except I frames
+
+     nokey           32           .D.V....... discard all frames except keyframes
+
+     all             48           .D.V....... discard all frames
+
+  -skip_idct         <int>        .D.V....... skip IDCT/dequantization for the selected frames (from INT_MIN to INT_MAX) (default default)
+
+     none            -16          .D.V....... discard no frame
+
+     default         0            .D.V....... discard useless frames
+
+     noref           8            .D.V....... discard all non-reference frames
+
+     bidir           16           .D.V....... discard all bidirectional frames
+
+     nointra         24           .D.V....... discard all frames except I frames
+
+     nokey           32           .D.V....... discard all frames except keyframes
+
+     all             48           .D.V....... discard all frames
+
+  -skip_pred         <int>        .D.V....... skip prediction for the selected frames (from INT_MIN to INT_MAX) (default default)
+
+     none            -16          .D.V....... discard no frame
+
+     default         0            .D.V....... discard useless frames
+
+     noref           8            .D.V....... discard all non-reference frames
+
+     bidir           16           .D.V....... discard all bidirectional frames
+
+     nointra         24           .D.V....... discard all frames except I frames
+
+     nokey           32           .D.V....... discard all frames except keyframes
+
+     all             48           .D.V....... discard all frames
+
+  -skip_frame        <int>        .D.V....... skip decoding for the selected frames (from INT_MIN to INT_MAX) (default default)
+
+     none            -16          .D.V....... discard no frame
+
+     default         0            .D.V....... discard useless frames
+
+     noref           8            .D.V....... discard all non-reference frames
+
+     bidir           16           .D.V....... discard all bidirectional frames
+
+     nointra         24           .D.V....... discard all frames except I frames
+
+     nokey           32           .D.V....... discard all frames except keyframes
+
+     all             48           .D.V....... discard all frames
+
+  -bidir_refine      <int>        E..V....... refine the two motion vectors used in bidirectional macroblocks (from 0 to 4) (default 1)
+
+  -keyint_min        <int>        E..V....... minimum interval between IDR-frames (from INT_MIN to INT_MAX) (default 25)
+
+  -refs              <int>        E..V....... reference frames to consider for motion compensation (from INT_MIN to INT_MAX) (default 1)
+
+  -trellis           <int>        E..VA...... rate-distortion optimal quantization (from INT_MIN to INT_MAX) (default 0)
+
+  -mv0_threshold     <int>        E..V....... (from 0 to INT_MAX) (default 256)
+
+  -compression_level <int>        E..VA...... (from INT_MIN to INT_MAX) (default -1)
+
+  -ch_layout         <channel_layout> ED..A......
+
+  -rc_max_vbv_use    <float>      E..V....... (from 0 to FLT_MAX) (default 0)
+
+  -rc_min_vbv_use    <float>      E..V....... (from 0 to FLT_MAX) (default 3)
+
+  -color_primaries   <int>        ED.V....... color primaries (from 1 to INT_MAX) (default unknown)
+
+     bt709           1            ED.V....... BT.709
+
+     unknown         2            ED.V....... Unspecified
+
+     bt470m          4            ED.V....... BT.470 M
+
+     bt470bg         5            ED.V....... BT.470 BG
+
+     smpte170m       6            ED.V....... SMPTE 170 M
+
+     smpte240m       7            ED.V....... SMPTE 240 M
+
+     film            8            ED.V....... Film
+
+     bt2020          9            ED.V....... BT.2020
+
+     smpte428        10           ED.V....... SMPTE 428-1
+
+     smpte428_1      10           ED.V....... SMPTE 428-1
+
+     smpte431        11           ED.V....... SMPTE 431-2
+
+     smpte432        12           ED.V....... SMPTE 422-1
+
+     jedec-p22       22           ED.V....... JEDEC P22
+
+     ebu3213         22           ED.V....... EBU 3213-E
+
+     unspecified     2            ED.V....... Unspecified
+
+  -color_trc         <int>        ED.V....... color transfer characteristics (from 1 to INT_MAX) (default unknown)
+
+     bt709           1            ED.V....... BT.709
+
+     unknown         2            ED.V....... Unspecified
+
+     gamma22         4            ED.V....... BT.470 M
+
+     bt470m          4            ED.V....... BT.470 M
+
+     gamma28         5            ED.V....... BT.470 BG
+
+     bt470bg         5            ED.V....... BT.470 BG
+
+     smpte170m       6            ED.V....... SMPTE 170 M
+
+     smpte240m       7            ED.V....... SMPTE 240 M
+
+     linear          8            ED.V....... Linear
+
+     log100          9            ED.V....... Log
+
+     log316          10           ED.V....... Log square root
+
+     iec61966-2-4    11           ED.V....... IEC 61966-2-4
+
+     bt1361e         12           ED.V....... BT.1361
+
+     iec61966-2-1    13           ED.V....... IEC 61966-2-1
+
+     bt2020-10       14           ED.V....... BT.2020 - 10 bit
+
+     bt2020-12       15           ED.V....... BT.2020 - 12 bit
+
+     smpte2084       16           ED.V....... SMPTE 2084
+
+     smpte428        17           ED.V....... SMPTE 428-1
+
+     arib-std-b67    18           ED.V....... ARIB STD-B67
+
+     unspecified     2            ED.V....... Unspecified
+
+     log             9            ED.V....... Log
+
+     log_sqrt        10           ED.V....... Log square root
+
+     iec61966_2_4    11           ED.V....... IEC 61966-2-4
+
+     bt1361          12           ED.V....... BT.1361
+
+     iec61966_2_1    13           ED.V....... IEC 61966-2-1
+
+     bt2020_10bit    14           ED.V....... BT.2020 - 10 bit
+
+     bt2020_12bit    15           ED.V....... BT.2020 - 12 bit
+
+     smpte428_1      17           ED.V....... SMPTE 428-1
+
+  -colorspace        <int>        ED.V....... color space (from 0 to INT_MAX) (default unknown)
+
+     rgb             0            ED.V....... RGB
+
+     bt709           1            ED.V....... BT.709
+
+     unknown         2            ED.V....... Unspecified
+
+     fcc             4            ED.V....... FCC
+
+     bt470bg         5            ED.V....... BT.470 BG
+
+     smpte170m       6            ED.V....... SMPTE 170 M
+
+     smpte240m       7            ED.V....... SMPTE 240 M
+
+     ycgco           8            ED.V....... YCGCO
+
+     bt2020nc        9            ED.V....... BT.2020 NCL
+
+     bt2020c         10           ED.V....... BT.2020 CL
+
+     smpte2085       11           ED.V....... SMPTE 2085
+
+     chroma-derived-nc 12           ED.V....... Chroma-derived NCL
+
+     chroma-derived-c 13           ED.V....... Chroma-derived CL
+
+     ictcp           14           ED.V....... ICtCp
+
+     ipt-c2          15           ED.V....... IPT-C2
+
+     unspecified     2            ED.V....... Unspecified
+
+     ycocg           8            ED.V....... YCGCO
+
+     ycgco-re        16           ED.V....... YCgCo-R, even add.
+
+     ycgco-ro        17           ED.V....... YCgCo-R, odd add.
+
+     bt2020_ncl      9            ED.V....... BT.2020 NCL
+
+     bt2020_cl       10           ED.V....... BT.2020 CL
+
+  -color_range       <int>        ED.V....... color range (from 0 to INT_MAX) (default unknown)
+
+     unknown         0            ED.V....... Unspecified
+
+     tv              1            ED.V....... MPEG (219*2^(n-8))
+
+     pc              2            ED.V....... JPEG (2^n-1)
+
+     unspecified     0            ED.V....... Unspecified
+
+     mpeg            1            ED.V....... MPEG (219*2^(n-8))
+
+     jpeg            2            ED.V....... JPEG (2^n-1)
+
+     limited         1            ED.V....... MPEG (219*2^(n-8))
+
+     full            2            ED.V....... JPEG (2^n-1)
+
+  -chroma_sample_location <int>        ED.V....... chroma sample location (from 0 to INT_MAX) (default unknown)
+
+     unknown         0            ED.V....... Unspecified
+
+     left            1            ED.V....... Left
+
+     center          2            ED.V....... Center
+
+     topleft         3            ED.V....... Top-left
+
+     top             4            ED.V....... Top
+
+     bottomleft      5            ED.V....... Bottom-left
+
+     bottom          6            ED.V....... Bottom
+
+     unspecified     0            ED.V....... Unspecified
+
+  -alpha_mode        <int>        ED.V....... alpha mode (from 0 to INT_MAX) (default unknown)
+
+     unknown         0            ED.V....... Unspecified
+
+     unspecified     0            ED.V....... Unspecified
+
+     premultiplied   1            ED.V....... Premultiplied
+
+     straight        2            ED.V....... Straight
+
+  -slices            <int>        E..V....... set the number of slices, used in parallelized encoding (from 0 to INT_MAX) (default 0)
+
+  -thread_type       <flags>      ED.VA...... select multithreading type (default slice+frame)
+
+     slice                        ED.V.......
+
+     frame                        ED.V.......
+
+  -audio_service_type <int>        E...A...... audio service type (from 0 to 8) (default ma)
+
+     ma              0            E...A...... Main Audio Service
+
+     ef              1            E...A...... Effects
+
+     vi              2            E...A...... Visually Impaired
+
+     hi              3            E...A...... Hearing Impaired
+
+     di              4            E...A...... Dialogue
+
+     co              5            E...A...... Commentary
+
+     em              6            E...A...... Emergency
+
+     vo              7            E...A...... Voice Over
+
+     ka              8            E...A...... Karaoke
+
+  -request_sample_fmt <sample_fmt> .D..A...... sample format audio decoders should prefer (default none)
+
+  -sub_charenc       <string>     .D...S..... set input text subtitles character encoding
+
+  -sub_charenc_mode  <flags>      .D...S..... set input text subtitles character encoding mode (default 0)
+
+     do_nothing                   .D...S.....
+
+     auto                         .D...S.....
+
+     pre_decoder                  .D...S.....
+
+     ignore                       .D...S.....
+
+  -apply_cropping    <boolean>    .D.V....... (default true)
+
+  -skip_alpha        <boolean>    .D.V....... Skip processing alpha (default false)
+
+  -field_order       <int>        ED.V....... Field order (from 0 to 5) (default 0)
+
+     progressive     1            ED.V.......
+
+     tt              2            ED.V.......
+
+     bb              3            ED.V.......
+
+     tb              4            ED.V.......
+
+     bt              5            ED.V.......
+
+  -dump_separator    <string>     ED.VAS..... set information dump field separator
+
+  -codec_whitelist   <string>     .D.VAS..... List of decoders that are allowed to be used
+
+  -max_pixels        <int64>      ED.VAS..... Maximum number of pixels (from 0 to INT_MAX) (default INT_MAX)
+
+  -max_samples       <int64>      ED..A...... Maximum number of samples (from 0 to INT_MAX) (default INT_MAX)
+
+  -hwaccel_flags     <flags>      .D.V....... (default ignore_level)
+
+     ignore_level                 .D.V....... ignore level even if the codec level used is unknown or higher than the maximum supported level reported by the hardware driver
+
+     allow_high_depth              .D.V....... allow to output YUV pixel formats with a different chroma sampling than 4:2:0 and/or other than 8 bits per component
+
+     allow_profile_mismatch              .D.V....... attempt to decode anyway if HW accelerated decoder's supported profiles do not exactly match the stream
+
+     unsafe_output                .D.V....... allow potentially unsafe hwaccel frame output that might require special care to process successfully
+
+  -extra_hw_frames   <int>        .D.V....... Number of extra hardware frames to allocate for the user (from -1 to INT_MAX) (default -1)
+
+  -discard_damaged_percentage <int>        .D.V....... Percentage of damaged samples to discard a frame (from 0 to 100) (default 95)
+
+  -side_data_prefer_packet [<int>     ].D.VAS..... Comma-separated list of side data types for which user-supplied (container) data is preferred over coded bytestream
+
+     replaygain      4            .D..A......
+
+     displaymatrix   5            .D..A......
+
+     spherical       21           .D..A......
+
+     stereo3d        6            .D..A......
+
+     audio_service_type 7            .D..A......
+
+     mastering_display_metadata 20           .D..A......
+
+     content_light_level 22           .D..A......
+
+     icc_profile     28           .D..A......
+
+     exif            40           .D..A......
+
+  -lcevc-dec-params  <dictionary> .D.V....... Configure liblcevc-dec using a :-separated list of key=value parameters
+
+
+

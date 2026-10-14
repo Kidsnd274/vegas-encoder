@@ -610,11 +610,13 @@ class CommandToken extends JsonModel {
     required String text,
     TokenRole role = TokenRole.extra,
     String? field = null,
+    String? replacedField = null,
     JsonMap extensions = const {},
   }) : super({
          'text': text,
          'role': role.name,
          'field': field,
+         'replacedField': replacedField,
          'extensions': extensions,
        });
   CommandToken.fromJson(super.json);
@@ -622,16 +624,19 @@ class CommandToken extends JsonModel {
   TokenRole get role =>
       TokenRole.values.byName(data['role'] as String? ?? 'extra');
   String? get field => data['field'] as String?;
+  String? get replacedField => data['replacedField'] as String?;
   CommandToken copyWith({
     Object? text = absent,
     Object? role = absent,
     Object? field = absent,
+    Object? replacedField = absent,
     Object? extensions = absent,
   }) => CommandToken.fromJson(
     changed({
       if (!identical(text, absent)) 'text': text,
       if (!identical(role, absent)) 'role': (role as TokenRole).name,
       if (!identical(field, absent)) 'field': field,
+      if (!identical(replacedField, absent)) 'replacedField': replacedField,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -896,6 +901,18 @@ class SignalPathFacts extends JsonModel {
   );
 }
 
+class ExpectedStream extends JsonModel {
+  ExpectedStream({
+    required String kind,
+    String? encoder = null,
+    String? codec = null,
+  }) : super({'kind': kind, 'encoder': encoder, 'codec': codec});
+  ExpectedStream.fromJson(super.json);
+  String get kind => data['kind'] as String;
+  String? get encoder => data['encoder'] as String?;
+  String? get codec => data['codec'] as String?;
+}
+
 class CompileResult extends JsonModel {
   CompileResult({
     required String executable,
@@ -908,6 +925,7 @@ class CompileResult extends JsonModel {
     List<Issue> issues = const [],
     JsonMap summary = const {},
     List<String> overriddenFields = const [],
+    List<ExpectedStream>? expectedStreams = null,
     JsonMap extensions = const {},
   }) : super({
          'executable': executable,
@@ -920,6 +938,7 @@ class CompileResult extends JsonModel {
          'issues': issues.map((v) => v.toJson()).toList(),
          'summary': summary,
          'overriddenFields': overriddenFields,
+         'expectedStreams': expectedStreams?.map((v) => v.data).toList(),
          'extensions': extensions,
        });
   CompileResult.fromJson(super.json);
@@ -930,6 +949,18 @@ class CompileResult extends JsonModel {
     jsonMaps(data['display'] ?? []).map(CommandToken.fromJson),
   );
   String get commandLine => data['commandLine'] as String? ?? '';
+
+  /// Native compiler input facts; absent in historical fake fixtures.
+  List<String>? get inputStreams => data['inputStreams'] == null
+      ? null
+      : List<String>.unmodifiable(
+          (data['inputStreams'] as List).cast<String>(),
+        );
+  List<ExpectedStream>? get expectedStreams => data['expectedStreams'] == null
+      ? null
+      : List.unmodifiable(
+          jsonMaps(data['expectedStreams']).map(ExpectedStream.fromJson),
+        );
   String get advancedTemplate => data['advancedTemplate'] as String? ?? '';
   ResolvedSettings? get resolved => data['resolved'] == null
       ? null
@@ -955,6 +986,7 @@ class CompileResult extends JsonModel {
     Object? issues = absent,
     Object? summary = absent,
     Object? overriddenFields = absent,
+    Object? expectedStreams = absent,
     Object? extensions = absent,
   }) => CompileResult.fromJson(
     changed({
@@ -976,6 +1008,10 @@ class CompileResult extends JsonModel {
       if (!identical(summary, absent)) 'summary': summary,
       if (!identical(overriddenFields, absent))
         'overriddenFields': overriddenFields,
+      if (!identical(expectedStreams, absent))
+        'expectedStreams': (expectedStreams as List<ExpectedStream>?)
+            ?.map((v) => v.data)
+            .toList(),
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -985,26 +1021,38 @@ class NormalizeResult extends JsonModel {
   NormalizeResult({
     required Recipe recipe,
     List<Issue> issues = const [],
+    List<String>? requiredEncoders = null,
     JsonMap extensions = const {},
   }) : super({
          'recipe': recipe.toJson(),
          'issues': issues.map((v) => v.toJson()).toList(),
+         'requiredEncoders': requiredEncoders,
          'extensions': extensions,
        });
   NormalizeResult.fromJson(super.json);
   Recipe get recipe => Recipe.fromJson(jsonMap(data['recipe']));
+
+  /// Core-derived Basic requirements; null means unknown (Advanced/older core).
+  List<String>? get requiredEncoders => data['requiredEncoders'] == null
+      ? null
+      : List<String>.unmodifiable(
+          (data['requiredEncoders'] as List).cast<String>(),
+        );
   List<Issue> get issues => List<Issue>.unmodifiable(
     jsonMaps(data['issues'] ?? []).map(Issue.fromJson),
   );
   NormalizeResult copyWith({
     Object? recipe = absent,
     Object? issues = absent,
+    Object? requiredEncoders = absent,
     Object? extensions = absent,
   }) => NormalizeResult.fromJson(
     changed({
       if (!identical(recipe, absent)) 'recipe': (recipe as Recipe).toJson(),
       if (!identical(issues, absent))
         'issues': (issues as List<Issue>).map((v) => v.toJson()).toList(),
+      if (!identical(requiredEncoders, absent))
+        'requiredEncoders': requiredEncoders,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1601,6 +1649,7 @@ class CoreCapabilities extends JsonModel {
     String label = '',
     String identityKey = '',
     String version = '',
+    int? libavformatMajor = null,
     JsonMap encoders = const {},
     JsonMap muxers = const {},
     JsonMap extensions = const {},
@@ -1609,6 +1658,7 @@ class CoreCapabilities extends JsonModel {
          'label': label,
          'identityKey': identityKey,
          'version': version,
+         'libavformatMajor': libavformatMajor,
          'encoders': encoders,
          'muxers': muxers,
          'extensions': extensions,
@@ -1618,6 +1668,7 @@ class CoreCapabilities extends JsonModel {
   String get label => data['label'] as String? ?? '';
   String get identityKey => data['identityKey'] as String? ?? '';
   String get version => data['version'] as String? ?? '';
+  int? get libavformatMajor => data['libavformatMajor'] as int?;
   JsonMap get encoders => jsonMap(data['encoders'] ?? <String, Object?>{});
   JsonMap get muxers => jsonMap(data['muxers'] ?? <String, Object?>{});
   CoreCapabilities copyWith({
@@ -1625,6 +1676,7 @@ class CoreCapabilities extends JsonModel {
     Object? label = absent,
     Object? identityKey = absent,
     Object? version = absent,
+    Object? libavformatMajor = absent,
     Object? encoders = absent,
     Object? muxers = absent,
     Object? extensions = absent,
@@ -1634,6 +1686,8 @@ class CoreCapabilities extends JsonModel {
       if (!identical(label, absent)) 'label': label,
       if (!identical(identityKey, absent)) 'identityKey': identityKey,
       if (!identical(version, absent)) 'version': version,
+      if (!identical(libavformatMajor, absent))
+        'libavformatMajor': libavformatMajor,
       if (!identical(encoders, absent)) 'encoders': encoders,
       if (!identical(muxers, absent)) 'muxers': muxers,
       if (!identical(extensions, absent)) 'extensions': extensions,

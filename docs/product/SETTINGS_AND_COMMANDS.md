@@ -3,9 +3,11 @@
 Updated: 2026-10-12 (Asia/Singapore). Status: proposal (schema v1 draft). Basic and
 Advanced are the round 1 Guided and Command modes, renamed by the owner.
 
-B2 implementation note (2026-10-13): the portable C++ core and Dart FFI now implement
-these rules. The embedded encoder/profile facts are B0 design bootstrap data until
-B1 Windows recapture; FFmpeg remains the final authority. Exact additive result
+B1/B2 implementation note (2026-10-13): the portable C++ core and Dart FFI implement
+these rules. Embedded options/formats now come from [three Windows builds](research/FFMPEG_WINDOWS.md);
+profile control defaults, quality marks and size-model coefficients remain product
+policy, not measured encoder defaults or quality guarantees. FFmpeg remains the
+final authority. Exact additive result
 fields (token provenance, overridden controls, stream/source facts, GOP frames and
 typed-length estimate ranges) are in [CONTRACTS.md](CONTRACTS.md).
 
@@ -121,7 +123,7 @@ The order is fixed so commands are predictable and diff cleanly:
 | --- | --- | --- | --- |
 | 1 | Executable | `ffmpeg` | machine default (never in recipe) |
 | 2 | Globals | `-hide_banner -nostdin -loglevel info -stats_period 0.5 -progress pipe:1` | product-owned |
-| 3 | Video input | `-f rawvideo -pix_fmt p010le -s 3840x2160 -r 30000/1001 -thread_queue_size 64 -i \\.\pipe\vegas-encoder-<id>-video` | product-owned, from delivered media |
+| 3 | Video input | `-f rawvideo -pix_fmt p010le -s 3840x2160 -r 30000/1001 -i \\.\pipe\vegas-encoder-<id>-video` | product-owned, from delivered media |
 | 4 | Audio input | `-f f32le -ar 48000 -ac 2 -thread_queue_size 64 -i \\.\pipe\vegas-encoder-<id>-audio` | product-owned, only if audio enabled |
 | 5 | Maps | `-map 0:v:0 -map 1:a:0` | product-owned |
 | 6 | Video | `-c:v <enc>`, speed, tune, rate control, multipass, profile, `-pix_fmt`, `-g`, color tags, Apple tag, extra | encoder profile + recipe |
@@ -144,6 +146,19 @@ Option names, ranges and enum values were checked against FFmpeg 8.1.3 help text
 Examples: NVENC `-preset` p1–p7 with default p4, `-tune` hq/uhq/ll/ull/lossless,
 `-rc` constqp/vbr/cbr; SVT-AV1 `-crf` 0–63 and `-preset` −2–13. See `design/shared/avoptions.js`.
 
+B1 qualifies those design-era facts against Windows help. Reported defaults can
+differ (e.g. SVT preset −1 vs −2, QSV medium vs 0/automatic); curated Basic defaults
+are product policy. Generated private values and pixel formats are checked against
+the selected build. AMF Basic uses `vbr_peak` for ABR, `cbr` for CBR, and `cqp`
+with `-qp_i/-qp_p/-qp_b` for fixed quantizer. Its former `qp_i`-only CQ mapping is
+removed; newer QVBR belongs in Advanced until version/device-qualified.
+
+Input `-thread_queue_size` is omitted by the product compiler: both current tested
+builds reject its old input placement and expose an output muxer queue instead.
+The resulting commands pass all three builds with offline files. Named-pipe
+backpressure/memory/timing qualification belongs to B4; the installed engine is
+unchanged by B1.
+
 ### Pixel formats
 
 VEGAS delivers `p010le` (10-bit 4:2:0). The encoder profile maps `depth` to a
@@ -159,14 +174,25 @@ format the encoder accepts:
 | dnxhd | yuv422p (LB/SQ/HQ) | yuv422p10le (HQX), yuv444p10le (444) | `-pix_fmt` is mandatory: auto-selection from p010le makes `dnxhr_hq` fail (matrix evidence) |
 | ffv1 | — | yuv420p10le | lossless baseline |
 
+An unset x264 profile follows depth (`high` / `high10`); an explicitly selected
+8-bit-only profile with 10-bit pixels is an error after applying Extra replacements.
+`+pixel_format` keeps FFmpeg's exact-format behavior while facts use the canonical
+format name; lone `+` has no established final format in the preview. Encoder-side audio format facts
+are measured for delivered float32 stereo; FDK AAC was absent and remains unknown.
+
 ### Other rules
 
 - **Keyframe interval.** Seconds are converted with the delivered rate,
   `round(gopSec × fps)`. For example, 2 s at 30000/1001 is 60 frames.
-- **Color tags.** `bt709` writes `-color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv`.
-  This is a tagging policy, not a conversion. Color metadata from VEGAS is
+- **Color tags.** `bt709` writes `-color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv`
+  both before the raw video input and on output. This labels input samples without
+  changing them, so newer FFmpeg does not automatically convert assumed source
+  colors to those output tags. Extra tag replacements are mirrored on the input.
+  This is a tagging policy, not an explicit color conversion. Color metadata from VEGAS is
   unqualified (ADAPTER_DATA_FLOW), so HDR and other primaries stay Advanced-mode
   territory until a color qualification exists.
+  The Advanced seed keeps the input tag flags explicitly before `{inputs}`;
+  general Advanced text never inherits inactive Basic color controls.
 - **Apple HEVC tag.** HEVC in MP4/MOV adds `-tag:v hvc1`, because FFmpeg's default
   `hev1` doesn't play in Apple software (matrix evidence).
 - **Extra arguments override.** An option typed in a stream's Extra arguments replaces
@@ -179,6 +205,8 @@ format the encoder accepts:
   use the relevant control or Advanced mode. `CompileResult.overriddenFields`
   identifies displaced controls. A syntax/value issue points to the actual emitted
   tokens after overrides, when any exist.
+  B1 also attaches `CommandToken.replacedField` to the replacing option and value;
+  their navigation `field` continues to point at the Extra arguments box.
 - **Output.** The engine writes `<dir>\<name>.ve-partial-<job>.<ext>`. It always passes
   `-f <muxer>` explicitly, then publishes by rename after exit 0 and successful output
   verification.

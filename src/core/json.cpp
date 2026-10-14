@@ -87,4 +87,20 @@ const Json* EncoderOptions(const Json& caps, const std::string& id) {
     }
     const auto i = Options().find(id); return i == Options().end() ? nullptr : &*i;
 }
+std::string ContainerSupport(const std::string& kind, const Json& profile,
+                             const std::string& container, const Json& caps) {
+    const Json* rules = &Profiles().at("compatibility");
+    if (caps.is_object()) {
+        const auto major = caps.find("libavformatMajor");
+        const auto tables = Profiles().find("compatibilityByAvformatMajor");
+        if (major != caps.end() && major->is_number_integer() && tables != Profiles().end()) {
+            const auto table = tables->find(major->dump());
+            // Untested majors use conservative cross-build rules, not the nearest version.
+            if (table != tables->end()) rules = &*table;
+        }
+    }
+    const auto& families = rules->at(kind);
+    const auto family = Str(profile,"family");
+    return families.contains(family) ? Str(families.at(family),container,"unknown") : "unknown";
+}
 } // namespace ve

@@ -1,4 +1,5 @@
 #include "../../src/core/core.h"
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <future>
@@ -31,21 +32,134 @@ void BadJson(const std::string& text, ve_status expected) {
 }
 int main(int argc, char** argv) {
     try {
-        if (argc != 2) throw std::runtime_error("Pass schema/fixtures/b0/core-and-services.json.");
+        if (argc != 3) throw std::runtime_error("Pass B0 source fixtures and B1 real-core argv goldens.");
         std::ifstream file(argv[1],std::ios::binary); if (!file) throw std::runtime_error("Cannot read fixtures.");
         const std::string data((std::istreambuf_iterator<char>(file)),std::istreambuf_iterator<char>());
         const auto bundle = ve::Json::parse(data);
+        std::ifstream goldenFile(argv[2],std::ios::binary); if (!goldenFile) throw std::runtime_error("Cannot read B1 argv goldens.");
+        const auto goldens = ve::Json::parse(std::string((std::istreambuf_iterator<char>(goldenFile)),std::istreambuf_iterator<char>()));
         for (const auto& f : bundle.at("fixtures")) {
             std::cout << "Native fixture " << ve::Str(f.at("recipe"),"id") << std::endl;
             const auto result = CallJson(ve_compile,{{"recipe",f.at("recipe")},{"media",f.at("media")},{"paths",f.at("paths")}});
             Check(!ve::HasErrors(result.at("issues")),"built-in semantics");
-            Check(result.at("argv") == f.at("compile").at("argv"),"golden argv parity");
+            Check(result.at("argv") == goldens.at("argv").at(ve::Str(f.at("recipe"),"id")),"B1 real-core golden argv parity");
+            auto advancedRecipe = f.at("recipe"); advancedRecipe["command"]["mode"] = "template";
+            advancedRecipe["command"]["template"] = result.at("advancedTemplate");
+            const auto seeded = CallJson(ve_compile,{{"recipe",advancedRecipe},{"media",f.at("media")},{"paths",f.at("paths")}});
+            Check(seeded.at("argv") == result.at("argv"),"Basic seed preserves input tagging in Advanced");
+        }
+        for (size_t i = 0; i < bundle.at("additionalFixtures").size(); ++i) {
+            const auto& popup = bundle.at("additionalFixtures")[i];
+            const auto result = CallJson(ve_compile,{{"recipe",popup.at("recipe")},{"media",popup.at("media")},{"paths",popup.at("paths")}});
+            Check(!ve::HasErrors(result.at("issues")),"existing popup semantics");
+            Check(result.at("argv") == goldens.at("additionalArgv")[i],"existing popup context has distinct argv golden");
         }
         const auto& f = bundle.at("fixtures")[0];
         auto recipe = f.at("recipe");
+        auto normalized = CallJson(ve_recipe_normalize,{{"recipe",recipe}});
+        Check(normalized.at("requiredEncoders") == ve::Json::array({"libx264","aac"}),"Basic requirements come from core");
+        auto requirementRecipe = recipe;
+        requirementRecipe["audio"][0]["enabled"] = false;
+        Check(CallJson(ve_recipe_normalize,{{"recipe",requirementRecipe}}).at("requiredEncoders") == ve::Json::array({"libx264"}),"disabled audio is not a requirement");
+        requirementRecipe["command"] = {{"mode","template"},{"template","{inputs} -c:v ffv1 {output}"}};
+        Check(CallJson(ve_recipe_normalize,{{"recipe",requirementRecipe}}).at("requiredEncoders").is_null(),"Advanced requirements do not use inactive Basic controls");
+        requirementRecipe["schema"] = 2;
+        Check(CallJson(ve_recipe_normalize,{{"recipe",requirementRecipe}}).at("requiredEncoders").is_null(),"invalid recipe requirements remain unknown");
         const auto original = recipe.dump();
         auto request = ve::Json{{"recipe",recipe},{"media",f.at("media")},{"paths",f.at("paths")}};
         const auto result = CallJson(ve_compile,request);
+        Check(result.at("expectedStreams") == ve::Json::array({{{"kind","video"},{"encoder","libx264"},{"codec","h264"}},{{"kind","audio"},{"encoder","aac"},{"codec","aac"}}}),"Basic verification codecs are native facts");
+        auto verificationRequest = request;
+        verificationRequest["recipe"]["audio"][0]["enabled"] = false;
+        Check(CallJson(ve_compile,verificationRequest).at("expectedStreams").size() == 1,"disabled audio is absent from verification");
+        verificationRequest = request; verificationRequest["media"]["audio"] = nullptr;
+        Check(CallJson(ve_compile,verificationRequest).at("expectedStreams").size() == 1,"undelivered audio is absent from verification");
+        verificationRequest = request;
+        verificationRequest["recipe"]["command"] = {{"mode","template"},{"template",result.at("advancedTemplate")}};
+        Check(CallJson(ve_compile,verificationRequest).at("expectedStreams") == result.at("expectedStreams"),"Advanced seed preserves verification facts");
+        verificationRequest["recipe"]["command"]["template"] = "{inputs} -map 0:v:0 -c:v ffv1 {output}";
+        Check(CallJson(ve_compile,verificationRequest).at("expectedStreams") == ve::Json::array({{{"kind","video"},{"encoder","ffv1"},{"codec","ffv1"}}}),"explicit video-only map does not claim audio output");
+        verificationRequest["recipe"]["command"]["template"] = "{inputs} -c:v ffv1 -an {output}";
+        Check(CallJson(ve_compile,verificationRequest).at("expectedStreams").size() == 1,"Advanced an disables verification audio");
+        verificationRequest["recipe"]["command"]["template"] = "{inputs} -c:v ve_unknown -c:a ve_unknown_audio {output}";
+        auto verification = CallJson(ve_compile,verificationRequest).at("expectedStreams");
+        Check(verification[0].at("codec").is_null() && verification[1].at("codec").is_null(),"unestablished codecs remain unknown");
+        verificationRequest["capabilities"] = {{"encoders",{{"ve_unknown",{{"kind","video"},{"codec","h264"}}}}}};
+        Check(CallJson(ve_compile,verificationRequest).at("expectedStreams")[0].at("codec") == "h264","captured canonical codec supplies verification fact");
+        verificationRequest.erase("capabilities");
+        for (const auto& text : {"{inputs} -i extra.mkv -c:v ffv1 {output}","{inputs} -c:v ffv1 extra.mkv {output}","{inputs} -map 0 -c:v ffv1 {output}","{inputs} -map 0:v:0 -map 0:v:0 -c:v ffv1 {output}","{inputs} -filter_complex null -c:v ffv1 {output}"}) {
+            verificationRequest["recipe"]["command"]["template"] = text;
+            Check(CallJson(ve_compile,verificationRequest).at("expectedStreams").is_null(),"general input/output/maps/complex-filter scope remains unknown");
+        }
+        verificationRequest = request;
+        verificationRequest["recipe"]["video"]["encoder"] = "dnxhd";
+        verificationRequest["recipe"]["audio"][0]["encoder"] = "pcm_f32le";
+        verificationRequest["recipe"]["audio"][0]["mode"] = "lossless";
+        verification = CallJson(ve_compile,verificationRequest).at("expectedStreams");
+        Check(verification[0].at("codec") == "dnxhd" && verification[1].at("codec") == "pcm_f32le","DNxHR family and PCM names map to FFprobe codecs");
+        auto b1Recipe = f.at("recipe");
+        b1Recipe["video"]["profile"] = nullptr; b1Recipe["video"]["depth"] = 10;
+        auto b1Request = ve::Json{{"recipe",b1Recipe},{"media",f.at("media")},{"paths",f.at("paths")}};
+        auto b1Result = CallJson(ve_compile,b1Request);
+        Check(!ve::HasErrors(b1Result.at("issues")) && b1Result.at("resolved").at("profile") == "high10","10-bit x264 unset profile follows depth");
+        b1Request["recipe"]["video"]["profile"] = "high";
+        Check(ve::HasErrors(CallJson(ve_recipe_validate,b1Request).at("issues")),"explicit high profile with 10-bit pixels is rejected");
+        for (const auto& extra : {"-profile:v high10","-pix_fmt yuv420p"}) {
+            b1Request["recipe"]["video"]["extra"] = extra;
+            b1Result = CallJson(ve_compile,b1Request);
+            Check(!ve::HasErrors(CallJson(ve_recipe_validate,b1Request).at("issues")) && !ve::HasErrors(b1Result.at("issues")),"final Extra profile/pixel combination supersedes displaced controls");
+            Check(extra == std::string("-profile:v high10") ? b1Result.at("resolved").at("profile") == "high10" && b1Result.at("resolved").at("depth") == 10 :
+                  b1Result.at("resolved").at("profile") == "high" && b1Result.at("resolved").at("depth") == 8,"resolved profile/depth matches valid Extra replacement");
+        }
+        b1Request["recipe"]["video"]["depth"] = 8;
+        b1Request["recipe"]["video"]["extra"] = "-pix_fmt yuv420p10le";
+        Check(ve::HasErrors(CallJson(ve_recipe_validate,b1Request).at("issues")) && ve::HasErrors(CallJson(ve_compile,b1Request).at("issues")),"Extra can introduce an incompatible final profile/depth");
+        b1Request["recipe"]["video"]["profile"] = "high10";
+        b1Request["recipe"]["video"]["extra"] = "-vf scale=320:180,format=yuv420p10le -pix_fmt +yuv420p10le";
+        b1Request["capabilities"] = {{"encoders",{{"libx264",{{"kind","video"},{"options",ve::Json::array()},{"pixelFormats",ve::Json::array({"yuv420p","yuv420p10le"})}}},{"aac",{{"kind","audio"},{"options",ve::Json::array()}}}}}};
+        b1Result = CallJson(ve_compile,b1Request);
+        Check(!ve::HasErrors(CallJson(ve_recipe_validate,b1Request).at("issues")) && !ve::HasErrors(b1Result.at("issues")),"FFmpeg exact pixel-format modifier is accepted against build capabilities");
+        Check(std::find(b1Result.at("argv").begin(),b1Result.at("argv").end(),ve::Json("+yuv420p10le")) != b1Result.at("argv").end() &&
+              b1Result.at("resolved").at("pixfmt") == "yuv420p10le" && b1Result.at("signalPath").at("video").at("outputBits") == 10,"plus syntax is preserved while resolved format facts use the format name");
+        for (const auto& format : {"+","+ve_unknown_format"}) {
+            b1Request["recipe"]["video"]["extra"] = std::string("-pix_fmt ") + format;
+            b1Request["capabilities"] = nullptr;
+            b1Result = CallJson(ve_compile,b1Request);
+            Check(!ve::HasErrors(CallJson(ve_recipe_validate,b1Request).at("issues")) && b1Result.at("resolved").is_null() &&
+                  b1Result.at("signalPath").at("video").at("outputBits").is_null(),"automatic or unmodeled exact format remains unknown");
+        }
+        b1Request["recipe"] = f.at("recipe"); b1Request["recipe"]["video"]["extra"] = "-crf 16 -preset faster -g 90";
+        b1Result = CallJson(ve_compile,b1Request);
+        for (const auto& token : b1Result.at("display")) if (ve::Str(token,"field") == "video.extra") {
+            const auto text = ve::Str(token,"text");
+            const auto expected = text == "-crf" || text == "16" ? "video.quality" : text == "-preset" || text == "faster" ? "video.speed" : "video.gopSec";
+            Check(ve::Str(token,"replacedField") == expected,"Extra option/value replaced-control provenance");
+        }
+        b1Request["recipe"] = f.at("recipe"); b1Request["recipe"]["audio"][0]["encoder"] = "pcm_s24le";
+        b1Request["recipe"]["audio"][0]["mode"] = "lossless";
+        b1Request["capabilities"] = {{"libavformatMajor",59},{"encoders",{{"libx264",{{"kind","video"},{"options",ve::Json::array()}}},{"pcm_s24le",{{"kind","audio"},{"options",ve::Json::array()}}}}}};
+        b1Result = CallJson(ve_compile,b1Request);
+        Check(b1Result.at("signalPath").at("audio")[0].at("containerSupport") == "no" && ve::HasErrors(b1Result.at("issues")),"avformat59 MP4 PCM refused");
+        b1Request["capabilities"]["libavformatMajor"] = 63;
+        b1Result = CallJson(ve_compile,b1Request);
+        Check(b1Result.at("signalPath").at("audio")[0].at("containerSupport") == "warn" && !ve::HasErrors(b1Result.at("issues")),"avformat63 MP4 PCM caveat");
+        b1Request["capabilities"]["libavformatMajor"] = 999;
+        Check(!ve::HasErrors(CallJson(ve_compile,b1Request).at("issues")),"unknown format major uses conservative consensus");
+        b1Request["recipe"] = f.at("recipe"); b1Request["recipe"]["video"]["encoder"] = "h264_amf";
+        b1Request["recipe"]["video"]["mode"] = "cqp"; b1Request["recipe"]["video"]["profile"] = nullptr;
+        b1Request["recipe"]["video"]["speed"] = nullptr; b1Request["capabilities"] = nullptr;
+        b1Result = CallJson(ve_compile,b1Request);
+        for (const auto& flag : {"-rc","-qp_i","-qp_p","-qp_b"}) Check(std::find(b1Result.at("argv").begin(),b1Result.at("argv").end(),ve::Json(flag)) != b1Result.at("argv").end(),"AMF CQP explicit controls");
+        const auto oldTuneCaps = ve::Json::parse(R"({"encoders":{"hevc_nvenc":{"options":[{"name":"tune","type":"int","min":"1","max":"4","constants":[{"name":"hq","value":"1"}]}]}}})");
+        Check(!ve::ValidEncoderOption(oldTuneCaps,"hevc_nvenc","video","-tune","uhq"),"new NVENC tune is rejected by old build option data");
+        Check(ve::ValidEncoderOption(oldTuneCaps,"hevc_nvenc","video","-tune","hq"),"old NVENC tune remains accepted");
+        b1Request["recipe"] = f.at("recipe"); b1Request["recipe"]["video"]["extra"] = "-colorspace smpte170m";
+        b1Request["capabilities"] = nullptr; b1Result = CallJson(ve_compile,b1Request);
+        size_t colorTags = 0;
+        for (size_t i = 0; i + 1 < b1Result.at("argv").size(); ++i) if (b1Result.at("argv")[i] == "-colorspace") {
+            ++colorTags; Check(b1Result.at("argv")[i+1] == "smpte170m","Extra color tag is metadata on input and output");
+        }
+        Check(colorTags == 2,"input/output Extra tag policy stays aligned");
         Check(recipe.dump() == original,"input recipe is not mutated");
         Check(result.at("resolved").at("gopFrames") == 60,"fractional rate and keyframe timing");
         for (const auto& argument : {std::string(""),std::string("simple"),std::string("with space"),std::string("C:\\with space\\"),std::string("a\\\\\"b"),std::string("\"quoted\""),std::string(u8"🧪 出力\\")}) {
@@ -92,6 +206,24 @@ int main(int argc, char** argv) {
             return true;
         }));
         for (auto& future : futures) Check(future.get(),"concurrent C ABI callers");
+        auto liveRequest = request;
+        liveRequest["paths"]["liveInputs"] = true;
+        liveRequest["paths"]["overwriteOutput"] = true;
+        auto liveResult = CallJson(ve_compile,liveRequest);
+        const auto& liveArgv = liveResult.at("argv");
+        Check(liveResult.at("inputStreams") == ve::Json::array({"video","audio"}),"core input facts own pipe selection");
+        Check(std::count(liveArgv.begin(),liveArgv.end(),ve::Json("-y")) == 1,"core temporary output overwrite flag");
+        Check(std::count(liveArgv.begin(),liveArgv.end(),ve::Json("-probesize")) == 2,"bounded raw input startup probing");
+        Check(std::count(liveArgv.begin(),liveArgv.end(),ve::Json("-analyzeduration")) == 2,"raw live inputs skip analysis delay");
+        Check(std::find(liveArgv.begin(),liveArgv.end(),ve::Json("-thread_queue_size")) == liveArgv.end(),"live inputs do not reintroduce rejected queue flags");
+        liveRequest["recipe"]["audio"][0]["enabled"] = false;
+        liveResult = CallJson(ve_compile,liveRequest);
+        Check(liveResult.at("inputStreams") == ve::Json::array({"video"}),"disabled audio core input fact");
+        Check(std::count(liveResult.at("argv").begin(),liveResult.at("argv").end(),ve::Json("-probesize")) == 1,"no inactive audio input options");
+        const ve::Json diagnosticCommand{{"argv",ve::Json::array({"-wrong","1","-other","2","out"})}};
+        Check(ve::ErrorTokenIndices(diagnosticCommand,"Unrecognized option 'wrong'.") == ve::Json::array({0}),"runtime diagnostic index excludes executable");
+        Check(ve::ErrorTokenIndices(diagnosticCommand,"Error setting option other to value 2.") == ve::Json::array({2}),"runtime option setting diagnostic");
+        Check(ve::ErrorTokenIndices(diagnosticCommand,"Generic hardware failure.").empty(),"unknown runtime provenance remains empty");
         std::cout << "Native/static core: " << checks << " ownership, bounds, quoting, payload, fuzz and concurrency checks passed. No host or encoder process.\n";
         return 0;
     } catch (const std::exception& e) { std::cerr << "CORE TEST FAILED: " << e.what() << '\n'; return 1; }

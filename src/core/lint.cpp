@@ -91,8 +91,16 @@ std::map<std::string,std::string> Encoders(const std::vector<Word>& words) {
     return encoders;
 }
 }
+bool ValidEncoderOption(const Json& caps, const std::string& encoder, const std::string& kind,
+                        const std::string& flag, const std::string& value) {
+    const auto key = OptionKey(flag);
+    const auto option = PrivateOption(caps,encoder,key);
+    const auto choice = Choice(encoder,kind,key);
+    return (!choice || AllowedChoice(*choice,value)) && (!option || PrivateValue(*option,value)) && GenericValue(key,value);
+}
 Json Lint(const Json& request) {
-    const auto text = Str(request,"text"); const auto caps = request.value("capabilities",Json(nullptr));
+    const auto text = Str(request,"text"); const Json noCaps = nullptr;
+    const Json& caps = request.contains("capabilities") ? request.at("capabilities") : noCaps;
     const auto offsets = Utf16Map(text);
     const bool extra = Bool(request,"extra"); Json diagnostics = Json::array(); std::vector<Word> words;
     auto emit = [&](const std::string& id, const std::string& level, size_t start, size_t end, const std::string& message, Json params = Json::object()) { diagnostics.push_back(Diagnostic(id,level,offsets,start,end,message,params)); };
@@ -160,7 +168,8 @@ Json Complete(const Json& request) {
     size_t endByte = offset;
     while (endByte < text.size() && text[endByte] != ' ' && text[endByte] != '\t' && text[endByte] != '\n' && text[endByte] != '\r') ++endByte;
     result["start"] = Utf16Offset(text,startByte); result["end"] = Utf16Offset(text,endByte);
-    const auto encoders = Encoders(words); const auto caps = request.value("capabilities",Json(nullptr));
+    const auto encoders = Encoders(words); const Json noCaps = nullptr;
+    const Json& caps = request.contains("capabilities") ? request.at("capabilities") : noCaps;
     const size_t prevIndex = space ? words.size() : words.empty() ? 0 : words.size() - 1;
     const auto previous = prevIndex ? words[prevIndex-1].text : "";
     std::set<std::string> seen;
