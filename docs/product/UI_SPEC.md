@@ -84,7 +84,9 @@ settings below it; arrow keys move between nodes.
 - **Node marks:** availability problems turn a node red with the state; "Changed" and
   "Revision 6" marks show local and library differences in the popup.
 - **Advanced mode** draws the nodes dashed, read back from the command. They don't
-  open settings; clicking one focuses the editor.
+  open settings; clicking one focuses the editor. Only the core's facts for the active
+  command fill them; the inactive Basic settings never show, and unknown facts stay
+  unknown (§3).
 - **Audio off** leaves a dashed audio node ("Audio is off. The file has video only.").
   It still opens the audio settings, where audio is turned back on.
 - **Only the core's facts.** Pips, notes, bits and broken wires come from the core's
@@ -208,23 +210,71 @@ This catches failing hardware encoders and bad extra arguments early. Voukoder P
 
 ## 3. Advanced mode (S2)
 
-- The mode switch reads "Basic | Advanced".
-- **Switching to Advanced** follows SETTINGS_AND_COMMANDS §5. The seed question appears
-  only if a template already exists.
-- **Locked chips:** `{inputs}` and `{output}` are inline chips. They can be moved with
-  cut and paste. They cannot be edited internally; deleting one shows its lint error.
-- **Lint:** errors are underlined red, warnings amber, hints dotted. Hover or caret
-  shows the message. A diagnostics list sits under the editor with "Go to" for each.
-- **Autocomplete:** opens after `-` or after an option that takes values. Tab or Enter
-  accepts; Esc closes. Ctrl+Space opens it manually. Entries show type, default and
-  description, and are filtered by the selected FFmpeg's real options. It is built
-  last in P3: the data is the same parsed option list lint already uses, so the cost is
-  the popover (caret placement, keyboard and focus). If it slips, Advanced mode ships
-  with highlighting, lint and the macros panel.
-- **Macros panel:** lists the macros with descriptions. Click to insert at the caret.
-- **Preview:** a "Resolved command" toggle shows the expanded result for the current
-  context: real pipe names, temp output, and `{gop:2s}` → 60.
-- **Errors** block Save in the popup (Apply) and are allowed in desktop drafts (marked).
+Built in F4 (desktop) on the native core; the popup reuses it in F5. Every highlight,
+range, check, suggestion and expansion is the core's (C2): the app tokenizes nothing.
+
+- The mode switch reads "Basic | Advanced"; **Ctrl+M** toggles it.
+- **Switching to Advanced** follows SETTINGS_AND_COMMANDS §5. The first time, the command
+  starts from the Basic settings (the core's `advancedTemplate`). The seed question
+  appears only if a command already exists: "Use your saved command" (the default, last
+  and focused), "Replace it with the current settings", or Cancel (Esc). The caret goes to
+  the editor. **Back in Basic**, a banner says "Your command is saved. Renders use these
+  settings until you switch back." with Switch to Advanced; it shows whenever a Basic
+  preset keeps a command. Long dialog actions wrap to a second row.
+- **Layout:** the dashed diagram, then the editor column (bar, editor, Diagnostics,
+  Resolved command) beside a side column with "Switching back to Basic" (what renders in
+  each mode, from the core's summary; Switch to Basic; Replace with Basic settings, with
+  Undo) and the Macros panel.
+- **Editor bar:** "FFmpeg command", then the message at the caret (or "{inputs} and
+  {output} are locked."), "Line 3, column 12", and the Ctrl Space hint.
+- **Highlighting** comes from the compile's token spans (`sourceStart`/`sourceEnd`).
+  Option names are bold (the command view's display rule); a word's stage colour, the
+  line stripes for stages and macro styling follow the core's token roles. B2 gives
+  Advanced words only `extra`, so today only the chips and the `{inputs}`/`{output}` lines
+  are coloured (workstreams/app.md, Needs).
+- **Locked chips:** `{inputs}` and `{output}` (the core's `input`/`output` token spans)
+  are drawn as chips with a lock badge. The caret never rests inside one (a click goes to
+  the nearer edge, an arrow step carries on). Typing inside or deleting part of a chip is
+  refused with "{inputs} is locked. Vegas Encoder puts the VEGAS video and audio pipes
+  here. Cut and paste moves it." and selects the chip, so a second Backspace deletes it
+  whole; the lint then says what is missing. Cut, paste and whole deletion work.
+- **Lint** (`VeCore.lint` with the chosen FFmpeg's capabilities, plus compile issues on
+  the text that lint doesn't repeat, such as an out-of-range `{gop:Ns}`): errors are
+  underlined red (wavy), warnings amber (wavy), hints dotted. Each line's number takes its
+  most severe level's colour and its message is written after the line's end. Pointing at
+  an underline shows a bubble; the caret's message shows in the bar. A finding whose range
+  is the whole command (an unterminated quote, extra outputs) is listed, not underlined.
+- **Diagnostics** under the editor: counts ("1 error, 2 warnings, 1 hint, 1 note") and the
+  FFmpeg checked; each finding with its icon, "Line N" and **Go to** (selects the range and
+  focuses the editor); then whole-command findings; then the compile's recipe notes ("Not
+  tested with VEGAS yet."). These are Advanced mode's Checks.
+- **Autocomplete** (`VeCore.complete`): typing opens it after `-` (options of the encoders
+  named in the command and FFmpeg's general options), after an option that takes values,
+  and after `{` (macros). Ctrl+Space opens whatever the core offers at the caret. Arrows
+  move; Tab or Enter inserts the entry and a space (an option with values then opens its
+  values); Esc closes; a click inserts; moving the caret closes it. Entries show the value,
+  description, type and default; encoders after `-c:v`/`-c:a` show Ready, Not in this
+  FFmpeg or Failed test from the core. Header: "Options" or "Values for -tune" and where
+  they come from; footer "Tab or Enter inserts".
+- **Macros panel:** the macros the core offers, each with what it is for and the value the
+  core expands it to for the sample ("1920", "30000/1001", `{gop:2s}` "60"). Click to
+  insert at the caret, with a space either side where needed. `{inputs}` and `{output}`
+  say "Required, locked"; when the command has lost one it says "Required, missing:
+  insert" and inserts.
+- **Preview:** "Resolved command" (open on the desktop) shows the core's compile for the
+  sample context laid out like the user's lines: what Vegas Encoder adds first, real pipe
+  names, the output path and macros expanded (`{gop:2s}` → 60), errors underlined. Copy
+  (and Ctrl+Shift+C) copies the core's command line. The output is the sample Render As
+  path; the engine's temporary name isn't in C2 yet.
+- **Signal path** (§2): dashed nodes from the core's facts for the active command only:
+  the encoder and codec it names ("From command" when none), "From command, slow", the
+  muxer `-f` names or "From file name" without one. Unknown formats claim no conversion,
+  no wire label and no availability; the wire keeps VEGAS's depth. Nodes open no settings;
+  selecting one puts the caret in the editor.
+- **No size estimate** in Advanced mode. The library row's **Advanced** tag leads its
+  summary line ("[Advanced] x265, your command") and follows the draft.
+- **Errors** block Save in the popup (Apply, F5) and are allowed in desktop drafts: Save
+  works, and the library marks the preset with an error.
 
 ## 4. VEGAS popup (S3)
 
@@ -390,6 +440,8 @@ toast.
 | Esc | Cancel / close popover | Popup, popovers |
 | Ctrl+Shift+C | Copy command | Everywhere |
 | Ctrl+M | Switch Basic / Advanced | Editor |
+| Ctrl+Space | Suggestions at the caret | Advanced editor |
+| Arrows, Tab / Enter, Esc | Move, insert, close the suggestions | Advanced editor, while open |
 | Arrow keys | Move between signal path nodes | Diagram |
 | Ctrl+1…4 | Presets, FFmpeg, History, Settings | Desktop |
 | F6 / Shift+F6 | Move between panes | Desktop |
@@ -499,7 +551,7 @@ Undo), and in `features/presets/`: the Ctrl+K palette, `BitrateField`, and
 | `SignalPath` | F1. Full and strip layouts; nodes, wires sized by bit depth, conversion pips, marks; keyboard navigation (`CustomPainter` for wires) |
 | `ExtraArgumentsField` | F2 (`features/presets/panels/extra_field.dart`): mono field per stream; the core's warnings for the field show under it |
 | `CommandView` | F1. Tokens with roles; collapsed inputs chip; copy; multi-line |
-| `CommandEditor` | `TextEditingController.buildTextSpan` highlighting, macro chips, lint underlines; autocomplete overlay last |
+| `CommandEditor` | F4 (`design/components/command_editor.dart`): `EditableText` with the selection gestures, `buildTextSpan` highlighting from a display model, painted locked chips, gutter, per-line messages and hover bubbles, the chip guard, the autocomplete overlay. The Advanced feature (`features/advanced/`) maps the core's results onto it |
 | `MessageList` / `InlineMessage` | F1 (`VeCheckList`, `VeMessage`). Levels, field focus |
 | `SizeQualityCard` | F1, reworked in F2 to take the core's figures (per minute, total for the typed length, range). Length field; video/audio split; consequences |
 | `OriginBanner` | Popup origin states and actions |

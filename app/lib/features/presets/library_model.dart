@@ -17,6 +17,7 @@ class LibraryEntry {
     required this.line,
     required this.favorite,
     required this.dirty,
+    this.advanced = false,
     this.depth,
     this.problem,
     this.problemDetail,
@@ -32,6 +33,9 @@ class LibraryEntry {
   /// Has unsaved changes.
   final bool dirty;
 
+  /// The command renders (Advanced mode), as the draft or saved recipe has it.
+  final bool advanced;
+
   /// Output bit depth for the wire glyph; null if the core couldn't say.
   final int? depth;
   final String? problem;
@@ -46,7 +50,6 @@ class LibraryEntry {
   String get id => preset.recipe.id;
   String get name => preset.recipe.name;
   bool get builtin => preset.builtin;
-  bool get advanced => preset.recipe.command.mode == 'template';
   String get category => preset.recipe.category;
 
   /// Search text: name, tags, encoders and codecs, summary.
@@ -59,6 +62,7 @@ class LibraryEntry {
       ...r.audio.map((a) => a.encoder),
       ...preset.requires.encoders,
       line,
+      if (advanced) 'advanced command',
       categoryLabel(r.category),
     ].join(' ').toLowerCase();
   }
@@ -126,7 +130,9 @@ LibraryEntry libraryEntry(
   final String line;
   if (advanced) {
     final enc = summary['videoEncoder'] as String?;
-    line = enc == null ? 'Advanced command' : 'Advanced command, $enc';
+    // The row's Advanced tag says where it comes from; the line names the
+    // encoder the core read from the command.
+    line = enc == null || enc.isEmpty ? 'Your command' : '$enc, your command';
   } else if (compiled != null) {
     final video = [summary['videoEncoder'], summary['videoQuality']].whereType<String>().join(' ');
     line = '$video, ${audio.enabled ? summary['audio'] ?? audio.encoder : 'no audio'}';
@@ -153,7 +159,10 @@ LibraryEntry libraryEntry(
     line: problem ?? line,
     favorite: favorite,
     dirty: dirty,
-    depth: compiled?.resolved?.depth,
+    advanced: advanced,
+    // Advanced commands have no resolved Basic settings; the core's signal
+    // facts give the output depth when the command sets one.
+    depth: compiled?.resolved?.depth ?? compiled?.signalPath?.video?.outputBits,
     problem: problem,
     problemDetail: detail,
     errors: [

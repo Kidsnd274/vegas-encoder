@@ -88,7 +88,10 @@ class SignalStream {
   final String codec;
   final int inputBits;
   final int outputBits;
-  final VeAvailability availability;
+
+  /// Null when it isn't known which encoder runs (Advanced mode): no state is
+  /// shown.
+  final VeAvailability? availability;
 
   /// "CPU", "NVIDIA GPU": shown with a check when the encoder is ready.
   final String? runsOn;

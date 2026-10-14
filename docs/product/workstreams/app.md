@@ -1,11 +1,13 @@
 # App workstream
 
-Updated: 2026-10-14 (Asia/Singapore). Branch `ws/app`. Status: **F0 and F1 done; F2
-and F3 done except the parts waiting on platform** (listed under Needs). **The app runs
-on the native core (B2)**: edits update the command, checks, signal path and estimate
-(the core part of F7), and the desktop starts in ~540 ms (runner fix, 2026-10-14).
-The services are still the platform fakes (B3). Master through F3 (`0be99dc`) is
-merged. Next: F4, the Advanced editor.
+Updated: 2026-10-14 (Asia/Singapore). Branch `ws/app`. Status: **F0, F1 and F4 done;
+F2 and F3 done except the parts waiting on platform** (listed under Needs). **The app
+runs on the native core (B2)**: edits update the command, checks, signal path and
+estimate (the core part of F7), and the desktop starts in ~540 ms (runner fix,
+2026-10-14). **F4, Advanced mode, is built on the native core, autocomplete included**
+(`87af9f0`, `658d0ef`); its highlighting waits on the core for stage and macro roles
+(Needs). The services are still the platform fakes (B3). Master through `6f77420` is
+merged. Next: F5, the VEGAS popup.
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
@@ -52,8 +54,8 @@ debug builds, and the goldens use it.
   (right-click, Shift+F10, Menu key): Duplicate, Rename…, Delete… (Mine only). An empty
   search offers New preset (a preset in Mine started from the first built-in) and
   Show all presets. Below 1280 px the library is a rail; it opens over the editor.
-- Header: name with Edited, Built-in/Mine, category, revision; Basic/Advanced (Advanced
-  says it arrives in F4); the FFmpeg the checks are for; Duplicate, Revert (with Undo),
+- Header: name with Edited, Built-in/Mine, category, revision; Basic/Advanced (working
+  since F4); the FFmpeg the checks are for; Duplicate, Revert (with Undo),
   Save preset or Save as new preset. Built-ins save as a new preset in Mine with origin
   `builtin/<id>`.
 - Signal path from the core's signal facts (C2 `signalPath`, platform's app-review
@@ -168,13 +170,81 @@ debug builds, and the goldens use it.
   the start-time cause and wrote the runner fix in its own worktree; a third verified
   that fix here.
 
+**F4: Advanced mode** (UI_SPEC §3; `lib/design/components/command_editor.dart`,
+`lib/features/advanced/`, `state/editor.dart`, `state/presets.dart`, `presets_page.dart`):
+
+- **Switching** (SETTINGS_AND_COMMANDS §5): Basic | Advanced and Ctrl+M. The first switch
+  starts the command from the core's `advancedTemplate`; with a command saved, the seed
+  question ("Use your saved command", the default; "Replace it with the current
+  settings"; Cancel). Both settings stay in the recipe (`command.mode`,
+  `command.template`). Back in Basic, a quiet banner says the command is kept and offers
+  Switch to Advanced. `PresetsController.setMode`/`setTemplate`; `EditorData` gains
+  `advanced`, `lint`, `basic` (the recipe compiled as Basic) and `capabilities`.
+- **`CommandEditor`** (design component): `EditableText` with
+  `TextSelectionGestureDetectorBuilder` (selection, context menu), `buildTextSpan`
+  highlighting from a display model (`CommandEditorModel`: words, chips, marks), a gutter
+  with line numbers, per-line stripes and the most severe message after each line, lock
+  badges and chip backgrounds painted from the laid-out text (padding of the platform's
+  `BoxWidthStyle.max` selection boxes trimmed, `glyphRects`), hover bubbles, and a chip
+  guard (`TextInputFormatter`) that refuses partial edits and selects the chip; the
+  controller keeps the caret out of chips. Autocomplete overlay with keyboard (arrows,
+  Tab/Enter, Esc, Ctrl+Space) seen before the text-editing shortcuts.
+- **Mapping** (`features/advanced/display.dart`), from the core only: chips from the
+  compile's `input`/`output` token spans; words from token `sourceStart`/`sourceEnd` (option
+  names bold by the command view's display rule; stage and macro roles honoured when the
+  core gives them); marks from `VeCore.lint` plus compile issues on the text lint doesn't
+  repeat (such as `L-GOP`), whole-command ranges listed but not underlined; diagnostics
+  with lines and Go to; the resolved command grouped by the user's lines; the macro list
+  from `VeCore.complete` after "{" with values from a compile of the names alone (stub
+  until platform supplies macros, Needs); suggestions from `VeCore.complete`, opened by
+  the spec's rule (after "-", after an option with values, after "{"; Ctrl+Space always).
+- **Elsewhere:** the signal path in Advanced mode uses only the core's facts and summary
+  for the active command (`_commandSignalPath`): unknown output formats claim no
+  conversion, no wire label and no availability (`SignalStream.availability` is now
+  nullable); "From file name" when no `-f`. Nodes focus the editor. No estimate. The
+  library's Advanced tag leads the summary line and follows the draft ("x264, your
+  command"); the depth glyph uses the core's signal facts. Copy (Ctrl+Shift+C) copies the
+  core's command line. Dialog actions wrap when they don't fit (the seed question).
+- Context7 (via the `.unsloth` Node runtime; Node isn't on PATH) returned little for
+  `EditableText`/`RenderEditable`; the APIs were checked against the Flutter 3.47.7 SDK
+  source in `L:\flutter`.
+
 ## Tests
 
-`flutter test` in `app/`: **348 tests, all passing** (319 after F3). `flutter analyze`:
+`flutter test` in `app/`: **403 tests, all passing** (348 before F4). `flutter analyze`:
 no issues. Platform fakes (B0) for services everywhere; the fake core for the F0–F3
 tests and the native core (B2, through `dart:ffi`, in the `flutter test` VM) for the
 new core tests below; a fake window controller; for F3 two test doubles
 (`test/ffmpeg_doubles.dart`: a probe and hardware tests that stall).
+
+F4 added (55), on the native core (B2) for everything Advanced, fake services, no FFmpeg
+or VEGAS:
+
+- Widget (`advanced_editor_test.dart`, 22): Ctrl+M seeds from the core and keeps both
+  settings, the banner; the header switch; the seed question (keep, Esc, replace);
+  Replace with Basic settings and Undo; Backspace into a chip refused, chip selected, the
+  lock message, then whole deletion and `L-OUTPUT`; typing over part of a chip refused;
+  caret snapping; cut and paste moves a chip; the core's lint as marks, counts, Line N
+  and Go to; hover bubble; whole-command findings listed only; errors allowed in a draft
+  and marked in the library; macro values from the core and insertion at the caret; a
+  lost `{output}` put back; the resolved command's pipes, output and `{gop:2s}` → 60, Copy
+  and the toggle; the dashed diagram with known and unknown facts and nodes focusing the
+  editor; no estimate and the library's Advanced tag; Ctrl+Shift+C. Autocomplete: "-"
+  opens the core's options in its order, arrows, Enter inserts and opens values; values
+  after `-preset `, Tab, Esc; filtering by typed text, no opening elsewhere, Ctrl+Space;
+  click to insert, caret move closes; encoders with their state.
+- Unit (`advanced_display_test.dart`, 19): the mapping on hand-built C2 shapes: chips and
+  words from spans, stage and macro roles when present, out-of-range spans ignored; marks
+  (lint, compile-only, whole command), checks order, counts, lines and columns, mark at a
+  caret; resolved lines; macro entries; the Basic summary line; the Advanced signal path
+  (unknown facts, known facts, no compile result); the guard's replaced range (repeated
+  characters, a paste before a chip); caret snapping; completion open rules, entries,
+  availability and titles.
+- Golden (`advanced_golden_test.dart`, 14 images): `seeded`, `lint`, `banner`, `narrow`
+  (1100 px), `locked`, `suggestions`, `question`, light and dark. **These use the native
+  core's bootstrap data: regenerate them when B1 lands, and when the core gives Advanced
+  words stage and macro roles.** No F0–F3 image changed. 96 images in all; each new one
+  was looked at.
 
 Native core additions (29):
 
@@ -370,10 +440,19 @@ arguments."; `SizeEstimate.minTotalBytes`/`maxTotalBytes` for the typed length's
 When B1 replaces the bootstrap profiles, the app needs nothing new, but the native
 goldens (`native_golden_test.dart`) will need regenerating and a look.
 
+Used in F4 with no change: `CompileResult.display` token `sourceStart`/`sourceEnd` and
+`input`/`output` roles for the Advanced text, `advancedTemplate` for the seed,
+`VeCore.lint`, `VeCore.complete`, Advanced `signalPath` facts and summary.
+
 Open (additive):
 
 | Need | Request |
 | --- | --- |
+| Advanced token roles (F4) | In Advanced mode every user word comes back as role `extra`, so the editor can't colour options by stage (video, audio, mux, global), draw stage stripes or style macros. Please give Advanced tokens the same stage roles Basic tokens have and role `macro` (already in `TokenRole`) for a word that held a macro, keeping `sourceStart`/`sourceEnd`. An option/value marker per token would replace the app's "starts with -[letter]" bold rule. The app reads these with no change; until then only option names (bold) and the chips stand out |
+| Macro list (F4) | The macros panel takes names from `VeCore.complete("{")` (generic description "VEGAS media or output macro") and values from a compile of the names alone. A `VeCore.macros(media, paths)` (name, description, required, expanded value) would replace both; the app keeps its own wording only as fallback |
+| Encoder IDs in Advanced (F4) | The Advanced summary names the command's encoders by label ("x265", or the raw name), so nodes can't show availability for the chosen FFmpeg (lint's `L-ENCODER` covers a missing one). A `videoEncoderId`/`audioEncoderId` (summary or signal facts) would let the nodes show Ready / Not in this FFmpeg |
+| Temporary output name (F4) | "Resolved command" shows the sample Render As path for `{output}`; SETTINGS_AND_COMMANDS §4 says the engine writes a temporary name. If the preview should show it, C2 needs the naming rule (or a `CompilePaths` helper) |
+| Partial highlighting (F4) | With an unterminated quote, compile returns no tokens, so the editor loses its chips (and their guard) until the quote is closed; lint reports `L-QUOTE` over the whole text. Spans for the words before the open quote, and the quote's position, would keep them |
 | Favorites on built-ins | C3 saves are READ-ONLY for built-ins, so a star on a built-in lasts the session. Built-in favorite/pinned need a stored place |
 | Duplicate origin | C3 defines `builtin/<id>` for copies of built-ins; copies of Mine presets get no origin until a form is defined. The same applies to History's "Open settings as new preset" (saved with no origin; a form such as `job/<id>` would do) |
 | Installation health (F3) | UI_SPEC §5 states Changed on disk, Missing and No ffprobe have no fact in `FFmpegInstallation`. Needs a per-installation status from discovery/read (unchanged / changed since checked / executable missing / ffprobe missing), without probing |
@@ -395,7 +474,21 @@ discovery, probes and hardware tests (B3); favorites on built-ins; Test this pre
 Export…, Show in folder / Open folder, Copy share string; installation health; the job
 index summary, full log, error tokens and command line.
 
-App side: Advanced mode and Ctrl+M (F4); the popup's collapsible command strip (F5).
+Waiting on platform for F4: Advanced stage and macro roles, a macro list, encoder IDs
+in Advanced mode, the temporary output name, partial highlighting with an open quote.
+
+App side: the popup (F5), including its collapsible command strip and Apply blocked by
+errors (Advanced included). F4 points to check in use:
+
+- **Ctrl+Space** is the Windows IME on/off key for some Chinese layouts; with such an
+  IME the system may take it first. Not tried on this PC.
+- The editor's per-line messages are painted, so screen readers get them from the bar
+  (message at the caret, a live region) and the Diagnostics list, not from the line.
+- The suggestions popover is placed from the caret after the frame (one frame late when
+  the caret moves); it stays where it opened if the page scrolls under it.
+- A word typed directly against a chip (`{inputs}x`) joins it, so the core no longer sees
+  `{inputs}` and the lint says so; the chip comes back when the space is restored.
+- Long Advanced library rows truncate the summary after the tag ("x264, your co…").
 The Open dialog (`pickFile`) is built and covered with a fake controller; it was not
 clicked through in the running app. Small display points seen on the native core:
 
@@ -423,13 +516,23 @@ Window start (runner), unverified or not fixed:
 
 ## Handoff for the next app agent
 
-Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md, this file and
-UI_SPEC first. F3 is done; the app runs on the native core (B2) with fake services.
-Next: **F4, the Advanced editor** (UI_SPEC §3): highlighting from the core's tokens, lint
-display (`VeCore.lint`, UTF-16 ranges), locked `{inputs}`/`{output}` chips, macros, the
-resolved command, then autocomplete last (`VeCore.complete`). The native core answers
-any text, so F4 can be built and tested on `NativeVeCore` directly; keep goldens on the
-fake or on the native core knowing B1 will move the latter.
+Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md (C4 for sessions),
+this file and UI_SPEC (§4 popup, §3 Advanced) first. F4 is done; the app runs on the
+native core (B2) with fake services. Next: **F5, the VEGAS popup** (UI_SPEC §4, S3 in
+`design/signal-flow.html`): `--edit-session <dir>` reads the C4 request through
+`EditSessionService` (fake seeds `b0-session`), the template header with the "Rename in
+VEGAS" hint, the one-row strip (`SignalPathLayout.strip`), origin line and Update from
+library (C2 `diff`), Load preset, Apply to template (Ctrl+Enter) blocked by errors and
+Cancel writing the C4 result. Project facts may be null ("Set by the project"); sample
+facts are labelled as samples. The popup's Advanced mode reuses `AdvancedWorkspace`'s
+pieces in a compact layout (resolved command closed, "N diagnostics" in the side).
+Window work (owner HWND, re-centre on another-DPI monitor) needs a release build and
+`tool/spikes/run_window_spikes.ps1`. Nothing runs in VEGAS until B6.
+
+- Advanced mode (F4) lives in `features/advanced/` (mapping in `display.dart`, the
+  workspace, the macro provider) and `design/components/command_editor.dart`. The editor
+  asks its controller's `describe` for the model of any text; the workspace answers from
+  `EditorData` or the core. Its goldens use the native core's data.
 
 - Tests default to the fake core: `pumpApp`/`pumpThemed` take `core:`; pass
   `NativeVeCore()` (one per test file, `setUpAll`) for live results. `native_core_test.dart`

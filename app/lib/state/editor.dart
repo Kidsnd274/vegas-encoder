@@ -50,6 +50,9 @@ class EditorData {
     required this.compiled,
     required this.perMinute,
     required this.total,
+    this.capabilities,
+    this.lint,
+    this.basic,
   });
 
   final Preset preset;
@@ -71,6 +74,22 @@ class EditorData {
 
   /// The total for the typed length; null when no length is typed.
   final CoreResult<SizeEstimate>? total;
+
+  /// What the core knows of the chosen FFmpeg, for checks, lint and
+  /// suggestions; null until probed.
+  final CoreCapabilities? capabilities;
+
+  /// Advanced mode: the core's lint of the command (`VeCore.lint`, UTF-16
+  /// ranges). Null in Basic mode.
+  final CoreResult<List<Diagnostic>>? lint;
+
+  /// Advanced mode: the same recipe compiled as Basic, for what switching back
+  /// would render and for replacing the command with the Basic settings
+  /// (`advancedTemplate`). Null in Basic mode.
+  final CoreResult<CompileResult>? basic;
+
+  /// The command, not the Basic settings, renders (`command.mode` template).
+  bool get advanced => recipe.command.mode == 'template';
 
   bool get dirty => draft != null;
 
@@ -124,6 +143,8 @@ final editorProvider = Provider<EditorData?>((ref) {
   final media = SamplePreview.media;
   final ext = catalog.containers.where((c) => c.id == recipe.container.format).firstOrNull?.ext;
   final length = ref.watch(sizeLengthSecProvider);
+  final paths = SamplePreview.paths(ext);
+  final advanced = recipe.command.mode == 'template';
 
   return EditorData(
     preset: preset,
@@ -134,12 +155,22 @@ final editorProvider = Provider<EditorData?>((ref) {
     installation: installation,
     defaultInstallationId: settings?.defaultFFmpegId,
     media: media,
-    compiled: CoreResult.run(
-      () => core.compile(recipe, media: media, paths: SamplePreview.paths(ext), capabilities: capabilities),
-    ),
+    compiled: CoreResult.run(() => core.compile(recipe, media: media, paths: paths, capabilities: capabilities)),
     perMinute: CoreResult.run(() => core.estimate(recipe, media: media)),
     total: length == null
         ? null
         : CoreResult.run(() => core.estimate(recipe, media: media, durationSec: length.toDouble())),
+    capabilities: capabilities,
+    lint: advanced ? CoreResult.run(() => core.lint(recipe.command.template, capabilities: capabilities)) : null,
+    basic: advanced
+        ? CoreResult.run(
+            () => core.compile(
+              recipe.copyWith(command: recipe.command.copyWith(mode: 'structured')),
+              media: media,
+              paths: paths,
+              capabilities: capabilities,
+            ),
+          )
+        : null,
   );
 });
