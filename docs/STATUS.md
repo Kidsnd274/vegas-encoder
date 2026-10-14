@@ -4,6 +4,13 @@ Updated: 2026-10-14 (Asia/Singapore). Installed version: 0.1.2-config-proof.
 
 ## Current progress
 
+**Master integration (2026-10-14):** owner-authorized `8513ecc` includes platform
+B1/B3/B4 (`1849990`, `0fc89a2`) and app F4 (`5b96a07`, merged through `5bc4b77`).
+No source conflicts. Combined app analysis and 307 unit/widget tests pass; native/
+Advanced goldens still need the app-owned B1 refresh. No push or installation.
+Next: app F7 real-service wiring and platform B5 static progress-slot analysis;
+see [platform handoff](product/workstreams/platform.md). Real-host gates unchanged.
+
 **Product design (2026-10-12):** the `product-ui-design` branch is merged into master,
 and the owner has reviewed it. Decisions are in
 [docs/product/README.md](product/README.md#decisions): the Signal Flow direction

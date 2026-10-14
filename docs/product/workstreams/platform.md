@@ -7,6 +7,32 @@ B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
+## Master integration (2026-10-14)
+
+The owner authorized commit and merge. B3/B4 are committed as `0fc89a2`; master
+integration `8513ecc` includes B1 (`1849990`), B3/B4 and app F4 (`5b96a07`, via
+`5bc4b77`). Both workstream tips are ancestors of master; no source conflict.
+Merged app analysis and **307 unit/widget tests pass** on the existing SDK.
+Golden tests were not regenerated: the app handoff explicitly requires refreshing
+the native/Advanced light and dark images after B1's Windows data. Flutter's
+generated app-file/lockfile rewrites from this check were restored; app F7 should
+refresh its path dependency lock (ve_services 0.3.0) in its own workstream.
+Nothing was pushed or installed; the main checkout's existing `.claude/` remains
+untouched.
+
+Next platform agent: first merge current master into ws/platform, read this file,
+STATUS, CONTRACTS, WORKSTREAMS and the native architecture/integration documents.
+Proceed with **B5 static analysis of ISfProgress slots 3/4** for the exact selected
+VEGAS build; prepare an opt-in test and owner checklist. Coordinate the remaining
+F4 token-role/macro/encoder-ID/partial-highlight requests through this file before
+changing C2. Keep B6 template/monitor wiring gated on A5–A7 and get separate owner
+authorization before any installed DLL change or real-host operation.
+
+App handoff: merge master into ws/app; wire WindowsServices (F7), remove duplicate
+discovery/probe/cache persistence, use recipe-specific reusable capability views,
+refresh/review affected goldens and measure the app budgets. Then proceed with
+F5 popup and F6 live progress against C4/C5, without declaring real-host gates.
+
 ## B4 delivered
 
 - `src/engine/recipe_job.*` links into the development DLL and compiles immutable
