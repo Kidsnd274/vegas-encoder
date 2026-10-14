@@ -4,7 +4,8 @@ Updated: 2026-10-15 (Asia/Singapore). Branch `ws/app`. Status: **F0, F1, F4 and 
 done; F2 and F3 done except the parts waiting on platform** (listed under Needs). **The
 app runs on the native core (B2) and the platform's Windows services (B3)** (F7's
 service part, `0d33d43`), with the §9.3 budgets measured on real data (Tests). Master
-through `a0d33c4` (B1, B3, B4) is merged; the native core carries B1's Windows FFmpeg
+through `1e14d64` (B1, B3, B4, B5 and the offline B6 preparation) is merged, with no C2, C4 or C5
+change; the native core carries B1's Windows FFmpeg
 data and its goldens are regenerated (`4829f8e`). **F5, the VEGAS popup, is built** (`fe248b5`)
 (`--edit-session`, UI_SPEC §4, S3): the C4 request and result through
 `EditSessionService`, the template header and origin line, the one-row strip, Load preset,
@@ -843,7 +844,9 @@ Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md (C5 for live s
 for `keepOnTop`), TECH_ARCHITECTURE §5.6, this file and UI_SPEC §12 first. F5 is done;
 the app runs on the native core (B2) and the Windows services (B3), with fakes in tests.
 Next: **F6, the render progress window** (UI_SPEC §12, S6 in
-`design/signal-flow.html`), replacing the F0 shell in `features/monitor/monitor_window.dart`:
+`design/signal-flow.html`), replacing the F0 shell in `features/monitor/monitor_window.dart`.
+B5's outcome (platform.md, NATIVE_PROGRESS.md): the owner dropped custom text in VEGAS's
+render dialog, so this window is the only place the encode statistics show:
 
 - `--render-monitor <file>` reads the C5 live file through `liveStatusReaderProvider`
   (`FileLiveRenderStatusReader.watch`; tests use `FakeLiveRenderStatusReader`, whose
