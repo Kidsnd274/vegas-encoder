@@ -1,8 +1,8 @@
 // Golden images of the Presets screen on the native core (B2), light and dark,
 // and of the window when the core didn't load. Fake services, no FFmpeg, no
-// VEGAS. The core's profile data is B0/Linux bootstrap, not Windows-qualified:
-// its figures and wording will move when platform's B1 lands, so regenerate
-// these images then.
+// VEGAS. The core's profile data is B1's Windows data (regenerated
+// 2026-10-14); regenerate these images when the core's figures or wording
+// change.
 // Regenerate with: flutter test --update-goldens test/golden/native_golden_test.dart
 // Images: test/golden/goldens/presets_native_<state>_<light|dark>.png and
 // core_unavailable_<light|dark>.png

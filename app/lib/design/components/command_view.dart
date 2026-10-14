@@ -13,7 +13,7 @@ enum CommandRole { inputs, video, audio, mux, output }
 /// One argument as the core compiled it, already quoted for display.
 @immutable
 class CommandToken {
-  const CommandToken(this.text, {this.extra = false, this.error = false, this.field});
+  const CommandToken(this.text, {this.extra = false, this.error = false, this.field, this.replacedField});
 
   final String text;
 
@@ -25,6 +25,12 @@ class CommandToken {
 
   /// The recipe field that produced it; clicking the token focuses it.
   final String? field;
+
+  /// The control an Extra argument replaced; pointing at that control lights
+  /// this token too.
+  final String? replacedField;
+
+  bool litBy(Set<String> fields) => fields.contains(field) || fields.contains(replacedField);
 
   bool get isFlag => text.length > 1 && text.startsWith('-') && RegExp(r'^-[A-Za-z]').hasMatch(text);
 }
@@ -307,7 +313,7 @@ class _CommandBackground extends CustomPainter {
     }
     if (lit.isNotEmpty) {
       final paint = Paint()..color = c.highlight;
-      for (final r in ranges.where((r) => r.token?.field != null && lit.contains(r.token!.field))) {
+      for (final r in ranges.where((r) => r.token?.litBy(lit) ?? false)) {
         for (final b in _boxes(r.start, r.end)) {
           canvas.drawRRect(RRect.fromRectAndRadius(b.inflate(2), const Radius.circular(3)), paint);
         }

@@ -232,6 +232,7 @@ CommandDisplay commandDisplay(core.CompileResult result, {required bool audio}) 
       extra: t.role == core.TokenRole.extra,
       error: errors.contains(index),
       field: t.field,
+      replacedField: t.replacedField,
     );
     switch (t.role) {
       case core.TokenRole.exe:

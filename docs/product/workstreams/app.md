@@ -6,13 +6,13 @@ runs on the native core (B2)**: edits update the command, checks, signal path an
 estimate (the core part of F7), and the desktop starts in ~540 ms (runner fix,
 2026-10-14). **F4, Advanced mode, is built on the native core, autocomplete included**
 (`87af9f0`, `658d0ef`); its highlighting waits on the core for stage and macro roles
-(Needs). The services are still the platform fakes (B3). Master through `6f77420` is
-merged. Next: F5, the VEGAS popup.
+(Needs). The services are still the platform fakes (B3). Master through `a0d33c4`
+(B1, B3, B4) is merged; the native core now carries B1's Windows FFmpeg data and its
+goldens are regenerated. Next: F7's real-service wiring, then F5, the VEGAS popup.
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
 widget and golden tests on the platform fakes, the native core and local sample data.
-The native core's profile data is B0/Linux bootstrap, not Windows-qualified (B1).
 
 ## Done
 
@@ -242,9 +242,16 @@ or VEGAS:
   availability and titles.
 - Golden (`advanced_golden_test.dart`, 14 images): `seeded`, `lint`, `banner`, `narrow`
   (1100 px), `locked`, `suggestions`, `question`, light and dark. **These use the native
-  core's bootstrap data: regenerate them when B1 lands, and when the core gives Advanced
-  words stage and macro roles.** No F0–F3 image changed. 96 images in all; each new one
-  was looked at.
+  core's data: regenerate them when it changes, and when the core gives Advanced words
+  stage and macro roles.** No F0–F3 image changed. 96 images in all; each new one was
+  looked at.
+
+B1 merge (2026-10-14): the 18 native-core goldens (14 Advanced, 4 `presets_native`) were
+regenerated and each compared with its old image. What changed is B1's data only: the
+CRF 18 mark reads "high quality" (was "visually lossless"); the Advanced seed starts with
+the explicit input colour tags before `{inputs}` (`-color_primaries bt709 … -color_range
+tv {inputs}`), so line 1 wraps; the resolved command has those tags before `-f rawvideo`
+and no `-thread_queue_size 64`. Every other test passed unchanged on B1's data.
 
 Native core additions (29):
 
@@ -437,8 +444,12 @@ its bundled DLL (the app's core); `CompileResult.overriddenFields` for "Set in E
 arguments."; `SizeEstimate.minTotalBytes`/`maxTotalBytes` for the typed length's range;
 `ResolvedSettings.gopFrames` for "2 s (60 frames at 29.97 fps)"; FakeVeCore treating
 `{}` and absent `extensions` alike (the tests still use it). No new core request came up.
-When B1 replaces the bootstrap profiles, the app needs nothing new, but the native
-goldens (`native_golden_test.dart`) will need regenerating and a look.
+
+Delivered in B1 (merged `a0d33c4`, 2026-10-14): the Windows FFmpeg data needed no app
+change beyond regenerating the 18 native-core goldens. `CommandToken.replacedField` is
+used: pointing at a control that Extra arguments replaced lights the Extra option and
+value that replaced it (before, nothing lit). `libavformatMajor` reaches the core through
+the services' capability view with no app code.
 
 Used in F4 with no change: `CompileResult.display` token `sourceStart`/`sourceEnd` and
 `input`/`output` roles for the Advanced text, `advancedTemplate` for the seed,
@@ -489,6 +500,10 @@ errors (Advanced included). F4 points to check in use:
 - A word typed directly against a chip (`{inputs}x`) joins it, so the core no longer sees
   `{inputs}` and the lint says so; the chip comes back when the space is restored.
 - Long Advanced library rows truncate the summary after the tag ("x264, your co…").
+- A chip's lock badge straddles its top-right corner (the mockup's `.t-lock::after`).
+  Since B1 the seed puts `{inputs}` after the colour tags, usually on a wrapped row, so
+  the badge overlaps the descenders of the row above (as `{output}`'s already did under
+  `-movflags`). Keeping the badge inside the line box would fix it.
 The Open dialog (`pickFile`) is built and covered with a fake controller; it was not
 clicked through in the running app. Small display points seen on the native core:
 

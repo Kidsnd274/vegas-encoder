@@ -23,8 +23,8 @@ import '../helpers.dart';
 /// The Presets screen on the native core (B2): edits now reach the C++ core
 /// through `dart:ffi`, so the command, checks, signal path and estimate
 /// follow them. Fake services, no FFmpeg, no VEGAS. The core's profile data is
-/// B0/Linux bootstrap, not Windows-qualified, so these tests check what moves
-/// and where it shows rather than the core's figures or wording.
+/// B1's Windows data; these tests still check what moves and where it shows
+/// rather than the core's figures or wording.
 void main() {
   late NativeVeCore core;
 
@@ -147,6 +147,22 @@ void main() {
       findsOneWidget,
       reason: 'the core\'s final -g, without the seconds Extra replaced',
     );
+    final view = tester.widget<CommandView>(find.byType(CommandView));
+    final tokens = [for (final line in view.command.lines) ...line.tokens];
+    expect(
+      [
+        for (final t in tokens.where((t) => t.litBy({'video.speed'}))) t.text,
+      ],
+      ['-preset', 'fast'],
+      reason: 'pointing at Encoder speed lights the Extra option that replaced it (replacedField)',
+    );
+    expect(
+      [
+        for (final t in tokens.where((t) => t.litBy({'video.gopSec'}))) t.text,
+      ],
+      ['-g', '120'],
+    );
+    expect(tokens.where((t) => t.text == 'fast').single.field, 'video.extra', reason: 'a click still opens Extra');
 
     await type(tester, extraField(), '');
     expect(setInExtra(), findsNothing, reason: 'clearing Extra arguments gives the controls back');
