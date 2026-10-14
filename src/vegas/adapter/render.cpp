@@ -7,6 +7,9 @@
 // drift (Voukoder's fixed 1601-sample reads lose ~0.6 samples per frame).
 #include "vegas_encoder.h"
 #include "../../engine/encode.h"
+#if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
+#include "../host/progress_text_probe.h"
+#endif
 #if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
 #include "../configuration/template_draft.h"
 #endif
@@ -490,9 +493,15 @@ class RenderFile final : public ISfRenderFile {
     SFAUDIORECORD fmt = r.tplAudio;
     bool ok = true;
     auto fail = [&](const char* why, HRESULT hr) { Stop(r, "failed", why, FAILED(hr) ? hr : E_FAIL); ok = false; };
+#if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
+    host::ProgressTextProbe textProbe(progress, cfg.progressTextProbe);
+#endif
     auto poll = [&](LONGLONG position) {
       double t = NowMs();
       bool go = CheckProgress(r, progress, position);
+#if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
+      if (go) textProbe.Update(GetTickCount64(), r.locksOutstanding);
+#endif
       r.msProgress += NowMs() - t;
       if (!go) ok = false;
       return go;
@@ -517,6 +526,21 @@ class RenderFile final : public ISfRenderFile {
       HRESULT hr = progress->SetTotal(r.frameCountReported);
       if (FAILED(hr)) fail("progress SetTotal failed", hr);
     }
+#if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
+    if (ok && progress && cfg.progressTextProbe) {
+      // Fingerprint before acquiring any frame. Hash polling stays on Render's
+      // caller thread. Any optional-probe exception leaves normal rendering on.
+      BestEffortDiagnostic([&] {
+        const auto hostPath = ModulePath(nullptr);
+        const bool exact = host::IsInspectedProgress(progress) && FileVersion(hostPath) == "2026.0.3.189" &&
+          Sha256File(Widen(hostPath), [&] { return poll(0); }) ==
+            "2B93C6613E1BDD4A435B65F63E3FC0B0EAD9EDB06B45F2458C43B63F784A73AF";
+        textProbe.Qualify(exact && ok);
+        Log("B5 progress-text mode=%d exactTarget=%d", cfg.progressTextProbe, exact);
+        textProbe.Begin(r.frameCountReported, GetTickCount64(), r.locksOutstanding);
+      });
+    }
+#endif
     double streamFps = 0;
     if (ok) {
       BYTE sf[streamfmt::size]{};
@@ -650,6 +674,13 @@ class RenderFile final : public ISfRenderFile {
       r.encoder = encoder_->Stats();
     }
     r.elapsedMs = NowMs() - start;
+#if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
+    BestEffortDiagnostic([&] {
+      Log("B5 progress-text calls=%u lastHr=%s maxCallMs=%llu guardFailed=%d enabled=%d",
+          textProbe.Calls(), Hr(textProbe.LastResult()).c_str(), textProbe.MaxCallMs(),
+          textProbe.GuardFailed(), textProbe.Enabled());
+    });
+#endif
     if (ok) { r.status = "ok"; r.returned = S_OK; r.encodedFile = BaseName(path_); }
     else r.returned = r.status == "cancelled" ? SF_E_RENDER_STOPPED : (FAILED(r.stopHr) ? r.stopHr : E_FAIL);
     WriteManifest(r, fmt);

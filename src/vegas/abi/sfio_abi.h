@@ -225,8 +225,13 @@ ISfReadVideoRenderStream : ISfReadStream {
 
 struct __declspec(uuid("D6EBCEC1-766C-11D3-9627-00C04F68BE42"))
 ISfProgress : IUnknown {
-  virtual HRESULT STDMETHODCALLTYPE Slot3(LPCWSTR text, LONGLONG v) = 0;      // 3
-  virtual HRESULT STDMETHODCALLTYPE Slot4(LPCWSTR text) = 0;                  // 4
+  // F-026/F-027 shapes. B5 exact CSfRenderProgress (2026.0.3.189): slot 3
+  // borrows text, sets total and zeroes position; slot 4 only borrows text.
+  // Neither copies/frees text or draws UI. Visible consumption is unverified.
+  // Keep numeric names: these are recovered effects, not original SDK names.
+  // Details/lifetime and opt-in procedure: docs/NATIVE_PROGRESS.md.
+  virtual HRESULT STDMETHODCALLTYPE Slot3(LPCWSTR text, LONGLONG total) = 0;  // 3 [static]
+  virtual HRESULT STDMETHODCALLTYPE Slot4(LPCWSTR text) = 0;                  // 4 [static]
   virtual HRESULT STDMETHODCALLTYPE SetTotal(LONGLONG total) = 0;             // 5 [rt]
   virtual HRESULT STDMETHODCALLTYPE SetPosition(LONGLONG pos) = 0;            // 6 [rt]
   virtual HRESULT STDMETHODCALLTYPE CheckCancel() = 0;                        // 7 [rt] ?

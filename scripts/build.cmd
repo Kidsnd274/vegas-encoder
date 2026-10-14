@@ -20,6 +20,12 @@ if "%~2"=="configuration-proof" (
   set VE_BUILD_PROOF_SOURCES="%VE_BUILD_ROOT%\src\vegas\configuration\template_draft.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\proof_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp"
   set "VE_BUILD_PROOF_OBJECTS=template_draft.obj proof_page.obj native_store.obj"
 )
+if "%~2"=="progress-text-proof" (
+  set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\progress-text-proof\vegas-encoder"
+  set "VE_BUILD_PROOF_FLAGS=/DVEGAS_ENCODER_CONFIGURATION_PROOF /DVEGAS_ENCODER_PROGRESS_TEXT_PROOF"
+  set VE_BUILD_PROOF_SOURCES="%VE_BUILD_ROOT%\src\vegas\configuration\template_draft.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\proof_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp"
+  set "VE_BUILD_PROOF_OBJECTS=template_draft.obj proof_page.obj native_store.obj"
+)
 set "VE_BUILD_TESTS=%VE_BUILD_ROOT%\build\fiohost"
 set "VE_BUILD_HELPERS=%VE_BUILD_ROOT%\build\host-tests"
 if not exist "%VE_BUILD_PLUGIN%" mkdir "%VE_BUILD_PLUGIN%"
@@ -36,6 +42,7 @@ popd
 pushd "%VE_BUILD_HELPERS%" || exit /b 1
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\host_helpers.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" /link /OUT:host-helpers.exe ole32.lib oleaut32.lib || goto :fail
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\native_boundary.cpp" /link /OUT:native-boundary.exe || goto :fail
+cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\native_progress.cpp" /link /OUT:native-progress.exe ole32.lib || goto :fail
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\native_configuration.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\template_draft.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\proof_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" /link /OUT:native-configuration.exe ole32.lib user32.lib gdi32.lib || goto :fail
 popd
 echo BUILD OK: Vegas Encoder, fiohost and native helpers

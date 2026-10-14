@@ -23,7 +23,9 @@ static_assert(sizeof(void*) == 8 && sizeof(LONG_PTR) == 8, "VEGAS x64 pointer wi
 
 namespace vegas_encoder {
 
-#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+#if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
+inline constexpr const char* kVersion = "0.1.3-progress-text-proof";
+#elif defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
 inline constexpr const char* kVersion = "0.1.2-config-proof";
 #else
 inline constexpr const char* kVersion = "0.1.1-dev";
@@ -52,6 +54,9 @@ struct Config {
   bool showEncoderErrors = true;
   std::wstring ffmpegPath = L"C:\\ffmpeg\\bin\\ffmpeg.exe";
   DWORD pipeTimeoutMs = 10000, finishTimeoutMs = 120000;
+#if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
+  int progressTextProbe = 0; // 0 off, 4 text only, 3 one-time initialization.
+#endif
 };
 const Config& Cfg();
 

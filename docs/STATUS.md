@@ -1,14 +1,78 @@
 # Vegas Encoder status
 
-Updated: 2026-10-14 (Asia/Singapore). Installed version: 0.1.2-config-proof.
+Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.3-progress-text-proof
+(B5 owner-authorized trial completed for normal renders; mode 4 retained).
 
 ## Current progress
+
+**B6 editor transport checkpoint (2026-10-15, offline):** fresh UUID session
+directories, bounded atomic C4 requests, explicit owned-helper launch, creator-thread
+zero-time exit polling and one validated result are implemented. Cancel/crash/
+invalid results preserve the prior draft; direct known-file cleanup retains unknown
+entries and reports incomplete cleanup. Optimized x64 `/W4 /WX` passes **89**
+transport checks with real Windows files/processes and fake children, plus the
+retained **95** recipe/draft checks. Current AddressSanitizer validation is
+**incomplete**: the boundary run stalled at its thread guard after 87 checks.
+The owner reported an antivirus alert during process/thread debugging and asked
+to stop that investigation. Temporary diagnostic test edits are removed; the
+cause is not established, and no sanitizer pass is claimed for this transport.
+There are no exporter/page/Render call sites,
+no real app/monitor launch and no new installation/VEGAS run. Remaining work:
+connect the native page to the actual F5 popup when ready and the owner resumes
+the native gates, then recipe/C5 progress integration. No additional fake-owner
+framework is planned. See [native recipe boundary](NATIVE_RECIPE_BOUNDARY.md).
+**A5–A7, real persistence, controlled real failure recovery and monitor performance
+remain unverified.** B6 is not complete; deferred persistence is not reopened.
+
+**B5 owner-authorized real trial (2026-10-14):** control and two slot-4 renders
+complete normally on the reviewed `0.1.3-progress-text-proof` DLL / VEGAS
+2026.0.3.189. Owner confirms normal advancing control progress. All return S_OK,
+encoder exit zero/publication and zero locks. Full decode of control and final
+text-test output verifies 182 1080p frames at 30000/1001 and 291,491 48 kHz float32
+stereo sample frames. Mode 0 makes zero text calls; both mode-4 renders make eight
+successful guarded calls, but the owner sees no switching text. **Drop custom
+dialog text**, per the owner's preference, and prioritize useful numeric progress
+and the separate frontend window. This candidate's cancel/recovery and mode 3
+were not tested. The frontend window has a shell; live figures remain F6, and
+the installed proof has no B6 monitor/recipe bridge.
+The owner authorized **keeping a healthy candidate, rollback only for issues**;
+the exact prior 0.1.2 rollback remains preserved/verified. No rollback or push.
+See [progress trial](NATIVE_PROGRESS.md). A5–A7, real persistence, controlled
+failure recovery and monitor performance stay unverified. No useful status line
+was established; that product track is dropped, not passed.
+
+**B6 offline boundary checkpoint (2026-10-14):** the owner authorized committing
+B5 as `2bdb44d` and fast-forwarding master; the main checkout's `.claude/` was
+preserved. Work continues on `ws/platform` with owned recipe envelope placement
+and C4 per-page draft transactions. Both optimized/ASan x64 `/W4 /WX` builds pass
+**95 checks**: byte/text/suffix preservation, bounds, proof/future rejection,
+single/invalid/crashed session handling, core validation, Apply failure/retry,
+thread guards and fake-holder allocation/reference balance. The helpers have
+**no exporter/page/Render call sites** and launch no editor or monitor. See
+[native recipe boundary](NATIVE_RECIPE_BOUNDARY.md). B6 is not complete. No new
+real VEGAS run or installation; A5–A7, real persistence, controlled real failure
+recovery, status-line visibility and monitor performance remain unverified.
+
+**B5 static/probe preparation (2026-10-14, committed/merged `2bdb44d`):** clean
+`ws/platform` fast-forwarded to current master `a0d33c4`. Exact VEGAS 2026.0.3.189
+bytes/RTTI establish slot 3 as borrowed text + total + position reset, and slot 4
+as borrowed text only. The internal consumer is a scripting render-status
+description/title; public SetPosition does not forward it. An isolated,
+default-off `0.1.3-progress-text-proof` candidate uses immutable markers, exact
+host/vtable gating, caller-thread/zero-lock guards and <=2 Hz slot-4 calls;
+optional text failure disables the probe. Slot 3 is initialization only.
+The concrete opt-in/rollback checklist is in [NATIVE_PROGRESS.md](NATIVE_PROGRESS.md).
+Focused results and staged candidate location are in the
+[platform handoff](product/workstreams/platform.md). **No real VEGAS test,
+installation or monitor launch.** Status-line visibility, A5–A7, real
+two-template/restart persistence, controlled real failure recovery and monitor
+performance remain unverified.
 
 **Master integration (2026-10-14):** owner-authorized `8513ecc` includes platform
 B1/B3/B4 (`1849990`, `0fc89a2`) and app F4 (`5b96a07`, merged through `5bc4b77`).
 No source conflicts. Combined app analysis and 307 unit/widget tests pass; native/
 Advanced goldens still need the app-owned B1 refresh. No push or installation.
-Next: app F7 real-service wiring and platform B5 static progress-slot analysis;
+Next: app F7 real-service wiring and the owner-operated B5 progress-text trial;
 see [platform handoff](product/workstreams/platform.md). Real-host gates unchanged.
 
 **Product design (2026-10-12):** the `product-ui-design` branch is merged into master,
@@ -329,8 +393,10 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 Platform B1, B3 and B4 are complete; B2 is already merged. The owner authorized
 committing B3/B4 and merging both workstreams into master. App F7 switches to NativeVeCore/WindowsServices through
-its own workstream. Next is B5 status-line analysis and gated B6 adapter/monitor
-integration. No installation or PATH change. Order and rationale are in
+its own workstream. B5 is committed/merged; its prepared owner trial needs separate
+installation approval. B6 snapshot/session boundaries are tested offline; next
+is file/process transport and the gated native page/recipe/monitor integration.
+No installation or PATH change. Order and rationale are in
 [platform.md](product/workstreams/platform.md).
 B5/B6 require the owner at the real host. Controlled failure/recovery and deferred
 persistence qualification remain open per [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).
