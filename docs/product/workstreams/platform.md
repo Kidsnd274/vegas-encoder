@@ -1,7 +1,8 @@
 # Platform workstream
 
 Updated: 2026-10-14 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
-branch `ws/platform`. **B3 and B4 implemented and validated; owner-authorized commit/merge.** B1 complete. Continued
+branch `ws/platform`. **B5 static analysis and opt-in trial prepared; changes
+uncommitted for owner review.** B1–B4 and app F4 are merged. Continued
 from `659fe02`; F3 master `0be99dc` was fast-forwarded before the B1 commit.
 B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
@@ -20,18 +21,82 @@ refresh its path dependency lock (ve_services 0.3.0) in its own workstream.
 Nothing was pushed or installed; the main checkout's existing `.claude/` remains
 untouched.
 
-Next platform agent: first merge current master into ws/platform, read this file,
-STATUS, CONTRACTS, WORKSTREAMS and the native architecture/integration documents.
-Proceed with **B5 static analysis of ISfProgress slots 3/4** for the exact selected
-VEGAS build; prepare an opt-in test and owner checklist. Coordinate the remaining
-F4 token-role/macro/encoder-ID/partial-highlight requests through this file before
-changing C2. Keep B6 template/monitor wiring gated on A5–A7 and get separate owner
-authorization before any installed DLL change or real-host operation.
+For B5, the worktree was clean before the requested fast-forward to current master
+`a0d33c4`; no local changes needed stashing/restoring and no merge conflict occurred.
+App-owned files arrived through that merge only. No app-owned files were edited
+or app tests/goldens regenerated during B5. Current changes stay uncommitted.
 
 App handoff: merge master into ws/app; wire WindowsServices (F7), remove duplicate
 discovery/probe/cache persistence, use recipe-specific reusable capability views,
 refresh/review affected goldens and measure the app budgets. Then proceed with
 F5 popup and F6 live progress against C4/C5, without declaring real-host gates.
+
+## B5 ready for owner review
+
+- Static inspection uses the unchanged VEGAS **2026.0.3.189** executable in
+  TARGET.md, RTTI and the captured `CSfRenderProgress` identity. Slot 3 stores a
+  borrowed description pointer, sets total and resets position; slot 4 only stores
+  the pointer. The internal helper forwards it into a scripting description/title;
+  public SetPosition supplies a null description. **Visible status-line behavior
+  is unverified.** Details/addresses, retained-string lifetime and the concrete
+  owner keep/drop/cancel/rollback checklist are in
+  [NATIVE_PROGRESS.md](../../NATIVE_PROGRESS.md).
+- Isolated `progress-text-proof` build (`0.1.3-progress-text-proof`), default off.
+  `B5ProgressText=4` alternates immutable module-lifetime markers at <=2 Hz;
+  `=3` initializes once with the real total before frames, never updates via slot
+  3. Exact host hash/version/vtable required. Caller-thread/zero-lock guards,
+  nonfatal disable after a text failure, normal numeric cancellation unchanged.
+  No host interfaces enter workers; no app/monitor launch or reader wait.
+- `Inspect-VegasProgress.py` independently checks exact bytes/RTTI/consumer;
+  `Prepare-B5StatusLine.ps1` stages three review candidates without installation;
+  `Test-B5.ps1` runs fake interfaces and negative host-gating renders. They use
+  existing tools/standard-library Python and need no investigation checkout or
+  real host for fake tests (`-HostPath` is an explicit read-only static check).
+- Review candidates: `build/b5-owner-review/mode-{0,4,3}/`, identities in
+  `build/b5-owner-review/review.json`. DLL SHA-256
+  `BB3447D10A689895DB8A7652B8397F8B62F03A79BD0CE3D44F8022AECC4F72BF`.
+  Installed DLL/PDB/INI and discovery still match their manifest; all three
+  payloads also match the main checkout's preserved `candidate-0.1.2-config-proof`
+  rollback. Nothing installed, replaced, committed, pushed or merged into master.
+- Focused checks: default/proof MSVC x64 `/W4 /WX` builds; **30** native fake
+  progress checks (borrowed lifetime, 500 ms boundary/repolls, slot-3 non-reset,
+  thread/lock guards, exact-object rejection, failures and exception containment);
+  **three fake-host gated modes with full decoded fixture checks**; retained
+  helper/boundary/configuration **24/9/67** and default exporter fake-host
+  regression (repeat/fractional/short-read/video-only/cancel/failure/destination/
+  Unicode and checker rejection). All pass. Static inspector checks pass against
+  the exact host, with eight changed/truncated/unbacked-span rejections. Changed
+  PowerShell scripts parse; staging rejects escaped/existing output directories;
+  three owner-candidate manifests match actual bytes; `git diff --check` passes.
+  Latest fake output: `build/test-results/b5-fabae044/` and
+  `build/test-results/b5-default-regression/`. **No new real VEGAS run.**
+
+Next: owner reviews the diff/candidates and separately authorizes the B5 installed
+trial, or drops the line based on the static limitation. B6 stays gated on A5–A7.
+Real two-template/restart persistence, controlled real failure recovery and
+monitor performance remain **unverified**. No monitor performance conclusion
+follows from text markers or the existing B4 async-file checks.
+
+## F4 core metadata coordination (queued; C2 unchanged in B5)
+
+The app's outstanding requests in app.md were read after the master merge.
+Continue its documented reduced display/fallbacks until native facts land;
+do not infer stages, encoder IDs or macro semantics in the app.
+
+| Request | Platform handoff / next implementation |
+| --- | --- |
+| Advanced stage/macro roles and option/value marker | Add core-authored roles/marker while preserving UTF-16 source spans and argv. A macro word needs both macro identity and stage, so use additive metadata rather than losing its stage when role becomes `macro`. General/ambiguous scopes stay unknown. Cover quoted/expanded macros, stream specifiers and literal values starting with `-`. |
+| Macro catalogue | Add a core API/C ABI plus Dart model for name, description, required flag and expanded value in the supplied media/paths context. Keep completion and expansion on the same C++ definitions; update fakes with the contract. No app-only macro expansion. |
+| Advanced encoder IDs | Add optional native video/audio IDs where the active command establishes them. Preserve unknown for ambiguous/general output scopes; never read inactive Basic selections or reverse-map display labels. |
+| Temporary output preview | C2 already takes `CompilePaths.output`; B4 passes its uniquely allocated temp path before core compile, and C6 records actual argv. Naming belongs to the engine, not portable compile. Keep the current selected/sample preview path explicitly labelled as a preview; no invented collision-free runtime filename in C2. Coordinate a services/context helper only if the owner wants an illustrative temp preview. |
+| Partial highlighting with an open quote | Add trustworthy prefix spans/quote diagnostic position without treating an invalid command as renderable or emitting partial executable argv. Preserve UTF-16 offsets, macro guards and the error that blocks Apply/render. |
+
+These changes are queued after B5 review, with focused core/FFI/fake tests and
+CONTRACTS updates together. App owns adoption/widget/light-dark goldens through
+its workstream. No C2 shape, core compile semantics or app-owned source changed
+for B5. Owner-owned TECH_ARCHITECTURE §5.6 can now link NATIVE_PROGRESS.md and
+replace the earlier "unmapped meaning" with the precise borrowed-description
+effects; this workstream proposes that update, without editing the owner's file.
 
 ## B4 delivered
 
@@ -74,7 +139,7 @@ F5 popup and F6 live progress against C4/C5, without declaring real-host gates.
 Reproduce with `scripts/Test-B4.ps1 -Asan -FFmpegPaths <supplied paths>`. Final
 optimized/ASan summaries are under ignored `build/test-results/b4-final-all/`
 and `b4-final-asan/`. No app-owned paths, installed exporter, user settings, PATH or
-SDK were changed. Existing B3 implementation remains in the working tree.
+SDK were changed. B3/B4 are now committed and merged as recorded above.
 
 App/B6 handoff: F7's existing FileLiveRenderStatusReader/FileJobRepository/JobLogs
 consume C5/C6 unchanged. inputStreams is an additive native fact (historical fakes
@@ -235,13 +300,13 @@ performance or native persistence claim follows from repository tests.
 
 B3 and F3's platform requests are delivered above. App F7 wires providers and
 measures its budgets; B4's History/live writers are ready for gated B6 rendering.
-Next agent: continue on ws/platform and incorporate the owner's integrated master
-before new work. B3/B4 are committed under the owner's merge authorization.
+Next agent: continue on ws/platform with the uncommitted B5 diff preserved.
+Master `a0d33c4` is incorporated; recheck status/master before new work.
+B3/B4 are committed under the owner's earlier merge authorization.
 B4's engine/C5/C6 writers are delivered above; app F7 consumes them through the
-existing readers. Next platform work is B5 status-line analysis and the gated B6
-adapter/monitor integration, with the owner for any real-host test or installation.
+existing readers. B5 static/probe preparation is delivered above; its real-host
+trial and gated B6 adapter/monitor integration need the owner.
 
-B5/B6 status-line/adapter/progress performance
-needs the owner with real VEGAS and gated evidence. Current changes remain
-committed on ws/platform for the owner's authorized master merge. No push,
-installation or exporter replacement is authorized by that merge request.
+B5/B6 status-line/adapter/progress performance needs the owner with real VEGAS and
+gated evidence. B5 changes remain **uncommitted for review**. No commit, push,
+master merge, installation or exporter replacement is authorized by this task.

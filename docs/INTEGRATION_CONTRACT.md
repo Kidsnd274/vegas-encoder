@@ -37,6 +37,14 @@ or a third-party capture as qualification of our current binary.
 
 ## New implementation versus native evidence
 
+B5 establishes the exact `CSfRenderProgress` text effects on the unchanged
+2026.0.3.189 executable: slot 3 borrows a description pointer, sets the total and
+resets position; slot 4 only borrows the pointer. An internal helper forwards it
+to a scripting render-status description/title; public SetPosition passes a null
+description. Visible interactive status-line behavior remains unverified. The
+isolated opt-in marker probe and owner/rollback checklist are in
+[NATIVE_PROGRESS.md](NATIVE_PROGRESS.md); no installed exporter was changed.
+
 Extracted checked templates, frame leases, HRESULT exception containment, product
 identity, generated fixtures and installer checks are authored implementation changes.
 Their helper/fake tests establish code behavior. The configuration work adds

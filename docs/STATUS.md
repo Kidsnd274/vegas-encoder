@@ -4,11 +4,26 @@ Updated: 2026-10-14 (Asia/Singapore). Installed version: 0.1.2-config-proof.
 
 ## Current progress
 
+**B5 static/probe preparation (2026-10-14, uncommitted review):** clean
+`ws/platform` fast-forwarded to current master `a0d33c4`. Exact VEGAS 2026.0.3.189
+bytes/RTTI establish slot 3 as borrowed text + total + position reset, and slot 4
+as borrowed text only. The internal consumer is a scripting render-status
+description/title; public SetPosition does not forward it. An isolated,
+default-off `0.1.3-progress-text-proof` candidate uses immutable markers, exact
+host/vtable gating, caller-thread/zero-lock guards and <=2 Hz slot-4 calls;
+optional text failure disables the probe. Slot 3 is initialization only.
+The concrete opt-in/rollback checklist is in [NATIVE_PROGRESS.md](NATIVE_PROGRESS.md).
+Focused results and staged candidate location are in the
+[platform handoff](product/workstreams/platform.md). **No real VEGAS test,
+installation or monitor launch.** Status-line visibility, A5–A7, real
+two-template/restart persistence, controlled real failure recovery and monitor
+performance remain unverified.
+
 **Master integration (2026-10-14):** owner-authorized `8513ecc` includes platform
 B1/B3/B4 (`1849990`, `0fc89a2`) and app F4 (`5b96a07`, merged through `5bc4b77`).
 No source conflicts. Combined app analysis and 307 unit/widget tests pass; native/
 Advanced goldens still need the app-owned B1 refresh. No push or installation.
-Next: app F7 real-service wiring and platform B5 static progress-slot analysis;
+Next: app F7 real-service wiring and the owner-operated B5 progress-text trial;
 see [platform handoff](product/workstreams/platform.md). Real-host gates unchanged.
 
 **Product design (2026-10-12):** the `product-ui-design` branch is merged into master,
@@ -329,7 +344,8 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 Platform B1, B3 and B4 are complete; B2 is already merged. The owner authorized
 committing B3/B4 and merging both workstreams into master. App F7 switches to NativeVeCore/WindowsServices through
-its own workstream. Next is B5 status-line analysis and gated B6 adapter/monitor
+its own workstream. B5 static analysis and opt-in preparation are ready for review;
+next is its separately authorized owner trial, followed by gated B6 adapter/monitor
 integration. No installation or PATH change. Order and rationale are in
 [platform.md](product/workstreams/platform.md).
 B5/B6 require the owner at the real host. Controlled failure/recovery and deferred
