@@ -8,6 +8,51 @@ B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
+## Next-agent priority (2026-10-15)
+
+Source checkpoint **`6ebd79c`** is committed on ws/platform and fast-forwarded
+into master. Platform is clean; master retains the pre-existing `.claude/`.
+The latest ws/app handoff now reports **F5 popup done; F6 progress window next**.
+This supersedes the earlier observation below that F5 was upcoming. Nothing in
+F5 establishes real VEGAS page/persistence gates.
+
+Work that can proceed without frontend completion, in priority order:
+
+1. **Advanced edit latency:** app measures **25–32 ms per edit** against the
+   4 ms budget because lint and compile each serialize a **156–236K-character**
+   capability map through FFI. Choose the smallest additive fix: reuse an immutable
+   core capability snapshot across calls, or provide a combined lint/compile call.
+   Keep the core the sole validator/compiler. If using handles, bound memory and
+   define identity, replacement, release and stale-handle behaviour. Measure the
+   full real capability path through Dart FFI; a tiny fake map is insufficient.
+   Implement in src/core and packages/ve_core, including fakes/contract/tests;
+   app adoption stays with its owner.
+2. **F4 token metadata:** deliver stage, macro identity and option/value markers,
+   preserving UTF-16 spans and actual argv. Keep ambiguous stages unknown. Then
+   deliver the shared core macro catalogue, established Advanced encoder IDs and
+   trustworthy prefix spans/quote position for unfinished commands, without
+   producing executable argv from invalid input. Detailed requests are below.
+3. **Popup size contract:** add bounded optional popup size to C7 AppUiState and
+   its services/fakes; preserve existing desktop fields. Frontend adopts it.
+
+F5 additionally requests `DesktopApp.openPreset(presetId)` and optional
+`context.outputPath`. Coordinate the desktop launch/selection protocol with app
+before implementation; do not edit its runner or invent single-instance behaviour.
+Only provide outputPath if the native page actually knows it; keep unknown/sample
+facts explicit. Saving invalid desktop drafts is marked an owner decision in
+app.md; do not silently change save policy. Temporary render-path naming remains
+engine-owned, not a new portable-core filename rule.
+
+Read latest app.md and this handoff before implementation. Keep changes additive,
+inside platform paths, with focused native/core/FFI/package checks and measured
+results. Update CONTRACTS and this file for adoption. Do not resume sanitizer
+thread/process debugging or add another fake-owner framework. Current sanitizer
+validation is incomplete and already recorded. No installation, exporter
+replacement, push, machine-tool change or antivirus exclusion is authorized by
+this handoff. A5–A7, real persistence, controlled real failure recovery and monitor
+performance remain unverified. Native host calls stay on Render's caller thread,
+release frames before waits, and Render never waits for app/monitor.
+
 ## Master integration (2026-10-14)
 
 The owner authorized commit and merge. B3/B4 are committed as `0fc89a2`; master
