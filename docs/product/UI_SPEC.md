@@ -3,8 +3,8 @@
 Updated: 2026-10-14 (Asia/Singapore). Status: proposal, updated for the chosen
 direction; §1, §9, §10 and §11 record what the app workstream built in F0 and F1, §2
 what F2 built, and §5, §6 and §6a what F3 built (on the platform fakes; open items
-are in workstreams/app.md). Since 2026-10-14 the editor runs on the native core (B2);
-the services are still fakes (B3).
+are in workstreams/app.md). Since 2026-10-14 the editor runs on the native core (B2)
+and the app on the platform's Windows services (B3, F7).
 
 This document covers the behaviour Flutter will implement: states, flows, the signal
 path, the size card, theme, keyboard, copy and the token structure. The chosen
@@ -274,7 +274,11 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
 - **No size estimate** in Advanced mode. The library row's **Advanced** tag leads its
   summary line ("[Advanced] x265, your command") and follows the draft.
 - **Errors** block Save in the popup (Apply, F5) and are allowed in desktop drafts: Save
-  works, and the library marks the preset with an error.
+  works, and the library marks the preset with an error. *Since F7 the real library
+  refuses a recipe the core finds errors in (C3 `RECIPE-INVALID`): the toast says
+  "Couldn’t save the preset: <the library's reason>" and the draft stays. Errors that
+  depend on the chosen FFmpeg still save and are marked. Which rule stands is the
+  owner's call (workstreams/app.md, Needs).*
 
 ## 4. VEGAS popup (S3)
 

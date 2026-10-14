@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ve_services/ve_services.dart' show Preset;
+import 'package:ve_services/ve_services.dart' show Preset, ServiceException;
 
 import '../../design/components/button.dart';
 import '../../design/components/command_view.dart';
@@ -83,14 +83,27 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
 
   // ------------------------------------------------------------ actions
 
-  Future<void> _save() async {
+  /// Runs a library write. A refusal (the library's checks found an error,
+  /// the store is busy, the disk is full) is said in the toast, with the
+  /// library's reason, instead of being lost.
+  Future<void> _write(String what, Future<void> Function() action) async {
+    try {
+      await action();
+    } on ServiceException catch (e) {
+      if (mounted) _showToast('Couldn’t $what: ${e.message}');
+    }
+  }
+
+  Future<void> _save() => _write('save the preset', _saveUnguarded);
+
+  Future<void> _saveUnguarded() async {
     final data = ref.read(editorProvider);
     if (data == null || !data.dirty) return;
     var overwrite = false;
     if (data.behindLibrary && !data.preset.builtin) {
       final choice = await _askConflict(data.recipe.name);
       if (choice == null) return;
-      if (choice == _Conflict.saveAsNew) return _saveAsNew();
+      if (choice == _Conflict.saveAsNew) return _saveAsNewUnguarded();
       overwrite = true;
     }
     final outcome = await _controller.save(overwrite: overwrite);
@@ -102,7 +115,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
         _showToast('Saved as a new preset in Mine');
       case SaveOutcome.conflict:
         final choice = await _askConflict(data.recipe.name);
-        if (choice == _Conflict.saveAsNew) return _saveAsNew();
+        if (choice == _Conflict.saveAsNew) return _saveAsNewUnguarded();
         if (choice == _Conflict.overwrite) {
           await _controller.save(overwrite: true);
           if (mounted) _showToast('Preset saved');
@@ -112,10 +125,14 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
     }
   }
 
-  Future<void> _saveAsNew() async {
+  /// Save as new from the conflict question (inside [_save]'s guard).
+  Future<void> _saveAsNewUnguarded() async {
     await _controller.saveAsNew();
     if (mounted) _showToast('Saved as a new preset in Mine');
   }
+
+  Future<void> _toggleFavorite(LibraryEntry entry) =>
+      _write(entry.favorite ? 'unstar it' : 'star it', () => _controller.toggleFavorite(entry.id));
 
   Future<_Conflict?> _askConflict(String name) => showVeDialog<_Conflict>(
     context,
@@ -144,10 +161,10 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
     );
   }
 
-  Future<void> _duplicate(String id) async {
+  Future<void> _duplicate(String id) => _write('duplicate it', () async {
     await _controller.duplicate(id);
     if (mounted) _showToast('Duplicated into Mine');
-  }
+  });
 
   /// "New preset": a preset in Mine started from the first built-in.
   Future<void> _newPreset() async {
@@ -159,11 +176,13 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
         .entries
         .first;
     if (first == null) return;
-    await _controller.createNew(first.id);
-    if (mounted) {
-      setState(() => _libraryOpen = false);
-      _showToast('Started a new preset in Mine from “${first.name}”');
-    }
+    await _write('start a new preset', () async {
+      await _controller.createNew(first.id);
+      if (mounted) {
+        setState(() => _libraryOpen = false);
+        _showToast('Started a new preset in Mine from “${first.name}”');
+      }
+    });
   }
 
   Future<void> _libraryAction(LibraryAction action, LibraryEntry entry) async {
@@ -178,7 +197,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
           initial: entry.name,
           confirmLabel: 'Rename',
         );
-        if (name != null && name != entry.name) await _controller.rename(entry.id, name);
+        if (name != null && name != entry.name) await _write('rename it', () => _controller.rename(entry.id, name));
       case LibraryAction.delete:
         final ok = await showVeDialog<bool>(
           context,
@@ -190,8 +209,10 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
           ],
         );
         if (ok == true) {
-          await _controller.delete(entry.id);
-          if (mounted) _showToast('Deleted “${entry.name}”');
+          await _write('delete it', () async {
+            await _controller.delete(entry.id);
+            if (mounted) _showToast('Deleted “${entry.name}”');
+          });
         }
     }
   }
@@ -322,7 +343,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
 
   /// Selects the first preset when nothing (or a deleted preset) is selected.
   void _ensureSelection(List<Preset> presets, PresetsState state) {
-    if (presets.isEmpty || presets.any((p) => p.recipe.id == state.selectedId)) return;
+    if (presets.isEmpty || presets.any((p) => presetId(p) == state.selectedId)) return;
     final groups = groupLibrary(ref.read(libraryEntriesProvider));
     final first = groups.isEmpty ? presets.first.recipe.id : groups.first.subgroups.first.entries.first.id;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -345,6 +366,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
         final library = LibraryPane(
           searchFocus: _search,
           onAction: _libraryAction,
+          onFavorite: (e) => unawaited(_toggleFavorite(e)),
           onNewPreset: _newPreset,
           onPicked: narrow ? () => setState(() => _libraryOpen = false) : null,
         );

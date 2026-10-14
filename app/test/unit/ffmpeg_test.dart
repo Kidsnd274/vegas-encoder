@@ -10,6 +10,8 @@ import 'package:vegas_encoder/state/services.dart';
 
 import '../ffmpeg_doubles.dart';
 
+import '../helpers.dart';
+
 /// The FFmpeg screen's mapping and state against the platform fakes (B0).
 /// Nothing here runs FFmpeg; the installations are illustrative fixtures.
 void main() {
@@ -231,6 +233,7 @@ void main() {
       container = ProviderContainer(
         overrides: [
           veCoreProvider.overrideWithValue(FakeVeCore()),
+          servicesOverride(),
           ffmpegDiscoveryProvider.overrideWithValue(discovery),
           machineSettingsRepositoryProvider.overrideWithValue(machine),
           capabilityCacheProvider.overrideWithValue(cache),
@@ -254,13 +257,17 @@ void main() {
       expect(saved.installations.map((i) => i.id), ['gyan-8.1', 'manual-7.1', 'btbn-lgpl-8.0']);
     });
 
-    test('Add FFmpeg… records, checks and selects the new installation', () async {
+    test('Add FFmpeg… adds through discovery, checks and selects the new installation', () async {
       start();
       final installation = await controller().add(added);
       expect(installation.id, 'manual-8.1');
       expect((await discovery.list()).map((i) => i.id), contains('manual-8.1'));
-      expect((await machine.read()).installations.map((i) => i.id), contains('manual-8.1'));
-      expect(await cache.read('b0-fixture-manual-8.1'), isNotNull, reason: 'probed and cached');
+      expect(
+        (await machine.read()).revision,
+        0,
+        reason: 'discovery records installations in C7 itself (B3); the app writes nothing',
+      );
+      expect(await cache.read('b0-fixture-manual-8.1'), isNull, reason: 'the probe caches its own result, not the app');
       expect(state().selectedId, 'manual-8.1');
       expect(state().probes, isEmpty);
       expect(state().probed.keys, ['manual-8.1']);
@@ -284,21 +291,18 @@ void main() {
       controller().select('manual-7.1');
       await controller().remove('manual-7.1');
       expect((await discovery.list()).map((i) => i.id), isNot(contains('manual-7.1')));
-      expect((await machine.read()).installations.map((i) => i.id), ['gyan-8.1', 'btbn-lgpl-8.0']);
+      expect((await machine.read()).revision, 0, reason: 'discovery updates C7 itself');
       expect(state().selectedId, isNull);
     });
 
-    test('Scan again keeps a default that disappeared, and checks the uncached', () async {
+    test('Scan again leaves C7 to discovery and checks the uncached', () async {
       start(withDiscovery: FakeFFmpegDiscovery(scanResults: [inst('manual-7.1')]));
       final found = await controller().scan();
       expect(found.map((i) => i.id), ['manual-7.1']);
       final saved = await machine.read();
+      expect(saved.revision, 0, reason: 'discovery keeps C7 and a vanished default itself (B3)');
       expect(saved.defaultFFmpegId, 'gyan-8.1');
-      expect(saved.installations.map((i) => i.id), [
-        'manual-7.1',
-        'gyan-8.1',
-      ], reason: 'a missing default never silently becomes another installation');
-      expect(await cache.read('b0-fixture-manual-7.1'), isNotNull);
+      expect(state().probed.keys, contains('manual-7.1'), reason: 'not in the cache, so checked');
       expect(state().scanning, isFalse);
     });
 

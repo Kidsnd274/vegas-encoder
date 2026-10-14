@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ve_services/ve_services.dart' show DesktopWindowBounds;
+import 'package:ve_services/ve_services.dart' show DesktopWindowBounds, ServiceException;
 
 import '../../design/components/button.dart';
 import '../../design/components/dialog.dart';
@@ -116,7 +116,24 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     if (choice != _CloseChoice.save) return AppExitResponse.cancel;
     final controller = ref.read(presetsControllerProvider.notifier);
     for (final id in drafts.keys.toList()) {
-      if (await controller.save(id: id) == SaveOutcome.conflict) {
+      final SaveOutcome outcome;
+      try {
+        outcome = await controller.save(id: id);
+      } on ServiceException catch (e) {
+        // The library refused it: stay open on that preset and say why.
+        controller.select(id);
+        if (mounted) {
+          final name = presets.where((p) => p.recipe.id == id).firstOrNull?.recipe.name ?? id;
+          await showVeDialog<void>(
+            context,
+            title: 'Couldn’t save “$name”',
+            message: '${e.message} Vegas Encoder stays open so you can fix it or close without saving.',
+            actions: const [VeDialogAction('OK', null, variant: VeButtonVariant.primary)],
+          );
+        }
+        return AppExitResponse.cancel;
+      }
+      if (outcome == SaveOutcome.conflict) {
         // Changed in another window: stay open on that preset so the user decides.
         controller.select(id);
         return AppExitResponse.cancel;

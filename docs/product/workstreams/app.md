@@ -6,13 +6,15 @@ runs on the native core (B2)**: edits update the command, checks, signal path an
 estimate (the core part of F7), and the desktop starts in ~540 ms (runner fix,
 2026-10-14). **F4, Advanced mode, is built on the native core, autocomplete included**
 (`87af9f0`, `658d0ef`); its highlighting waits on the core for stage and macro roles
-(Needs). The services are still the platform fakes (B3). Master through `a0d33c4`
-(B1, B3, B4) is merged; the native core now carries B1's Windows FFmpeg data and its
-goldens are regenerated. Next: F7's real-service wiring, then F5, the VEGAS popup.
+(Needs). Master through `a0d33c4` (B1, B3, B4) is merged; the native core carries B1's
+Windows FFmpeg data and its goldens are regenerated (`4829f8e`). **F7's service part is
+done: the app runs on the platform's Windows services (B3)**, with the §9.3 budgets
+measured on real data (below). Next: F5, the VEGAS popup.
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
-widget and golden tests on the platform fakes, the native core and local sample data.
+widget and golden tests on the platform fakes and the native core; the Windows services
+with unit tests on temporary folders. No FFmpeg ran for this work.
 
 ## Done
 
@@ -209,13 +211,99 @@ debug builds, and the goldens use it.
   `EditableText`/`RenderEditable`; the APIs were checked against the Flutter 3.47.7 SDK
   source in `L:\flutter`.
 
+**F7, services part: the app on the Windows services (B3)** (2026-10-14;
+`state/services.dart`, `main.dart`, `state/presets.dart`, `state/ffmpeg.dart`,
+`state/editor.dart`, `features/presets/library_model.dart`):
+
+- **One composition.** `servicesProvider` builds `WindowsAppServices`, the platform's
+  `WindowsServices(core:, paths:)`, on first use (the progress window never loads the core
+  or the library). Every service provider (library, machine settings, discovery, probe,
+  hardware tests, capability cache, jobs, live status, edit sessions) derives from it;
+  `presetPreferencesProvider` and `presetTransferProvider` derive from the library.
+  `main` makes one `ProviderContainer` before `runApp` (`UncontrolledProviderScope`), so
+  the remembered desktop bounds come from the same machine settings the app then uses.
+- **Tests never reach real data.** Under `flutter test` the real services refuse to build
+  (`FLUTTER_TEST`); `servicesOverride()`/`FakeAppServices` in `test/helpers.dart` give
+  every test the platform fakes (`pumpApp`, `pumpThemed`, `testContainer`).
+  `VEGAS_ENCODER_DATA_ROOT=<folder>` moves the data to `<folder>\Roaming` and `\Local`
+  for development and spike runs; the exporter doesn't read it.
+- **Duplicate persistence removed** (CONTRACTS C3 "C7 ownership"): the app no longer
+  copies discovery's list into C7 or writes probe results to the cache; Set as default
+  writes only `defaultFFmpegId`. Probes and hardware tests invalidate the editor's
+  capabilities, which re-read the cache.
+- **Capability views.** `capabilitiesProvider` returns the cached `FFmpegCapabilities`
+  (selected by the installation's identity key, so unrelated settings writes don't
+  re-read a 200–330 KB cache file); the editor and library pass the recipe's reusable view
+  (`toCoreCapabilities(recipe:)`, ~43K characters instead of ~236K). Only the desktop probes
+  an uncached installation; the popup reads the cache only.
+- **Budgets** (measured below): an edit compiles once, shared by the editor and the
+  edited preset's library row (`compileSample`, keyed by the recipe object); other rows
+  are reused (`_LibraryRowCache`); one `Recipe` object per preset (`presetRecipe`,
+  `presetId`) since `Preset.recipe` deep-copies; size estimates are worked out when the
+  File node reads them; `LibraryEntry` works out its search text once.
+- **Library writes** (`PresetsController`): stars on built-ins persist through
+  `PresetPreferences` (the session-only built-in stars are gone); copies carry C3 origins
+  (`builtin/<id>`, `preset/<id>@<revision>` with the revision the edit started from; a
+  copy starts unstarred); History's "Open settings as new preset" uses
+  `PresetTransfer.fromJob` (origin `job/<id>`). After each write the controller re-reads
+  the library before changing selection or drafts: the file library polls every 250 ms,
+  and without this a new copy's selection fell back to the first preset and a saved draft
+  showed the old recipe for a moment (found by the file-based tests). A refused write
+  (`RECIPE-INVALID`, `STORE-BUSY`, `FILE-WRITE`…) shows "Couldn’t save the preset: <the
+  library's reason>" and keeps the draft; closing with unsaved changes that can't be saved
+  says so and stays open.
+- **History**: the recorded `commandLine` and `realtime` (B4) replace the app's own
+  quoting and division; older records keep the fallback.
+- Settings > About names the data folders ("This PC. Settings and presets are in …").
+
 ## Tests
 
-`flutter test` in `app/`: **403 tests, all passing** (348 before F4). `flutter analyze`:
-no issues. Platform fakes (B0) for services everywhere; the fake core for the F0–F3
-tests and the native core (B2, through `dart:ffi`, in the `flutter test` VM) for the
-new core tests below; a fake window controller; for F3 two test doubles
-(`test/ffmpeg_doubles.dart`: a probe and hardware tests that stall).
+`flutter test` in `app/`: **416 tests, all passing** (403 before F7, 348 before F4).
+`flutter analyze`: no issues. Platform fakes for services everywhere except the Windows
+services tests below; the fake core for the F0–F3 tests and the native core (B2, through
+`dart:ffi`, in the `flutter test` VM) for the core tests; a fake window controller; for
+F3 two test doubles (`test/ffmpeg_doubles.dart`: a probe and hardware tests that stall).
+
+F7 added (13):
+
+- Unit (`services_wiring_test.dart`, 9), the **real Windows services on a temporary
+  folder** with the native core: the providers are `FilePresetLibrary`,
+  `FileMachineSettingsRepository`, `WindowsFFmpegDiscovery` and the rest, and reading
+  writes nothing; the six packaged built-ins; a star on a built-in survives a new
+  container (`preferences.json`) and its revision stays 1; a copy is a `.vepreset` file
+  with origin `builtin/yt-h264` and core-derived requirements; the library refuses a
+  recipe the core finds errors in (`RECIPE-INVALID`), keeps revision 1 and the draft; the
+  editor's capabilities are the Basic view from the cache file (the recipe's encoder with
+  options, others without). On fakes: the real services refuse to build under
+  `flutter test`; the popup reads cached capabilities and never probes, the desktop probes
+  once; an edit recompiles one library row and search none; the editor and the edited row
+  share one compile.
+- Unit: copies carry `builtin/<id>`, `preset/<id>@1` and the draft's base revision;
+  stars on built-ins go through `PresetPreferences`; History copies get `job/<id>` and use
+  the recorded command line and realtime figure (B4). The
+  FFmpeg controller tests now check that the app writes nothing to C7 on Add, Remove and
+  Scan again (discovery does).
+- Widget: a refused save shows the library's reason and keeps "Edited"; About names the
+  data folders. The History "Open settings as new preset" test caught a refresh that
+  hung while nothing listened to the library (fixed).
+- No golden changed: the fakes' screens look the same.
+
+Budgets (TECH_ARCHITECTURE §9.3), `tool/budgets/budgets_test.dart`, run on purpose with
+`VE_BUDGET_CACHE` set to a capability cache a real probe wrote on this PC (platform's B3
+runs, three builds: gyan git `615b07170e`, BtbN `24e860f6d3`, gyan 5.1.2), the native
+core, the Windows services on a temporary folder and a 500-preset file library. Figures
+are from the `flutter test` VM (JIT), so an upper bound for the release build; medians:
+
+| Path | Before F7 | After |
+| --- | --- | --- |
+| Basic edit: command, checks, library row (budget ≤ 4 ms) | 10–14 ms compile with the full map, plus every library row recompiled (1.5–1.7 s with 500 presets) | **3.9–4.3 ms** (compile 3.4–3.7 ms with the 38–43K-character view; rows 0.4 ms) |
+| Size estimates (File node only now) | 1.3 ms on every edit | when the File node shows |
+| Advanced keystroke: lint, compile, Basic compile (≤ 4 ms) | — | **25–32 ms**: lint and compile each send the full 156–236K-character map |
+| Search / group 500 presets (< 150 ms; 60 fps) | — | 0.6 / 0.5 ms |
+| File library `list()`, 500 presets (one watch tick) | — | **430–470 ms, repeated every 250 ms** on the UI isolate |
+
+The last two rows are platform requests (Needs). Not measured: frame times in a profile
+build with DevTools, memory, cold start.
 
 F4 added (55), on the native core (B2) for everything Advanced, fake services, no FFmpeg
 or VEGAS:
@@ -422,6 +510,20 @@ the window is being placed waits for placement before Show. No Dart or channel c
   screen 90 or 205 ms after Dart draws it (popup ~42 ms), with or without a restore.
   Cause not established.
 
+**F7 recheck (2026-10-14), on the Windows services.** Release build (56 s), same machine
+and harness, `-Checks start`, fake host, `VEGAS_ENCODER_DATA_ROOT` set to a scratch folder
+(the user's `%APPDATA%` and `%LOCALAPPDATA%\VegasEncoder` stayed absent).
+
+| Start, warm, median of 10 | Before (runner fix) | F7 |
+| --- | --- | --- |
+| Skia desktop shown (Dart main to first frame) | 537 ms (32) | **414 ms (13)** |
+| Skia popup shown | 351 ms | 360 ms |
+| Impeller desktop / popup shown | 1,413 / 1,297 ms | 1,328 / 1,319 ms |
+
+The desktop's first frame no longer waits for the library: the file library delivers
+after it. The 20 desktop runs saved their bounds to the scratch `machine.json`
+(revision 20), so window bounds now survive a restart.
+
 - **Renderer: deferred.** The runner defaults to Skia for start time;
   `RendererFromEnvironment` in `windows/runner/main.cpp` is the one place to change, and
   `VEGAS_ENCODER_RENDERER=impeller` tries Impeller. Re-measure on each Flutter upgrade
@@ -455,35 +557,47 @@ Used in F4 with no change: `CompileResult.display` token `sourceStart`/`sourceEn
 `input`/`output` roles for the Advanced text, `advancedTemplate` for the seed,
 `VeCore.lint`, `VeCore.complete`, Advanced `signalPath` facts and summary.
 
+Delivered in B3 and B4 (merged `a0d33c4`) and **used since F7** (2026-10-14):
+`WindowsServices` (one composition for every provider); discovery, probes and hardware
+tests owning C7 installation records and the cache (the app's copies are gone);
+`toCoreCapabilities(recipe:)` views; `PresetPreferences` for stars on built-ins;
+C3 copy origins (`builtin/<id>`, `preset/<id>@<revision>`, `PresetTransfer.fromJob`'s
+`job/<id>`); real settings, so window bounds and the size card's length survive a restart;
+C6 `commandLine` and `realtime` in History. This answers the F3 questions on discovery
+vs `machine.json`, probe results on the installation and where hardware results are kept.
+
+Delivered and **not used yet** (app work, Open items): `FFmpegInstallation.health` and
+`healthMessage`; job index summaries (`encoderSummary`, `project`, `durationSec`,
+`elapsedSec`, `sizeBytes`); `JobLogs` for the full log; `errorTokenIndices`;
+`PresetTests` (Test this preset); `PresetTransfer.exportTo`/`shareString`/
+`importShareString`, `PresetLocations` and `FileReveal` (Export…, Copy share string,
+Show in folder, History's Open folder). `PresetTransfer.duplicate` copies the source's
+star; the app keeps its own copy path so a copy starts unstarred and can hold a draft.
+
 Open (additive):
 
 | Need | Request |
 | --- | --- |
+| Library watch cost (F7) | `FilePresetLibrary.watch` re-reads, decodes and normalizes (FFI) every preset file each 250 ms, on the app's UI isolate. Measured with 500 presets: **430–470 ms per tick**, so the poll runs back to back; with a handful of presets it is a few ms every 250 ms. Please list the folder and re-read only files whose size or time changed (keeping the decoded preset and requirements), or watch the folder with `ReadDirectoryChangesW`, or poll off the caller isolate. §9.3's 500-preset budget can't be met while this runs |
+| Capability transfer in Advanced mode (F7) | Lint and compile each serialize the full capability map (156–236K characters) through FFI: **25–32 ms per keystroke** in Advanced mode (budget 4 ms). Please let the core keep a capability map it was given (an ID or handle per identity key) so later calls pass the ID, or offer one call that lints and compiles a template together |
+| Saving a recipe with errors (F7, owner decision) | `FilePresetLibrary.save` refuses a recipe the core finds errors in (`RECIPE-INVALID`); UI_SPEC §3 says desktop drafts with errors can be saved and are marked in the library. The app shows the refusal with the library's reason and keeps the draft. Either the library accepts them (platform change) or UI_SPEC changes to "errors block Save" (app change, already the behaviour). Errors that depend on the chosen FFmpeg still save and are marked |
 | Advanced token roles (F4) | In Advanced mode every user word comes back as role `extra`, so the editor can't colour options by stage (video, audio, mux, global), draw stage stripes or style macros. Please give Advanced tokens the same stage roles Basic tokens have and role `macro` (already in `TokenRole`) for a word that held a macro, keeping `sourceStart`/`sourceEnd`. An option/value marker per token would replace the app's "starts with -[letter]" bold rule. The app reads these with no change; until then only option names (bold) and the chips stand out |
 | Macro list (F4) | The macros panel takes names from `VeCore.complete("{")` (generic description "VEGAS media or output macro") and values from a compile of the names alone. A `VeCore.macros(media, paths)` (name, description, required, expanded value) would replace both; the app keeps its own wording only as fallback |
 | Encoder IDs in Advanced (F4) | The Advanced summary names the command's encoders by label ("x265", or the raw name), so nodes can't show availability for the chosen FFmpeg (lint's `L-ENCODER` covers a missing one). A `videoEncoderId`/`audioEncoderId` (summary or signal facts) would let the nodes show Ready / Not in this FFmpeg |
 | Temporary output name (F4) | "Resolved command" shows the sample Render As path for `{output}`; SETTINGS_AND_COMMANDS §4 says the engine writes a temporary name. If the preview should show it, C2 needs the naming rule (or a `CompilePaths` helper) |
 | Partial highlighting (F4) | With an unterminated quote, compile returns no tokens, so the editor loses its chips (and their guard) until the quote is closed; lint reports `L-QUOTE` over the whole text. Spans for the words before the open quote, and the quote's position, would keep them |
-| Favorites on built-ins | C3 saves are READ-ONLY for built-ins, so a star on a built-in lasts the session. Built-in favorite/pinned need a stored place |
-| Duplicate origin | C3 defines `builtin/<id>` for copies of built-ins; copies of Mine presets get no origin until a form is defined. The same applies to History's "Open settings as new preset" (saved with no origin; a form such as `job/<id>` would do) |
-| Installation health (F3) | UI_SPEC §5 states Changed on disk, Missing and No ffprobe have no fact in `FFmpegInstallation`. Needs a per-installation status from discovery/read (unchanged / changed since checked / executable missing / ffprobe missing), without probing |
-| Discovery vs machine.json (F3) | Which is the source of truth for installations? The app shows `FFmpegDiscovery.watch()` and writes its list to C7 `installations` after Scan again, Add and Remove, keeping a default discovery no longer lists. If B3's discovery persists C7 itself, the app drops that write |
-| Probe results on the installation (F3) | After a probe, does discovery's record update (`probedAt`, `probeMs`, `counts`, `availability`)? The app shows this session's probe from `ProbeProgress.capabilities` and caches it with `CapabilityCache.write`; it would rather read one updated record |
-| Hardware results persisted (F3) | `HardwareTests.test` streams results, but nothing says where they are kept. The app holds them for the session. Does the service write them to the cache / installation availability, or should the app call `CapabilityCache.write`? |
-| Job index summary (F3) | `JobIndexEntry` has no encoder, project, duration, elapsed or size, so History reads every record to fill the list. Long histories need these in the index |
-| Full log (F3) | C6 carries only `stderrTail`. The full FFmpeg log needs a path or a read service |
-| Error tokens in a job (F3) | UI_SPEC §6 highlights the option FFmpeg names. Needs the argv indexes in the job record; the app won't parse stderr |
-| Job command line (F3) | The record should carry the core's `commandLine`; History quotes argv with standard Windows quoting until then. A recorded realtime figure would also replace History's length ÷ elapsed |
-| Test this preset | UI_SPEC §2: encode 60 synthetic frames (testsrc2 + sine) with the selected FFmpeg, verify with ffprobe, stream the log. No C3 service covers it; HardwareTests is per encoder. Needs a service that runs it and streams progress and the log |
-| Export, Show in folder, share string | Export… needs `PresetLibrary` to write the exported preset to a path the user picks (the app shows the file dialog); Show in folder needs the preset's file location or a "reveal" call; Copy share string needs a defined format. The app does no file or Explorer access of its own (AGENTS.md). History's Open folder needs the same reveal call |
-
 ## Open items
 
-Waiting on platform (see Needs): the recommended quality band (B1 profiles); settings,
-window bounds and length surviving a restart (B3's real settings repository); real
-discovery, probes and hardware tests (B3); favorites on built-ins; Test this preset;
-Export…, Show in folder / Open folder, Copy share string; installation health; the job
-index summary, full log, error tokens and command line.
+Waiting on platform (see Needs): the recommended quality band (a product-policy choice,
+platform.md); the library watch's cost and the Advanced capability transfer (the §9.3
+budgets); the owner's call on saving recipes with errors.
+
+App side, unblocked by B3/B4 (F3 follow-up): installation health on the FFmpeg cards
+(Changed on disk, Missing, No ffprobe); History's list from the index summaries instead
+of one record per visible row; the full log (JobLogs) and FFmpeg's error tokens in a
+job; Test this preset (PresetTests); Export…, Copy share string, Show in folder and
+History's Open folder (PresetTransfer, PresetLocations, FileReveal). Real discovery
+and probes were not run from the app: no FFmpeg ran for F7.
 
 Waiting on platform for F4: Advanced stage and macro roles, a macro list, encoder IDs
 in Advanced mode, the temporary output name, partial highlighting with an open quote.
@@ -549,6 +663,13 @@ Window work (owner HWND, re-centre on another-DPI monitor) needs a release build
   asks its controller's `describe` for the model of any text; the workspace answers from
   `EditorData` or the core. Its goldens use the native core's data.
 
+- Services: one `servicesProvider` (`WindowsAppServices` over the platform's
+  `WindowsServices`); every service provider derives from it. Tests get the platform's
+  fakes through `servicesOverride()` (`pumpApp`, `pumpThemed`, `testContainer`; pass
+  `services:` for another bundle) and the real services refuse to build under
+  `flutter test`. Set `VEGAS_ENCODER_DATA_ROOT` to a scratch folder for release runs and
+  spikes. File watches poll every 250 ms: after a write, re-read before relying on the
+  stream (`PresetsController._refresh`).
 - Tests default to the fake core: `pumpApp`/`pumpThemed` take `core:`; pass
   `NativeVeCore()` (one per test file, `setUpAll`) for live results. `native_core_test.dart`
   shows the pattern, including reading `editorProvider` through

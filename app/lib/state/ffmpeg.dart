@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
@@ -91,9 +89,10 @@ const Object _keep = Object();
 final ffmpegControllerProvider = NotifierProvider<FFmpegController, FFmpegState>(FFmpegController.new);
 
 /// Scan again, Add FFmpeg…, Remove, Set as default, probes and hardware tests.
-/// Discovery finds installations; the app writes the list and the default to
-/// machine settings (C7), which renders read. Nothing here works out what an
-/// encoder can do: probes and tests are the services' results.
+/// Discovery finds installations and records them in machine settings (C7)
+/// itself; probes and hardware tests keep their own results (cache and C7).
+/// The app writes only the default. Nothing here works out what an encoder
+/// can do: probes and tests are the services' results.
 class FFmpegController extends Notifier<FFmpegState> {
   @override
   FFmpegState build() {
@@ -124,14 +123,13 @@ class FFmpegController extends Notifier<FFmpegState> {
   void setQuery(String query) => state = state.copyWith(query: query);
   void selectEncoder(String id) => state = state.copyWith(selectedEncoder: id);
 
-  /// Looks for installations again, records them in machine settings, and
-  /// checks each one that has no cached capabilities. Returns what was found.
+  /// Looks for installations again (discovery records them) and checks each
+  /// one that has no cached capabilities. Returns what was found.
   Future<List<FFmpegInstallation>> scan() async {
     state = state.copyWith(scanning: true);
     try {
       final found = await _discovery.scan();
       if (!ref.mounted) return found;
-      await _record(found);
       final cache = ref.read(capabilityCacheProvider);
       for (final installation in found) {
         if (!ref.mounted) break;
@@ -143,13 +141,11 @@ class FFmpegController extends Notifier<FFmpegState> {
     }
   }
 
-  /// Adds the FFmpeg at [executablePath] (from the Open dialog), records it,
-  /// checks it and shows it. Discovery's failure (not FFmpeg, no ffprobe
-  /// beside it…) reaches the caller as a [ServiceException].
+  /// Adds the FFmpeg at [executablePath] (from the Open dialog; discovery
+  /// records it), checks it and shows it. Discovery's failure (not FFmpeg, no
+  /// ffprobe beside it…) reaches the caller as a [ServiceException].
   Future<FFmpegInstallation> add(String executablePath) async {
     final installation = await _discovery.add(executablePath);
-    if (!ref.mounted) return installation;
-    await _record(await _discovery.list());
     if (!ref.mounted) return installation;
     select(installation.id);
     await probe(installation);
@@ -165,26 +161,17 @@ class FFmpegController extends Notifier<FFmpegState> {
     }
     await _discovery.remove(id);
     if (!ref.mounted) return;
-    await _record(await _discovery.list());
-    if (!ref.mounted) return;
     if (state.selectedId == id) state = state.copyWith(selectedId: null, selectedEncoder: null);
   }
 
   /// Makes [installation] the FFmpeg every render uses (C7 defaultFFmpegId).
+  /// Discovery has already recorded the installation itself.
   Future<void> setDefault(FFmpegInstallation installation) async {
-    await ref
-        .read(machineSettingsWriterProvider)
-        .update(
-          (s) => s.copyWith(
-            installations: [...s.installations.where((i) => i.id != installation.id), installation]
-              ..sort(_byOrder(s.installations)),
-            defaultFFmpegId: installation.id,
-          ),
-        );
+    await ref.read(machineSettingsWriterProvider).update((s) => s.copyWith(defaultFFmpegId: installation.id));
   }
 
-  /// Reads what [installation] can do, showing progress as it streams in,
-  /// and caches the result for the editor's checks.
+  /// Reads what [installation] can do, showing progress as it streams in.
+  /// The probe caches its own result; the editor's checks then read it.
   Future<void> probe(FFmpegInstallation installation) async {
     final id = installation.id;
     state = state.copyWith(
@@ -212,11 +199,7 @@ class FFmpegController extends Notifier<FFmpegState> {
       _probing.remove(id);
     }
     if (!ref.mounted) return;
-    if (found != null) {
-      await ref.read(capabilityCacheProvider).write(found);
-      if (!ref.mounted) return;
-      ref.invalidate(capabilitiesProvider(id));
-    }
+    if (found != null) ref.invalidate(capabilitiesProvider(id));
     state = state.copyWith(
       probes: Map.of(state.probes)..remove(id),
       probed: found == null ? null : {...state.probed, id: found},
@@ -259,33 +242,9 @@ class FFmpegController extends Notifier<FFmpegState> {
       if (ref.mounted) {
         final left = {...?state.testing[id]}..removeAll(names);
         state = state.copyWith(testing: {...state.testing, id: left}..removeWhere((_, v) => v.isEmpty));
+        // The tests keep their results; the editor's checks read them again.
+        ref.invalidate(capabilitiesProvider(id));
       }
     }
   }
-
-  /// Writes discovery's list to machine settings, keeping the default's
-  /// record if discovery no longer lists it: a missing default must not
-  /// silently become another installation (C7). Skips an unchanged list.
-  Future<void> _record(List<FFmpegInstallation> found) async {
-    List<FFmpegInstallation> merged(MachineSettings s) => [
-      ...found,
-      ...s.installations.where((i) => i.id == s.defaultFFmpegId && !found.any((f) => f.id == i.id)),
-    ];
-    final current = await ref.read(machineSettingsRepositoryProvider).read();
-    if (!ref.mounted || _sameJson(merged(current), current.installations)) return;
-    await ref.read(machineSettingsWriterProvider).update((s) => s.copyWith(installations: merged(s)));
-  }
-}
-
-bool _sameJson(List<FFmpegInstallation> a, List<FFmpegInstallation> b) =>
-    jsonEncode([for (final i in a) i.toJson()]) == jsonEncode([for (final i in b) i.toJson()]);
-
-/// Keeps installations in their existing order; new ones go last.
-int Function(FFmpegInstallation, FFmpegInstallation) _byOrder(List<FFmpegInstallation> existing) {
-  int rank(FFmpegInstallation i) {
-    final index = existing.indexWhere((e) => e.id == i.id);
-    return index < 0 ? existing.length : index;
-  }
-
-  return (a, b) => rank(a).compareTo(rank(b));
 }

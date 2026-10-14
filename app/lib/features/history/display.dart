@@ -1,7 +1,8 @@
 // Maps job records (C6) to what History shows. Display work only: labels,
 // sentences and formatting. Every figure comes from the record the engine
-// wrote; the one thing worked out here is the realtime ratio, which divides
-// two recorded figures (the project length and the time the render took).
+// wrote. Records from before B4 lack the realtime figure and the core's
+// command line; for those the ratio divides two recorded figures and the
+// command is quoted here.
 
 import 'package:ve_services/ve_services.dart' as core;
 
@@ -38,12 +39,15 @@ String jobTime(String utc, {bool year = false}) {
   return '${d.day} ${_months[d.month - 1]}${year ? ' ${d.year}' : ''}, $hm';
 }
 
-/// The project length over the time the render took: "0.51×". Only for a
-/// finished render (a stopped one didn't encode the whole length), and only
-/// when both figures are known and the render took some time.
+/// The recorded realtime figure (C6 `realtime`): "0.51×". Only for a
+/// finished render (a stopped one didn't encode the whole length). An older
+/// record without it divides the project length by the time taken, when both
+/// are known and the render took some time.
 double? realtimeRatio(core.JobRecord r) {
+  if (r.status != 'succeeded') return null;
+  if (r.realtime case final recorded?) return recorded;
   final length = r.media.durationSec;
-  if (r.status != 'succeeded' || length == null || length <= 0 || r.elapsedSec <= 0) return null;
+  if (length == null || length <= 0 || r.elapsedSec <= 0) return null;
   return length / r.elapsedSec;
 }
 
@@ -109,11 +113,11 @@ String verificationLabel(core.VerificationResult v) => switch (v.state) {
 String shortHash(String hash) =>
     hash.length <= 16 ? hash : '${hash.substring(0, 8)}…${hash.substring(hash.length - 8)}';
 
-/// The command that ran: the executable, then its arguments, each quoted the
-/// way the Windows C runtime reads them back, so a copied command can be
-/// pasted into a terminal. The core's own command line (C2 `commandLine`)
-/// should replace this once job records carry it (workstreams/app.md, Needs).
-String commandLine(core.JobRecord r) => [r.ffmpeg.path, ...r.argv].map(quoteArgument).join(' ');
+/// The command that ran, as the core wrote it into the record (C6
+/// `commandLine`). An older record without it: the executable, then its
+/// arguments, each quoted the way the Windows C runtime reads them back, so a
+/// copied command can be pasted into a terminal.
+String commandLine(core.JobRecord r) => r.commandLine ?? [r.ffmpeg.path, ...r.argv].map(quoteArgument).join(' ');
 
 /// Quotes one argument for the Windows C runtime's parser: an argument with
 /// no space, tab, newline or quote stays as it is; otherwise it goes in double

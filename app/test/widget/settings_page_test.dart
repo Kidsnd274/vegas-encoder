@@ -221,6 +221,27 @@ void main() {
     expect(find.text('Sample data from the platform’s fakes. Settings last until the app closes.'), findsOneWidget);
   });
 
+  testWidgets('About says where this PC\'s services keep their files', (tester) async {
+    final services = _OnThisPc();
+    addTearDown(services.dispose);
+    await pumpApp(
+      tester,
+      services: services,
+      overrides: [windowControllerProvider.overrideWithValue(FakeWindowController())],
+    );
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit4);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'This PC. Settings and presets are in "C:\\Users\\Ana\\AppData\\Roaming\\VegasEncoder"; FFmpeg checks and '
+        'render records in "C:\\Users\\Ana\\AppData\\Local\\VegasEncoder".',
+      ),
+      findsOneWidget,
+    );
+  });
+
   group('default FFmpeg state', () {
     test('says when renders have no FFmpeg to use', () async {
       final settings = await FakeMachineSettingsRepository().read();
@@ -231,4 +252,13 @@ void main() {
       expect(defaultFFmpegState(MachineSettings(defaultFFmpegId: 'gone')), DefaultFFmpegState.unregistered);
     });
   });
+}
+
+/// The fakes, reporting the folders the Windows services would use.
+class _OnThisPc extends FakeAppServices {
+  @override
+  ServicePaths get paths => ServicePaths(
+    roaming: r'C:\Users\Ana\AppData\Roaming\VegasEncoder',
+    local: r'C:\Users\Ana\AppData\Local\VegasEncoder',
+  );
 }

@@ -23,12 +23,16 @@ class LibraryPane extends ConsumerWidget {
     super.key,
     required this.searchFocus,
     required this.onAction,
+    required this.onFavorite,
     required this.onNewPreset,
     this.onPicked,
   });
 
   final FocusNode searchFocus;
   final void Function(LibraryAction action, LibraryEntry entry) onAction;
+
+  /// The row's star.
+  final ValueChanged<LibraryEntry> onFavorite;
 
   /// "New preset" from an empty search.
   final VoidCallback onNewPreset;
@@ -68,7 +72,7 @@ class LibraryPane extends ConsumerWidget {
                 controller.select(e.id);
                 onPicked?.call();
               },
-              onFavorite: () => controller.toggleFavorite(e.id),
+              onFavorite: () => onFavorite(e),
               onAction: (a) => onAction(a, e),
             ),
           );
