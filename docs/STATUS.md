@@ -4,7 +4,19 @@ Updated: 2026-10-14 (Asia/Singapore). Installed version: 0.1.2-config-proof.
 
 ## Current progress
 
-**B5 static/probe preparation (2026-10-14, uncommitted review):** clean
+**B6 offline boundary checkpoint (2026-10-14):** the owner authorized committing
+B5 as `2bdb44d` and fast-forwarding master; the main checkout's `.claude/` was
+preserved. Work continues on `ws/platform` with owned recipe envelope placement
+and C4 per-page draft transactions. Both optimized/ASan x64 `/W4 /WX` builds pass
+**95 checks**: byte/text/suffix preservation, bounds, proof/future rejection,
+single/invalid/crashed session handling, core validation, Apply failure/retry,
+thread guards and fake-holder allocation/reference balance. The helpers have
+**no exporter/page/Render call sites** and launch no editor or monitor. See
+[native recipe boundary](NATIVE_RECIPE_BOUNDARY.md). B6 is not complete. No new
+real VEGAS run or installation; A5–A7, real persistence, controlled real failure
+recovery, status-line visibility and monitor performance remain unverified.
+
+**B5 static/probe preparation (2026-10-14, committed/merged `2bdb44d`):** clean
 `ws/platform` fast-forwarded to current master `a0d33c4`. Exact VEGAS 2026.0.3.189
 bytes/RTTI establish slot 3 as borrowed text + total + position reset, and slot 4
 as borrowed text only. The internal consumer is a scripting render-status
@@ -344,9 +356,10 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 Platform B1, B3 and B4 are complete; B2 is already merged. The owner authorized
 committing B3/B4 and merging both workstreams into master. App F7 switches to NativeVeCore/WindowsServices through
-its own workstream. B5 static analysis and opt-in preparation are ready for review;
-next is its separately authorized owner trial, followed by gated B6 adapter/monitor
-integration. No installation or PATH change. Order and rationale are in
+its own workstream. B5 is committed/merged; its prepared owner trial needs separate
+installation approval. B6 snapshot/session boundaries are tested offline; next
+is file/process transport and the gated native page/recipe/monitor integration.
+No installation or PATH change. Order and rationale are in
 [platform.md](product/workstreams/platform.md).
 B5/B6 require the owner at the real host. Controlled failure/recovery and deferred
 persistence qualification remain open per [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).

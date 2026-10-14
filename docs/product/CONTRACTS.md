@@ -605,6 +605,17 @@ adapter tasks gated on real-host evidence; Render never participates in sessions
 Sample request/apply/cancel files are in schema/fixtures/b0. FakeEditSessionService
 seeds directory key `b0-session`; actual paths can be injected.
 
+B6's offline `RecipeTemplateDraft` now supplies the native transaction side:
+actual template name/recipe/origin in requests, one matching terminal result,
+core validation before accepting a draft, and stored-byte changes only after
+successful host Apply. The existing `VEnc` envelope can be placed/resized in
+owned native template bytes while preserving the host prefix and raw text suffix.
+Core payload encoding remains canonical; key order alone does not dirty a draft.
+These helpers are not linked into exporter discovery/pages/Render. File/process
+transport, modality, native persistence and monitor integration remain gated;
+details/tests are in [NATIVE_RECIPE_BOUNDARY.md](../NATIVE_RECIPE_BOUNDARY.md).
+No C4/C5 shape or C2 API changed for this checkpoint.
+
 ## C5 — Live render status
 
 Launch: `VegasEncoder.exe --render-monitor <absolute-live-file>`.

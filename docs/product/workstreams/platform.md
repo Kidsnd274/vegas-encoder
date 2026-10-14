@@ -1,8 +1,8 @@
 # Platform workstream
 
 Updated: 2026-10-14 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
-branch `ws/platform`. **B5 static analysis and opt-in trial prepared; changes
-uncommitted for owner review.** B1–B4 and app F4 are merged. Continued
+branch `ws/platform`. **B5 committed/merged; B6 owned snapshot/session checkpoint
+validated offline (95 optimized/95 ASan checks).** B1–B4 and app F4 are merged. Continued
 from `659fe02`; F3 master `0be99dc` was fast-forwarded before the B1 commit.
 B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
@@ -24,14 +24,48 @@ untouched.
 For B5, the worktree was clean before the requested fast-forward to current master
 `a0d33c4`; no local changes needed stashing/restoring and no merge conflict occurred.
 App-owned files arrived through that merge only. No app-owned files were edited
-or app tests/goldens regenerated during B5. Current changes stay uncommitted.
+or app tests/goldens regenerated during B5. The owner then authorized commit and
+master merge: **`2bdb44d`**, fast-forwarded into master with `.claude/` preserved.
+No push, installation or real-host test followed that Git authorization.
 
 App handoff: merge master into ws/app; wire WindowsServices (F7), remove duplicate
 discovery/probe/cache persistence, use recipe-specific reusable capability views,
 refresh/review affected goldens and measure the app budgets. Then proceed with
 F5 popup and F6 live progress against C4/C5, without declaring real-host gates.
 
-## B5 ready for owner review
+## B6 owned snapshot/session boundary (offline checkpoint)
+
+- `recipe_template.*` places the core's `VEnc` envelope in owned native template
+  bytes, resizes without losing fixed host fields/raw text/padding/trailers, and
+  rejects foreign, damaged, future and historical proof templates. Fresh creation
+  requires an empty product template; no proof migration. The 16 KiB envelope
+  budget and odd/even byte layouts remain unqualified at the actual saved host.
+- `RecipeTemplateDraft` supplies C4's transaction boundary on its creator UI
+  thread: actual snapshot/name in requests, one terminal result, missing/invalid/
+  mismatched/crashed-editor cancellation, core domain/lint/capability checks,
+  editor Apply as draft only, and host Apply accepting a baseline only after
+  S_OK. Preallocation precedes host commit; failure/S_FALSE/exception stays dirty
+  and retryable. Prior Apply survives later Cancel/Discard. Immutable render
+  snapshots require no library or app lookup.
+- The focused tests exposed an object-insertion-order mismatch against existing
+  canonical payload JSON; setting comparisons now use core canonical values so
+  reordering keys does not create a false edit. Unknown values/preferences remain
+  intact. **C2/C4/C5 shapes unchanged**; app-owned files are untouched.
+- `Test-B6.ps1 -Asan` passes **95 optimized + 95 instrumented checks**, x64
+  `/W4 /WX`, including six authored recipes, both payload parities, native spans/
+  allocation limits, core/C4 limits, saved-byte independence, invalid editor
+  results, Apply retry and existing fake holder/allocator balance. The runner's
+  PowerShell syntax is checked. Tests use owned bytes/fakes, no real VEGAS,
+  application process, UI, user state or exporter installation.
+- These helpers have **no exporter discovery/page/Render call sites**. Details,
+  API ownership, deferred transport and owner gate checklist:
+  [NATIVE_RECIPE_BOUNDARY.md](../../NATIVE_RECIPE_BOUNDARY.md). B6 is not complete.
+  Next implementation is C4 file/process transport with fake children, then the
+  gated page/recipe/monitor bridge. App F5/F6 readiness must be coordinated here;
+  do not modify its files. A5–A7, real persistence, controlled real failure
+  recovery and monitor performance stay **unverified**.
+
+## B5 delivered (`2bdb44d`, merged to master)
 
 - Static inspection uses the unchanged VEGAS **2026.0.3.189** executable in
   TARGET.md, RTTI and the captured `CSfRenderProgress` identity. Slot 3 stores a
@@ -57,7 +91,8 @@ F5 popup and F6 live progress against C4/C5, without declaring real-host gates.
   `BB3447D10A689895DB8A7652B8397F8B62F03A79BD0CE3D44F8022AECC4F72BF`.
   Installed DLL/PDB/INI and discovery still match their manifest; all three
   payloads also match the main checkout's preserved `candidate-0.1.2-config-proof`
-  rollback. Nothing installed, replaced, committed, pushed or merged into master.
+  rollback. B5 source is now committed/merged by owner request; nothing was
+  installed, replaced or pushed.
 - Focused checks: default/proof MSVC x64 `/W4 /WX` builds; **30** native fake
   progress checks (borrowed lifetime, 500 ms boundary/repolls, slot-3 non-reset,
   thread/lock guards, exact-object rejection, failures and exception containment);
@@ -71,7 +106,7 @@ F5 popup and F6 live progress against C4/C5, without declaring real-host gates.
   Latest fake output: `build/test-results/b5-fabae044/` and
   `build/test-results/b5-default-regression/`. **No new real VEGAS run.**
 
-Next: owner reviews the diff/candidates and separately authorizes the B5 installed
+Next: owner reviews the candidates and separately authorizes the B5 installed
 trial, or drops the line based on the static limitation. B6 stays gated on A5–A7.
 Real two-template/restart persistence, controlled real failure recovery and
 monitor performance remain **unverified**. No monitor performance conclusion
@@ -300,13 +335,16 @@ performance or native persistence claim follows from repository tests.
 
 B3 and F3's platform requests are delivered above. App F7 wires providers and
 measures its budgets; B4's History/live writers are ready for gated B6 rendering.
-Next agent: continue on ws/platform with the uncommitted B5 diff preserved.
-Master `a0d33c4` is incorporated; recheck status/master before new work.
-B3/B4 are committed under the owner's earlier merge authorization.
+Next agent: continue on ws/platform and recheck status/master before new work.
+B5 `2bdb44d` is committed and merged under the owner's latest authorization;
+B6's offline boundary checkpoint is described above. Preserve any later local
+changes and the main checkout's existing `.claude/`/ignored candidates/backups.
 B4's engine/C5/C6 writers are delivered above; app F7 consumes them through the
 existing readers. B5 static/probe preparation is delivered above; its real-host
 trial and gated B6 adapter/monitor integration need the owner.
 
 B5/B6 status-line/adapter/progress performance needs the owner with real VEGAS and
-gated evidence. B5 changes remain **uncommitted for review**. No commit, push,
-master merge, installation or exporter replacement is authorized by this task.
+gated evidence. The owner authorized source commit/master merge, with no push.
+The prepared B5 installation/trial approval is pending; installed exporter and
+user state remain unchanged. B6 activation is not authorized or qualified by a
+B5 trial. Deferred persistence is not reopened automatically.
