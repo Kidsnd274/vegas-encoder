@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "launch_options.h"
@@ -50,12 +51,15 @@ class Win32Window {
   void SetKeepOnTop(bool keep_on_top);
   bool keep_on_top() const { return keep_on_top_; }
 
-  // Desktop window only, before Show: puts the window at |bounds| (the outer
-  // rectangle in physical screen pixels, as RestoredBounds reported it) and
-  // shows it maximized if |maximized|. Bounds that no longer touch a monitor
-  // are ignored; the rest are clamped to that monitor's work area and the
-  // minimum size. Returns whether the bounds were used.
-  bool RestoreBounds(RECT bounds, bool maximized);
+  // Desktop window only: |bounds| (the outer rectangle in physical screen
+  // pixels, as RestoredBounds reported it) clamped to its monitor's work area
+  // and the minimum size, or nullopt if no monitor holds it any more (keep the
+  // default placement).
+  std::optional<RECT> ClampBounds(RECT bounds);
+
+  // Before Show: puts the window at |bounds|, a ClampBounds result, and shows
+  // it maximized if |maximized|.
+  void RestoreBounds(RECT bounds, bool maximized);
 
   // The outer rectangle the window has when restored (not maximized or
   // minimized), in physical screen pixels, and whether it is maximized.

@@ -56,6 +56,11 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
 
   bool active_ = false;
+
+  // "configure" is restoring the desktop window's bounds; a first frame that
+  // arrives meanwhile shows the window once it is in place.
+  bool placing_ = false;
+  bool show_when_placed_ = false;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

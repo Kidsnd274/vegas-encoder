@@ -2,8 +2,9 @@
 
 Updated: 2026-10-14 (Asia/Singapore). Status: proposal, updated for the chosen
 direction; §1, §9, §10 and §11 record what the app workstream built in F0 and F1, §2
-what F2 built, and §5, §6 and §6a what F3 built (all on the platform fakes; open items
-are in workstreams/app.md).
+what F2 built, and §5, §6 and §6a what F3 built (on the platform fakes; open items
+are in workstreams/app.md). Since 2026-10-14 the editor runs on the native core (B2);
+the services are still fakes (B3).
 
 This document covers the behaviour Flutter will implement: states, flows, the signal
 path, the size card, theme, keyboard, copy and the token structure. The chosen
@@ -62,6 +63,8 @@ outside), and the popup moves the command preview into a collapsible bottom stri
 | Built-in | Built-in preset selected | Editing allowed as a draft; Save becomes **Save as new preset**; a note says "Built-in presets can't be changed. Your changes will be saved as a new preset." |
 | Errors | Validation has errors | Save still allowed (presets can be work in progress); the preset shows an error mark in the library |
 | Updated elsewhere | File changed by the popup or another window | Banner: "This preset changed in another window." **Reload** / **Keep editing** (save then asks to overwrite or save as new) |
+| Core failure | The core returns an error for this recipe (for example `JSON-LIMIT`, input over 1 MiB) | The command column says "The core couldn’t build the command: <message>" and Checks wait for it; the File node says "The core couldn’t work out an estimate: <message>". No earlier result is shown |
+| Core not loaded | The core's DLL is missing or doesn't match (`NATIVE-LOAD`, `ABI-MISMATCH`) | The desktop window keeps its title bar and shows "Vegas Encoder couldn’t load its core", what it is for, and the code and message, in place of every screen. Nothing falls back to the fake core |
 
 ### Signal path
 
@@ -86,9 +89,9 @@ settings below it; arrow keys move between nodes.
   It still opens the audio settings, where audio is turned back on.
 - **Only the core's facts.** Pips, notes, bits and broken wires come from the core's
   signal facts (C2 `signalPath`): a pip wherever `conversion` is true, video and audio
-  alike ("flt to fltp" for AAC's planar input). When the core gives none (an edit
-  beyond the B0 fake core), the wire keeps VEGAS's depth and claims neither a pip nor
-  "No conversion".
+  alike ("flt to fltp" for AAC's planar input). When the core gives none (a core
+  failure, or an edit the test fake has no fixture for), the wire keeps VEGAS's depth
+  and claims neither a pip nor "No conversion".
 
 ### Basic editor
 
@@ -103,6 +106,13 @@ encoder, Container, and File. Every panel must:
   summary list near the command. Clicking a summary item focuses its field.
 - Show units and meaning: "CRF 18, visually lossless", "8 Mb/s average, 12 Mb/s peak",
   "2 s (60 frames at 29.97 fps)".
+- **Keyframes** read out the interval the core emits (C2 `resolved.gopFrames`, after
+  Extra arguments and fixed GOPs) at the delivered frame rate: "**2 s** (60 frames at
+  29.97 fps)" for the seconds typed; "**120 frames** at 29.97 fps" when Extra arguments
+  set `-g` or no seconds are typed; nothing when no interval is emitted (encoder
+  default). The app never rounds seconds into frames itself. Keyframes has a row of its
+  own in the Video panel so the read-out fits; Bit depth and Color tags each take the
+  column's width.
 
 Basic has no list of every FFmpeg option and no cross-setting search. The curated
 controls cover the common settings; anything else goes in Extra arguments.
@@ -112,7 +122,10 @@ controls cover the common settings; anything else goes in Extra arguments.
 - One field per stream, in a monospace font. It is the place for any option without a
   control.
 - An option typed here replaces the generated option of the same name
-  (SETTINGS_AND_COMMANDS §3), and the replaced control shows "set in Extra arguments".
+  (SETTINGS_AND_COMMANDS §3), and the replaced control shows the note "Set in Extra
+  arguments." under it, before the core's messages for that field. Which controls were
+  replaced comes from the core (C2 `overriddenFields`); the app parses no option names.
+  The control keeps its recipe value (it is only ignored by compile) and its Reset.
 - Options are checked against the encoder's options parsed from the selected FFmpeg,
   plus the generic list. An unknown option shows a warning under the field: "-foo isn't
   an option of x264 in FFmpeg 8.1 full. FFmpeg stops with an error if it doesn't know
@@ -128,10 +141,16 @@ The estimate appears only in the File node's panel, never in the command column.
     (**gated** on A5); otherwise it is empty and says "Type a length".
 - **Figures.** The total ("About 537 MB"), the rate per minute, and for quality modes a
   typical range. Bitrate modes give a plain figure. Every figure is the core's (see
-  SETTINGS_AND_COMMANDS §7); the card works out none. Until the core gives the range
-  for a typed length, the range is per minute: "About 53.7 MB per minute, typically
-  32.2 MB to 85.9 MB." When a length is typed but the core gives no total, the figure
-  reads "Total not available yet".
+  SETTINGS_AND_COMMANDS §7); the card works out none. With a typed length the range is
+  the core's range for that length (C2 `minTotalBytes`/`maxTotalBytes`): "About 53.7 MB
+  per minute. Typically 322 MB to 859 MB for 10:00." Without a length it is the core's
+  range per minute: "About 53.7 MB per minute, typically 32.2 MB to 85.9 MB." When a
+  length is typed but the core gives no total, the figure reads "Total not available
+  yet".
+- **No estimate.** When the core returns none (`available` false, for example filters
+  or conflicting rate options in Extra arguments), the panel shows the core's
+  explanation in place of the card ("No reliable size estimate for these Extra
+  arguments.").
 - **Split bar** for video and audio bitrate, then plain-language consequences of the
   rate mode and bit depth (from D5's card).
 - **Advanced mode** shows no estimate: a custom command can do anything.
@@ -183,8 +202,9 @@ This catches failing hardware encoders and bad extra arguments early. Voukoder P
   that produced it; hovering or focusing a control highlights its tokens (StaxRip's
   click-to-jump). Both use the core's `CommandToken.field`; tokens an error issue points
   at (`tokenIndices`) are underlined in the error colour.
-- Options replaced by Extra arguments show a small "set in Extra arguments" note at
-  their control.
+- Options replaced by Extra arguments show a small "Set in Extra arguments." note at
+  their control (`overriddenFields`); in the command, the Extra tokens that replaced
+  them are drawn in the Extra colour where Extra arguments put them.
 
 ## 3. Advanced mode (S2)
 

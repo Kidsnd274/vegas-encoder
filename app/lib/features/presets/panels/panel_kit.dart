@@ -25,8 +25,14 @@ class PanelScope {
   bool modified(String path) => fieldDiffers(recipe, saved, path);
   VoidCallback? reset(String path) => modified(path) ? () => edit((r) => resetField(r, saved, path)) : null;
 
-  /// The core's messages for a field (`field` in its issues).
+  /// Extra arguments replaced the option this control generates (C2
+  /// `overriddenFields`), so its value isn't in the command.
+  bool overridden(Iterable<String> fields) => fields.any(data.overriddenFields.contains);
+
+  /// The control's messages: "Set in Extra arguments" when they replaced its
+  /// option, then the core's issues for its fields (`field` in each issue).
   List<VeMessage> messages(Iterable<String> fields) => [
+    if (overridden(fields)) const VeMessage(level: VeLevel.info, text: setInExtraArguments),
     for (final f in fields)
       for (final i in data.issuesFor(f)) VeMessage(level: levelOf(i.level), text: i.message, fix: i.fix),
   ];

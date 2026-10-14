@@ -1,14 +1,16 @@
 # App workstream
 
 Updated: 2026-10-14 (Asia/Singapore). Branch `ws/app`. Status: **F0 and F1 done; F2
-and F3 done except the parts waiting on platform** (listed under Needs). F2 and F3 run
-on the platform fakes (B0). Master through B2 (`659fe02`) is merged; the app still
-selects `FakeVeCore`, so the editor reacts to edits only after the switch to
-`NativeVeCore` (see Handoff).
+and F3 done except the parts waiting on platform** (listed under Needs). **The app runs
+on the native core (B2)**: edits update the command, checks, signal path and estimate
+(the core part of F7), and the desktop starts in ~540 ms (runner fix, 2026-10-14).
+The services are still the platform fakes (B3). Master through F3 (`0be99dc`) is
+merged. Next: F4, the Advanced editor.
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
-widget and golden tests on the platform fakes and local sample data.
+widget and golden tests on the platform fakes, the native core and local sample data.
+The native core's profile data is B0/Linux bootstrap, not Windows-qualified (B1).
 
 ## Done
 
@@ -131,11 +133,74 @@ debug builds, and the goldens use it.
 - Built with two parallel agents (History, Settings) on files each owned; the parent
   reviewed their goldens and code.
 
+**Native core (2026-10-14; the core part of F7):**
+
+- `veCoreProvider` (`state/services.dart`) creates `NativeVeCore()`, one per isolate
+  (one `ProviderScope`); ve_core's build hook bundles `ve_core.dll` beside
+  `VegasEncoder.exe` (release build checked). If it can't load, the provider returns
+  `UnavailableCore`, which throws the load `CoreException` from every call, and the
+  desktop window shows "Vegas Encoder couldn’t load its core" with the code and message
+  in place of every screen (`features/shell/core_unavailable.dart`). Nothing falls back
+  to the fake.
+- `CoreResult` keeps native failures explicit: the command column says "The core
+  couldn’t build the command: <message>", the File node "The core couldn’t work out an
+  estimate: <message>" or "…the total: <message>". The "needs the real core (B2)"
+  notices remain for `B0-FIXTURE-MISSING` only, which only the fake (tests) returns.
+- B2 fields mapped, with no parsing or arithmetic in the app:
+  - `CompileResult.overriddenFields`: "Set in Extra arguments." under each replaced
+    control, before its issues (`PanelScope.messages`), for video and audio alike.
+  - `SizeEstimate.minTotalBytes`/`maxTotalBytes`: "About 53.7 MB per minute. Typically
+    322 MB to 859 MB for 10:00." for the typed length (`SizeQualityCard`); the
+    per-minute range stays when no length is typed. An unavailable estimate shows the
+    core's explanation.
+  - `ResolvedSettings.gopFrames`: the Keyframes read-out "**2 s** (60 frames at 29.97
+    fps)", or "**120 frames** at 29.97 fps" when Extra arguments set `-g`
+    (`keyframesReadout` in `features/presets/display.dart`). Keyframes now has its own
+    row in the Video panel so the read-out fits; Color tags moved below it.
+- Tests stay on explicit `FakeVeCore` overrides (`coreOverride` in `test/helpers.dart`,
+  used by `pumpApp`/`pumpThemed`, and the unit tests' containers), so the F2/F3 goldens
+  keep the fake's fixtures. The tests that need the native core pass `core:
+  NativeVeCore()`.
+- Desktop start: the runner replies to `configure` before restoring remembered bounds,
+  which removed ~220 ms of engine waits (649 → 537 ms; see Spike results).
+- Built with parallel agents: one wrote the native goldens and unit tests (the parent
+  reviewed every image and fixed the layout bug it found in the new notice); one found
+  the start-time cause and wrote the runner fix in its own worktree; a third verified
+  that fix here.
+
 ## Tests
 
-`flutter test` in `app/`: 319 tests, all passing (225 after F2). `flutter analyze`: no
-issues. All on fakes: platform fakes (B0), a fake window controller, and for F3 two
-test doubles (`test/ffmpeg_doubles.dart`: a probe and hardware tests that stall).
+`flutter test` in `app/`: **348 tests, all passing** (319 after F3). `flutter analyze`:
+no issues. Platform fakes (B0) for services everywhere; the fake core for the F0–F3
+tests and the native core (B2, through `dart:ffi`, in the `flutter test` VM) for the
+new core tests below; a fake window controller; for F3 two test doubles
+(`test/ffmpeg_doubles.dart`: a probe and hardware tests that stall).
+
+Native core additions (29):
+
+- Widget, on `NativeVeCore` (`native_core_test.dart`, 9): the app's core is native and
+  loaded; a CRF edit changes the command (`-crf 26`), the node's summary and the core's
+  total; 8 to 10-bit changes `-pix_fmt`, the wire's output bits, and the checks (the
+  core's `video.depth` issues show at Bit depth and in Checks); `-preset fast -g 120` in
+  Extra arguments marks exactly Encoder speed and Keyframes, reads "120 frames at
+  29.97 fps", and clearing Extra gives the controls back; `-b:a 192k` marks the audio
+  Bitrate; 4 s of keyframes reads "4 s (120 frames at 29.97 fps)" and `-g 120`, no
+  seconds emits no `-g` and no read-out; 25:00 gets the core's total range; `-vf` shows
+  the core's no-estimate explanation; a recipe over the 1 MiB transport limit shows
+  `JSON-LIMIT`'s message in the command and File node with no fake-core notice; an
+  `UnavailableCore` shows the notice on every screen without an exception.
+- Unit (`core_mapping_test.dart`, 11): `keyframesReadout` (seconds, overridden, no
+  seconds, 1 frame, thousands, 25 fps, 0.5 s, null) and `CoreResult` (only
+  `B0-FIXTURE-MISSING` is the fake's notice; `JSON-LIMIT`, `NATIVE-LOAD`,
+  `ABI-MISMATCH` stay failures; other exceptions aren't swallowed).
+- Widget: the size card's range for a typed length and back to per minute (1).
+- Golden (`native_golden_test.dart`, 8 images): the Presets screen on the native core
+  (video node, Extra arguments replacing speed and keyframes, File node with the total
+  range) and the core-not-loaded window, light and dark. **These use the native core's
+  bootstrap data: regenerate them when B1 changes profiles or wording.** Twelve F2
+  images were regenerated for the Keyframes row and read-out (`presets_edited`,
+  `bitrate`, `lgpl`, `narrow`, `text150`, `window_desktop`, both themes); each was
+  looked at. 82 images in all.
 
 F3 added:
 
@@ -229,7 +294,56 @@ comparison.
 | Desktop launch | Window shown, WM_CLOSE exits with code 0 |
 | Open dialog (`pickFile`) | Compiled in; not clicked or automated |
 
-## Owner decisions (2026-10-12)
+**Native core recheck (2026-10-14).** Release build (35 s, `ve_core.dll` bundled beside
+the exe), same machine and harness, `-Checks start`, fake host, nothing else running.
+
+| Check | Result |
+| --- | --- |
+| Start, Skia, warm, 10 runs | desktop **649 ms** (Dart main to first frame 253 ms); popup **379 ms**. Impeller: 1,664 / 1,370 ms. Within noise of F3 (660 / 410 ms) |
+
+**The F2 explanation above was wrong.** Removing the fake core changed nothing, so a
+temporary Dart stopwatch (5 runs, reported through the startup trace, then removed)
+timed each step from Dart main: settings read 0.5 ms; **`await window.configure(...)` in
+`main.dart` returns after 217–250 ms**; window state 0.1 ms; native core load 1 ms;
+profiles 1 ms; library and editor providers (six compiles) ~8 ms; first frame ~10 ms
+later. The core costs about 10 ms in all. The desktop's extra time is the runner's
+`configure` reply, which F2's window-bounds change introduced (F2's baseline had 33 ms
+from Dart main to first frame); the popup's `configure` returns at once.
+
+**Cause and fix (2026-10-14).** B0's settings fixture remembers desktop bounds at
+(-1280, 80), 1200×800, which on this PC is a 100% monitor beside the 125% primary.
+`RestoreBounds` moved, then sized the hidden window; each resize reached the Flutter view,
+and the engine (`FlutterWindowsView::OnWindowSizeChanged`) blocked the platform thread up
+to ~100 ms waiting for a frame of the new size. That frame couldn't come, since Dart
+awaits the `configure` reply before `runApp`, so both waits timed out (113 ms and 212 ms
+in a per-message trace). Any real remembered size that differs from the default costs one
+wait; another-DPI monitor costs two. The runner now replies first, then restores
+(`ClampBounds` / `RestoreBounds` in `win32_window.cpp`); a first frame that arrives while
+the window is being placed waits for placement before Show. No Dart or channel change.
+
+| Start, warm, median of 10 (125% primary + 100% left monitor) | Before | After |
+| --- | --- | --- |
+| Skia desktop shown (Dart main to first frame) | 649 ms (253) | **537 ms (32)** |
+| Skia popup shown | 379 ms | 351 ms |
+| Impeller desktop / popup shown | 1,664 / 1,370 ms | 1,413 / 1,297 ms |
+
+- Owner window (3 runs): owner set, centred within 4 px, hidden and restored with the
+  owner, re-enabled after Close; "owner foreground after Close" missed once in 3 (the
+  popup doesn't use the changed code; likely focus noise, unproven). No-activate progress
+  window: fake VEGAS stayed foreground, `WS_EX_NOACTIVATE`, not topmost, 20 px from the
+  corner. `flutter test` 348 passing; release build without C++ warnings (`/W4 /WX`).
+- A scratch probe (outside the repo) recorded the window's rect and visibility and
+  captured the screen after show: the window is placed while hidden, appears only at its
+  final rect and never moves (7 Skia, 3 Impeller runs); no stretched frame on restore.
+  The old build showed a white window for 33–150 ms on Skia; the fix shortens it.
+- A same-DPI remembered size (temporary override, reverted) takes one wait, which now
+  runs while Dart starts; shown in place.
+- The monitor layout changed during these checks (the 125% monitor went away), so the
+  fixture's bounds now miss every monitor and later desktop runs take the bounds-ignored
+  path (default placement, `boundsSet: false`).
+- Still about 150 ms between desktop and popup: the desktop's first frame reaches the
+  screen 90 or 205 ms after Dart draws it (popup ~42 ms), with or without a restore.
+  Cause not established.
 
 - **Renderer: deferred.** The runner defaults to Skia for start time;
   `RendererFromEnvironment` in `windows/runner/main.cpp` is the one place to change, and
@@ -248,11 +362,13 @@ Delivered by platform's app-review additions (merged `a0d9b39`) and used in F2: 
 fields and issue token indexes, signal-path facts, C7 `uiState`. C5 `hostHwnd` is for
 the progress window (F6).
 
-Delivered in B2 (merged `bbcbe91`), **not yet mapped by the app** (next app task, with
-the `NativeVeCore` switch): `CompileResult.overriddenFields` for "set in Extra
-arguments"; `SizeEstimate.minTotalBytes`/`maxTotalBytes` for the typed length's range;
+Delivered in B2 (merged `bbcbe91`) and **used since 2026-10-14**: `NativeVeCore` with
+its bundled DLL (the app's core); `CompileResult.overriddenFields` for "Set in Extra
+arguments."; `SizeEstimate.minTotalBytes`/`maxTotalBytes` for the typed length's range;
 `ResolvedSettings.gopFrames` for "2 s (60 frames at 29.97 fps)"; FakeVeCore treating
-`{}` and absent `extensions` alike.
+`{}` and absent `extensions` alike (the tests still use it). No new core request came up.
+When B1 replaces the bootstrap profiles, the app needs nothing new, but the native
+goldens (`native_golden_test.dart`) will need regenerating and a look.
 
 Open (additive):
 
@@ -279,25 +395,48 @@ discovery, probes and hardware tests (B3); favorites on built-ins; Test this pre
 Export…, Show in folder / Open folder, Copy share string; installation health; the job
 index summary, full log, error tokens and command line.
 
-App side: switch `veCoreProvider` to `NativeVeCore` and map B2's delivered fields
-(above); Advanced mode and Ctrl+M (F4); the popup's collapsible command strip (F5).
+App side: Advanced mode and Ctrl+M (F4); the popup's collapsible command strip (F5).
 The Open dialog (`pickFile`) is built and covered with a fake controller; it was not
-clicked through in the running app.
+clicked through in the running app. Small display points seen on the native core:
+
+- The size card can wrap between a figure and its unit ("…to 859 / MB for 10:00.");
+  a non-breaking space in `VeFormat.bytes` would fix it (tests match its strings).
+- The command view's wrapped lines have no hanging indent, and an option can wrap away
+  from its value (`-profile:v` | `high`). F1 component behaviour, more visible now that
+  the core's lines are longer.
+- A control replaced by Extra arguments keeps showing its own value with the note
+  (UI_SPEC §2 as written). If that reads as contradictory in use, dimming the control is
+  a later design choice.
+- The native core loads at the first build of the desktop shell; a load failure is
+  shown, not retried (it is permanent for the process).
+
+Window start (runner), unverified or not fixed:
+
+- **Popup over a VEGAS window on another-DPI monitor** (F5): `PlaceOnOwner` likely pays
+  the same ~100 ms engine wait before its `configure` reply, and centres with the size
+  from before the DPI change, so it could land off-centre. Split it like
+  `ClampBounds`/`RestoreBounds`, reuse the deferred show, re-centre after the change.
+- **Restoring maximized** shows a stretched first frame for ~20–40 ms (the restored-size
+  frame scaled up). Present before the fix too. Sizing the hidden window to the maximized
+  client size before the first frame may avoid it (untested).
+- The remaining ~150 ms desktop-only first-frame delay (Spike results); cold start.
 
 ## Handoff for the next app agent
 
 Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md, this file and
-UI_SPEC first. F3 is done on the fakes. Next, in this order:
+UI_SPEC first. F3 is done; the app runs on the native core (B2) with fake services.
+Next: **F4, the Advanced editor** (UI_SPEC §3): highlighting from the core's tokens, lint
+display (`VeCore.lint`, UTF-16 ranges), locked `{inputs}`/`{output}` chips, macros, the
+resolved command, then autocomplete last (`VeCore.complete`). The native core answers
+any text, so F4 can be built and tested on `NativeVeCore` directly; keep goldens on the
+fake or on the native core knowing B1 will move the latter.
 
-1. **The real core.** Platform asks the app to switch `veCoreProvider`
-   (`state/services.dart`) from `FakeVeCore()` to `NativeVeCore()` now that B2 is
-   merged, keeping explicit `FakeVeCore` overrides in widget and golden tests (the
-   goldens were made with the fake). Then map B2's fields: `overriddenFields` ("set in
-   Extra arguments" at the control), the typed length's `minTotalBytes`/`maxTotalBytes`,
-   and `gopFrames` ("2 s (60 frames at 29.97 fps)"). Measure the desktop's start again
-   (the fake core's fixture decoding was ~220 ms of it). Part of F7, but it unblocks
-   edits in the editor.
-2. **F4: Advanced editor** (UI_SPEC §3).
+- Tests default to the fake core: `pumpApp`/`pumpThemed` take `core:`; pass
+  `NativeVeCore()` (one per test file, `setUpAll`) for live results. `native_core_test.dart`
+  shows the pattern, including reading `editorProvider` through
+  `ProviderScope.containerOf`.
+- Core failures: `UnavailableCore` (load) and `CoreResult` (per call) keep them explicit;
+  `notInPreviewCore` is the fake's `B0-FIXTURE-MISSING` only.
 
 - Mapping from core and service results is display work in `features/*/display.dart`
   style files; never derive domain facts. Where a fact is missing, show less and add a

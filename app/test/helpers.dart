@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ve_services/ve_services.dart' show FakeVeCore, VeCore;
 import 'package:vegas_encoder/app/app.dart';
 import 'package:vegas_encoder/design/theme.dart';
 import 'package:vegas_encoder/design/tokens.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
+import 'package:vegas_encoder/state/services.dart';
 
 const goldenKey = ValueKey('golden');
 
@@ -14,6 +16,12 @@ const goldenKey = ValueKey('golden');
 const themes = [Brightness.light, Brightness.dark];
 
 String themeName(Brightness b) => b == Brightness.dark ? 'dark' : 'light';
+
+/// The core for a test: the platform's fake unless a test passes another.
+/// The app itself runs on the native core (B2); widget and golden tests stay
+/// on the fake's fixtures so their results don't move with the core's data.
+/// Tests that show live edits pass `NativeVeCore()` (test/widget/native_core_test.dart).
+Override coreOverride([VeCore? core]) => veCoreProvider.overrideWithValue(core ?? FakeVeCore());
 
 /// Pumps [child] in the app's theme for [brightness], at 1:1 pixels, on paper.
 /// The golden boundary wraps the child at [width] with a 16 px margin.
@@ -26,6 +34,7 @@ Future<void> pumpThemed(
   FakeWindowController? window,
   bool settle = true,
   bool wholeView = false,
+  VeCore? core,
 }) async {
   tester.view.physicalSize = view;
   tester.view.devicePixelRatio = 1.0;
@@ -38,7 +47,7 @@ Future<void> pumpThemed(
     child: child,
   );
   final app = ProviderScope(
-    overrides: [windowControllerProvider.overrideWithValue(window ?? FakeWindowController())],
+    overrides: [coreOverride(core), windowControllerProvider.overrideWithValue(window ?? FakeWindowController())],
     child: MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: buildVeTheme(tokens),
@@ -58,11 +67,13 @@ Future<void> pumpThemed(
   if (settle) await tester.pumpAndSettle();
 }
 
-/// Pumps the whole app root ([VeApp]) for a launch mode, with a fake window.
+/// Pumps the whole app root ([VeApp]) for a launch mode, with a fake window
+/// and the fake core unless [core] says otherwise.
 Future<void> pumpApp(
   WidgetTester tester, {
   required List<Override> overrides,
   Size view = const Size(1440, 900),
+  VeCore? core,
 }) async {
   tester.view.physicalSize = view;
   tester.view.devicePixelRatio = 1.0;
@@ -70,7 +81,7 @@ Future<void> pumpApp(
   await tester.pumpWidget(
     RepaintBoundary(
       key: goldenKey,
-      child: ProviderScope(overrides: overrides, child: const VeApp()),
+      child: ProviderScope(overrides: [coreOverride(core), ...overrides], child: const VeApp()),
     ),
   );
   await tester.pumpAndSettle();

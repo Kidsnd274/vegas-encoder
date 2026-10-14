@@ -77,7 +77,9 @@ class VideoPanel extends StatelessWidget {
             if (p?.speed case final speed?) _speed(s, speed),
             if (_selects(s, p, mode) case final selects when selects.isNotEmpty) PanelRow(children: selects),
             if (p != null) _depth(s, p),
-            if (mode != 'profile' && mode != 'lossless') PanelRow(children: [_keyframes(s), _color(s)]) else _color(s),
+            // A row of its own, so "2 s (60 frames at 29.97 fps)" fits.
+            if (mode != 'profile' && mode != 'lossless') _keyframes(s),
+            _color(s),
           ],
         ),
         PanelMore(
@@ -317,23 +319,33 @@ class VideoPanel extends StatelessWidget {
     );
   }
 
-  Widget _keyframes(PanelScope s) => FieldAnchor(
-    fields: ['video.gopSec', 'video.gop'],
-    child: VeField(
-      label: 'Keyframes every',
-      modified: s.modified('video.gopSec'),
-      onReset: s.reset('video.gopSec'),
-      messages: s.messages(['video.gopSec', 'video.gop']),
-      child: VeNumberField(
-        value: s.recipe.video.gopSec,
-        unit: 'seconds',
-        decimals: true,
-        placeholder: 'Default',
-        semanticLabel: 'Keyframe interval in seconds',
-        onChanged: (n) => s.edit((r) => r.withVideo((v) => v.copyWith(gopSec: n == null ? null : jsonNumber(n)))),
+  Widget _keyframes(PanelScope s) {
+    const fields = ['video.gopSec', 'video.gop'];
+    final readout = keyframesReadout(
+      gopFrames: s.resolved?.gopFrames,
+      gopSec: s.recipe.video.gopSec,
+      overridden: s.overridden(fields),
+      media: s.data.media,
+    );
+    return FieldAnchor(
+      fields: fields,
+      child: VeField(
+        label: 'Keyframes every',
+        modified: s.modified('video.gopSec'),
+        onReset: s.reset('video.gopSec'),
+        messages: s.messages(fields),
+        readout: readout == null ? null : VeReadout(value: readout.value, meaning: readout.meaning),
+        child: VeNumberField(
+          value: s.recipe.video.gopSec,
+          unit: 'seconds',
+          decimals: true,
+          placeholder: 'Default',
+          semanticLabel: 'Keyframe interval in seconds',
+          onChanged: (n) => s.edit((r) => r.withVideo((v) => v.copyWith(gopSec: n == null ? null : jsonNumber(n)))),
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _color(PanelScope s) => FieldAnchor(
     fields: ['video.color'],

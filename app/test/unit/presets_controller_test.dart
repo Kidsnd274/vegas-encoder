@@ -24,6 +24,7 @@ void main() {
     machine = FakeMachineSettingsRepository();
     container = ProviderContainer(
       overrides: [
+        veCoreProvider.overrideWithValue(FakeVeCore()),
         presetLibraryProvider.overrideWithValue(library),
         machineSettingsRepositoryProvider.overrideWithValue(machine),
       ],

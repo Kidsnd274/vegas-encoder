@@ -94,10 +94,16 @@ bool FlutterWindow::OnCreate() {
 
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  // Dart configures the window (owner, keep on top) before runApp, so the
-  // first frame always arrives after placement: no visible jump.
+  // Dart configures the window (owner, keep on top, bounds) before runApp,
+  // and a frame drawn while bounds are still being restored waits for them
+  // (HandleMethodCall), so the window is shown in place: no visible jump.
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     startup_trace::Mark("first_frame");
+    if (placing_) {
+      // The frame came while "configure" was still moving the window.
+      show_when_placed_ = true;
+      return;
+    }
     this->Show();
     startup_trace::Mark("shown");
   });
@@ -139,7 +145,7 @@ void FlutterWindow::HandleMethodCall(
     if (auto keep_on_top = AsBool(Find(args, "keepOnTop"))) {
       SetKeepOnTop(*keep_on_top);
     }
-    bool bounds_set = false;
+    std::optional<RECT> restore;
     if (const auto* value = Find(args, "bounds")) {
       if (const auto* bounds = std::get_if<EncodableMap>(value)) {
         const auto x = AsInt(Find(*bounds, "x"));
@@ -147,18 +153,34 @@ void FlutterWindow::HandleMethodCall(
         const auto width = AsInt(Find(*bounds, "width"));
         const auto height = AsInt(Find(*bounds, "height"));
         if (x && y && width && height) {
-          RECT rect{static_cast<LONG>(*x), static_cast<LONG>(*y),
-                    static_cast<LONG>(*x + *width),
-                    static_cast<LONG>(*y + *height)};
-          bounds_set = RestoreBounds(
-              rect, AsBool(Find(args, "maximized")).value_or(false));
+          restore = ClampBounds(RECT{static_cast<LONG>(*x),
+                                     static_cast<LONG>(*y),
+                                     static_cast<LONG>(*x + *width),
+                                     static_cast<LONG>(*y + *height)});
         }
       }
     }
     result->Success(EncodableValue(EncodableMap{
         {EncodableValue("ownerSet"), EncodableValue(owner_set)},
-        {EncodableValue("boundsSet"), EncodableValue(bounds_set)},
+        {EncodableValue("boundsSet"), EncodableValue(restore.has_value())},
     }));
+    // Restore after replying. A new size (or a monitor with another DPI)
+    // resizes the Flutter view, and the engine then blocks this thread for
+    // up to ~100-200 ms waiting for a frame of that size
+    // (FlutterWindowsView::OnWindowSizeChanged). Dart draws that frame only
+    // after this reply (main awaits configure before runApp); while blocked
+    // the engine keeps running Dart's tasks, so replying first lets the frame
+    // arrive. The window is shown only once it is in place, so it never jumps.
+    if (restore) {
+      placing_ = true;
+      RestoreBounds(*restore, AsBool(Find(args, "maximized")).value_or(false));
+      placing_ = false;
+      if (show_when_placed_) {
+        show_when_placed_ = false;
+        Show();
+        startup_trace::Mark("shown");
+      }
+    }
   } else if (method == "startDrag") {
     // Reply first: the move loop runs until the button is released.
     result->Success();

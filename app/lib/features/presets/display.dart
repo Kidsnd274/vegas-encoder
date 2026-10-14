@@ -110,6 +110,28 @@ String qualityUnit(String flag) => switch (flag) {
   _ => flag.replaceFirst('-', '').toUpperCase(),
 };
 
+/// The note at a control whose option Extra arguments replaced (UI_SPEC §2;
+/// C2 `overriddenFields`).
+const setInExtraArguments = 'Set in Extra arguments.';
+
+/// "**2 s** (60 frames at 29.97 fps)": the keyframe interval the core emits
+/// (`resolved.gopFrames`, after Extra arguments and fixed GOPs) at the
+/// delivered frame rate. The seconds are what the user typed, so they're left
+/// out ("**120 frames** at 29.97 fps") when Extra arguments set the interval
+/// or no seconds were typed. Null when the core emits no interval.
+({String value, String meaning})? keyframesReadout({
+  required int? gopFrames,
+  required num? gopSec,
+  required bool overridden,
+  required core.MediaDescription media,
+}) {
+  if (gopFrames == null) return null;
+  final frames = '${VeFormat.count(gopFrames)} ${gopFrames == 1 ? 'frame' : 'frames'}';
+  final rate = 'at ${VeFormat.fps(media.video.fps[0], media.video.fps[1])}';
+  if (gopSec == null || overridden) return (value: frames, meaning: ' $rate');
+  return (value: '${_num(gopSec)} s', meaning: ' ($frames $rate)');
+}
+
 /// "MP4", "MKV" from the container's extension.
 String containerShortName(core.ContainerProfile? c, String id) =>
     c == null ? id.toUpperCase() : c.ext.replaceFirst('.', '').toUpperCase();

@@ -8,10 +8,11 @@ import 'recipe_edit.dart';
 import 'services.dart';
 import 'ui_state.dart';
 
-/// A core result, or why the core couldn't give one. Until the native core
-/// (B2) the fake core only knows the built-in presets as shipped, so most
-/// edits come back as `B0-FIXTURE-MISSING`; the editor says so instead of
-/// showing a stale or invented result.
+/// A core result, or why the core couldn't give one. A native failure (a
+/// `CoreException` such as `JSON-LIMIT` or `NATIVE-LOAD`) stays a failure: the
+/// editor says what went wrong instead of showing a stale or invented result.
+/// The fake core (tests) only knows the built-in presets as shipped, so its
+/// edits come back as `B0-FIXTURE-MISSING`, which gets its own notice.
 @immutable
 class CoreResult<T> {
   const CoreResult.ok(T this.value) : error = null;
@@ -21,7 +22,8 @@ class CoreResult<T> {
 
   bool get ok => error == null;
 
-  /// The fake core has no stored answer for this request (B0 only).
+  /// The fake core has no stored answer for this request. Never set by the
+  /// native core.
   bool get notInPreviewCore => error?.code == 'B0-FIXTURE-MISSING';
 
   static CoreResult<T> run<T>(T Function() call) {
@@ -80,6 +82,9 @@ class EditorData {
   bool get behindLibrary => draft != null && draft!.baseRevision != preset.revision;
 
   List<Issue> get issues => compiled.value?.issues ?? const [];
+
+  /// Recipe fields whose generated option Basic Extra arguments replaced.
+  List<String> get overriddenFields => compiled.value?.overriddenFields ?? const [];
   List<Issue> issuesFor(String field) => issues.where((i) => i.field == field).toList();
   bool get hasErrors => issues.any((i) => i.level == IssueLevel.error);
 

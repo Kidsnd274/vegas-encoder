@@ -107,6 +107,47 @@ void main() {
       expect(find.text('About 53.7 MB per minute.'), findsOneWidget);
     });
 
+    testWidgets('a typed length gets the core\'s range for that length', (tester) async {
+      int? length = 600;
+      await pumpThemed(
+        tester,
+        SizedBox(
+          width: 340,
+          child: StatefulBuilder(
+            builder: (context, setState) => SizeQualityCard(
+              estimate: SizeEstimate(
+                videoKbps: 6840,
+                audioKbps: 320,
+                approximate: true,
+                bytesPerMinute: 53670329.67,
+                totalBytes: length == null ? null : 536703296.7,
+                minBytesPerMinute: 32202197.8,
+                maxBytesPerMinute: 85872527.47,
+                minTotalBytes: length == null ? null : 322021978.0,
+                maxTotalBytes: length == null ? null : 858725274.7,
+              ),
+              lengthSeconds: length,
+              onLengthChanged: (v) => setState(() => length = v),
+            ),
+          ),
+        ),
+      );
+      expect(find.text('About 537 MB', findRichText: true), findsOneWidget);
+      expect(find.text('About 53.7 MB per minute. Typically 322 MB to 859 MB for 10:00.'), findsOneWidget);
+      expect(find.textContaining('typically'), findsNothing, reason: 'the per-minute range gives way');
+
+      await tester.enterText(find.byType(TextField), 'soon');
+      await tester.pump();
+      expect(length, isNull);
+      expect(find.text('Type a length', findRichText: true), findsOneWidget);
+      expect(
+        find.text('About 53.7 MB per minute, typically 32.2 MB to 85.9 MB.'),
+        findsOneWidget,
+        reason: 'without a length, the per-minute range',
+      );
+      expect(find.textContaining('Typically'), findsNothing);
+    });
+
     testWidgets('the split bar shows video and audio shares', (tester) async {
       await pumpThemed(
         tester,

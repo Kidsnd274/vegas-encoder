@@ -19,6 +19,7 @@ import '../gallery/gallery_page.dart';
 import '../history/history_page.dart';
 import '../presets/presets_page.dart';
 import '../settings/settings_page.dart';
+import 'core_unavailable.dart';
 
 /// The desktop window: title bar with Presets, FFmpeg, History and Settings.
 /// In debug builds Ctrl+Shift+D shows the design system gallery (F1).
@@ -130,6 +131,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     final maximized = ref.watch(windowStateProvider.select((s) => s.maximized));
     final c = VeTokens.of(context).colors;
     final section = ref.watch(desktopSectionProvider);
+    final coreError = ref.watch(coreLoadErrorProvider);
 
     return CallbackShortcuts(
       bindings: {
@@ -159,6 +161,8 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
               Expanded(
                 child: _gallery
                     ? const GalleryPage()
+                    : coreError != null
+                    ? CoreUnavailable(error: coreError)
                     : switch (section) {
                         DesktopSection.presets => const PresetsPage(),
                         DesktopSection.ffmpeg => const FFmpegPage(),
