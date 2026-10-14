@@ -12,6 +12,7 @@ unchanged; see [STATUS.md](../STATUS.md).
 | Document | What it answers |
 | --- | --- |
 | [design/signal-flow.html](design/signal-flow.html) | **Start here.** The chosen direction, Signal Flow round 2, in light and dark |
+| [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) | **How it is built today:** the tech stack, the folders, how the C++ core, the Dart packages and the Flutter app fit together, and what runs where |
 | [WORKSTREAMS.md](WORKSTREAMS.md) | How the build is split between the app and platform agents: ownership, contracts, order |
 | [design/index.html](design/index.html) | The round 1 gallery of eight directions, plus the shared VEGAS native page |
 | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Features and priorities, key user flows, and the adapter limits shown to users |
