@@ -764,6 +764,7 @@ Open (additive):
 
 | Need | Request |
 | --- | --- |
+| **Library watch cost (F7). Owner priority, 2026-10-15** | `FilePresetLibrary.watch` polls every 250 ms, and each tick calls `list()`, which reads, decodes and normalizes (an FFI call per preset) every preset file on the caller's isolate, the app's UI isolate. Measured with 500 presets: **430–470 ms per tick** (`app/tool/budgets/budgets_test.dart`, real capability caches, JIT), so the poll runs back to back while a screen watches the library; with a handful of presets it is a few ms every 250 ms. Please make an unchanged library cheap to watch: list the folder and compare each file's size and last-write time (and `preferences.json`'s), keep each decoded preset and its requirements, and re-read only added or changed files (or watch the folder with `ReadDirectoryChangesW`, or poll off the caller's isolate). Keep what `watch` promises now: a current snapshot per listener, then a new value only when something changed; added, removed and edited presets and built-in star changes all show, and a malformed file behaves as today. Target: with 500 unchanged presets, a tick costs a few ms at most on the caller's isolate, measured through the real `FilePresetLibrary`. The app needs no change (it re-reads after its own writes, `PresetsController._refresh`) |
 | Open in Vegas Encoder (F5) | UI_SPEC §4: the popup opens the desktop app on the origin preset. No C3 service starts the desktop app (or hands an existing one a preset), and the app starts no processes itself (AGENTS.md). Please add one, for example `DesktopApp.openPreset(presetId)` that starts `VegasEncoder.exe` with a preset argument or asks the running single instance to select it. The button is disabled with that reason until then (`desktopAppLauncherProvider` is null) |
 | Popup size (F5) | UI_SPEC §1: the popup remembers its size, not its position. C7 `uiState` has desktop fields only, so the popup opens at its default size every time. Please add an additive `popupWindowSize` (physical width and height, or logical) to `AppUiState`, or the owner decides the popup keeps the default size |
 | Render As path in the popup (F5) | C4 `context` carries the project but not the file Render As will write, so the popup's command and Advanced's resolved command use the sample path (`D:\Renders\Sample project.mp4`; the resolved command says "for the sample project"). If the page can know the path, an additive `context.outputPath` would let the preview show it; otherwise nothing changes |
@@ -779,8 +780,9 @@ Open (additive):
 Waiting on platform (see Needs): the recommended quality band (a product-policy choice,
 platform.md); the library watch's cost and the Advanced capability transfer (the §9.3
 budgets). platform.md's queue of 2026-10-15 has the Advanced latency, the F4 token data,
-the popup size, the desktop launch and `context.outputPath`; the library watch's cost is
-not in it yet.
+the popup size, the desktop launch and `context.outputPath`. The library watch's cost was
+missing from the table after F5's rewrite; it is back at the top of Needs as the owner's
+priority (2026-10-15).
 
 App side, unblocked by B3/B4 (F3 follow-up): installation health on the FFmpeg cards
 (Changed on disk, Missing, No ffprobe); History's list from the index summaries instead
