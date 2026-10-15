@@ -946,29 +946,33 @@ performance or native persistence claim follows from repository tests.
 
 ## Next / queued requests
 
-B3 and F3's platform requests are delivered above. App F7's providers/budgets are
-delivered in ws/app; B4's History/live writers are ready for gated B6 rendering.
-Next agent: continue on ws/platform and recheck status/master before new work.
-B5 `2bdb44d` is committed and merged under the owner's latest authorization;
-B6's offline boundary checkpoint is described above. Preserve any later local
-changes and the main checkout's existing `.claude/`/ignored candidates/backups.
-B4's engine/C5/C6 writers are delivered above; app F7 consumes them through the
-existing readers. B5 normal trials and the owner's drop-text decision are recorded
-above; further marker trials are ended. Connect B6 to the actual F5 popup when
-ready and the native gates resume, then the recipe/C5 progress bridge. Avoid adding
-another fake-owner framework. The additive F4/core/C7 changes are committed/merged;
-app adoption of precise unmatched-quote ranges is now in 493f146. The reviewed
-library-watch checkpoint is committed/merged as described above. The independent
-F6 C5 output bit-depth/precision request is complete above. The app owns its header
-wire/pip adoption.
+Continue in `L:\repos\vegas-encoder-platform` on `ws/platform`; recheck all relevant
+git status/branches before editing. Preserve existing changes, the main checkout's
+`.claude/`, staged candidates, trial data and rollback backups. Current B6 is active
+by owner authorization and connected; earlier hold/offline-only statements are
+historical. Do not repeat completed library-watch/F6/import or basic B6 wiring.
 
-B6 adapter/progress performance needs the owner with real VEGAS and gated
-evidence. The owner authorized committing/merging the library-watch checkpoint
-and continuing with F6, and subsequently authorized local commits whenever a stage
-or feature is complete. Commit completed platform work on ws/platform; further
-merges into master and pushes still require separate authorization.
-The B5 installation/trial is authorized with rollback only for issues; current
-mode-0 control and mode-4 normal renders pass; the owner drops custom status-line
-testing after no useful visible change. Mode 4 is retained, with no rollback.
-B6 activation is not authorized or qualified by a
-B5 trial. Deferred persistence is not reopened automatically.
+1. Address the app-owned foreground close-handoff request at the top of this file.
+   The existing platform-only scope does not permit frontend edits; a successor
+   doing that fix needs explicit owner scope for the narrow runner change. Follow
+   current Win32 docs and focused native window checks; retain passive background
+   completion, native crash recovery and all Render threading/no-app-wait rules.
+2. The owner could not find the progress toggle in VEGAS's template popup. It is
+   in the separate desktop app: `Start-B6Trial.ps1 -Target App`, then Settings →
+   Rendering → **Show a progress window during renders**. The literal label was
+   verified in the staged 0.1.6 candidate's `app/data/app.so`, not only in source.
+   No reinstall is needed to access it. Retain the isolated trial data launcher.
+3. Finish bounded B6 qualification with the owner: focus repro, controlled real
+   cancellation/failure recovery, maximum private-payload capacity and the existing
+   three-on/three-off monitor comparison. Basic tested-template restart persistence
+   is owner-confirmed; do not describe it as still deferred. Keep remaining gates
+   open until their own real-host evidence exists.
+4. Proceed to B7 installer inputs for the owner's Inno Setup work: matched native/
+   app file set and versions, detected VEGAS targets, closure/update/rollback rules,
+   and concise build/install documentation. Preparing inputs can proceed while
+   owner tests are pending; release signoff must not assume B6 qualification passed.
+
+Commit completed milestones locally on the authorized workstream branch. No push,
+master merge, installed-exporter replacement, machine-tool change, AV exclusion,
+sanitizer or old process/thread debugging workflow. Owner manually tests VEGAS and
+installs prepared candidates. No additional status-line investigation or scaffolding.
