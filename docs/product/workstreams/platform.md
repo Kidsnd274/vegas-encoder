@@ -8,7 +8,75 @@ B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
-## Current owner feedback and app close-handoff request
+## 0.1.7 close handoff fixed offline; owner qualification and B7 inputs
+
+Continued from clean `ws/platform` checkpoint **6dd7833**, rechecked as a
+handoff-only commit. Main checkout's untracked `.claude/` is preserved. The owner
+explicitly authorized the narrow frontend runner/test exception for this task;
+other app paths and the app handoff remain untouched.
+
+`Win32Window::MessageHandler(WM_CLOSE)` now captures foreground **before** enabling
+the valid original owner, enables it, and calls `SetForegroundWindow(owner_)`
+before destruction only for a foreground close. Flutter's accepted-close routing
+is unchanged; rejected/discard-confirmation paths do not reach this handoff.
+Background close stays passive. Native crash/teardown fallback, the parallel
+startup worker and all Render caller-thread/frame-release/no-app-wait rules remain.
+
+The same existing window probe now has `-Checks close`, exercising actual Apply
+clicks and Cancel/Escape against a fake owner/full-screen other window, without
+a native page poll/post-exit activation masking the result. Preserved old frontend
+0.1.5+1: **3/7 passed**, with accepted normal and before-open Apply/Cancel returning
+to another window; switch-back happened to pass that run. New frontend: **7/7
+passed**, including both switch sequences and background WM_CLOSE/Cancel. All
+foreground prerequisites were established in these compared runs. This supports
+the suspected close-time gap; **real VEGAS focus confirmation remains pending**.
+Interactive probe prerequisites are intermittent: the final repeat passed four
+cases and could not establish foreground for three (no close attempted in those
+three). Those are unverified attempts, not additional focus passes or product
+close failures; the probe exits nonzero. Owner should run the real repro with an
+idle desktop. The complete seven-case comparison above is the accepted valid run.
+Observed same-DPI process-age `shown` marks: **435.7–462.7 ms**. Existing owner
+placement/modality/minimize/restore and crash fallback checks also pass, including
+other-DPI placement (centre within 4 px, shown 667–776 ms). No renderer/startup
+architecture change or new process/thread investigation.
+
+Validation: release frontend build **0.1.7+1**, clean Flutter analysis, **44** popup
+widget/light+dark golden tests, optimized native build, **162** snapshots, **95**
+transport/task, **107** native-page/owner, **19** C7 runtime checks and existing
+writer monitor-launch/two-Hz checks pass. The staged native DLL's discovery check
+passes with balanced fake-host allocations. These use fakes/fake windows/files,
+not real VEGAS. Background crash focus is still handled by native fallback;
+the runner cannot re-enable an owner after it is killed.
+The full existing Flutter suite also passes **553** checks. B7's final focused
+packaging/detection suite passes **65** checks, and the retained fake-installer
+install/update/uninstall/refusal suite passes. The deliberate nonexistent filter
+was accepted by the current core and separately rejected by the supplied FFmpeg
+without publishing media; that prepares the owner step, not real recovery proof.
+
+Matched **0.1.7-recipe-proof / app 0.1.7+1** is prepared separately at
+`build/b6-candidate-0.1.7`, not installed. Native preflight now requires 0.1.7.1.
+The candidate copies the old trial data and preserves exact installed 0.1.6
+DLL/PDB/INI/manifest/discovery rollback with hashes. Old candidates, backups and
+installed files are unchanged. [B6_TRIAL.md](../../B6_TRIAL.md) has focused owner
+focus, controlled cancellation/encoder-failure recovery, bounded capacity and
+six-run on/off monitor instructions. The toggle is in the separate desktop app;
+the 0.1.6 launcher default is retained, so pass the new CandidateRoot explicitly.
+Four capacity presets are prepared/round-tripped through existing core/repository
+code and seeded into the **copied** trial library only. No host capacity claim.
+
+B7 preparation: `Prepare-B7.ps1` stages the full runtime/notices, native files,
+renderable INI/discovery inputs and a complete file/version/hash manifest.
+Native now has PE version metadata (0.1.7.1 for this candidate). Read-only registry/
+PE discovery identifies 2026.0.3.189 and older 13/21/22/23 installs; older hosts
+remain detection only. Focused bundle/detection/refusal checks and the existing
+installer's fake-tree suite pass. `dumpbin` confirms runner VC++ runtime imports;
+none was downloaded/executed. [B7_INSTALLER_INPUTS.md](../../B7_INSTALLER_INPUTS.md)
+specifies shared/per-host destinations, closure, manifests, all-target update,
+durable rollback and preservation rules for the owner's Inno Setup implementation.
+No Inno installer or release qualification is claimed. A5–A7 capacity/recovery/
+overhead limits remain explicit; normal saved-template persistence is confirmed.
+
+## Prior owner feedback and close-handoff request (superseded offline above)
 
 The owner confirms saved templates persist across restarts on the installed
 0.1.6 trial. Combined with the prior distinct FFV1/libx264 renders, normal recipe
@@ -952,11 +1020,9 @@ git status/branches before editing. Preserve existing changes, the main checkout
 by owner authorization and connected; earlier hold/offline-only statements are
 historical. Do not repeat completed library-watch/F6/import or basic B6 wiring.
 
-1. Address the app-owned foreground close-handoff request at the top of this file.
-   The existing platform-only scope does not permit frontend edits; a successor
-   doing that fix needs explicit owner scope for the narrow runner change. Follow
-   current Win32 docs and focused native window checks; retain passive background
-   completion, native crash recovery and all Render threading/no-app-wait rules.
+1. Owner retest of the prepared 0.1.7 close fix. The explicitly authorized narrow
+   frontend change is complete offline above; do not redo it or broaden app scope.
+   Retain passive background close, native crash recovery and startup improvement.
 2. The owner could not find the progress toggle in VEGAS's template popup. It is
    in the separate desktop app: `Start-B6Trial.ps1 -Target App`, then Settings →
    Rendering → **Show a progress window during renders**. The literal label was
@@ -967,10 +1033,9 @@ historical. Do not repeat completed library-watch/F6/import or basic B6 wiring.
    three-on/three-off monitor comparison. Basic tested-template restart persistence
    is owner-confirmed; do not describe it as still deferred. Keep remaining gates
    open until their own real-host evidence exists.
-4. Proceed to B7 installer inputs for the owner's Inno Setup work: matched native/
-   app file set and versions, detected VEGAS targets, closure/update/rollback rules,
-   and concise build/install documentation. Preparing inputs can proceed while
-   owner tests are pending; release signoff must not assume B6 qualification passed.
+4. B7 inputs are prepared above; owner implements/tests Inno Setup from the matched
+   manifest and destination/update/rollback notes. Release signoff still depends on
+   real-host qualification and the owner's runtime/license/deployment decisions.
 
 Commit completed milestones locally on the authorized workstream branch. No push,
 master merge, installed-exporter replacement, machine-tool change, AV exclusion,

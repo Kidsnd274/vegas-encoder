@@ -5,7 +5,7 @@
 // launches VegasEncoder.exe the way the exporter will. Nothing here touches
 // VEGAS; results describe the app's window behaviour against a fake host.
 //
-// Usage: WindowProbe.exe <VegasEncoder.exe> <outDir> [start|owner|monitor|theme|all] [runs]
+// Usage: WindowProbe.exe <VegasEncoder.exe> <outDir> [start|owner|close|monitor|theme|all] [runs]
 //        WindowProbe.exe <VegasEncoder.exe> <outDir> shot <name.png> <skia|impeller|-> [app arguments...]
 // Build: see run_window_spikes.ps1.
 //
@@ -59,6 +59,7 @@ static class Native
     [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hwnd, int cmd);
+    [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll")] public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
     [DllImport("user32.dll")] public static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
     [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
@@ -66,6 +67,8 @@ static class Native
     [DllImport("user32.dll")] public static extern void mouse_event(uint flags, int dx, int dy, uint data, UIntPtr extra);
     [DllImport("user32.dll")] public static extern IntPtr GetFocus();
     [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
     [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
     [DllImport("shcore.dll")] public static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint dpiX, out uint dpiY);
     public delegate bool MonitorProc(IntPtr monitor, IntPtr dc, ref RECT rect, IntPtr data);
@@ -92,12 +95,13 @@ sealed class FakeHost : IDisposable
     Form _form;
     public IntPtr Handle { get; private set; }
 
-    public FakeHost(string title, Rectangle bounds)
+    public FakeHost(string title, Rectangle bounds, bool fullScreen = false)
     {
         var ready = new ManualResetEventSlim();
         _thread = new Thread(() =>
         {
             _form = new Form { Text = title, StartPosition = FormStartPosition.Manual, Bounds = bounds, BackColor = Color.FromArgb(38, 38, 38), ShowInTaskbar = true };
+            if (fullScreen) { _form.FormBorderStyle = FormBorderStyle.None; _form.Bounds = Screen.PrimaryScreen.Bounds; }
             _form.Load += (s, e) => { Handle = _form.Handle; ready.Set(); };
             Application.Run(_form);
         });
@@ -111,14 +115,21 @@ sealed class FakeHost : IDisposable
     /// A real click in the window, as a user would, so it becomes foreground.
     public bool Activate()
     {
-        Native.GetWindowRect(Handle, out var r);
-        Native.GetCursorPos(out var saved);
-        Native.SetCursorPos(r.Left + r.Width / 2, r.Top + r.Height / 2);
-        Native.mouse_event(Native.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, UIntPtr.Zero);
-        Native.mouse_event(Native.MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
-        Thread.Sleep(250);
-        Native.SetCursorPos(saved.X, saved.Y);
-        return Native.GetForegroundWindow() == Handle;
+        for (int attempt = 0; attempt < 3; ++attempt)
+        {
+            Native.SetForegroundWindow(Handle);
+            Native.SetWindowPos(Handle, IntPtr.Zero, 0, 0, 0, 0, 0x0013); // NOMOVE | NOSIZE | NOACTIVATE
+            Thread.Sleep(100);
+            Native.GetWindowRect(Handle, out var r);
+            Native.GetCursorPos(out var saved);
+            Native.SetCursorPos(r.Left + r.Width / 2, r.Top + r.Height / 2);
+            Native.mouse_event(Native.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, UIntPtr.Zero);
+            Native.mouse_event(Native.MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
+            Thread.Sleep(250);
+            Native.SetCursorPos(saved.X, saved.Y);
+            if (Native.GetForegroundWindow() == Handle) return true;
+        }
+        return false;
     }
 
     public void Dispose()
@@ -133,6 +144,7 @@ static class Probe
     static string _exe, _out, _request;
     static int _sessions;
     static readonly List<string> Report = new List<string>();
+    static int _closeFailures;
 
     static void Log(string line) { Console.WriteLine(line); Report.Add(line); }
 
@@ -158,7 +170,7 @@ static class Probe
         }
         var runs = args.Length > 3 ? int.Parse(args[3]) : 10;
         _request = Environment.GetEnvironmentVariable("VE_SPIKE_REQUEST");
-        if ((what == "start" || what == "owner" || what == "all") && (_request == null || !File.Exists(_request)))
+        if ((what == "start" || what == "owner" || what == "close" || what == "all") && (_request == null || !File.Exists(_request)))
         {
             Console.WriteLine("Set VE_SPIKE_REQUEST to the C4 request fixture (run_window_spikes.ps1 does).");
             return 2;
@@ -172,6 +184,7 @@ static class Probe
         {
             if (what == "start" || what == "all") StartTime(runs);
             if (what == "owner" || what == "all") Owner();
+            if (what == "close") CloseFocus();
             if (what == "monitor" || what == "all") Monitor();
             if (what == "theme" || what == "all") Theme();
         }
@@ -179,7 +192,7 @@ static class Probe
         {
             File.WriteAllLines(Path.Combine(_out, "window-spikes.txt"), Report);
         }
-        return 0;
+        return _closeFailures == 0 ? 0 : 1;
     }
 
     // ------------------------------------------------------------ helpers
@@ -256,7 +269,7 @@ static class Probe
     static string NewSession(IntPtr owner)
     {
         var dir = Path.Combine(_out, "sessions", $"s{++_sessions:000}");
-        if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        if (Directory.Exists(dir)) throw new IOException("Preserve existing session output: " + dir);
         Directory.CreateDirectory(dir);
         var json = File.ReadAllText(_request);
         if (owner != IntPtr.Zero)
@@ -376,6 +389,85 @@ static class Probe
     }
 
     // ------------------------------------------------------------ owner window
+
+    // Focused regression using the real release runner/C4, no native page poll
+    // or post-exit activation to mask the frontend's close-time handoff.
+    static void CloseFocus()
+    {
+        Log("== close focus: fake owner and full-screen other app; real Apply button / Cancel shortcut ==");
+        using (var host = new FakeHost("Fake VEGAS Custom Settings", new Rectangle(300, 200, 1280, 820)))
+        using (var other = new FakeHost("Fake full-screen other app", Rectangle.Empty, fullScreen: true))
+        foreach (var order in new[] { "normal", "switch-back", "before-open", "background" })
+        foreach (var action in order == "background" ? new[] { "cancel" } : new[] { "apply", "cancel" })
+        {
+            bool ready = host.Activate();
+            if (order == "before-open") ready &= other.Activate();
+            Native.EnableWindow(host.Handle, false);
+            var dir = NewSession(host.Handle);
+            var trace = Path.Combine(dir, "startup.txt");
+            using (var p = Launch($"--edit-session \"{dir}\"",
+                new Dictionary<string, string> { { "VEGAS_ENCODER_STARTUP_TRACE", trace } }))
+            {
+                var editor = FindAppWindow(p.Id);
+                WaitForTrace(trace);
+                Thread.Sleep(500);
+                ready &= editor != IntPtr.Zero && Native.GetWindow(editor, Native.GW_OWNER) == host.Handle;
+                if (order == "switch-back" || order == "background") ready &= other.Activate();
+                if (order != "background")
+                {
+                    // Returning through the disabled VEGAS owner should route
+                    // activation to its last active popup, as the real host does.
+                    if (order == "switch-back") Native.SetForegroundWindow(host.Handle);
+                    Native.SetWindowPos(editor, IntPtr.Zero, 0, 0, 0, 0, 0x0013);
+                    Native.GetWindowRect(editor, out var er);
+                    Native.GetCursorPos(out var saved);
+                    Native.SetCursorPos(er.Left + er.Width / 2, er.Top + 24);
+                    Native.mouse_event(Native.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, UIntPtr.Zero);
+                    Native.mouse_event(Native.MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
+                    Native.SetCursorPos(saved.X, saved.Y);
+                    Thread.Sleep(250);
+                    ready &= Native.GetForegroundWindow() == editor;
+                }
+                else ready &= Native.GetForegroundWindow() == other.Handle;
+
+                if (ready && order != "background")
+                {
+                    if (action == "apply")
+                    {
+                        Native.GetWindowRect(editor, out var er);
+                        double dpiScale = Native.GetDpiForWindow(editor) / 96.0;
+                        Native.GetCursorPos(out var saved);
+                        Native.SetCursorPos(er.Right - (int)(90 * dpiScale), er.Bottom - (int)(30 * dpiScale));
+                        Native.mouse_event(Native.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, UIntPtr.Zero);
+                        Native.mouse_event(Native.MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
+                        Native.SetCursorPos(saved.X, saved.Y);
+                    }
+                    else
+                    {
+                        Native.keybd_event(0x1B, 0x01, 0, UIntPtr.Zero); // Escape
+                        Native.keybd_event(0x1B, 0x01, 2, UIntPtr.Zero);
+                    }
+                }
+                else if (ready) Native.PostMessage(editor, Native.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                bool exited = ready && p.WaitForExit(5000);
+                Thread.Sleep(250);
+                var expected = order == "background" ? other.Handle : host.Handle;
+                var result = SessionResult(dir);
+                bool passed = ready && exited && Native.IsWindowEnabled(host.Handle) &&
+                    !Native.IsIconic(host.Handle) && Native.GetForegroundWindow() == expected &&
+                    result != null && result.Value.action == action && result.Value.session == FixtureSessionId();
+                Log($"{order}/{action}: {(passed ? "PASS" : "FAIL")} prerequisites={ready} exited={exited} " +
+                    $"enabled={Native.IsWindowEnabled(host.Handle)} iconic={Native.IsIconic(host.Handle)} " +
+                    $"foregroundExpected={Native.GetForegroundWindow() == expected} result={result?.action}; " +
+                    $"shownMs={Mark(File.Exists(trace) ? File.ReadAllLines(trace) : new string[0], "shown")}");
+                if (!passed) _closeFailures++;
+                if (ready && !exited) Save(editor, $"close-{order}-{action}-failure.png");
+                if (!p.HasExited) { p.Kill(); p.WaitForExit(); }
+                Native.EnableWindow(host.Handle, true);
+            }
+        }
+        Log($"close focus: {7 - _closeFailures}/7 passed (fake windows, not VEGAS)");
+    }
 
     static void Owner()
     {

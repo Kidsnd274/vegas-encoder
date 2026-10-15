@@ -54,8 +54,8 @@ void AppReady() {
   if (application.empty() || application.find(L'\0') != std::wstring::npos || !fs::path(application).is_absolute() ||
       GetFileAttributesW(application.c_str()) == INVALID_FILE_ATTRIBUTES)
     throw std::runtime_error("Matching Vegas Encoder app is missing. Run the reviewed setup or restore the staged app folder.");
-  if (FileVersion(Utf8(application.c_str())) != "0.1.5.1")
-    throw std::runtime_error("Vegas Encoder app and plug-in versions differ. Run the matching setup (candidate app 0.1.5+1).");
+  if (FileVersion(Utf8(application.c_str())) != "0.1.7.1")
+    throw std::runtime_error("Vegas Encoder app and plug-in versions differ. Run the matching setup (candidate app 0.1.7+1).");
 }
 void EnsureDirectory(const fs::path& path) {
   // Refuse known junctions before creating children; the transport subsequently

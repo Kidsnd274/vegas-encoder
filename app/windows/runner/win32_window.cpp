@@ -498,13 +498,20 @@ Win32Window::MessageHandler(HWND hwnd,
       }
       return 0;
 
-    case WM_CLOSE:
-      // Reached only when Flutter allowed the close. Re-enable the owner first,
-      // as a modal dialog does, so Windows returns activation to it.
+    case WM_CLOSE: {
+      // Reached only when Flutter allowed the close. Sample before EnableWindow:
+      // it sends synchronous messages that can change activation. Hand off while
+      // this process is still foreground, before destruction lets Windows choose
+      // another app. A background close must only release the modal owner.
+      const bool was_foreground = GetForegroundWindow() == hwnd;
       if (owner_ != nullptr && IsWindow(owner_)) {
         EnableWindow(owner_, TRUE);
+        if (was_foreground) {
+          SetForegroundWindow(owner_);
+        }
       }
       break;
+    }
 
     case WM_NCCALCSIZE: {
       if (wparam == FALSE) {

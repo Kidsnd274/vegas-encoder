@@ -5,7 +5,26 @@ Updated: 2026-10-15 (Asia/Singapore). Owner-installed version: 0.1.6-recipe-proo
 
 ## Current progress
 
-**Latest owner feedback:** saved templates persist across VEGAS restarts; record
+**0.1.7 focus fix / B7 inputs (prepared, not installed):** the owner-authorized
+narrow frontend change captures foreground before re-enabling the valid owner,
+then explicitly activates it before destruction for foreground closes only.
+Same existing fake-window probe: old frontend **3/7**, new **7/7** close cases,
+covering Apply/Cancel, both full-screen switch orders and passive background close.
+New same-DPI process-age visible traces are **0.436–0.463 s**; native parallel
+startup and renderer are unchanged. Real VEGAS focus/startup retest remains pending.
+Frontend analysis and **44** popup widget/light+dark golden checks pass; native
+optimized snapshot/transport/page/C7/writer checks and staged DLL fake-host
+discovery pass. Matched **0.1.7-recipe-proof / app 0.1.7+1** is staged separately
+with copied trial data, bounded capacity presets and exact installed-0.1.6 rollback.
+Both PE file versions are 0.1.7.1, with native frontend-version enforcement.
+B7 supplies complete runtime/notices/hash inputs, read-only VEGAS detection and
+installer closure/update/rollback rules; no Inno installer or installation is done.
+See [owner checks](B6_TRIAL.md), [installer inputs](B7_INSTALLER_INPUTS.md) and
+[validation/handoff](product/workstreams/platform.md). Owner-confirmed normal
+template persistence stands. Controlled real cancellation/encoder-failure recovery,
+payload capacity and monitor overhead/memory remain unqualified; A5–A7 stay open.
+
+**Prior 0.1.6 owner feedback:** saved templates persist across VEGAS restarts; record
 normal persistence for the tested recipes as owner-confirmed, rather than still
 deferred. This does not measure maximum private-payload capacity. The focus bug
 remains: switch to another full-screen app, return to VEGAS/the editor, then
@@ -536,12 +555,11 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 ## Next task
 
-Platform B1, B3 and B4 are complete; B2 is already merged. The owner authorized
-committing B3/B4 and merging both workstreams into master. App F7 switches to NativeVeCore/WindowsServices through
-its own workstream. B5 is committed/merged; its prepared owner trial needs separate
-installation approval. B6 snapshot/session boundaries are tested offline; next
-is file/process transport and the gated native page/recipe/monitor integration.
-No installation or PATH change. Order and rationale are in
-[platform.md](product/workstreams/platform.md).
-B5/B6 require the owner at the real host. Controlled failure/recovery and deferred
-persistence qualification remain open per [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).
+The owner installs/tests the separately prepared 0.1.7 candidate for foreground
+Apply/Cancel, controlled cancellation/encoder-failure recovery, bounded payload
+capacity and measured monitor time/memory. Basic recipe renders and normal
+restart persistence are already owner-confirmed. B7's matched inputs and rules
+are ready for the owner's Inno Setup work; installer implementation/testing and
+release signoff remain. Do not redo library-watch, precision facts or B6 wiring.
+No push, master merge, installed-exporter replacement, tool upgrade or sanitizer/
+old process-thread debugging. Details: [platform.md](product/workstreams/platform.md).

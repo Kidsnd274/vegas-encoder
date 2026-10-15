@@ -1,5 +1,120 @@
 # B6 connected candidate: owner VEGAS trial
 
+## Current continuation: 0.1.7 focus fix and remaining owner checks
+
+Installed baseline remains **native 0.1.6 / frontend 0.1.5+1** on VEGAS
+**2026.0.3.189**. New **0.1.7-recipe-proof / frontend 0.1.7+1** is prepared at
+`L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.7`, **not installed**.
+Its trial data is a copy of 0.1.6; original candidates/data/backups are preserved.
+The new `rollback` holds the exact installed 0.1.6 set with hashes. The native
+parallel startup path is unchanged. Normal distinct-codec templates and restart
+persistence are already owner-confirmed; do not repeat those basic qualification
+steps. Remaining A5–A7 checks below stay open until tested in real VEGAS.
+
+The close fix samples foreground before enabling the owner and explicitly
+activates it before destruction only for foreground closes. With the same probe,
+the old frontend failed four of seven cases (accepted foreground Apply/Cancel
+exposed another window); the new frontend passes all seven, including both switch
+sequences and passive background close. These are **fake-window** results.
+
+### Owner installation and focus retest
+
+Close VEGAS and all trial app/editor/monitor windows, then manually install:
+
+```powershell
+Set-Location L:\repos\vegas-encoder-platform
+$trial = "$PWD\build\b6-candidate-0.1.7"
+.\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\plugin" -Update
+.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
+```
+
+1. Open an existing working template's editor. Switch to the full-screen app,
+   return through VEGAS to the editor, then click **Apply to template**. VEGAS's
+   template dialog should remain foreground and usable; the other app must stay
+   behind it. Repeat with **Cancel**. Also check a normal foreground close.
+2. Repeat with the other full-screen app foreground **before opening** the editor.
+   Report the exact route used to open it, then Apply/Cancel and the foreground
+   result. An iconic/minimized VEGAS window and one merely covered are different;
+   report which was observed if it fails.
+3. Check background completion if encountered: another app stays foreground when
+   the editor closes. Do not click the editor to manufacture a background close;
+   that click would make it foreground. Automated fake-window coverage includes
+   this case, but do not call the real-host variant passed unless actually observed.
+4. Report any startup regression. Existing `logs\frontend-startup.txt` and native
+   timings suffice; no extra tracing. The installed baseline's observed visible
+   times were 0.53–0.75 s after process creation, not an exact click-to-visible total.
+
+### Controlled cancellation and failure recovery
+
+Use test copies and fresh `.mkv` filenames; leave working saved templates intact.
+
+1. Use a range long enough to cancel during encoding. Cancel through **VEGAS**,
+   note time until the dialog becomes usable, and render the normal template to a
+   new name **in the same VEGAS session**. Expect a cancelled C6 job, no successful
+   publication, and a successful recovery render. Report a freeze, retained partial
+   or child, wrong terminal status, or need to restart.
+2. For an actual FFmpeg error, edit a **test copy** of the H.264/MKV recipe and put
+   `-vf vegas_encoder_deliberate_failure` in Video → Extra arguments. Apply and
+   render a short range to a new name. This is a deliberately nonexistent filter;
+   the current core emits it without a blocking issue. Expect an actionable encoder
+   failure/failed History record and no published final output. If Apply blocks on
+   this machine, report its message; do not bypass validation or alter FFmpeg files.
+3. Return to the unchanged normal template and render to another fresh filename
+   without restarting VEGAS. Report the failure and recovery output names and any
+   displayed message. A preflight refusal alone does not qualify recovery from an
+   encoder failure. Never kill VEGAS or corrupt the user's encoder installation.
+
+### Payload capacity, separate from normal persistence
+
+Four isolated library inputs **B6 capacity 4096 / 8192 / 12288 / 16000** are seeded
+only into the new candidate's copied trial library. They use FFV1/PCM/MKV with
+large inert notes and a UTF-8 end marker; encoding settings stay short and valid.
+`capacity\capacity-inputs.json` records their exact **offline** envelope sizes and
+notes byte counts. Popup origin metadata may alter the final stored size.
+
+In increasing order, Load preset in the popup, Apply, save a **new disposable VEGAS
+template**, reopen, restart through the matching launcher, then reopen it again.
+Stop on the first failure; preserve that test template and the last good one, and
+report their names/paths and the step. Leave normal templates alone. Existing core
+payload decoding can check the saved bytes/end marker once their paths are known.
+One short render of the largest intact sample checks that saved settings remain
+usable. If all four pass, report **at least the largest measured intact size**, not
+an absolute host maximum. The product's 16 KiB draft ceiling is not an established
+VEGAS limit; refine the boundary only if needed after this bounded pass.
+
+### Monitor overhead using the existing records
+
+The toggle is in the **separate desktop app**, not the template popup:
+
+```powershell
+.\scripts\Start-B6Trial.ps1 -Target App -CandidateRoot $trial
+```
+
+Settings → Rendering → **Show a progress window during renders**. Use the existing
+six-run comparison below, **on, off, off, on, on, off**, one fixed project/template/
+range, a warm-up, fresh filenames and otherwise unchanged settings/load. Close the
+desktop app before each run; closing an already-launched monitor does not make an
+off run. Send the six output names: C6 `elapsedSec` and phase timings already give
+the measurements. Compare on/off medians; inconclusive variation stays inconclusive.
+During an on run, also observe the monitor's private memory and working set in Task
+Manager (record both, with the PID); the budget is under 120 MB and about 2% time.
+Record any visible disturbance. Restore the preferred toggle afterward.
+
+For this candidate all logs/jobs are under `$trial\logs` and `$trial\data\Local\jobs`.
+Rollback after closing VEGAS/app windows uses the existing reversible installer:
+
+```powershell
+.\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\rollback\plugin" -Update
+.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.6"
+```
+
+The original discovery file/manifest and `rollback\backup-sha256.json` are retained;
+the installer regenerates and verifies its installation manifest. Saved templates
+and both trial data roots remain. B7's matched runtime/destination/update inputs
+are in [B7_INSTALLER_INPUTS.md](B7_INSTALLER_INPUTS.md).
+
+## Installed 0.1.6 trial record and original procedure
+
 Prepared candidate: **0.1.6-recipe-proof**, frontend **0.1.5+1** (unchanged). Target:
 Boris FX VEGAS **2026.0.3.189**. This candidate connects the existing frontend
 popup and monitor to native template recipes and the recipe engine. It is staged
@@ -92,10 +207,9 @@ fixed FFmpeg or configuration-proof template; there is no proof migration.
    draft should also preserve the previous saved template.
 4. Create a second fresh template with **H.264 (libx264), 8-bit, CRF 20** and
    **AAC 192 kb/s**, still **Matroska**. Save it as **B6 H264 8**.
-5. Close VEGAS, restart through the trial launcher and reopen both named
-   templates. Check each retained its own settings. Report if either name,
-   recipe or dialog contents changed unexpectedly. This is the outstanding
-   real two-template/restart persistence qualification, not an assumed pass.
+5. This normal restart check is now **owner-confirmed** for the tested templates.
+   Retain those working templates; only the separate capacity samples above need
+   new restart qualification.
 
 Popup previews use explicitly unknown project/media context and the existing app
 sample. Actual rendering compiles again from delivered media. Native project name,

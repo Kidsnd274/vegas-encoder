@@ -205,7 +205,8 @@ parser-2 cache files with the 1 MiB bound. Selected FFmpeg identity is rechecked
 by the engine; native cached hardware readiness is downgraded to unknown.
 `VEGAS_ENCODER_DATA_ROOT` maps to the same `Roaming`/`Local` trial roots as the app.
 Unknown popup media/project facts remain null. The configured app's numeric file
-version must be 0.1.5.1 for the current fix candidate; the full frontend folder is required.
+version must be 0.1.7.1 for the current focus-fix candidate (native
+0.1.7-recipe-proof / frontend 0.1.7+1); the full frontend folder is required.
 
 The page queues C4 preparation on its UI thread and starts file/process transport
 on one independent worker from copied request/path/argv values. No host interface,
