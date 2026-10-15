@@ -438,6 +438,8 @@ class _Launcher implements DesktopAppLauncher {
   final List<String> opened = [];
   @override
   Future<void> openPreset(String presetId) async => opened.add(presetId);
+  @override
+  Future<void> openJob(String jobId) async => opened.add('job/$jobId');
 }
 
 /// A session whose result can't be written (a locked or vanished folder).

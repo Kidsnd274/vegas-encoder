@@ -51,6 +51,14 @@ class Win32Window {
   std::optional<RECT> OwnerBounds(HWND owner);
   HWND owner() const { return owner_; }
 
+  // Progress window only: where it goes for VEGAS's main window |host| (C5
+  // `hostHwnd`): the bottom-right corner of the work area of the monitor
+  // |host| is on, at the window's size for that monitor's DPI. Neither owns
+  // nor activates anything. Nullopt if |host| is not a top-level window any
+  // more (keep Create's placement, on the foreground window's monitor). Put
+  // it there with RestoreBounds before Show, after replying to Dart.
+  std::optional<RECT> HostBounds(HWND host);
+
   void SetKeepOnTop(bool keep_on_top);
   bool keep_on_top() const { return keep_on_top_; }
 

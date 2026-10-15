@@ -653,26 +653,29 @@ Undo), and in `features/presets/`: the Ctrl+K palette, `BitrateField`, and
 | `InstallationCard`, `CapabilityTable` | F3 (`features/ffmpeg/`), with `EncoderDetail` and its test-encode diagram |
 | `JobList`, `JobDetail`, `LogView` | F3 (`features/history/`); the stderr tail shows in the detail, the full log waits on C6 |
 | `VePageHeader`, `VeToastHost` | F3 (`design/components/page_header.dart`): a section's heading and actions; one toast per screen |
-| `RenderMonitor` | Progress window (§12): wire progress bar, figures, done and failed states; reads the live status file through `ve_services` |
+| `RenderMonitor` | F6 (`features/monitor/`, `state/monitor.dart`): the progress window (§12). `VeWireProgress` (`design/components/wire_progress.dart`) is its bar |
 
 ## 12. Render progress window
 
 Mock: S6 in [design/signal-flow.html](design/signal-flow.html). Architecture and the
-performance rule: TECH_ARCHITECTURE §5.6.
+performance rule: TECH_ARCHITECTURE §5.6. Built in F6; as built:
 
 | Item | Behaviour |
 | --- | --- |
-| Size | About 380×250; not resizable; placed at the bottom-right of the monitor VEGAS is on |
-| Showing | Appears when a render starts **without taking focus**. Keep on top is a pin in the title bar (remembered in C7 `keepOnTop`); **off by default** (owner, 2026-10-12). Mockup S6 shows it pinned |
-| Header | Wire glyph for 10-bit or 8-bit output, output file name, encoder summary |
-| Progress | A video-wire bar with a round head; percentage and "Frame 9,607 of 22,873" |
-| Figures | Encoding fps, speed (× realtime), bitrate, size so far, final size (about, extrapolated from bytes so far), time left and total |
-| Finishing | "Writing the file index" (fast start), then "Checking the output" |
-| Done | Result sentence, as in History; **Open folder** and **Close**. Closes itself after 10 s unless the pointer is over it |
-| Failed | The reason and FFmpeg's error line; **Show in History** and **Open log**. Stays open |
-| Cancelled | "Cancelled in VEGAS"; closes after 5 s |
+| Size | 380×340 (the mockup's content; the earlier "about 380×250" didn't fit it); not resizable; 16 px in from the bottom-right corner of the work area of the monitor VEGAS's main window is on (C5 `hostHwnd`), at that monitor's DPI. Without a usable handle: the foreground window's monitor |
+| Showing | Appears when a render starts **without taking focus**, and a click on it doesn't take it either. Keep on top is a pin in the title bar, remembered in C7 `keepOnTop` (the same setting as in Settings) and applied before the first frame; **off by default** (owner, 2026-10-12). Mockup S6 shows it pinned |
+| Title | "Rendering, 42%"; "Starting the render", "Finishing the file", "Checking the output"; "Rendered", "Render failed", "Render cancelled"; "Waiting for the render" until the file appears |
+| Header | Output file name, then the encoder summary as the engine writes it; the folder once done. **No wire glyph yet:** C5 doesn't carry the output's bit depth (workstreams/app.md, Needs) |
+| Progress | A video-wire bar with a round head; percentage (rounded down, so 100% means every frame went to FFmpeg) and "Frame 9,607 of 22,873". With no total: no fill, "Rendering", "Frame 9,607" |
+| Figures | Encoding fps, speed (× realtime), bitrate, size so far, final size ("about"; the engine's estimate, `estimatedFinalBytes`) and time left with the total. A figure the engine hasn't written shows a dash; the app computes none of them |
+| Finishing | "Finishing" then "Checking", with the frame count. The engine doesn't say whether a fast-start index is being written, so the window doesn't either |
+| Done | The result sentence as in History, plus the output check: "Rendered 12:43 in 4:07, 3.09× realtime, 2.93 GB. Output checked: h264 and aac, as set." (from the job record, C6). Without the record, "Rendered in 4:07, 2.06× realtime." **Open folder** (Explorer, file selected) and **Close**. "Closes in 10 s", counting; while the pointer is over the window, "Stays open while the pointer is here", and the count resumes when it leaves |
+| Failed | The reason ("Failed after 4:08. FFmpeg exited with code 1. Partial file removed.") and FFmpeg's last lines from the record, in a three-line box scrolled to the end (the wheel scrolls back). **Show in History** (disabled with the reason until a service can start the desktop app) and **Show log** (FFmpeg's log in Explorer; disabled when there is none). Stays open |
+| Cancelled | "Cancelled in VEGAS after 1:12."; closes after 5 s, with the same pointer rule |
+| No news | While starting or encoding, 30 s without a new status: the footer says "No news from the render for 30 s. If VEGAS stopped, close this." It never ends the render or closes the window; a new status clears it. Not shown while checking the output (ffprobe can take minutes) |
 | Cancel | Not offered: rendering is cancelled in VEGAS's own dialog, and the footer says so |
-| Updates | At most twice a second; no animation beyond the bar moving. Reduced motion changes nothing else |
+| Updates | Redraws only when the status changes (at most twice a second); no animation beyond the bar moving. Reduced motion changes nothing else |
+| Reading | While VEGAS renders it reads the live file and machine settings only: no core, no library. After the end it reads the job record, which loads the core |
 
-If VEGAS's render dialog can show a status line, it carries the same figures as one
-sentence: "x264: 61.8 fps, 2.06× realtime, 30.7 Mb/s, 1.23 GB so far".
+B5's outcome: the owner dropped custom text in VEGAS's render dialog, so this window
+is the only place the encode statistics show.

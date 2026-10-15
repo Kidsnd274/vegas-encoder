@@ -33,9 +33,9 @@ LaunchOptions LaunchOptions::FromArguments(
     case LaunchKind::kRenderMonitor:
       options.title = L"Vegas Encoder render progress";
       options.width = 380;
-      options.height = 250;
+      options.height = 340;
       options.min_width = 380;
-      options.min_height = 250;
+      options.min_height = 340;
       options.resizable = false;
       options.no_activate = true;
       break;

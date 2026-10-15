@@ -1,6 +1,6 @@
 # App workstream
 
-Updated: 2026-10-15 (Asia/Singapore). Branch `ws/app`. Status: **F0, F1, F4 and F5
+Updated: 2026-10-15 (Asia/Singapore). Branch `ws/app`. Status: **F0, F1, F4, F5 and F6
 done; F2 and F3 done except the parts waiting on platform** (listed under Needs). **The
 app runs on the native core (B2) and the platform's Windows services (B3)** (F7's
 service part, `0d33d43`), with the §9.3 budgets measured on real data (Tests). Master
@@ -10,15 +10,19 @@ data and its goldens are regenerated (`4829f8e`). **F5, the VEGAS popup, is buil
 (`--edit-session`, UI_SPEC §4, S3): the C4 request and result through
 `EditSessionService`, the template header and origin line, the one-row strip, Load preset,
 Show changes, Update from library, Save to library, Apply and Cancel, and Advanced mode
-in a compact layout. Next: **F6, the render progress window** (C5, `--render-monitor`,
-design S6, UI_SPEC §12).
+in a compact layout. **F6, the render progress window, is built** (`--render-monitor`,
+UI_SPEC §12, S6): the C5 live file, placement on VEGAS's monitor from `hostHwnd`, the
+remembered pin, the figures, and the done, failed and cancelled states from the C6
+record. Next: the F3 follow-ups that platform already unblocked (Open items).
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
 widget and golden tests on the platform fakes and the native core; the Windows services
 with unit tests on temporary folders. No FFmpeg ran for this work. The popup's sessions
 in tests come from the platform's `FakeEditSessionService`; no VEGAS page wrote a
-request, and A5–A7 (page exchange, template persistence) are not claimed.
+request, and A5–A7 (page exchange, template persistence) are not claimed. The progress
+window read hand-written live files, never one the exporter wrote; its performance
+check in VEGAS (TECH_ARCHITECTURE §5.6) is B6 work.
 ## Done
 
 **F0: project, runner, modes, theme, fonts, spikes.**
@@ -366,14 +370,76 @@ errors stop the save ("Fix the errors before saving", Show setting / Keep editin
 FFmpeg-only errors offer Save anyway. A core that can't check (the fake core in tests)
 leaves the decision to the library, whose refusal still shows its reason.
 
+**F6: the render progress window** (2026-10-15; UI_SPEC §12, S6; `state/monitor.dart`,
+`features/monitor/`, `design/components/wire_progress.dart`, `main.dart`,
+`windows/runner/`):
+
+- **Reading.** `liveRenderStatusProvider` watches the C5 file through
+  `LiveRenderStatusReader` (null until it appears; the reader keeps the last good
+  snapshot, so a stale or malformed file never reads as an end). Once the status is done,
+  failed or cancelled, `monitorJobRecordProvider` reads the C6 record (up to 8 tries,
+  250 ms apart; the engine writes it right after the final status) and
+  `monitorLogProvider` the log's location. Decoding a record loads the core; nothing
+  else does. `WindowsAppServices.machineSettings` is now a `FileMachineSettingsRepository`
+  of its own (same file, lock and revision rule), so reading keep on top no longer builds
+  `WindowsServices` and the core. Measured on the release build (Spike results):
+  `ve_core.dll` not loaded while encoding, loaded after done.
+- **Placement.** Before the first frame `monitorPlacement` reads `hostHwnd` from the live
+  file (`hostHwndOf`: C5's unsigned 64-bit decimal as the runner's signed 64 bits) and
+  C7 `keepOnTop`; `configure` takes `hostHwnd`. The runner's `HostBounds` puts the
+  window 16 px in from the bottom-right of the work area of that window's monitor, at its
+  DPI, after the reply (as the popup's owner placement); no owner is set. A handle that
+  isn't a top-level window keeps `Create`'s placement (the foreground window's monitor).
+  The window is 380×340 (`launch_options.cpp`).
+- **Window.** Title and headline per state, header (file name; encoder summary, then the
+  folder), `VeWireProgress` (video wire, green when done, dashed red when failed, grey
+  when cancelled), the six figures with dashes for unknown ones, and the footer.
+  Mapping in `features/monitor/display.dart`; the done and failed sentences reuse
+  History's `resultSentence`. Done closes after 10 s and cancelled after 5 s, paused while
+  the pointer is over the window. Failed stays open with FFmpeg's last lines (a
+  three-line box scrolled to the end), Show in History (disabled until a launcher exists:
+  `DesktopAppLauncher.openJob`, Needs) and Show log (`JobLogs.logLocation` →
+  `FileReveal`). Thirty seconds without a new status while starting or encoding puts
+  "No news from the render…" in the footer and nothing else. The pin calls
+  `setKeepOnTop` and writes C7 through `machineSettingsWriterProvider`.
+- **Services.** `AppServices` gains `jobLogs` and `fileReveal` (`jobLogsProvider`,
+  `fileRevealProvider`); the test fakes are `FakeJobRepository` and `FakeFileReveal`.
+- **Spike harness.** The monitor check now writes a C5 live file naming the fake host, checks
+  the corner placement at the monitor's DPI, starts again with `keepOnTop` true in the
+  data root's `machine.json`, and adds a run with VEGAS on another monitor while another
+  window is in front, plus a stale handle.
+
 ## Tests
 
-`flutter test` in `app/`: **477 tests** (470 before saving with errors, 416 before F5, 403 before F7, 348 before F4;
-F5's count is from the test files, to be confirmed by the final run). `flutter analyze`:
-no issues. Platform fakes for services everywhere except the Windows
+`flutter test` in `app/`: **523 tests** (477 before F6, 470 before saving with errors, 416 before F5, 403 before F7, 348 before F4).
+`flutter analyze`: no issues. Platform fakes for services everywhere except the Windows
 services tests below; the fake core for the F0–F3 tests and the native core (B2, through
 `dart:ffi`, in the `flutter test` VM) for the core tests; a fake window controller; for
 F3 two test doubles (`test/ffmpeg_doubles.dart`: a probe and hardware tests that stall).
+
+F6 added (46), on the platform's fakes (`FakeLiveRenderStatusReader` samples, fixture job
+records given the job's ID, `FakeFileReveal`; `test/monitor_doubles.dart`), a fake window
+controller, no FFmpeg, no VEGAS:
+
+- Widget (`monitor_test.dart`, 17): waiting, then starting → encoding (figures) →
+  finishing → verifying → done through `publish`; an older sequence changes nothing; done
+  closes at 10 s, stays open under the pointer and resumes after it leaves; Open folder
+  and Close; done without a record; cancelled closes at 5 s; failed stays open with the
+  reason and FFmpeg's lines; Show log reveals the log, and is off with its reason when
+  there is none; Show in History off without a launcher and calling one; the pin writes C7
+  both ways; "No news" after 30 s and cleared by a new status, never while checking;
+  `monitorPlacement` with and without a file.
+- Unit (`monitor_display_test.dart`, 16): paths, rounding down, unknown totals, titles,
+  headlines and frames per state, bar tones, the six figures and dashes, header detail,
+  the end sentences with and without a record (and a record for another job), FFmpeg's
+  last lines, `hostHwndOf` (64-bit, invalid text).
+- Unit (`services_wiring_test.dart`, +1) on the **real Windows services** in a
+  temporary folder: the progress window's placement, live status and settings reads build
+  no core; `jobLogsProvider` and `fileRevealProvider` are the Windows ones.
+- Golden (`monitor_golden_test.dart`, 6 states × light and dark = 12 images, 380×340):
+  `waiting`, `encoding`, `verifying`, `done`, `failed`, `cancelled`. Each was looked at.
+  `window_progress` (design-system goldens) was regenerated at 380×340: it now shows the
+  waiting state instead of the F0 placeholder.
 
 F5 added (54), on the native core (B2) for everything in the popup, the platform's fake
 services (`FakeEditSessionService`, `FakePresetLibrary` with `yt-h264` at revision 6), a
@@ -699,6 +765,35 @@ Over the other-DPI owner the popup stays within the 0.7 s warm budget but takes 
 those runs (4 ms otherwise), and the move to the other monitor then resizes the view.
 Why the request read took longer there is not established.
 
+**F6 recheck (2026-10-15), the progress window.** Release build (37 s), `-Checks monitor`
+three times, then `-Checks start`, fake host, `VEGAS_ENCODER_DATA_ROOT` on
+`app\build\spikes\data-root`, the same three monitors. Live files written by the probe
+(the encoding sample with the fake host's handle), not by the exporter. The user's
+folders were the same before and after.
+
+| Check | Result |
+| --- | --- |
+| No-activate, VEGAS's monitor = primary (120 dpi) | Fake VEGAS stayed foreground when the window showed and after a click on it; `WS_EX_NOACTIVATE`; not topmost (pin off); 475×425 physical (380×340 at 120 dpi), 20 px (16 logical) from the work-area corner |
+| Pin remembered | With `keepOnTop: true` in `machine.json`: topmost from the start, VEGAS still foreground |
+| **VEGAS on the right 96-dpi monitor, another window in front on the primary** | Window on VEGAS's monitor at 96 dpi, 380×340, 16 px from the corner; the other window stayed foreground; no owner. `host_bounds` 294–301 ms after start; shown 385–506 ms |
+| Stale `hostHwnd` | Falls back to the foreground window's monitor, 20 px from the corner |
+| Start, Skia, warm, median of 10 | Desktop 433 ms, popup 413 ms (F5: 445 / 395). Impeller 1,346 / 1,351 ms |
+
+Runs 2 and 3 agree line for line. **Run 1 is not used:** its monitor coordinates
+changed partway through (the right monitor reported at x=1920 instead of 2560), so its
+own placement checks disagreed with the app's trace, which was right
+(`host_bounds target=(4084,693,…)`, 16 px in from that monitor's corner). The cause was
+not established.
+
+**Cost while rendering** (release build, a script replacing the live file twice a
+second for 20 s, no VEGAS, no FFmpeg): 109 ms of CPU in 20.6 s (0.5% of one core);
+working set 99 MB, private 114 MB, under the 120 MB rule; `ve_core.dll` not loaded until
+after `done`; the window closed itself after done. One of the script's 41 replaces failed
+with "access denied" while the window was reading. The exporter's writer
+(`job_store.cpp` `Atomic`) retries that for up to 500 ms on its own thread, never Render's,
+so this costs it at most a short wait. The owner's three-renders-with, three-without check
+in VEGAS (TECH_ARCHITECTURE §5.6) is still to do (B6).
+
 - **Renderer: deferred.** The runner defaults to Skia for start time;
   `RendererFromEnvironment` in `windows/runner/main.cpp` is the one place to change, and
   `VEGAS_ENCODER_RENDERER=impeller` tries Impeller. Re-measure on each Flutter upgrade
@@ -801,7 +896,8 @@ Open (additive):
 | --- | --- |
 | Version checks and installer inputs (owner, 2026-10-15; later stage) | See the owner's "Plug-in and app versions" and "Installer" decisions above. (1) Before launching the popup or the progress window, the plug-in checks the installed app's version against its own build and says "run setup" on a mismatch. (2) An "installer inputs" note for the owner's Inno Setup work: the file set per target, install locations, version stamps, what must be closed, and the current reversible installer's rules. (3) Research before supporting older VEGAS versions: per-version host interfaces and where each version records its install |
 | **Library watch cost (F7). Owner priority, 2026-10-15** | `FilePresetLibrary.watch` polls every 250 ms, and each tick calls `list()`, which reads, decodes and normalizes (an FFI call per preset) every preset file on the caller's isolate, the app's UI isolate. Measured with 500 presets: **430–470 ms per tick** (`app/tool/budgets/budgets_test.dart`, real capability caches, JIT), so the poll runs back to back while a screen watches the library; with a handful of presets it is a few ms every 250 ms. Please make an unchanged library cheap to watch: list the folder and compare each file's size and last-write time (and `preferences.json`'s), keep each decoded preset and its requirements, and re-read only added or changed files (or watch the folder with `ReadDirectoryChangesW`, or poll off the caller's isolate). Keep what `watch` promises now: a current snapshot per listener, then a new value only when something changed; added, removed and edited presets and built-in star changes all show, and a malformed file behaves as today. Target: with 500 unchanged presets, a tick costs a few ms at most on the caller's isolate, measured through the real `FilePresetLibrary`. The app needs no change (it re-reads after its own writes, `PresetsController._refresh`) |
-| Open in Vegas Encoder (F5) | UI_SPEC §4: the popup opens the desktop app on the origin preset. No C3 service starts the desktop app (or hands an existing one a preset), and the app starts no processes itself (AGENTS.md). Please add one, for example `DesktopApp.openPreset(presetId)` that starts `VegasEncoder.exe` with a preset argument or asks the running single instance to select it. The button is disabled with that reason until then (`desktopAppLauncherProvider` is null) |
+| Open in Vegas Encoder (F5), Show in History (F6) | UI_SPEC §4: the popup opens the desktop app on the origin preset; §12: the failed progress window opens it on the job in History. No C3 service starts the desktop app (or hands an existing one a preset or job), and the app starts no processes itself (AGENTS.md). Please add one, for example `DesktopApp.openPreset(presetId)` and `openJob(jobId)` that start `VegasEncoder.exe` with an argument or ask the running single instance to show it. The app's side is ready (`DesktopAppLauncher` in `state/services.dart`); both buttons are disabled with the reason until then (`desktopAppLauncherProvider` is null) |
+| Output bit depth in C5 (F6) | S6's header starts with a wire glyph for 10-bit or 8-bit output, with a pip when a conversion lowers it. C5 has no bit-depth fact, so the window shows no glyph rather than guess. An additive `outputBitDepth` (and whether a pixel-format conversion reduces it, as the core's signal facts say) would let it draw one; nothing else changes |
 | Popup size (F5) | UI_SPEC §1: the popup remembers its size, not its position. C7 `uiState` has desktop fields only, so the popup opens at its default size every time. Please add an additive `popupWindowSize` (physical width and height, or logical) to `AppUiState`, or the owner decides the popup keeps the default size |
 | Render As path in the popup (F5) | C4 `context` carries the project but not the file Render As will write, so the popup's command and Advanced's resolved command use the sample path (`D:\Renders\Sample project.mp4`; the resolved command says "for the sample project"). If the page can know the path, an additive `context.outputPath` would let the preview show it; otherwise nothing changes |
 | Capability transfer in Advanced mode (F7) | Lint and compile each serialize the full capability map (156–236K characters) through FFI: **25–32 ms per keystroke** in Advanced mode (budget 4 ms). Please let the core keep a capability map it was given (an ID or handle per identity key) so later calls pass the ID, or offer one call that lints and compiles a template together |
@@ -825,7 +921,27 @@ App side, unblocked by B3/B4 (F3 follow-up): installation health on the FFmpeg c
 of one record per visible row; the full log (JobLogs) and FFmpeg's error tokens in a
 job; Test this preset (PresetTests); Export…, Copy share string, Show in folder and
 History's Open folder (PresetTransfer, PresetLocations, FileReveal). Real discovery
-and probes were not run from the app: no FFmpeg ran for F7.
+and probes were not run from the app: no FFmpeg ran for F7. F6 already wired
+`jobLogsProvider` and `fileRevealProvider` into `AppServices`, so History's full log and
+Open folder can use them directly.
+
+Waiting on platform for F6: starting the desktop app on a job (Show in History), the
+output bit depth in C5 (the header glyph). Gated: the window has only read hand-written
+live files; the exporter launching it, real renders, and the owner's with/without
+performance check are B6 work.
+
+F6 points to check in use:
+
+- **Private memory is close to the budget:** 114 MB private, 99 MB working set, against
+  "under 120 MB" (TECH_ARCHITECTURE §5.6, which doesn't say which figure). Most of it is
+  the Flutter engine. If the owner's check counts private bytes, this is the first thing
+  to look at (Skia vs Impeller, the font set).
+- The record lookup gives up after about 2 s; a record written later than that leaves the
+  live file's shorter sentence (no size, no output check) and Show log off.
+- "Show log" shows the file in Explorer rather than opening it in an editor: there is no
+  service for opening a file with its default app.
+- The window can't be moved off the monitor it opened on except by dragging; it doesn't
+  follow VEGAS if VEGAS moves during the render.
 
 Waiting on platform for F4: Advanced stage and macro roles, a macro list, encoder IDs
 in Advanced mode, the temporary output name, partial highlighting with an open quote.
@@ -900,34 +1016,28 @@ Window start (runner), unverified or not fixed:
 
 ## Handoff for the next app agent
 
-Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md (C5 for live status, C7
-for `keepOnTop`), TECH_ARCHITECTURE §5.6, this file and UI_SPEC §12 first. F5 is done;
-the app runs on the native core (B2) and the Windows services (B3), with fakes in tests.
-Next: **F6, the render progress window** (UI_SPEC §12, S6 in
-`design/signal-flow.html`), replacing the F0 shell in `features/monitor/monitor_window.dart`.
-B5's outcome (platform.md, NATIVE_PROGRESS.md): the owner dropped custom text in VEGAS's
-render dialog, so this window is the only place the encode statistics show:
+Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md, this file and the
+UI_SPEC section for what you change. F6 is done; the app runs on the native core (B2) and
+the Windows services (B3), with fakes in tests. Next, app-only work that platform has
+already unblocked (Open items, "App side, unblocked by B3/B4"):
 
-- `--render-monitor <file>` reads the C5 live file through `liveStatusReaderProvider`
-  (`FileLiveRenderStatusReader.watch`; tests use `FakeLiveRenderStatusReader`, whose
-  `samples()` give one status per state and `publish(file, status)` drives a test). A
-  missing file is null at first; a malformed or stale replacement keeps the last good
-  snapshot and never means the render ended.
-- The window never takes focus (`WS_EX_NOACTIVATE`, already in the runner) and shows
-  near VEGAS: C5 `hostHwnd` names VEGAS's main window for the monitor (the runner places
-  the window on the foreground window's monitor today; use `hostHwnd` when it is valid,
-  else that fallback). Keep on top starts from C7 `keepOnTop`; the pin writes it through
-  `machineSettingsWriterProvider`.
-- It shows state, frames, fps, speed, bitrate, size so far and the estimate, closes a few
-  seconds after `done`, and stays open after `failed` or `cancelled`. Cancelling stays in
-  VEGAS. Nothing in the window may make Render wait (AGENTS.md).
-- The owner's performance rule (TECH_ARCHITECTURE §5.6): if the window costs more than
-  about 2% of render time or 120 MB, it is dropped. Keep its startup to the live file
-  only (the services are built lazily; the window must not load the core or the
-  library).
+- FFmpeg cards: installation health (`FFmpegInstallation.health`, `healthMessage`).
+- History: the list from the index summaries; the full log (`jobLogsProvider`) and
+  FFmpeg's error tokens (`errorTokenIndices`) in a job; Open folder (`fileRevealProvider`).
+- Presets: Test this preset (`PresetTests`); Export…, Copy share string, Show in folder
+  (`PresetTransfer`, `PresetLocations`, `FileReveal`).
 - Runner or window changes need a release build and `tool/spikes/run_window_spikes.ps1`
-  (`-Checks monitor`, `start`; never `all` or `theme`), with `VEGAS_ENCODER_DATA_ROOT`
-  on a scratch folder. Nothing runs in VEGAS until B6.
+  (`-Checks monitor`, `owner` or `start`; never `all` or `theme`); it sets
+  `VEGAS_ENCODER_DATA_ROOT` to a scratch folder. If a run's monitor coordinates disagree
+  with themselves, run it again (F6 recheck). Nothing runs in VEGAS until B6.
+
+- The progress window (F6) lives in `state/monitor.dart` (live status, record, log,
+  `monitorPlacement`, `hostHwndOf`) and `features/monitor/` (the window; `display.dart`
+  for every label and sentence). Its tests use `test/monitor_doubles.dart`. Done closes
+  after 10 s and cancelled after 5 s (UI_SPEC §12; the earlier handoff said cancelled
+  stays open, but the spec and mockup say it closes); failed stays open. While rendering
+  it must keep reading only the live file and settings: `services_wiring_test.dart` fails
+  if it loads the core.
 
 - The popup (F5) lives in `state/popup.dart` (session, controller, `popupEditorProvider`,
   `popupChangesProvider`, `applyBlocked`) and `features/popup/` (window, editor, dialogs,

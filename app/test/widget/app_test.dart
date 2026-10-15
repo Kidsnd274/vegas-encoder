@@ -147,7 +147,7 @@ void main() {
       final window = FakeWindowController(const WindowState(keepOnTop: true));
       await pumpApp(
         tester,
-        view: const Size(380, 250),
+        view: const Size(380, 340),
         overrides: [
           launchModeProvider.overrideWithValue(const RenderMonitorLaunch(r'D:\jobs\7.live.json')),
           windowControllerProvider.overrideWithValue(window),
@@ -163,7 +163,7 @@ void main() {
     testWidgets('a mode flag without its path is shown, not swallowed', (tester) async {
       await pumpApp(
         tester,
-        view: const Size(380, 250),
+        view: const Size(380, 340),
         overrides: [
           launchModeProvider.overrideWithValue(
             const LaunchError('--render-monitor', '--render-monitor needs a path after it.'),

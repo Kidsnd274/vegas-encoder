@@ -43,9 +43,13 @@ class FakeAppServices implements AppServices {
   @override
   final FakeJobRepository jobs = FakeJobRepository();
   @override
+  FakeJobRepository get jobLogs => jobs;
+  @override
   final FakeLiveRenderStatusReader liveStatus = FakeLiveRenderStatusReader();
   @override
   final FakeEditSessionService editSessions = FakeEditSessionService();
+  @override
+  final FakeFileReveal fileReveal = FakeFileReveal();
   @override
   ServicePaths? get paths => null;
 

@@ -44,10 +44,13 @@ typedef WindowBounds = ({int x, int y, int width, int height});
 /// [FakeWindowController].
 abstract interface class WindowController {
   /// Applies placement before the first frame. [ownerHwnd] makes the popup an
-  /// owned window centred on VEGAS's dialog. [bounds] and [maximized] restore
-  /// the desktop window where it was (clamped to a current monitor; ignored if
-  /// that monitor is gone). Returns whether the owner was set.
-  Future<bool> configure({int? ownerHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized});
+  /// owned window centred on VEGAS's dialog. [hostHwnd] puts the progress
+  /// window in the bottom-right corner of the monitor VEGAS's main window is
+  /// on, without owning it (C5); a handle that is no longer a window keeps
+  /// the runner's placement. [bounds] and [maximized] restore the desktop
+  /// window where it was (clamped to a current monitor; ignored if that
+  /// monitor is gone). Returns whether the owner was set.
+  Future<bool> configure({int? ownerHwnd, int? hostHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized});
 
   /// Where the window is when restored, and whether it is maximized; null
   /// outside the Windows runner.
@@ -104,9 +107,10 @@ class MethodChannelWindowController implements WindowController {
   }
 
   @override
-  Future<bool> configure({int? ownerHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized}) async {
+  Future<bool> configure({int? ownerHwnd, int? hostHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized}) async {
     final result = await _invoke<Map<Object?, Object?>>('configure', {
       'ownerHwnd': ?ownerHwnd,
+      'hostHwnd': ?hostHwnd,
       'keepOnTop': ?keepOnTop,
       if (bounds != null) 'bounds': {'x': bounds.x, 'y': bounds.y, 'width': bounds.width, 'height': bounds.height},
       'maximized': ?maximized,
@@ -186,9 +190,9 @@ class FakeWindowController implements WindowController {
   }
 
   @override
-  Future<bool> configure({int? ownerHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized}) async {
+  Future<bool> configure({int? ownerHwnd, int? hostHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized}) async {
     calls.add(
-      'configure(owner: $ownerHwnd, keepOnTop: $keepOnTop'
+      'configure(owner: $ownerHwnd${hostHwnd == null ? '' : ', host: $hostHwnd'}, keepOnTop: $keepOnTop'
       '${bounds == null ? '' : ', bounds: $bounds, maximized: $maximized'})',
     );
     return ownerHwnd != null;

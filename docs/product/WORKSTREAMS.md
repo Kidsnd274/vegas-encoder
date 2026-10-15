@@ -87,7 +87,7 @@ The early milestones are chosen so neither side waits.
 | B4 | Engine: argv input, `-progress` parsing, live status writer, ffprobe verification, job records; fake-host suite with recipes | Progress window on real data (fake host) |
 | B5 | VEGAS status line track: static analysis of `ISfProgress` slots 3/4, then an opt-in real-host test with the owner | Keep or drop the status line |
 | B6 | Adapter (gated A5–A7): template payload, native page launching the editor, render from recipe, progress window launch; real-host checklist and the progress-window performance check with the owner | Popup and progress window in VEGAS |
-| B7 | Installer for app, DLL and config; reversible, manifest-based | Release |
+| B7 | Installer inputs for the owner's Inno Setup installer (owner, 2026-10-15): the file set per target, install locations, version stamps, what must be closed, VEGAS detection, and the current reversible installer's rules (manifest, backups). The owner builds the installer | Release |
 
 **App**
 

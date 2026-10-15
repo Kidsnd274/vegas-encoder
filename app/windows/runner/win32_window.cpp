@@ -356,6 +356,34 @@ std::optional<RECT> Win32Window::OwnerBounds(HWND owner) {
   return RECT{x, y, x + width, y + height};
 }
 
+std::optional<RECT> Win32Window::HostBounds(HWND host) {
+  if (window_handle_ == nullptr ||
+      options_.kind != LaunchKind::kRenderMonitor || host == nullptr ||
+      !IsWindow(host) || GetAncestor(host, GA_ROOT) != host) {
+    return std::nullopt;
+  }
+  // As Create places it, but on the host's monitor and at that monitor's DPI
+  // (the progress window has no resize borders).
+  const HMONITOR monitor = MonitorFromWindow(host, MONITOR_DEFAULTTONEAREST);
+  const RECT work = WorkAreaOf(monitor);
+  const UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+  const double scale_factor = dpi / 96.0;
+  const int width = std::min(Scale(options_.width, scale_factor),
+                             static_cast<int>(work.right - work.left));
+  const int height = std::min(Scale(options_.height, scale_factor),
+                              static_cast<int>(work.bottom - work.top));
+  const int margin = Scale(kMonitorWindowMargin, scale_factor);
+  const int x = std::max(static_cast<int>(work.left),
+                         static_cast<int>(work.right) - width - margin);
+  const int y = std::max(static_cast<int>(work.top),
+                         static_cast<int>(work.bottom) - height - margin);
+  char line[160];
+  snprintf(line, sizeof(line), "host_bounds dpi=%u target=(%d,%d,%d,%d)", dpi,
+           x, y, x + width, y + height);
+  startup_trace::Mark(line);
+  return RECT{x, y, x + width, y + height};
+}
+
 void Win32Window::SetKeepOnTop(bool keep_on_top) {
   keep_on_top_ = keep_on_top;
   if (window_handle_ != nullptr) {

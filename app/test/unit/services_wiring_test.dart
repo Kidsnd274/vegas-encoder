@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,11 +8,13 @@ import 'package:vegas_encoder/app/launch.dart';
 import 'package:vegas_encoder/features/presets/library_model.dart';
 import 'package:vegas_encoder/state/app_state.dart';
 import 'package:vegas_encoder/state/editor.dart';
+import 'package:vegas_encoder/state/monitor.dart';
 import 'package:vegas_encoder/state/presets.dart';
 import 'package:vegas_encoder/state/recipe_edit.dart';
 import 'package:vegas_encoder/state/services.dart';
 
 import '../helpers.dart';
+import '../monitor_doubles.dart';
 
 /// F7: the app on the platform's Windows services (B3). The real services run
 /// on a temporary folder, never the user's `%APPDATA%`; the native core
@@ -57,6 +60,8 @@ void main() {
       expect(container.read(ffmpegProbeProvider), isA<WindowsFFmpegProbe>());
       expect(container.read(hardwareTestsProvider), isA<WindowsHardwareTests>());
       expect(container.read(jobRepositoryProvider), isA<FileJobRepository>());
+      expect(container.read(jobLogsProvider), isA<FileJobRepository>());
+      expect(container.read(fileRevealProvider), isA<WindowsFileReveal>());
       expect(container.read(liveStatusReaderProvider), isA<FileLiveRenderStatusReader>());
       expect(container.read(editSessionServiceProvider), isA<FileEditSessionService>());
       expect(container.read(servicesProvider).paths!.roaming, paths.roaming);
@@ -138,6 +143,34 @@ void main() {
       expect(encoders['libx264'], contains('options'), reason: 'the recipe\'s own encoder keeps its options');
       expect(encoders['hevc_nvenc'], isNot(contains('options')), reason: 'others keep name and availability only');
       expect(data.compiled.ok, isTrue);
+    });
+
+    test('the progress window reads its live file and the pin without loading the core', () async {
+      final live = '${root.path}\\b0-render.live.json';
+      await File(live).writeAsString(jsonEncode(liveSample(RenderState.encoding).toJson()));
+      final settings = FileMachineSettingsRepository(paths: paths);
+      final current = await settings.read();
+      await settings.save(current.copyWith(keepOnTop: true), expectedRevision: current.revision);
+
+      var coreLoads = 0;
+      final container = ProviderContainer(
+        overrides: [
+          launchModeProvider.overrideWithValue(RenderMonitorLaunch(live)),
+          veCoreProvider.overrideWith((ref) {
+            coreLoads++;
+            return core;
+          }),
+          servicesProvider.overrideWith((ref) => WindowsAppServices(() => ref.read(veCoreProvider), paths: paths)),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(await monitorPlacement(container, live), (host: 123456, keepOnTop: true));
+      container.listen(liveRenderStatusProvider, (_, _) {});
+      container.listen(machineSettingsProvider, (_, _) {});
+      expect((await container.read(liveRenderStatusProvider.future))?.framesDone, 7400);
+      expect((await container.read(machineSettingsProvider.future)).keepOnTop, isTrue);
+      expect(coreLoads, 0, reason: 'while VEGAS renders the window reads two small files and nothing else');
     });
   });
 

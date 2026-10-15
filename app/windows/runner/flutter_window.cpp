@@ -137,11 +137,17 @@ void FlutterWindow::HandleMethodCall(
   const EncodableMap& args = arguments != nullptr ? *arguments : empty;
 
   if (method == "configure") {
-    // The popup over its owner, or the desktop at its remembered bounds.
+    // The popup over its owner, the progress window on VEGAS's monitor, or
+    // the desktop at its remembered bounds.
     std::optional<RECT> on_owner;
     if (auto owner = AsInt(Find(args, "ownerHwnd"))) {
       on_owner =
           OwnerBounds(reinterpret_cast<HWND>(static_cast<intptr_t>(*owner)));
+    }
+    std::optional<RECT> on_host;
+    if (auto host = AsInt(Find(args, "hostHwnd"))) {
+      on_host =
+          HostBounds(reinterpret_cast<HWND>(static_cast<intptr_t>(*host)));
     }
     if (auto keep_on_top = AsBool(Find(args, "keepOnTop"))) {
       SetKeepOnTop(*keep_on_top);
@@ -164,6 +170,7 @@ void FlutterWindow::HandleMethodCall(
     result->Success(EncodableValue(EncodableMap{
         {EncodableValue("ownerSet"), EncodableValue(on_owner.has_value())},
         {EncodableValue("boundsSet"), EncodableValue(restore.has_value())},
+        {EncodableValue("hostSet"), EncodableValue(on_host.has_value())},
     }));
     // Place after replying. A new size (or a monitor with another DPI: a VEGAS
     // window on a second monitor, or remembered bounds there) resizes the
@@ -173,7 +180,7 @@ void FlutterWindow::HandleMethodCall(
     // after this reply (main awaits configure before runApp); while blocked
     // the engine keeps running Dart's tasks, so replying first lets the frame
     // arrive. The window is shown only once it is in place, so it never jumps.
-    if (const auto target = restore ? restore : on_owner) {
+    if (const auto target = restore ? restore : on_owner ? on_owner : on_host) {
       placing_ = true;
       RestoreBounds(*target,
                     restore && AsBool(Find(args, "maximized")).value_or(false));

@@ -508,6 +508,50 @@ static class Probe
 
     // ------------------------------------------------------------ no-activate progress window
 
+    /// A C5 live status file for a render in VEGAS's main window [host]: the
+    /// encoding sample (schema/fixtures/b0/live) with this host's handle.
+    static string WriteLive(string name, IntPtr host)
+    {
+        var live = Path.Combine(_out, name);
+        File.WriteAllText(live,
+            "{\"live\":1,\"jobId\":\"spike-render\",\"hostHwnd\":\"" + unchecked((ulong)host.ToInt64()) + "\",\"sequence\":2," +
+            "\"updatedAt\":\"" + DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") + "\",\"state\":\"encoding\"," +
+            "\"framesDone\":7400,\"framesTotal\":22873,\"encodeFps\":61.8,\"speed\":2.06,\"bitrateKbps\":30700," +
+            "\"bytesWritten\":1230000000,\"elapsedSec\":244,\"etaSec\":250,\"estimatedFinalBytes\":2930000000," +
+            "\"outputPath\":\"D:\\\\Renders\\\\Lakeside wedding final.mp4\",\"templateName\":\"YouTube 4K upload (Lakeside)\"," +
+            "\"encoderSummary\":\"x264 CRF 17, slower / AAC 256 kb/s\",\"message\":\"Encoding.\",\"ffmpegExitCode\":null}");
+        return live;
+    }
+
+    /// C7 keep on top in the spike's data root (run_window_spikes.ps1 sets it).
+    static void SetKeepOnTop(bool value)
+    {
+        var root = Environment.GetEnvironmentVariable("VEGAS_ENCODER_DATA_ROOT");
+        if (root == null) throw new InvalidOperationException("VEGAS_ENCODER_DATA_ROOT is not set: refusing to write the user's machine.json.");
+        var roaming = Path.Combine(root, "Roaming");
+        Directory.CreateDirectory(roaming);
+        File.WriteAllText(Path.Combine(roaming, "machine.json"),
+            "{\"machine\":1,\"revision\":0,\"installations\":[],\"defaultFFmpegId\":null,\"progressWindow\":true," +
+            "\"keepOnTop\":" + (value ? "true" : "false") + ",\"verifyOutput\":true,\"theme\":\"system\",\"uiState\":null}");
+    }
+
+    /// Where the window should be on [m]: 380x340 at its DPI, 16 px in from
+    /// the bottom-right corner of its work area.
+    static string CornerCheck(Native.RECT r, MonitorInfo m)
+    {
+        var scale = m.Dpi / 96.0;
+        int w = (int)Math.Round(380 * scale), h = (int)Math.Round(340 * scale), margin = (int)Math.Round(16 * scale);
+        int gapRight = m.Work.Right - r.Right, gapBottom = m.Work.Bottom - r.Bottom;
+        var inside = r.Left >= m.Work.Left && r.Top >= m.Work.Top && r.Right <= m.Work.Right && r.Bottom <= m.Work.Bottom;
+        return $"inside that work area: {Yes(inside)}; size {r.Width}x{r.Height} vs {w}x{h}; gap right {gapRight}, bottom {gapBottom} px (margin {margin})";
+    }
+
+    static MonitorInfo MonitorOf(IntPtr hwnd)
+    {
+        var handle = Native.MonitorFromWindow(hwnd, Native.MONITOR_DEFAULTTONEAREST);
+        return Monitors().First(m => m.Handle == handle);
+    }
+
     static void Monitor()
     {
         Log("");
@@ -515,7 +559,8 @@ static class Probe
         using (var host = new FakeHost("Fake VEGAS Pro", new Rectangle(200, 150, 1400, 900)))
         {
             Log($"fake VEGAS foreground after click: {Yes(host.Activate())}");
-            var live = Path.Combine(_out, "render.live.json");
+            SetKeepOnTop(false);
+            var live = WriteLive("render.live.json", host.Handle);
             var p = Launch($"--render-monitor \"{live}\"");
             var mon = FindAppWindow(p.Id);
             Thread.Sleep(800);
@@ -526,7 +571,7 @@ static class Probe
             Log($"WS_EX_NOACTIVATE: {Yes((ex & Native.WS_EX_NOACTIVATE) != 0)}, topmost (keep on top): {Yes((ex & Native.WS_EX_TOPMOST) != 0)}");
             var r = Visible(mon);
             var work = WorkArea(host.Handle);
-            Log($"progress window {r}; work area of VEGAS's monitor {work}; gap right {work.Right - r.Right}, bottom {work.Bottom - r.Bottom} px");
+            Log($"progress window {r}; work area of VEGAS's monitor {work}; {CornerCheck(r, MonitorOf(host.Handle))}");
             Save(mon, "monitor-window.png", 24);
 
             // A click on the progress window body must not activate it.
@@ -537,6 +582,64 @@ static class Probe
             Thread.Sleep(300);
             Native.SetCursorPos(saved.X, saved.Y);
             Log($"VEGAS still foreground after a click on the progress window: {Yes(Native.GetForegroundWindow() == host.Handle)}");
+            CloseAndWait(p, mon);
+
+            // The remembered pin (C7 keepOnTop) applies before the first frame.
+            SetKeepOnTop(true);
+            host.Activate();
+            p = Launch($"--render-monitor \"{live}\"");
+            mon = FindAppWindow(p.Id);
+            Thread.Sleep(800);
+            ex = Native.GetWindowLongPtr(mon, Native.GWL_EXSTYLE).ToInt64();
+            Log($"with keepOnTop=true in machine.json: topmost {Yes((ex & Native.WS_EX_TOPMOST) != 0)}; VEGAS still foreground {Yes(Native.GetForegroundWindow() == host.Handle)}");
+            CloseAndWait(p, mon);
+            SetKeepOnTop(false);
+        }
+        MonitorOnHostMonitor();
+    }
+
+    /// C5 hostHwnd names VEGAS's main window on another monitor while a
+    /// different window is in the foreground: the window goes to VEGAS's
+    /// monitor, at that monitor's DPI, not the foreground window's.
+    static void MonitorOnHostMonitor()
+    {
+        Log("");
+        Log("== progress window on VEGAS's monitor (C5 hostHwnd), another window in front ==");
+        var monitors = Monitors();
+        var primary = monitors.FirstOrDefault(m => m.Primary);
+        var other = monitors.FirstOrDefault(m => !m.Primary);
+        if (primary == null || other == null)
+        {
+            Log("skipped: one monitor only");
+            return;
+        }
+        Rectangle On(MonitorInfo m) => new Rectangle(m.Work.Left + 80, m.Work.Top + 80, Math.Min(1000, m.Work.Width - 160), Math.Min(700, m.Work.Height - 160));
+        using (var vegas = new FakeHost("Fake VEGAS Pro (other monitor)", On(other)))
+        using (var front = new FakeHost("Another app (primary monitor)", On(primary)))
+        {
+            Log($"VEGAS on {other.Bounds} at dpi {other.Dpi}; foreground window on the primary at dpi {primary.Dpi}: {Yes(front.Activate())}");
+            var live = WriteLive("render-other.live.json", vegas.Handle);
+            var trace = Path.Combine(_out, "trace-monitor-host.txt");
+            File.Delete(trace);
+            var p = Launch($"--render-monitor \"{live}\"", new Dictionary<string, string> { { "VEGAS_ENCODER_STARTUP_TRACE", trace } });
+            var mon = FindAppWindow(p.Id);
+            var lines = WaitForTrace(trace);
+            Thread.Sleep(800);
+            var r = Visible(mon);
+            Log($"progress window {r}, dpi {Native.GetDpiForWindow(mon)}; on VEGAS's monitor: {Yes(MonitorOf(mon).Handle == other.Handle)}; {CornerCheck(r, other)}");
+            Log($"the other app still foreground: {Yes(Native.GetForegroundWindow() == front.Handle)}; owner none: {Yes(Native.GetWindow(mon, Native.GW_OWNER) == IntPtr.Zero)}");
+            Log($"  trace: {lines.FirstOrDefault(l => l.Contains("host_bounds")) ?? "(no host_bounds line)"}; shown {Mark(lines, "shown"):0} ms");
+            Save(mon, "monitor-window-host.png", 24);
+            CloseAndWait(p, mon);
+
+            // A handle that is no longer a window falls back to the foreground's monitor.
+            var stale = WriteLive("render-stale.live.json", new IntPtr(0x7FFFFFF0));
+            front.Activate();
+            p = Launch($"--render-monitor \"{stale}\"");
+            mon = FindAppWindow(p.Id);
+            Thread.Sleep(800);
+            r = Visible(mon);
+            Log($"stale hostHwnd: on the foreground window's monitor: {Yes(MonitorOf(mon).Handle == primary.Handle)}; {CornerCheck(r, primary)}");
             CloseAndWait(p, mon);
         }
     }

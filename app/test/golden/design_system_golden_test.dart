@@ -100,7 +100,7 @@ void main() {
         tester.platformDispatcher.platformBrightnessTestValue = brightness;
         await pumpApp(
           tester,
-          view: const Size(380, 250),
+          view: const Size(380, 340),
           overrides: [
             launchModeProvider.overrideWithValue(
               const RenderMonitorLaunch(r'C:\Users\me\AppData\Local\VegasEncoder\jobs\7.live.json'),

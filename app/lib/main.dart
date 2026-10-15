@@ -8,6 +8,7 @@ import 'app/app.dart';
 import 'app/launch.dart';
 import 'platform/window_channel.dart';
 import 'state/app_state.dart';
+import 'state/monitor.dart';
 import 'state/popup.dart';
 import 'state/services.dart';
 
@@ -34,15 +35,17 @@ Future<void> main(List<String> args) async {
 
   // The runner shows the window on the first frame, so placement (owner,
   // keep on top, the desktop window's remembered bounds) happens before runApp
-  // and the window never jumps. Keep on top is off by default (owner
-  // decision); F6 reads the remembered pin from C7 `keepOnTop` here.
-  // Only the desktop window restores bounds, so only it reads settings first.
+  // and the window never jumps. Only the desktop window restores bounds.
   final remembered = mode is DesktopLaunch ? await _rememberedBounds(container) : null;
   // The popup is owned by the VEGAS dialog its request names (C4).
   final owner = mode is EditSessionLaunch ? await _owner(container) : null;
+  // The progress window goes on VEGAS's monitor (C5 `hostHwnd`) with the
+  // remembered pin (C7 `keepOnTop`, off by default).
+  final monitor = mode is RenderMonitorLaunch ? await monitorPlacement(container, mode.liveFile) : null;
   await window.configure(
     ownerHwnd: owner,
-    keepOnTop: mode is RenderMonitorLaunch ? false : null,
+    hostHwnd: monitor?.host,
+    keepOnTop: monitor?.keepOnTop,
     bounds: remembered?.bounds,
     maximized: remembered?.maximized,
   );

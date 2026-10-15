@@ -83,8 +83,14 @@ abstract interface class AppServices {
   HardwareTests get hardwareTests;
   CapabilityCache get capabilityCache;
   JobRepository get jobs;
+
+  /// A job's full FFmpeg log (C6 `logFile`).
+  JobLogs get jobLogs;
   LiveRenderStatusReader get liveStatus;
   EditSessionService get editSessions;
+
+  /// Shows a file or folder in Explorer.
+  FileReveal get fileReveal;
 
   /// Where the services keep their files, for Settings > About; null for
   /// the fakes, which keep nothing.
@@ -94,9 +100,9 @@ abstract interface class AppServices {
 }
 
 /// The platform's Windows services (CONTRACTS C3, `WindowsServices`). Built
-/// on first use, so the progress window, which only reads its live file,
-/// never loads the core or the library. Constructing them scans nothing and
-/// writes nothing.
+/// on first use, so the progress window, which reads only its live file and
+/// keep on top while VEGAS renders, loads neither the core nor the library
+/// then. Constructing them scans nothing and writes nothing.
 final class WindowsAppServices implements AppServices {
   /// [core] gives the process's core when the services are first used.
   WindowsAppServices(this._core, {ServicePaths? paths}) : _paths = paths ?? ServicePaths.windows();
@@ -109,8 +115,11 @@ final class WindowsAppServices implements AppServices {
   ServicePaths get paths => _paths;
   @override
   PresetLibrary get library => _windows.library;
+  /// The settings file on its own, without the core, so the progress window
+  /// can read keep on top (C7). Discovery writes through the copy inside
+  /// [WindowsServices]; both use the same file, lock and revision check.
   @override
-  MachineSettingsRepository get machineSettings => _windows.machineSettings;
+  late final MachineSettingsRepository machineSettings = FileMachineSettingsRepository(paths: _paths);
   @override
   FFmpegDiscovery get discovery => _windows.discovery;
   @override
@@ -122,7 +131,11 @@ final class WindowsAppServices implements AppServices {
   @override
   JobRepository get jobs => _windows.jobs;
   @override
+  JobLogs get jobLogs => _windows.jobs;
+  @override
   late final LiveRenderStatusReader liveStatus = FileLiveRenderStatusReader();
+  @override
+  late final FileReveal fileReveal = WindowsFileReveal();
 
   /// Needs the native core: a core that didn't load makes this throw
   /// `CORE-CONTRACT`, which the popup shows like any unreadable session.
@@ -185,19 +198,27 @@ final hardwareTestsProvider = Provider<HardwareTests>((ref) => ref.watch(service
 /// Render records (C6), for History.
 final jobRepositoryProvider = Provider<JobRepository>((ref) => ref.watch(servicesProvider).jobs);
 
+/// Full FFmpeg logs (C6), by job.
+final jobLogsProvider = Provider<JobLogs>((ref) => ref.watch(servicesProvider).jobLogs);
+
+/// Shows a file in Explorer (the progress window's Open folder).
+final fileRevealProvider = Provider<FileReveal>((ref) => ref.watch(servicesProvider).fileReveal);
+
 /// The render's live status file (C5), for the progress window.
 final liveStatusReaderProvider = Provider<LiveRenderStatusReader>((ref) => ref.watch(servicesProvider).liveStatus);
 
 /// The popup's request and result files (C4).
 final editSessionServiceProvider = Provider<EditSessionService>((ref) => ref.watch(servicesProvider).editSessions);
 
-/// Starts the desktop app on a preset ("Open in Vegas Encoder", UI_SPEC §4).
+/// Starts the desktop app on a preset ("Open in Vegas Encoder", UI_SPEC §4)
+/// or on a job in History (the progress window's "Show in History", §12).
 abstract interface class DesktopAppLauncher {
   Future<void> openPreset(String presetId);
+  Future<void> openJob(String jobId);
 }
 
 /// No C3 service starts the desktop app yet (workstreams/app.md, Needs), so
-/// this is null and the popup says why. Tests supply one to check the action.
+/// this is null and the popup and the progress window say why. Tests supply one to check the action.
 final desktopAppLauncherProvider = Provider<DesktopAppLauncher?>((ref) => null);
 
 /// The installations discovery knows about, kept current.
