@@ -138,6 +138,49 @@ Future<void> main() async {
         user.origin == 'builtin/${builtin.recipe.id}',
     'duplicate origin and revision',
   );
+  final transfer = FakePresetTransfer(
+    library,
+    files: {
+      'selected.vepreset': await library.exportPreset(builtin.recipe.id),
+      'invalid.vepreset': '{bad',
+      'large.vepreset': ' ' * (1024 * 1024 + 1),
+    },
+  );
+  final fromFile = await transfer.importFrom(
+    'selected.vepreset',
+    newId: 'fake-file',
+  );
+  check(
+    fromFile.recipe.id == 'fake-file' &&
+        !fromFile.builtin &&
+        fromFile.origin == 'builtin/${builtin.recipe.id}',
+    'fake imports selected text fixtures without reading files',
+  );
+  await transfer.exportTo(fromFile.recipe.id, 'captured.vepreset');
+  check(
+    (await transfer.importFrom(
+          'captured.vepreset',
+          newId: 'captured-file',
+        )).recipe.name ==
+        fromFile.recipe.name,
+    'fake captured exports can be imported without I/O',
+  );
+  for (final (path, code) in [
+    ('missing.vepreset', 'NOT-FOUND'),
+    ('invalid.vepreset', 'INVALID-DATA'),
+    ('large.vepreset', 'FILE-LIMIT'),
+  ]) {
+    await rejects(() async {
+      await transfer.importFrom(path, newId: 'fake-rejected');
+    }, code);
+  }
+  await rejects(() async {
+    await transfer.importFrom('selected.vepreset', newId: '../unsafe');
+  }, 'INVALID-ID');
+  check(
+    await library.get('fake-rejected') == null,
+    'failed fake imports add no preset',
+  );
   final saves = await Future.wait([
     library
         .save(

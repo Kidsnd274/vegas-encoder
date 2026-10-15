@@ -371,6 +371,91 @@ Future<void> main(List<String> args) async {
           await library.exportPreset('mine'),
       'export goes to selected path',
     );
+    final importPath = joinPath(root.path, '导入 preset.vepreset');
+    final sourceText = await File(exportPath).readAsString();
+    await File(importPath).writeAsString(sourceText);
+    final importedFile = await transfers.importFrom(
+      importPath,
+      newId: 'from-file',
+    );
+    check(
+      importedFile.recipe.id == 'from-file' &&
+          importedFile.recipe.name == latest.recipe.name &&
+          importedFile.revision == 1 &&
+          !importedFile.builtin &&
+          importedFile.origin == latest.origin &&
+          importedFile.recipe.data['futureRecipe'] != null &&
+          importedFile.data['futureTop'] != null &&
+          importedFile.requires.known,
+      'selected Unicode file imports through native validation with a new identity and unknown metadata',
+    );
+    final importedBytes = await File(
+      (await library.location('from-file'))!,
+    ).readAsString();
+    await rejects(
+      () => transfers.importFrom(importPath, newId: 'from-file'),
+      'REVISION-CONFLICT',
+    );
+    check(
+      await File((await library.location('from-file'))!).readAsString() ==
+              importedBytes &&
+          await File(importPath).readAsString() == sourceText,
+      'import collision preserves the existing preset and source file',
+    );
+    await rejects(
+      () => transfers.importFrom(
+        joinPath(root.path, 'missing.vepreset'),
+        newId: 'missing-import',
+      ),
+      'NOT-FOUND',
+    );
+    await rejects(
+      () => transfers.importFrom(root.path, newId: 'directory-import'),
+      'FILE-READ',
+    );
+    await rejects(
+      () => transfers.importFrom(importPath, newId: '../unsafe'),
+      'INVALID-ID',
+    );
+    final invalidSources = <(String, List<int>, String)>[
+      ('utf8', [0xff], 'INVALID-DATA'),
+      ('malformed', utf8.encode('{bad'), 'INVALID-DATA'),
+      ('duplicate', utf8.encode('{"vepreset":1,"vepreset":1}'), 'INVALID-DATA'),
+      (
+        'future-file',
+        utf8.encode(jsonEncode({...latest.toJson(), 'vepreset': 2})),
+        'UNSUPPORTED-VERSION',
+      ),
+      (
+        'bad-recipe-file',
+        utf8.encode(jsonEncode(badRecipe.data)),
+        'RECIPE-INVALID',
+      ),
+      ('oversize', List.filled(jsonFileLimit + 1, 32), 'FILE-LIMIT'),
+    ];
+    for (final (id, bytes, code) in invalidSources) {
+      await File(importPath).writeAsBytes(bytes);
+      await rejects(() => transfers.importFrom(importPath, newId: id), code);
+      check(
+        await library.get(id) == null &&
+            base64Encode(await File(importPath).readAsBytes()) ==
+                base64Encode(bytes),
+        'failed file import leaves its source intact and creates no preset: $id',
+      );
+    }
+    await File(
+      importPath,
+    ).writeAsString(await library.exportPreset(builtin.recipe.id));
+    final importedBuiltin = await transfers.importFrom(
+      importPath,
+      newId: 'builtin-file',
+    );
+    check(
+      importedBuiltin.origin == 'builtin/${builtin.recipe.id}' &&
+          !importedBuiltin.builtin &&
+          importedBuiltin.revision == 1,
+      'file import preserves built-in copy origin',
+    );
     final advanced = latest.copyWith(
       recipe: latest.recipe.copyWith(
         id: 'advanced',

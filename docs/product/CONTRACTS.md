@@ -531,7 +531,7 @@ the parser-version-2 cache and GPU-aware view composed by WindowsServices below.
 | --- | --- | --- |
 | PresetPreferences | setPreferences(id,{favorite?,pinned?}) -> Preset | FakePresetLibrary |
 | PresetLocations | location(id) -> absolute path or null for built-in/missing | FakePresetLibrary (illustrative location) |
-| PresetTransfer(library) | duplicate(id,{newId,name?}); fromJob(record,{newId,name?}); exportTo(id,selectedPath); shareString(id); importShareString(text,{newId}) | FakePresetTransfer (export captured in memory) |
+| PresetTransfer(library) | duplicate(id,{newId,name?}); fromJob(record,{newId,name?}); exportTo(id,selectedPath); importFrom(selectedPath,{required newId}); shareString(id); importShareString(text,{newId}) | FakePresetTransfer (selected-file fixtures and captured exports in memory) |
 | JobLogs | readLog(id) -> Stream<String> UTF-8 chunks; logLocation(id) -> path or null | FakeJobRepository(logs:{id:text}) |
 | FileReveal | reveal(absolutePath) | FakeFileReveal |
 
@@ -549,6 +549,20 @@ plain portable preset data, not encrypted or signed. Decoded data is bounded and
 validated through the same import path. Export writes only the user-selected path,
 atomically. Six packaged built-ins adopt the original recipe snapshots at product
 revision 1; design-time installation identities/results are never packaged with them.
+
+`PresetTransfer.importFrom(selectedPath, newId: ...)` reads only the caller-selected
+UTF-8 JSON file, bounded to 1 MiB even if it grows during the read. It delegates to
+the same repository import/native recipe validation and create-only Save path as
+share imports; a selected file cannot overwrite an existing preset. Imports preserve
+unknown metadata and copy origins, use the caller's new ID and start at revision 1.
+The source file is never changed or removed, including on failure. A missing file
+is NOT-FOUND, an unreadable file is FILE-READ, oversized input is FILE-LIMIT;
+malformed JSON/UTF-8, future versions, invalid recipes/IDs and collisions retain the
+repository's existing errors. The app supplies the Open dialog and refreshes/selects
+the returned preset. No extension-based trust or automatic scan is introduced.
+`FakePresetTransfer(library, files: {selectedPath: jsonText})` supports this operation
+without file I/O and can re-import its captured exports. Its file envelope checks
+are bounded; semantic behavior remains that of the injected library.
 
 Adjacent temp files are flushed then atomically renamed; the old destination is
 never deleted before replacement. Separate persistent lock files serialize Windows

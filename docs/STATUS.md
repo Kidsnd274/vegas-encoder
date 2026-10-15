@@ -5,6 +5,15 @@ Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.3-progress-text-pro
 
 ## Current progress
 
+**Selected-file preset import (2026-10-15):** added the C3
+PresetTransfer.importFrom(path, newId: ...) service requested by the app. It uses
+bounded file reads and existing native validation/create-only Save, preserving the
+source and existing presets on failure; a matching in-memory fake is supplied.
+**150 repository / 86 fake-service checks** pass; package analysis is clean.
+Frontend adoption is app-owned. Focused validation is in the
+[platform handoff](product/workstreams/platform.md). No real VEGAS run or installation;
+B6 remains disabled and the existing real-host qualification limits are unchanged.
+
 **F6 C5 precision facts (2026-10-15, completed checkpoint):** after committing the library-watch
 checkpoint **b6811be**, integrated app 493f146 through **ea4d557** on ws/platform and
 fast-forwarded master. No push; master's .claude/ is preserved. The app's old quote

@@ -8,6 +8,32 @@ B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
+## Selected-file preset import (completed service feature)
+
+After F6 precision checkpoint **84de5f4**, added the app-requested
+`PresetTransfer.importFrom(selectedPath, newId: ...)`. It reads a selected .vepreset
+file through the existing 1 MiB bounded UTF-8/JSON reader and delegates to the
+repository's native validation and create-only Save. Unknown data/origins survive,
+the imported preset starts at revision 1 with the caller's new ID, and the source
+is preserved. Missing/unreadable/oversized/malformed/future/invalid files and ID
+collisions return the existing service errors without replacing a preset.
+FakePresetTransfer accepts selected-file text fixtures and its captured exports,
+with no file I/O. No new dependency or framework.
+
+App handoff: enable the existing Import file action, use pickFile to select the path,
+call presetTransfer.importFrom(path, newId: ...), then refresh/select the returned
+preset just as Import share string does. This implements the missing service;
+the menu remains app-owned and has not been changed here.
+
+Validation: **150 repository checks** pass with real Windows files/locks and native
+core validation; **86 fake-service checks** pass. Package analysis and diff checks
+are clean. New cases cover Unicode selected paths, metadata/origin preservation,
+create-only conflicts, source preservation, missing/directory/oversized/invalid
+UTF-8/JSON/future/recipe/ID failures and fake export/import without I/O.
+No FFmpeg, fake host or real VEGAS ran for this feature. B6 integration remains on
+hold; installation, A5–A7, real persistence, controlled failure recovery and monitor
+performance are unchanged.
+
 ## F6 C5 video precision follow-up (completed)
 
 Continued after library checkpoint **b6811be** and integration **ea4d557**. Master
