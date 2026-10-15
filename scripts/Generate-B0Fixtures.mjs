@@ -223,6 +223,8 @@ const live = states.map((state, n) => {
     elapsedSec: n === 0 ? 0 : 243 + n, etaSec: terminal ? null : state === 'encoding' ? 250 : null,
     estimatedFinalBytes: state === 'encoding' ? 2930000000 : null,
     outputPath: ve.vegas.output, templateName: ve.vegas.templateName, encoderSummary: 'libx264 + aac',
+    outputBitDepth: state === 'starting' ? null : 8,
+    pixelFormatConversionReducesPrecision: state === 'starting' ? null : true,
     message: state === 'failed' ? 'FFmpeg exited with code 1. Partial file removed.' : state === 'cancelled' ? 'Cancelled in VEGAS. Partial file removed.' : '',
     ffmpegExitCode: state === 'done' ? 0 : state === 'failed' ? 1 : null };
 });

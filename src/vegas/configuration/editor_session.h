@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <memory>
 #include <optional>
+#include <functional>
 
 namespace vegas_encoder::configuration {
 
@@ -19,9 +20,8 @@ struct EditorExit {
   bool cleanupComplete = false;
 };
 
-// B6 offline transport, NOT linked into an exporter/page/Render. A page must
-// separately own modality, draft lifetime, startup scheduling and HWND validation.
-// All methods stay on the creator UI thread. Poll never waits for an editor.
+// Low-level owned transport. A page separately owns modality/draft/HWND lifetime.
+// All methods stay on its creator thread. Poll never waits for an editor.
 // Start does synchronous local file/process setup; it has no visibility/latency
 // qualification and must never be called from Render.
 class EditorSessionTransport final {
@@ -46,5 +46,26 @@ class EditorSessionTransport final {
  private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
+};
+
+// One background owner for the low-level transport, including slow Windows
+// process creation. UI methods copy/poll values only, never join or touch host
+// objects on a worker. The worker retains its DLL through late cancellation.
+class EditorSessionTask final {
+ public:
+  EditorSessionTask(const std::wstring& existingRoot, const ve::Json& request,
+                    const EditorLaunch& launch, std::function<void()> beforeStart = {});
+  ~EditorSessionTask();
+  EditorSessionTask(const EditorSessionTask&) = delete;
+  EditorSessionTask& operator=(const EditorSessionTask&) = delete;
+  std::optional<EditorExit> Poll();
+  void Cancel() noexcept;
+  DWORD ProcessId() const noexcept;
+ private:
+  struct State;
+  static DWORD WINAPI Worker(void* context);
+  std::shared_ptr<State> state_;
+  const DWORD caller_ = GetCurrentThreadId();
+  bool consumed_ = false;
 };
 } // namespace vegas_encoder::configuration

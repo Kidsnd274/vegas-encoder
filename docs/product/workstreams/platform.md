@@ -1,12 +1,430 @@
 # Platform workstream
 
 Updated: 2026-10-15 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
-branch `ws/platform`. **B5 committed/merged; B6 owned snapshot/session checkpoint
-validated offline; C4 file/process transport added, still disabled in exporters.** B1–B4 and app F4 are merged. Continued
+branch `ws/platform`. **B6 template recipes work in the owner's 0.1.5 renders;
+the owner confirms improved editor startup with installed 0.1.6.** B1–B4 and app F4 are merged. Continued
 from `659fe02`; F3 master `0be99dc` was fast-forwarded before the B1 commit.
 B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
+
+## 0.1.7 close handoff fixed offline; owner qualification and B7 inputs
+
+Continued from clean `ws/platform` checkpoint **6dd7833**, rechecked as a
+handoff-only commit. Main checkout's untracked `.claude/` is preserved. The owner
+explicitly authorized the narrow frontend runner/test exception for this task;
+other app paths and the app handoff remain untouched.
+
+`Win32Window::MessageHandler(WM_CLOSE)` now captures foreground **before** enabling
+the valid original owner, enables it, and calls `SetForegroundWindow(owner_)`
+before destruction only for a foreground close. Flutter's accepted-close routing
+is unchanged; rejected/discard-confirmation paths do not reach this handoff.
+Background close stays passive. Native crash/teardown fallback, the parallel
+startup worker and all Render caller-thread/frame-release/no-app-wait rules remain.
+
+The same existing window probe now has `-Checks close`, exercising actual Apply
+clicks and Cancel/Escape against a fake owner/full-screen other window, without
+a native page poll/post-exit activation masking the result. Preserved old frontend
+0.1.5+1: **3/7 passed**, with accepted normal and before-open Apply/Cancel returning
+to another window; switch-back happened to pass that run. New frontend: **7/7
+passed**, including both switch sequences and background WM_CLOSE/Cancel. All
+foreground prerequisites were established in these compared runs. This supports
+the suspected close-time gap; **real VEGAS focus confirmation remains pending**.
+Interactive probe prerequisites are intermittent: the final repeat passed four
+cases and could not establish foreground for three (no close attempted in those
+three). Those are unverified attempts, not additional focus passes or product
+close failures; the probe exits nonzero. Owner should run the real repro with an
+idle desktop. The complete seven-case comparison above is the accepted valid run.
+Observed same-DPI process-age `shown` marks: **435.7–462.7 ms**. Existing owner
+placement/modality/minimize/restore and crash fallback checks also pass, including
+other-DPI placement (centre within 4 px, shown 667–776 ms). No renderer/startup
+architecture change or new process/thread investigation.
+
+Validation: release frontend build **0.1.7+1**, clean Flutter analysis, **44** popup
+widget/light+dark golden tests, optimized native build, **162** snapshots, **95**
+transport/task, **107** native-page/owner, **19** C7 runtime checks and existing
+writer monitor-launch/two-Hz checks pass. The staged native DLL's discovery check
+passes with balanced fake-host allocations. These use fakes/fake windows/files,
+not real VEGAS. Background crash focus is still handled by native fallback;
+the runner cannot re-enable an owner after it is killed.
+The full existing Flutter suite also passes **553** checks. B7's final focused
+packaging/detection suite passes **65** checks, and the retained fake-installer
+install/update/uninstall/refusal suite passes. The deliberate nonexistent filter
+was accepted by the current core and separately rejected by the supplied FFmpeg
+without publishing media; that prepares the owner step, not real recovery proof.
+
+Matched **0.1.7-recipe-proof / app 0.1.7+1** is prepared separately at
+`build/b6-candidate-0.1.7`, not installed. Native preflight now requires 0.1.7.1.
+The candidate copies the old trial data and preserves exact installed 0.1.6
+DLL/PDB/INI/manifest/discovery rollback with hashes. Old candidates, backups and
+installed files are unchanged. [B6_TRIAL.md](../../B6_TRIAL.md) has focused owner
+focus, controlled cancellation/encoder-failure recovery, bounded capacity and
+six-run on/off monitor instructions. The toggle is in the separate desktop app;
+the 0.1.6 launcher default is retained, so pass the new CandidateRoot explicitly.
+Four capacity presets are prepared/round-tripped through existing core/repository
+code and seeded into the **copied** trial library only. No host capacity claim.
+
+B7 preparation: `Prepare-B7.ps1` stages the full runtime/notices, native files,
+renderable INI/discovery inputs and a complete file/version/hash manifest.
+Native now has PE version metadata (0.1.7.1 for this candidate). Read-only registry/
+PE discovery identifies 2026.0.3.189 and older 13/21/22/23 installs; older hosts
+remain detection only. Focused bundle/detection/refusal checks and the existing
+installer's fake-tree suite pass. `dumpbin` confirms runner VC++ runtime imports;
+none was downloaded/executed. [B7_INSTALLER_INPUTS.md](../../B7_INSTALLER_INPUTS.md)
+specifies shared/per-host destinations, closure, manifests, all-target update,
+durable rollback and preservation rules for the owner's Inno Setup implementation.
+No Inno installer or release qualification is claimed. A5–A7 capacity/recovery/
+overhead limits remain explicit; normal saved-template persistence is confirmed.
+
+## Prior owner feedback and close-handoff request (superseded offline above)
+
+The owner confirms saved templates persist across restarts on the installed
+0.1.6 trial. Combined with the prior distinct FFV1/libx264 renders, normal recipe
+persistence is owner-confirmed for the tested templates. Do not keep requesting
+that same basic restart check. Maximum private-payload capacity, controlled real
+cancellation/failure recovery and measured monitor overhead remain unqualified;
+this feedback does not fully pass A5–A7.
+
+**Needs app:** foreground return remains faulty. Repro: open the template editor,
+switch to another full-screen app, return via VEGAS to the editor, then Apply.
+The previous app reappears; the owner described this as minimization, but actual
+iconic state has not been established. Also test the variant where the other app
+was foreground before opening the editor, as the reported ordering is ambiguous.
+In `app/windows/runner/win32_window.cpp`, `Win32Window::MessageHandler` currently
+only calls `EnableWindow(owner_, TRUE)` in `WM_CLOSE`, then destroys the editor.
+The native 100 ms poll samples foreground ownership and attempts activation only
+after child exit; it cannot reliably prevent the close-time activation choice,
+and Windows may deny a later foreground request. This is a code-based suspected
+handoff gap, not a reproduced real-host root-cause proof.
+
+Requested small app fix: in the accepted `WM_CLOSE` path capture whether the
+editor HWND is foreground **before** re-enabling its owner, then re-enable the
+valid original owner and explicitly `SetForegroundWindow(owner_)` **before**
+destroying the editor when that captured condition is true. Background closure
+must only re-enable, without raising VEGAS over the user's current app. Keep
+cancelled/rejected Flutter close requests open, do not alter recipe/session
+semantics, and do not change Render. Keep native fallback for crash/teardown.
+Test foreground Apply/Cancel after switching away/back, normal foreground close,
+and background close while another app stays foreground, including a maximized
+or full-screen other window. Frontend code remains unchanged under the path split.
+
+Documentation checked with the current Windows [EnableWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enablewindow)
+and [SetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)
+rules. Context7 resolution returned UWP/WinRT/binding results, without an appropriate
+Win32 conceptual reference, so those direct Microsoft primary references were used.
+
+Monitor performance needs no new harness: trial Settings already has **Show a
+progress window during renders**, and C6 `elapsedSec`/phase timings already record
+each render. [B6_TRIAL.md](../../B6_TRIAL.md) now gives an alternating three-on /
+three-off comparison with fresh filenames and the same project/template/range.
+No real performance claim or new test run follows from this documentation-only
+checkpoint; native close behavior was inspected, not changed or fixed here.
+
+## 0.1.6 real-host startup confirmation
+
+The owner installed 0.1.6-recipe-proof on VEGAS 2026.0.3.189 and reports opening
+is "a lot better now". Three frontend process-age traces reach `shown` at
+**748.6 / 533.3 / 526.8 ms**. Native CreateProcess durations are
+**153.1 / 32.8 / 31.8 ms**; UI request/scheduling takes **3.7 / 0.4 / 0.4 ms**.
+These measurements cover three observed launches, not a general performance
+guarantee; process-age and native launch intervals overlap and must not be added
+as an exact click-to-visible time.
+
+The normal B6 edit/Apply/template-recipe/render/progress flow is implemented and
+has real-host smoke evidence. Explicit Apply/minimize confirmation remains open;
+the startup feedback alone does not establish that focus regression passed.
+Next work is a bounded real-host qualification pass for two-template restart
+persistence/capacity, controlled cancellation/failure recovery and monitor
+overhead. A5–A7 remain unverified. No additional feature scaffolding is needed
+for this startup fix. Documentation-only recording of the owner result; checked
+against native version/launch logs and frontend startup traces, with no code/test
+or installation changes in this checkpoint.
+
+## 0.1.5 template confirmation and 0.1.6 parallel launch/owner return
+
+Owner reports that two separate templates now render with different intended
+codecs and the template corruption/request bugs appear solved. C6 confirms FFV1
+and libx264 success on VEGAS 2026.0.3.189, sampled readbacks **0.719 s / 0.187 s**.
+Keep full A5–A7, restart/capacity, controlled failure recovery and monitor overhead
+unverified; this is additional successful recipe-render evidence.
+
+The remaining report is intermittent ~6 s editor opening (some instant), plus
+VEGAS minimizing on popup Apply. The 0.1.5 native log captures **12,367.6 / 7,029.2 /
+7,893.1 ms** in its spawn section, versus about **33–37 ms** on fast launches.
+Preflight is 2–3 ms and files/validation 6–8 ms. The section creates/assigns/resumes
+a suspended process. That localizes the spike to native launch but does not
+separate creation from resume or child work overlapping resume. The unchanged
+runner already defaults to **Skia**, not Impeller; a shader cause is not established.
+The exact variable operation remains open pending the new per-call/first-frame data.
+
+Implemented **0.1.6-recipe-proof**, bundled with the unchanged **0.1.5+1 frontend**:
+`EditorSessionTask` copies C4/path/argv values and owns the existing transport on
+one independent worker. File/process setup runs in parallel with VEGAS's UI,
+without UI message pumping, joins, host/draft/allocator/window access on the
+worker, or a new launch-cancel UI. Page lifetime and late startup remain safe via
+owned task state, existing child job ownership and a retained DLL reference.
+Result validation/draft/native Apply and all window calls stay on the page thread.
+The goal is actual click-to-visible speed; moving the wait alone is **not** claimed
+to remove the OS delay. The owner retest above records the observed improvement.
+
+Owner return now follows explicit `GW_OWNER` links, because `GA_ROOTOWNER` can
+stop at an owned `WS_OVERLAPPED` window (reproduced in the window regression).
+Normal Apply/Cancel from the foreground editor restores an iconic host and its
+settings dialog before returning focus. Background/crashed completion only
+re-enables the original owner. This guards the minimize/activation symptom;
+the exact real-host trigger and fix remain pending owner verification. The native
+code never minimizes a host. Frontend WM_CLOSE currently also re-enables its owner;
+app-owned close behavior should be reviewed if the symptom remains.
+
+Launch timings now split job setup, CreateProcess and ownership/resume. The trial
+launcher enables the existing frontend startup trace (by PID) at
+`logs/frontend-startup.txt`, allowing process launch versus first frame to be
+separated without a debugger. No shader/backend switch, AV exclusion, machine
+tool change or old process/thread debugging workflow was introduced.
+
+Validation: optimized DLL build; **162 snapshot**, **95 transport/parallel task**,
+**107 native-page/owner-window** checks; **19 C7 runtime** and monitor cadence
+checks pass. Task tests hold startup deliberately, prove scheduling/polling return,
+owned result/cleanup and late-page-lifetime safety; normal/failure/repeated Apply
+preservation tests remain. Owner-window tests retain an iconic host on background
+completion and restore its explicit owner chain on foreground return. These are
+fake child/window tests, not a real VEGAS latency/focus pass.
+
+Staged `build/b6-candidate-0.1.6` with a copied 0.1.5 data root and exact installed
+0.1.5 rollback. Preparation did not install, push or merge master; the owner later
+installed it for the retest above. Existing working 0.1.5 templates
+remain compatible; do not repeat the codec trials just to prove them again.
+Opening has now been retested; explicit confirmation that Apply leaves VEGAS
+restored remains pending. See [B6_TRIAL.md](../../B6_TRIAL.md).
+
+App handoff if native launch remains slow after parallelizing: prioritize a reusable
+editor process/engine or an out-of-process launch path that avoids repeated cold
+process creation. That requires app-owned lifecycle/C4 dispatch work; changing
+shaders or frontend controls is not justified by the current native-launch data. No
+frontend files were edited here, in keeping with workstream ownership.
+
+## First real B6 feedback and 0.1.5 fix candidate
+
+The owner installed **0.1.4-recipe-proof** and tried popup edits/save/restart and a
+render. Screenshots show Chinese-looking/byte-shifted names and notes, native/popup
+name disagreement and intermittent “Invalid edit-session request/context”. One
+successful real render produced C6 job `B5941A06-6823-4AC5-B19F-FF900E22F509`:
+VEGAS **2026.0.3.189**, supplied gyan FFmpeg **5.1.2**, FFV1/PCM float, 182 frames,
+1920×1080 P010/29.97 input, final publication and passed readback. The owner reports
+the monitor works, with slow updates and Open Folder incorrectly opening Documents.
+This is real smoke evidence only. Apply/Cancel/persistence and performance gates
+are **not** passed; the trial found failures rather than qualifying them.
+
+Fixes staged as **0.1.5-recipe-proof / frontend 0.1.5+1**, with no frontend source
+edits. The old candidate/data, saved native templates and installed 0.1.4 files are
+preserved; the new candidate has its own copied trial data and exact 0.1.4 rollback.
+
+- Native payload placement now rounds odd private allocations to even and places
+  at most one zero byte outside the core VEnc envelope. Real logs show `cbExtra=559`;
+  a wchar-indexed regression reproduces the old mismatch and new aligned behavior.
+  Core length/checksum validation stays strict, arbitrary padding is refused,
+  intact old odd envelopes remain readable, and suffix/unknown bytes are preserved.
+  Names/notes already damaged cannot be reconstructed; retest with fresh built-in
+  templates and new saved names. Historical id-0 hiding is already present and
+  is unchanged; no speculative index/GUID reassignment.
+- Invalid C4 requests identify the exact core issue/field instead of a generic
+  context message. The name corruption is a plausible cause of intermittent empty
+  templateName, but that connection requires real retest rather than an assumed fix.
+- Open Folder now passes Explorer `['/select,', path]`. The previous combined token
+  was quoted by Dart when the path contained spaces, causing Explorer to ignore
+  it and open Documents. Actual Explorer reproduced both failure and corrected
+  target selection in isolated test files; those windows were closed.
+- The writer wakes for pending idle metrics when its two-Hz budget is free, with
+  phase updates immediate. It no longer adds a periodic half-second idle wait.
+  Existing coalescing/nonblocking Render rules remain.
+- The owner's 2.140 s encode spent another **9.015 s verifying**. The old probe
+  decoded every output frame to establish only a positive frame count. New
+  `-read_intervals %+#32` bounds the sample, retaining all stream metadata, a
+  positive decoded count for every video, kind/count/known-codec checks and all
+  cancellation/timeout/diagnostic/publication guards. Read-only comparison on that
+  output: **9.897 s → 0.743 s**. It samples readability; corruption later in the
+  file is not scanned. Full decode qualification remains separate. CLI semantics
+  checked against [official FFprobe docs](https://ffmpeg.org/ffprobe.html#Main-options).
+
+Popup startup: the owner observes about three seconds; this remains unresolved.
+The native page now paints its status child with “Starting the editor...” before
+startup and records preflight/files/spawn durations in the existing log. Launch
+still has synchronous OS/file setup on the native UI thread. Replacing it with an
+async state/lifetime mechanism without latency evidence would expand scope and
+risk cancellation/teardown. Next real click will distinguish native startup from
+the helper's first frame. App handoff: use the existing startup trace when native
+setup is fast; do not count sample previews as established project facts. No new
+debugger, sanitizer, AV exclusions or process/thread investigation was used.
+
+Validation: optimized candidate builds; **162 snapshot/host-text** regressions,
+**87 transport**, **102 native-page**, **19 C7 runtime**, writer monitor/cadence
+checks, **94 adapter checks / 9 fake-host real-FFmpeg cases**, and **24,502 engine
+checks / 23 fake-host/real-FFmpeg + controlled-child cases** pass. The engine adds
+an actual owned probe-child test that requires the bounded interval and all-stream
+view, plus malformed/absent/zero sample-count regressions; cancellation/error/
+timeout/destination/recovery cases retain their guards. **12 reveal service checks**
+and targeted analysis pass; release frontend rebuild includes the corrected service.
+The AOT repository runner passes **150** checks; package analysis is clean. The
+actual staged DLL passes the existing fiohost discovery/conformance/render check
+with 24 frames released, six matching allocator frees and `cbExtra=560`; its
+UTF-16 preset name reads “Vegas Encoder settings (MKV)” at the aligned offset.
+
+Owner retest and rollback commands: [B6_TRIAL.md](../../B6_TRIAL.md). Keep A5–A7,
+real restart persistence/capacity, controlled real failure recovery and monitor
+performance unverified. First retest: fresh built-in → two new names → reopen/
+restart; render to a new filename and check Open Folder/terminal latency.
+
+## B6 connected candidate ready for the owner's VEGAS trial (0.1.4 checkpoint)
+
+The owner explicitly resumed B6 after clarifying that the antivirus restriction
+came from earlier debugging/quarantined builds. Prepared the actual connection,
+without resuming sanitizers, debugger/process/thread investigations, machine tool
+changes or AV exclusions. Local milestone commits are authorized. No installation,
+master merge or push occurred. Earlier B6 hold statements below are historical.
+
+Opt-in `build.cmd "" recipe-proof` produces **0.1.4-recipe-proof**. Its fresh
+**Vegas Encoder settings (MKV)** preset has distinct preset GUIDs and the core VEnc
+recipe payload; proof bytes are never migrated. Existing holder/allocator storage
+backs the native page. Queued UI-thread C4 launch, root-owner disable/restore,
+timer polling, retryable native Apply and teardown preserve the prior template.
+The complete existing frontend is rebuilt as **0.1.4+1**, with no frontend edits.
+
+Create copies the recipe/origin; Render uses actual delivered media, selected C7
+installation and the existing B4 engine. Host calls stay on Render's caller thread
+and every frame is copied/released before settings reads, hashing or transport
+waits. Unused audio is not read. Native C7/cache reads are bounded to 1 MiB; engine
+identity checks remain authoritative. Cached hardware readiness stays unknown.
+The existing job writer launches the monitor after atomic initial C5 publication,
+with the app parent cwd and no Render wait/acknowledgement. Launch failure is nonfatal.
+
+Additive C2 `outputContainerId` keeps output format decisions inside the core.
+Advanced requires a known explicit final muxer; absent/input-only/unknown/general/
+partially quoted output stays null. Candidate constraints check that fact and
+established video output before spawn, with the same refusal on editor return.
+This candidate deliberately supports the evidenced MKV/P010/square-pixel and
+48 kHz stereo float input path. General Advanced/audio-only/non-MKV is refused.
+
+Prepared `build/b6-candidate/{app,plugin,data,rollback}`. The data root has a real
+C3-registered default `C:\ffmpeg\bin\ffmpeg.exe`, verification/progress enabled,
+and no inferred capability qualification. The exact installed DLL/PDB/INI/manifest
+and discovery file were copied before any installation; hashes are retained for
+rollback verification. `Start-B6Trial.ps1` launches the app/VEGAS with process-local
+isolated data and verifies the installed candidate DLL before VEGAS launch.
+See [B6_TRIAL.md](../../B6_TRIAL.md) for the owner's steps and rollback command.
+
+Validation: optimized native DLL build and **3,055 core** checks; real FFI **230**;
+snapshot **95**, transport **87** (no optional junction fixture), page **102**,
+C7 runtime **19**; actual adapter **94 checks / 9 fake-host real-FFmpeg cases**
+(immutable Create, video-only, Cancel, host error, Advanced MKV, wrong/unknown muxer,
+recovery and preserved existing destination). The staged DLL itself passes the
+existing fiohost discovery/conformance/render test with production C7 selection,
+balanced frames/allocator references and real FFmpeg. Monitor writer checks cover
+initial publication, argv/cwd, stalled child independence and nonfatal refusal.
+New trial preparation tool analysis and launcher syntax/refusal checks pass.
+
+The actual staged frontend's existing window probe shows the primary popup owner,
+centering, minimize/restore, Cancel result and owner re-enable paths working; the
+monitor shows no-activate, remembered pin and placement on the named host monitor.
+Secondary multi-monitor/crash foreground observations include NO results where
+foreground acquisition prerequisites were also NO; they do not prove focus recovery.
+App handoff: confirm secondary foreground behavior in the real host, and update the
+stale comment in app/lib/state/services.dart saying the exporter ignores the trial
+root (this opt-in candidate honors it). No frontend files changed here.
+
+**Still unverified:** A5–A7, real native Apply/Cancel/save/restart and maximum payload
+capacity, real render/cancellation, controlled real failure recovery, and the
+three-with/three-without monitor performance comparison. Offline tests do not pass
+these gates. Next: owner follows the short first-popup/two-template trial, then
+render/Cancel. No more offline scaffolding or B5 custom-text investigation is queued.
+
+## Selected-file preset import (completed service feature)
+
+After F6 precision checkpoint **84de5f4**, added the app-requested
+`PresetTransfer.importFrom(selectedPath, newId: ...)`. It reads a selected .vepreset
+file through the existing 1 MiB bounded UTF-8/JSON reader and delegates to the
+repository's native validation and create-only Save. Unknown data/origins survive,
+the imported preset starts at revision 1 with the caller's new ID, and the source
+is preserved. Missing/unreadable/oversized/malformed/future/invalid files and ID
+collisions return the existing service errors without replacing a preset.
+FakePresetTransfer accepts selected-file text fixtures and its captured exports,
+with no file I/O. No new dependency or framework.
+
+App handoff: enable the existing Import file action, use pickFile to select the path,
+call presetTransfer.importFrom(path, newId: ...), then refresh/select the returned
+preset just as Import share string does. This implements the missing service;
+the menu remains app-owned and has not been changed here.
+
+Validation: **150 repository checks** pass with real Windows files/locks and native
+core validation; **86 fake-service checks** pass. Package analysis and diff checks
+are clean. New cases cover Unicode selected paths, metadata/origin preservation,
+create-only conflicts, source preservation, missing/directory/oversized/invalid
+UTF-8/JSON/future/recipe/ID failures and fake export/import without I/O.
+No FFmpeg, fake host or real VEGAS ran for this feature. B6 integration remains on
+hold; installation, A5–A7, real persistence, controlled failure recovery and monitor
+performance are unchanged.
+
+## F6 C5 video precision follow-up (completed)
+
+Continued after library checkpoint **b6811be** and integration **ea4d557**. Master
+and ws/platform include the latest app 493f146; master was fast-forwarded under
+the owner's authorization, with its .claude/ preserved. No push. The app-owned
+precise unmatched-quote assertion and affected goldens are adopted in 493f146.
+
+Additive C5 fields: `outputBitDepth` (`int?`) and
+`pixelFormatConversionReducesPrecision` (`bool?`). RecipeJob publishes the native
+core's encoder-input video precision after a valid compile, with a reduction only
+when known input bits exceed output bits and conversion is established. Equal or
+increased depth/layout-only conversion is false; filters or unknown input precision
+leave the reduction unknown. No text/recipe/codec-name inference or encoded-file
+precision claim. General Advanced source/output/map/codec scope, stream copy,
+disabled/omitted video and unknown formats stay null. Initial/precompile failures
+also stay null; known facts survive terminal phases. Existing Render scheduling,
+frame release and asynchronous publication rules are unchanged.
+
+A small core reflection correction prevents input-scoped Advanced options and
+unsupported pixel-format stream selectors from masquerading as output facts.
+Supported selectors are unscoped, `:v` and `:v:0`; absolute `:0` and more general
+selectors remain unknown. A pixel-format option in Basic audio Extra can override
+earlier video arguments, so that cross-row case also stays unknown. Arbitrary
+`-filter:v` aliases mark conversion unknown, as `-vf` already does; unscoped filters
+cannot inherit a preceding audio option's scope. Authored argv is preserved.
+Current option-scope rules were
+checked with Context7's FFmpeg documentation and the official
+[FFmpeg options/stream specifiers](https://ffmpeg.org/ffmpeg.html#Options) and
+[pixel-format option](https://ffmpeg.org/ffmpeg.html#Advanced-Video-options).
+
+The model, copyWith, persistent reader, fake seed/publish validation and generated
+live samples carry both fields. Older absent fields stay absent/unknown; explicit
+null clears them. Readers/fakes reject invalid types or nonpositive depth and retain
+the previous successful status. Samples remain design fixtures, not real render data.
+App handoff: use these getters for the F6 header wire/pip, showing less when unknown.
+No frontend files were edited; frontend adoption is app-owned. The owner now
+authorizes local commits when a stage or feature is complete, including this F6
+checkpoint on ws/platform. Gated B6 activation remains separate.
+
+Validation: optimized DLL/static builds and **3,034 native core checks** pass,
+including unchanged B1 argv goldens. **59** focused real-core C5 fact checks pass
+without processes/a host; native-asset FFI **208**, service fake **79**, Windows
+repository **131**, fixture structural/bounds **295** and selected app compatibility
+**65** checks pass. The app checks cover service wiring, monitor display/widget and
+Advanced editor (including the adopted precise quote range). Both packages analyze
+cleanly; fixture generator --check and diff whitespace checks pass.
+
+The existing optimized B4 suite passes **23,160 checks / 22 cases**, using the
+supplied gyan 5.1.2 FFmpeg, synthetic fake-host streams and controlled children.
+Its retained ownership, bounds, polling, cancellation/recovery, destination
+preservation and nonfatal storage/publication cases pass. New assertions verify
+nullable depth facts across live/terminal state and atomic C5 files. The Dart C5/C6
+readback passes **279 checks / 21 native jobs**, including P010-to-8-bit reduction
+and preserved 10-bit Basic/seeded Advanced cases. These are offline fake-host
+checks, not a real VEGAS or monitor performance test. Reproduce with
+`scripts/Test-CoreNative.cmd`, `build/b4-tests/recipe-jobs.exe --facts-only schema/fixtures/b0/core-and-services.json`,
+`scripts/Test-B3Repositories.ps1` and `scripts/Test-B4.ps1` (without -Asan).
+Compact engine output is under ignored build/test-results/b4-b34553b9.
+No goldens were regenerated here.
+No installed exporter, machine tool, antivirus setting or real VEGAS state changed.
+**A5–A7, real persistence, controlled real failure recovery and monitor performance
+remain unverified.** No sanitizer/process/thread debugging resumed.
 
 ## Merge and library-watch follow-up (2026-10-15)
 
@@ -16,16 +434,16 @@ as **9018965**, then fast-forwarded master to 9018965. No conflicts or push; mas
 pre-existing untracked .claude/ is preserved. No frontend source was edited.
 
 At 9018965, merged app integration used existing SDK/offline dependencies; app analysis passed and
-**394 unit/widget tests pass, one fails**. The remaining assertion is app-owned
+**394 unit/widget tests passed, one failed**. The assertion was app-owned
 advanced_editor_test.dart:299, named "an unterminated quote is about the whole
 command: listed, not underlined". It expects wholeCommand=true, while the reviewed
-C2 addition deliberately reports the unmatched quote's precise range. App needs to
-adopt that range/prefix contract in this test (and its own native light/dark goldens).
+C2 addition deliberately reports the unmatched quote's precise range. The app needed
+to adopt that range/prefix contract in this test and its native light/dark goldens.
 Do not restore the old whole-command diagnostic in core. **While this continuation
 was validating, master advanced through app follow-ups 84acb66 to 493f146**, which
 adopts the precise quote range and refreshes the affected native goldens. The request
-above is satisfied by that app-owned commit; it will be included in the library
-checkpoint integration. Generated runner files from
+above is satisfied by that app-owned commit, included in **ea4d557** alongside the
+library-watch commit **b6811be**; master fast-forwarded to ea4d557. Generated runner files from
 Flutter checks were restored; no app edits or SDK upgrade are retained.
 
 **Library-watch checkpoint reviewed and finished:** the app's F7 library-watch
@@ -93,7 +511,7 @@ No installation, exporter replacement, machine-tool change or antivirus exclusio
 monitor performance remain unverified.** Render threading/frame release/no-app-wait
 rules remain unchanged. F6's synthetic window figures do not pass its VEGAS render
 performance gate. Subsequent platform work: coordinate DesktopApp openPreset/openJob
-with app, output-depth C5 facts, then version checks/installer inputs under the owner's
+with app, adopt the output-depth C5 facts above, then version checks/installer inputs under the owner's
 recorded decisions. Gated B6 activation remains separate.
 
 ## Advanced capability reuse / F4 / popup size (reviewed checkpoint)
@@ -596,27 +1014,30 @@ performance or native persistence claim follows from repository tests.
 
 ## Next / queued requests
 
-B3 and F3's platform requests are delivered above. App F7's providers/budgets are
-delivered in ws/app; B4's History/live writers are ready for gated B6 rendering.
-Next agent: continue on ws/platform and recheck status/master before new work.
-B5 `2bdb44d` is committed and merged under the owner's latest authorization;
-B6's offline boundary checkpoint is described above. Preserve any later local
-changes and the main checkout's existing `.claude/`/ignored candidates/backups.
-B4's engine/C5/C6 writers are delivered above; app F7 consumes them through the
-existing readers. B5 normal trials and the owner's drop-text decision are recorded
-above; further marker trials are ended. Connect B6 to the actual F5 popup when
-ready and the native gates resume, then the recipe/C5 progress bridge. Avoid adding
-another fake-owner framework. The additive F4/core/C7 changes are committed/merged;
-app adoption of precise unmatched-quote ranges remains requested above. The reviewed
-library-watch checkpoint is finished above. Next is the independent F6 C5 output
-bit-depth/precision fact request, to remain uncommitted under the owner's instructions.
+Continue in `L:\repos\vegas-encoder-platform` on `ws/platform`; recheck all relevant
+git status/branches before editing. Preserve existing changes, the main checkout's
+`.claude/`, staged candidates, trial data and rollback backups. Current B6 is active
+by owner authorization and connected; earlier hold/offline-only statements are
+historical. Do not repeat completed library-watch/F6/import or basic B6 wiring.
 
-B6 adapter/progress performance needs the owner with real VEGAS and gated
-evidence. Prior checkpoints had owner authorization to commit/merge; **this
-checkpoint was reviewed; the owner now authorizes committing/merging it and
-continuing with the library-watch bottleneck**, with no push.
-The B5 installation/trial is authorized with rollback only for issues; current
-mode-0 control and mode-4 normal renders pass; the owner drops custom status-line
-testing after no useful visible change. Mode 4 is retained, with no rollback.
-B6 activation is not authorized or qualified by a
-B5 trial. Deferred persistence is not reopened automatically.
+1. Owner retest of the prepared 0.1.7 close fix. The explicitly authorized narrow
+   frontend change is complete offline above; do not redo it or broaden app scope.
+   Retain passive background close, native crash recovery and startup improvement.
+2. The owner could not find the progress toggle in VEGAS's template popup. It is
+   in the separate desktop app: `Start-B6Trial.ps1 -Target App`, then Settings →
+   Rendering → **Show a progress window during renders**. The literal label was
+   verified in the staged 0.1.6 candidate's `app/data/app.so`, not only in source.
+   No reinstall is needed to access it. Retain the isolated trial data launcher.
+3. Finish bounded B6 qualification with the owner: focus repro, controlled real
+   cancellation/failure recovery, maximum private-payload capacity and the existing
+   three-on/three-off monitor comparison. Basic tested-template restart persistence
+   is owner-confirmed; do not describe it as still deferred. Keep remaining gates
+   open until their own real-host evidence exists.
+4. B7 inputs are prepared above; owner implements/tests Inno Setup from the matched
+   manifest and destination/update/rollback notes. Release signoff still depends on
+   real-host qualification and the owner's runtime/license/deployment decisions.
+
+Commit completed milestones locally on the authorized workstream branch. No push,
+master merge, installed-exporter replacement, machine-tool change, AV exclusion,
+sanitizer or old process/thread debugging workflow. Owner manually tests VEGAS and
+installs prepared candidates. No additional status-line investigation or scaffolding.

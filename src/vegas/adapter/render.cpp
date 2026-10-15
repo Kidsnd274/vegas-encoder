@@ -7,6 +7,11 @@
 // drift (Voukoder's fixed 1601-sample reads lose ~0.6 samples per frame).
 #include "vegas_encoder.h"
 #include "../../engine/encode.h"
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+#include "../../engine/recipe_job.h"
+#include "../configuration/recipe_template.h"
+#include "recipe_runtime.h"
+#endif
 #if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
 #include "../host/progress_text_probe.h"
 #endif
@@ -217,6 +222,11 @@ struct Report {
 class RenderFile final : public ISfRenderFile {
  public:
   explicit RenderFile(Tpl t) : tpl_(std::move(t)) {
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    // Own the decoded recipe at Create. Later native-page or library edits must
+    // never change the settings of this render object.
+    recipeSnapshot_ = configuration::ReadRecipeSnapshot(tpl_, GUID_VegasEncoderType);
+#endif
 #if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
     // Snapshot the one proof value at Create; later page edits cannot change it.
     proofExtraReport_ = configuration::ReadProofSettings(tpl_).extraReport;
@@ -334,7 +344,11 @@ class RenderFile final : public ISfRenderFile {
   HRESULT STDMETHODCALLTYPE Render(ISfProgress* progress) override {
     return NativeBoundary([&]() -> HRESULT {
       try {
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+        HRESULT hr = DoEncode(progress);
+#else
         HRESULT hr = (Cfg().encode || !Cfg().validMode) ? DoEncode(progress) : DoRender(progress);
+#endif
         encoder_.reset();
         return hr;
       } catch (const std::bad_alloc&) {
@@ -493,6 +507,12 @@ class RenderFile final : public ISfRenderFile {
     SFAUDIORECORD fmt = r.tplAudio;
     bool ok = true;
     auto fail = [&](const char* why, HRESULT hr) { Stop(r, "failed", why, FAILED(hr) ? hr : E_FAIL); ok = false; };
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    // The job owns only copied media. Its destructor aborts an exceptional exit;
+    // no borrowed frame or host interface ever reaches its worker threads.
+    std::unique_ptr<RecipeJob> recipeJob;
+    bool consumeAudio = false;
+#endif
 #if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
     host::ProgressTextProbe textProbe(progress, cfg.progressTextProbe);
 #endif
@@ -507,9 +527,16 @@ class RenderFile final : public ISfRenderFile {
       return go;
     };
     if (!cfg.validMode) fail("OutputMode must be ffmpeg or raw", E_INVALIDARG);
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    else if (!cfg.encode) fail("B6 recipe candidate requires OutputMode=ffmpeg", E_INVALIDARG);
+    else if (path_.size() < 4 || _wcsicmp(path_.c_str() + path_.size() - 4, L".mkv") != 0)
+      fail("the B6 VEGAS candidate currently requires a .mkv output filename", E_INVALIDARG);
+    else if (!video) fail("B6 recipe rendering requires a video render stream", E_NOINTERFACE);
+#else
     else if (path_.size() < 4 || _wcsicmp(path_.c_str() + path_.size() - 4, L".mkv") != 0)
       fail("choose a .mkv output filename for the fixed FFmpeg profile", E_INVALIDARG);
     else if (!video) fail("fixed FFmpeg profile requires a video render stream", E_NOINTERFACE);
+#endif
     else if (audio && (fmt.format != SFAUDIO_FORMAT_FLOAT32 || fmt.sampleRate != 48000 ||
                        fmt.channels != 2 || fmt.blockAlign != 8))
       fail("fixed FFmpeg profile requires float32 stereo at 48000 Hz", E_INVALIDARG);
@@ -593,6 +620,10 @@ class RenderFile final : public ISfRenderFile {
             fps, Utf8(r.rate.Text().c_str()).c_str(), streamFps); });
         if (!r.rate.num || (streamFps && (!std::isfinite(streamFps) || std::abs(streamFps - fps) > 1e-8)))
           fail("unsupported or inconsistent delivered frame rate", E_INVALIDARG);
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+        if (!std::isfinite(par) || std::abs(par - 1.0) > 1e-8)
+          fail("the B6 candidate currently requires square-pixel video", E_INVALIDARG);
+#endif
         LONGLONG expected = 0;
         if (ok && audio && (!r.rate.Endpoint(r.frameCountReported, fmt.sampleRate, expected) ||
                             std::abs(expected - r.streamLength) > 1))
@@ -619,6 +650,47 @@ class RenderFile final : public ISfRenderFile {
       r.msRelease += NowMs() - t;
       if (FAILED(released)) fail("ReleaseRenderFrame failed", released);
       if (!ok) break;  // no host frame is held from this point forward
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      auto keepGoing = [&]() -> JobControl {
+        if (poll(frame)) return {};
+        return {r.stopHr, r.status == "cancelled"};
+      };
+      if (!recipeJob) {
+        try {
+          const auto runtime = LoadRecipeRuntime();
+          RecipeJobOptions options;
+          options.output = path_; options.jobsRoot = runtime.jobsRoot;
+          options.templateName = r.tplName; options.hostHwnd = runtime.hostHwnd;
+          options.verifyOutput = runtime.verifyOutput;
+          options.monitorApplication = runtime.monitorApplication;
+          options.requiredOutputContainerId = "mkv";
+          options.requiredVideoOutput = true;
+          options.pipeTimeoutMs = cfg.pipeTimeoutMs; options.finishTimeoutMs = cfg.finishTimeoutMs;
+          ve::Json media{{"video", {{"width", r.width}, {"height", r.height},
+              {"fps", ve::Json::array({r.rate.num, r.rate.den})}, {"pixfmt", "p010le"},
+              {"sar", "1:1"}, {"frames", r.frameCountReported}}},
+            {"audio", nullptr}, {"durationSec", double(r.frameCountReported) * r.rate.den / r.rate.num}};
+          if (audio) media["audio"] = {{"rate", fmt.sampleRate}, {"channels", fmt.channels}, {"sampleFmt", "f32le"}};
+          // The actual project path/name are not established by these native
+          // interfaces. Leave the optional project string empty rather than
+          // treating the template's name as a project fact.
+          recipeJob.reset(new RecipeJob);
+          if (!recipeJob->Start(recipeSnapshot_.at("recipe"), media, runtime.installation,
+                               runtime.capabilities, recipeSnapshot_.at("origin"), options, keepGoing)) {
+            if (ok) fail(recipeJob->Reason().c_str(), recipeJob->Error());
+            break;
+          }
+          const auto& inputs = recipeJob->Compiled().at("inputStreams");
+          consumeAudio = std::find(inputs.begin(), inputs.end(), ve::Json("audio")) != inputs.end();
+        } catch (const std::exception& e) {
+          fail(e.what(), E_FAIL); break;
+        }
+      }
+      if (!recipeJob->Submit(false, std::move(owned), keepGoing)) {
+        if (ok) fail(recipeJob->Reason().c_str(), recipeJob->Error());
+        break;
+      }
+#else
       if (!encoder_) {
         encoder_.reset(new FfmpegEncoder);
         if (!encoder_->Start(cfg.ffmpegPath, path_, r.width, r.height, r.rate, audio != nullptr,
@@ -631,8 +703,13 @@ class RenderFile final : public ISfRenderFile {
         if (ok) fail(encoder_->Reason().c_str(), encoder_->Error());
         break;
       }
+#endif
       r.framesWritten++;
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      if (audio && consumeAudio) {
+#else
       if (audio) {
+#endif
         LONGLONG endpoint = 0;
         if (!r.rate.Endpoint(frame + 1, fmt.sampleRate, endpoint)) { fail("audio timing overflow", E_INVALIDARG); break; }
         if (frame + 1 == r.frameCountReported) endpoint = r.streamLength;
@@ -655,14 +732,32 @@ class RenderFile final : public ISfRenderFile {
           }
           if (got < want) r.shortReads++;
           samples.resize((size_t)got * fmt.blockAlign);  // S_FALSE with data is consumed
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+          if (!recipeJob->Submit(true, std::move(samples), keepGoing)) {
+            if (ok) fail(recipeJob->Reason().c_str(), recipeJob->Error());
+#else
           if (!encoder_->Submit(true, std::move(samples), keepGoing)) {
             if (ok) fail(encoder_->Reason().c_str(), encoder_->Error());
+#endif
             break;
           }
           r.samplesWritten += got;
         }
       }
     }
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    if (ok && recipeJob) {
+      auto finalPoll = [&]() -> JobControl {
+        if (poll(r.frameCountReported)) return {};
+        return {r.stopHr, r.status == "cancelled"};
+      };
+      if (!recipeJob->Finish(finalPoll) && ok) fail(recipeJob->Reason().c_str(), recipeJob->Error());
+    }
+    if (recipeJob) {
+      if (!ok) recipeJob->Stop(r.stopHr, r.stopReason, r.status == "cancelled");
+      r.encoder = recipeJob->Stats();
+    }
+#else
     if (ok && encoder_) {
       auto finalPoll = [&] { return poll(r.frameCountReported); };
       if (!encoder_->Finish(finalPoll)) {
@@ -673,6 +768,7 @@ class RenderFile final : public ISfRenderFile {
       if (!ok) encoder_->Abort();
       r.encoder = encoder_->Stats();
     }
+#endif
     r.elapsedMs = NowMs() - start;
 #if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
     BestEffortDiagnostic([&] {
@@ -683,12 +779,19 @@ class RenderFile final : public ISfRenderFile {
 #endif
     if (ok) { r.status = "ok"; r.returned = S_OK; r.encodedFile = BaseName(path_); }
     else r.returned = r.status == "cancelled" ? SF_E_RENDER_STOPPED : (FAILED(r.stopHr) ? r.stopHr : E_FAIL);
+#if !defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    // RecipeJob publishes C5/C6 with the real immutable recipe/media/installation;
+    // the historical proof manifest would mislabel it as fixed FFV1 + PCM.
     WriteManifest(r, fmt);
+#endif
     BestEffortDiagnostic([&] { Log("FFmpeg render: %s hr=%s frames=%lld samples=%lld exit=%lu published=%d", r.status.c_str(),
         Hr(r.returned).c_str(), r.framesWritten, r.samplesWritten, r.encoder.exitCode, r.encoder.published); });
     if (!ok && r.status != "cancelled" && cfg.showEncoderErrors) {
       std::wstring message = L"FFmpeg render failed: " + Widen(r.stopReason) + L"\n" + Widen(Hr(r.stopHr)) +
-        L"\nEncoder log: " + r.encoder.stderrPath + L"\nManifest: " + r.manifestPath;
+        L"\nEncoder log: " + r.encoder.stderrPath;
+#if !defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      message += L"\nManifest: " + r.manifestPath;
+#endif
       MessageBoxW(nullptr, message.c_str(), L"Vegas Encoder", MB_OK | MB_ICONERROR);
     }
     return r.returned;
@@ -1082,6 +1185,9 @@ class RenderFile final : public ISfRenderFile {
 
   LONG ref_ = 1;
   Tpl tpl_;
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+  ve::Json recipeSnapshot_;
+#endif
 #if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
   bool proofExtraReport_ = false;
 #endif
@@ -1097,7 +1203,11 @@ HRESULT CreateRenderFile(const SFTEMPLATE* t, ISfRenderFile** out) {
   if (!out) return E_POINTER;
   *out = nullptr;
   return NativeBoundary([&]() -> HRESULT {
-#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    try { *out = new RenderFile(Tpl::Copy(t)); }
+    catch (const std::invalid_argument&) { return E_INVALIDARG; }
+    catch (const ve::Error&) { return E_INVALIDARG; }
+#elif defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
     try { *out = new RenderFile(Tpl::Copy(t)); }
     catch (const std::invalid_argument&) { return E_INVALIDARG; }
 #else

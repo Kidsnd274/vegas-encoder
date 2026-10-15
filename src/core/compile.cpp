@@ -89,11 +89,21 @@ double Bitrate(const std::string& text, double fallback) {
     return fallback;
 }
 void ReadStream(const Json& tokens, Json& resolved, bool video) {
+    bool unknownVideoFormatScope = false;
     for (size_t i = 0; i + 1 < tokens.size(); ++i) {
-        const auto key = OptionKey(Str(tokens[i],"text")); const auto value = Str(tokens[i+1],"text");
+        const auto option = Str(tokens[i],"text"); const auto key = OptionKey(option); const auto value = Str(tokens[i+1],"text");
         if (!IsOption(Str(tokens[i],"text")) || (tokens[i].contains("isOption") && !Bool(tokens[i],"isOption"))) continue;
         const std::string prefix = video ? "video" : "audio";
-        if (video) ReflectVideoFormatOption(resolved,key,value);
+        if (video) {
+            ReflectVideoFormatOption(resolved,key,value);
+            // Reflection models one video output, not general FFmpeg stream
+            // selectors. Do not apply another stream's pixel format to it.
+            if (key == "pix_fmt" && option != "-pix_fmt" && option != "-pix_fmt:v" && option != "-pix_fmt:v:0") unknownVideoFormatScope = true;
+        }
+        // Basic audio Extra arguments are emitted after the video arguments.
+        // A cross-stream pixel option there can supersede the generated video
+        // format; this audio resolver cannot establish that final video scope.
+        if (!video && key == "pix_fmt") unknownVideoFormatScope = true;
         if ((key == "crf" || key == "cq" || key == "global_quality" || key == "qp_i") && video) {
             try { resolved["quality"] = std::stod(value); } catch (const std::exception&) {}
         }
@@ -105,9 +115,11 @@ void ReadStream(const Json& tokens, Json& resolved, bool video) {
         if (key == "sample_fmt" && !video) resolved["audioSampleFormat"] = value;
         if (key == "ar" && !video) { try { resolved["audioRate"] = std::stod(value); } catch (const std::exception&) {} }
         if (key == "ac" && !video) { try { resolved["audioChannels"] = std::stod(value); } catch (const std::exception&) {} }
-        if (key == "vf" || key == "filter_complex") resolved["videoFilter"] = true;
-        if (key == "af" || key == "filter_complex") resolved["audioFilter"] = true;
+        const bool unknownFilterStream = key == "filter" && option.find(":v") == std::string::npos && option.find(":a") == std::string::npos;
+        if (key == "vf" || key == "filter_complex" || unknownFilterStream || (key == "filter" && video)) resolved["videoFilter"] = true;
+        if (key == "af" || key == "filter_complex" || unknownFilterStream || (key == "filter" && !video)) resolved["audioFilter"] = true;
     }
+    if (unknownVideoFormatScope) { resolved["pixfmt"] = ""; resolved["depth"] = 0; }
 }
 Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
     const auto& v = r.at("video"); const auto& a = r.at("audio")[0]; const auto& c = r.at("container");
@@ -207,6 +219,9 @@ void Reflected(const Json& tokens, Json& res) {
     Json video = Json::array(), audio = Json::array();
     std::string kind = "video";
     for (size_t i = 0; i < tokens.size(); ++i) {
+        // TokenMetadata already establishes input/output option scope. Options
+        // before {inputs}/-i describe that input, not the encoded output.
+        if (Str(tokens[i],"stage") == "input") continue;
         const auto option = Str(tokens[i],"text"), key = IsOption(option) && (!tokens[i].contains("isOption") || Bool(tokens[i],"isOption")) ? OptionKey(option) : "";
         if (!key.empty() && option == "-vn") res["videoEnabled"] = false;
         if (!key.empty() && option == "-an") res["audioEnabled"] = false;
@@ -218,6 +233,7 @@ void Reflected(const Json& tokens, Json& res) {
         }
         if (key == "f" && i + 1 < tokens.size()) {
             const auto muxer = Str(tokens[i+1],"text");
+            res["container"] = ""; // A later unknown muxer must not retain an earlier fact.
             for (const auto& c : Profiles().at("containers")) if (Str(c,"muxer") == muxer) res["container"] = Str(c,"id");
         }
         (kind == "video" ? video : audio).push_back(tokens[i]);
@@ -273,7 +289,7 @@ Json Compile(const Json& request, const Json* capabilities) {
     CheckMedia(media);
     if (!paths.is_object() || Str(paths,"ffmpeg","ffmpeg").empty() || Str(paths,"videoPipe").empty() || Str(paths,"output").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Executable, video pipe and output path must be nonempty strings.");
     Json issues = Validate(request,capabilities); const auto exe = Str(paths,"ffmpeg","ffmpeg");
-    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr}};
+    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr},{"outputContainerId",nullptr}};
     if (HasErrors(Structural(r))) return result;
     const bool audioInput = Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null();
     result["inputStreams"] = audioInput ? Json::array({"video","audio"}) : Json::array({"video"});
@@ -392,6 +408,13 @@ Json Compile(const Json& request, const Json* capabilities) {
     std::string commandLine;
     for (size_t i = 0; i < tokens.size(); ++i) { if (i) commandLine += " "; commandLine += Quote(Str(tokens[i],"text")); if (i) result["argv"].push_back(Str(tokens[i],"text")); }
     result["display"] = tokens; result["commandLine"] = commandLine; result["signalPath"] = signal; result["issues"] = issues; result["summary"] = Summary(r,res);
+    // This is an established command fact, independent of the path's extension
+    // and the inactive Basic controls in Advanced mode. An explicit, known muxer
+    // is required there; partial/general output scope leaves it unknown.
+    if (!partialCommand && !Bool(res,"unknownOutputScope")) {
+        const auto container = FindContainer(advanced ? Str(res,"container") : Str(r.at("container"),"format"));
+        if (container) result["outputContainerId"] = Str(*container,"id");
+    }
     // IDs are established below only after conservative stream-map qualification.
     result["summary"]["videoEncoderId"] = nullptr; result["summary"]["audioEncoderId"] = nullptr;
     if (partialCommand) { result["argv"] = Json::array(); result["commandLine"] = ""; }

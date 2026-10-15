@@ -144,7 +144,7 @@ Diagnostic {id,level,message,params,fix as above,start:int,end:int}
 CompileResult {executable:string,argv:string[],display:CommandToken[],commandLine:string,
   advancedTemplate:string,resolved:ResolvedSettings|null,signalPath:SignalPathFacts|null,
   issues:Issue[],summary:RecipeSummary,overriddenFields:string[],expectedStreams:ExpectedStream[]|null,
-  inputStreams:("video"|"audio")[]|null}
+  inputStreams:("video"|"audio")[]|null,outputContainerId:string|null}
 ExpectedStream {kind:"video"|"audio",encoder:string|null,codec:string|null}
 CommandToken {text:string,role:"exe"|"global"|"input"|"map"|"video"|"audio"|"mux"|"output"|"extra"|"macro",
   field,replacedField,stage:string|null,isOption:bool|null,macros:string[],
@@ -187,6 +187,47 @@ startup probing (`-probesize 32 -analyzeduration 0`), and `overwriteOutput:true`
 supplies `-y` for its exclusively created temporary output. Defaults remain false
 for existing previews/file tests. These are transport context, not recipe settings;
 the core still produces every argv token. No rejected input queue flag is restored.
+
+B6 adds nullable `outputContainerId`, an established catalog ID (`mkv`, `mov`,
+etc.). Basic uses its emitted muxer; Advanced requires an explicit known final
+output `-f`. An absent/input-only/unknown muxer, partial quote or general output
+scope stays null. Neither filename extensions nor inactive Basic controls supply
+Advanced facts. The opt-in MKV native candidate uses this fact plus an established
+video `expectedStreams` entry before spawning FFmpeg. Historical fakes may omit
+the additive field and readers expose null; argv/validation remain core-owned.
+
+### B6 opt-in native trial (2026-10-15)
+
+`build.cmd "" recipe-proof` connects fresh `VEnc` templates to C4 and immutable
+Render recipes to the B4 engine. This is an owner-authorized trial candidate,
+not qualification of A5–A7 or a default-exporter switch. It reads C7 v1 and matching
+parser-2 cache files with the 1 MiB bound. Selected FFmpeg identity is rechecked
+by the engine; native cached hardware readiness is downgraded to unknown.
+`VEGAS_ENCODER_DATA_ROOT` maps to the same `Roaming`/`Local` trial roots as the app.
+Unknown popup media/project facts remain null. The configured app's numeric file
+version must be 0.1.7.1 for the current focus-fix candidate (native
+0.1.7-recipe-proof / frontend 0.1.7+1); the full frontend folder is required.
+
+The page queues C4 preparation on its UI thread and starts file/process transport
+on one independent worker from copied request/path/argv values. No host interface,
+draft, allocator or window calls cross to that worker. It owns its transport and
+retains the DLL through late launch completion/page teardown. The UI window timer
+polls one copied terminal result; it never joins a Windows process-creation call.
+Only the page's originally enabled root owner is disabled. Normal foreground
+editor return re-enables that owner, follows explicit GW_OWNER links and restores
+an iconic host before returning focus. Background/crashed completion remains
+passive. Editor Apply changes only its draft; native Apply commits owned bytes.
+Render owns its decoded snapshot from Create and never reads the preset library.
+It releases copied host frames before C7 reads, hashing, queues or process waits.
+C5 monitor creation belongs to the independent job writer after its first atomic
+live publication, with the app directory as cwd, no inherited handles and no
+acknowledgement or process wait on Render. Monitor launch failure is nonfatal.
+The candidate requires MKV video, square pixels and the established P010/48 kHz
+stereo float input path; it does not activate arbitrary native formats/containers.
+The native private allocation rounds odd VEnc lengths up by one zero byte before
+the host's UTF-16 suffix. That byte is outside the core's strict envelope/checksum;
+only this exact padding is accepted. Earlier intact unpadded B6 envelopes still
+read. No proof migration or reconstruction of corrupted native names is performed.
 
 `minTotalBytes` / `maxTotalBytes` are the range for the user-entered length, null if
 there is no length, estimate or range. They are not figures the app scales itself.
@@ -317,6 +358,14 @@ unknown facts. Missing signalPath means facts unavailable (older result), not al
 streams disabled. In Advanced mode core supplies only facts it can establish from
 the active command, with unknown formats/bits/conversion null and unknown mux support.
 It must not present the inactive Basic recipe as resolved command facts.
+Input-scoped Advanced options do not replace output facts. Pixel-format reflection
+models only unscoped `-pix_fmt`, `-pix_fmt:v` and `-pix_fmt:v:0`; other selectors
+(including absolute `:0`, whose stream may be audio) leave output format/bits
+unknown in Basic Extra and Advanced. Arbitrary video filters, including `-filter:v`,
+leave conversion unknown even when an explicit final pixel format establishes depth.
+An unscoped/absolute-selector `-filter` leaves both stream conversions unknown;
+pixel-format options in Basic audio Extra leave final video format/bits unknown,
+since those arguments follow and may override the generated video options.
 For general extra-input selection or multiple outputs, core keeps the delivered
 source node but leaves unestablished stream/output facts unknown. It does not infer
 which source/output FFmpeg's general stream-selection rules will choose.
@@ -511,6 +560,9 @@ PresetPreferences and PresetLocations. `FileMachineSettingsRepository(paths?)`,
 implement their existing C3 interfaces. The app injects these explicitly; platform
 does not change app providers. Production uses NativeVeCore. No repository invokes
 FFmpeg or VEGAS. FileReveal launches Explorer only on an explicit reveal call.
+Windows file reveal passes `/select,` separately from the unchanged absolute
+file path, keeping Dart's automatic path quoting from obscuring the switch.
+Directories open directly; invalid/missing targets fail before launching.
 
 ServicePaths defaults to the C3/C6/C7 Windows user roots; injectable roaming/local
 roots keep tests isolated. Cache files are `%LOCALAPPDATA%\VegasEncoder\cache\<identityKey>.json`,
@@ -523,7 +575,7 @@ the parser-version-2 cache and GPU-aware view composed by WindowsServices below.
 | --- | --- | --- |
 | PresetPreferences | setPreferences(id,{favorite?,pinned?}) -> Preset | FakePresetLibrary |
 | PresetLocations | location(id) -> absolute path or null for built-in/missing | FakePresetLibrary (illustrative location) |
-| PresetTransfer(library) | duplicate(id,{newId,name?}); fromJob(record,{newId,name?}); exportTo(id,selectedPath); shareString(id); importShareString(text,{newId}) | FakePresetTransfer (export captured in memory) |
+| PresetTransfer(library) | duplicate(id,{newId,name?}); fromJob(record,{newId,name?}); exportTo(id,selectedPath); importFrom(selectedPath,{required newId}); shareString(id); importShareString(text,{newId}) | FakePresetTransfer (selected-file fixtures and captured exports in memory) |
 | JobLogs | readLog(id) -> Stream<String> UTF-8 chunks; logLocation(id) -> path or null | FakeJobRepository(logs:{id:text}) |
 | FileReveal | reveal(absolutePath) | FakeFileReveal |
 
@@ -541,6 +593,20 @@ plain portable preset data, not encrypted or signed. Decoded data is bounded and
 validated through the same import path. Export writes only the user-selected path,
 atomically. Six packaged built-ins adopt the original recipe snapshots at product
 revision 1; design-time installation identities/results are never packaged with them.
+
+`PresetTransfer.importFrom(selectedPath, newId: ...)` reads only the caller-selected
+UTF-8 JSON file, bounded to 1 MiB even if it grows during the read. It delegates to
+the same repository import/native recipe validation and create-only Save path as
+share imports; a selected file cannot overwrite an existing preset. Imports preserve
+unknown metadata and copy origins, use the caller's new ID and start at revision 1.
+The source file is never changed or removed, including on failure. A missing file
+is NOT-FOUND, an unreadable file is FILE-READ, oversized input is FILE-LIMIT;
+malformed JSON/UTF-8, future versions, invalid recipes/IDs and collisions retain the
+repository's existing errors. The app supplies the Open dialog and refreshes/selects
+the returned preset. No extension-based trust or automatic scan is introduced.
+`FakePresetTransfer(library, files: {selectedPath: jsonText})` supports this operation
+without file I/O and can re-import its captured exports. Its file envelope checks
+are bounded; semantic behavior remains that of the injected library.
 
 Adjacent temp files are flushed then atomically renamed; the old destination is
 never deleted before replacement. Separate persistent lock files serialize Windows
@@ -737,8 +803,11 @@ launches an explicitly selected owned helper and polls its exit before consuming
 one core-validated result. Nonzero exit, missing/invalid/foreign results or explicit
 Cancel preserve the draft; no Render wait or app lookup is introduced. Direct
 known-file cleanup preserves unknown entries and reports incomplete cleanup.
-These helpers are not linked into exporter discovery/pages/Render. Actual Flutter
-launch, startup scheduling/modality, native persistence and monitor integration remain gated;
+The default/proof exporters retain their previous paths; the opt-in B6 candidate
+now links these helpers into discovery/pages/Render as described above. Real
+native restart persistence is owner-confirmed for the tested recipes; maximum
+payload capacity and monitor performance remain unqualified, and foreground
+return after switching apps remains an open app close-handoff issue;
 details/tests are in [NATIVE_RECIPE_BOUNDARY.md](../NATIVE_RECIPE_BOUNDARY.md).
 No C4/C5 shape or C2 API changed for this checkpoint.
 
@@ -757,7 +826,8 @@ LiveRenderStatus {
   encodeFps:number|null,speed:number|null,bitrateKbps:number|null,
   bytesWritten:nonnegativeInt,elapsedSec:number,etaSec:number|null,
   estimatedFinalBytes:nonnegativeInt|null,outputPath:string,templateName:string,
-  encoderSummary:string,message:string,ffmpegExitCode:int|null
+  encoderSummary:string,outputBitDepth:positiveInt|null,
+  pixelFormatConversionReducesPrecision:bool|null,message:string,ffmpegExitCode:int|null
 }
 ```
 
@@ -769,7 +839,33 @@ Finishing/verification are not success. Failed verification may retain a temp fi
 reported in the job record. bytesWritten is work so far; failure/cancellation does
 not mean it was published. Unknown metrics remain null; ETA is advisory.
 
+`outputBitDepth` is the core's useful video precision at the encoder input, after
+pixel-format conversion and before codec compression. It describes the compiled
+signal path, not measured encoded-file precision or a codec quality guarantee.
+`pixelFormatConversionReducesPrecision` is true only when established input bits
+exceed output bits and the core establishes conversion; false covers unchanged or
+increased depth and layout-only conversion. It excludes compression and chroma
+changes. Unknown input precision or arbitrary filters leave that flag null, even
+if outputBitDepth is known. Consumers must not turn null into false or derive facts
+from encoder labels, pixel-format names, the recipe or diagnostic text.
+
+The native writer initializes both fields to null and fills them only after a valid
+compile establishes exactly one video output and an unambiguous video encoder ID.
+Video-disabled/audio-only commands, stream copy, general Advanced input/output/map
+or codec scope, and unknown output formats keep both null. A simple Advanced command
+with an explicit scoped encoder and known pixel format can supply facts; inactive
+Basic settings never fill them. Facts then persist across phases and terminal states.
+An error before valid compilation retains nulls. Existing files with absent fields
+remain readable as unknown without inserting defaults; copyWith(null) explicitly
+clears them. Disk and fake readers reject nonpositive/noninteger depth or a nonbool
+nonnull precision flag; malformed replacements preserve the last valid snapshot.
+The fake transports supplied facts without calculating them. Samples show unknown
+at startup and illustrative P010-to-8-bit reduction in subsequent phases.
+
 Worker writes at most twice a second plus phase/terminal changes, atomically.
+A pending metric wakes an idle writer as soon as this rate budget is free; there
+is no extra periodic half-second wait after an idle gap. Phase changes bypass
+ordinary metric coalescing.
 Render never waits for the app, monitor startup, or file-reader acknowledgements;
 failed monitor launch/status publication is logged and does not fail the render.
 Missing initial file produces null. Malformed/incomplete replacements retain the
@@ -843,6 +939,13 @@ complete per-job files. `rebuildIndex()` explicitly replaces an interrupted/corr
 index under the index lock. Watches never repair files as a side effect. Stopped
 jobs cannot claim publication or published bytes; success requires zero exit,
 publication and a passed/explicitly skipped output check.
+
+The engine's output readback samples the first 32 packets (`-read_intervals %+#32`)
+after ordinary stream discovery. It retains all streams, requires a positive
+decoded count and dimensions for every video stream, and checks stream kinds/count
+and known core codecs. Cancellation, timeout, diagnostics, JSON bounds and refusal
+to publish on failure remain enforced. This is sampled readability, not an exact
+frame count or a full-file corruption scan. Full decode qualification is separate.
 
 ## C7 — machine.json
 

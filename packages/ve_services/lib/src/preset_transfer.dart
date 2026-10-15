@@ -10,6 +10,26 @@ class PresetTransfer {
   final PresetLibrary library;
   Future<void> exportTo(String id, String selectedPath) async =>
       atomicWrite(selectedPath, await library.exportPreset(id));
+
+  /// Reads a caller-selected file through the same bounded storage reader and
+  /// repository validation used by the library. The source is never modified.
+  Future<Preset> importFrom(
+    String selectedPath, {
+    required String newId,
+  }) async {
+    safeId(newId);
+    return _importFile(await readJson(selectedPath), newId: newId);
+  }
+
+  Future<Preset> _importFile(
+    Map<String, Object?>? data, {
+    required String newId,
+  }) {
+    if (data == null)
+      throw const ServiceException('NOT-FOUND', 'Preset file is missing.');
+    return library.importPreset(jsonEncode(data), newId: newId);
+  }
+
   Future<String> shareString(String id) async =>
       'vepreset:1:${base64Url.encode(utf8.encode(await library.exportPreset(id)))}';
   Future<Preset> importShareString(String text, {required String newId}) async {
@@ -79,8 +99,22 @@ class PresetTransfer {
 }
 
 class FakePresetTransfer extends PresetTransfer {
-  FakePresetTransfer(super.library);
+  FakePresetTransfer(super.library, {Map<String, String> files = const {}})
+    : files = Map.of(files);
+
+  /// Selected-file fixtures; imports also accept this fake's captured exports.
+  final Map<String, String> files;
   final Map<String, String> exported = {};
+  @override
+  Future<Preset> importFrom(
+    String selectedPath, {
+    required String newId,
+  }) async {
+    safeId(newId);
+    final text = exported[selectedPath] ?? files[selectedPath];
+    return _importFile(text == null ? null : decodeJson(text), newId: newId);
+  }
+
   @override
   Future<void> exportTo(String id, String selectedPath) async {
     exported[selectedPath] = await library.exportPreset(id);
@@ -92,6 +126,23 @@ abstract interface class FileReveal {
 }
 
 class WindowsFileReveal implements FileReveal {
+  WindowsFileReveal({Future<void> Function(String, List<String>)? launch})
+    : _launch = launch ?? _startExplorer;
+
+  final Future<void> Function(String, List<String>) _launch;
+
+  static Future<void> _startExplorer(
+    String executable,
+    List<String> arguments,
+  ) async {
+    await Process.start(
+      executable,
+      arguments,
+      runInShell: false,
+      mode: ProcessStartMode.detached,
+    );
+  }
+
   @override
   Future<void> reveal(String path) async {
     if (!Platform.isWindows)
@@ -117,11 +168,11 @@ class WindowsFileReveal implements FileReveal {
         'Windows directory is unavailable.',
       );
     try {
-      await Process.start(
+      await _launch(
         joinPath(windows, 'explorer.exe'),
-        [entity == FileSystemEntityType.directory ? path : '/select,$path'],
-        runInShell: false,
-        mode: ProcessStartMode.detached,
+        // Keep the switch separate: Dart quotes an entire argument containing
+        // spaces, and Explorer ignores a quoted "/select,<path>" token.
+        entity == FileSystemEntityType.directory ? [path] : ['/select,', path],
       );
     } on ProcessException catch (e) {
       throw ServiceException('REVEAL-FAILED', e.message);

@@ -371,6 +371,91 @@ Future<void> main(List<String> args) async {
           await library.exportPreset('mine'),
       'export goes to selected path',
     );
+    final importPath = joinPath(root.path, '导入 preset.vepreset');
+    final sourceText = await File(exportPath).readAsString();
+    await File(importPath).writeAsString(sourceText);
+    final importedFile = await transfers.importFrom(
+      importPath,
+      newId: 'from-file',
+    );
+    check(
+      importedFile.recipe.id == 'from-file' &&
+          importedFile.recipe.name == latest.recipe.name &&
+          importedFile.revision == 1 &&
+          !importedFile.builtin &&
+          importedFile.origin == latest.origin &&
+          importedFile.recipe.data['futureRecipe'] != null &&
+          importedFile.data['futureTop'] != null &&
+          importedFile.requires.known,
+      'selected Unicode file imports through native validation with a new identity and unknown metadata',
+    );
+    final importedBytes = await File(
+      (await library.location('from-file'))!,
+    ).readAsString();
+    await rejects(
+      () => transfers.importFrom(importPath, newId: 'from-file'),
+      'REVISION-CONFLICT',
+    );
+    check(
+      await File((await library.location('from-file'))!).readAsString() ==
+              importedBytes &&
+          await File(importPath).readAsString() == sourceText,
+      'import collision preserves the existing preset and source file',
+    );
+    await rejects(
+      () => transfers.importFrom(
+        joinPath(root.path, 'missing.vepreset'),
+        newId: 'missing-import',
+      ),
+      'NOT-FOUND',
+    );
+    await rejects(
+      () => transfers.importFrom(root.path, newId: 'directory-import'),
+      'FILE-READ',
+    );
+    await rejects(
+      () => transfers.importFrom(importPath, newId: '../unsafe'),
+      'INVALID-ID',
+    );
+    final invalidSources = <(String, List<int>, String)>[
+      ('utf8', [0xff], 'INVALID-DATA'),
+      ('malformed', utf8.encode('{bad'), 'INVALID-DATA'),
+      ('duplicate', utf8.encode('{"vepreset":1,"vepreset":1}'), 'INVALID-DATA'),
+      (
+        'future-file',
+        utf8.encode(jsonEncode({...latest.toJson(), 'vepreset': 2})),
+        'UNSUPPORTED-VERSION',
+      ),
+      (
+        'bad-recipe-file',
+        utf8.encode(jsonEncode(badRecipe.data)),
+        'RECIPE-INVALID',
+      ),
+      ('oversize', List.filled(jsonFileLimit + 1, 32), 'FILE-LIMIT'),
+    ];
+    for (final (id, bytes, code) in invalidSources) {
+      await File(importPath).writeAsBytes(bytes);
+      await rejects(() => transfers.importFrom(importPath, newId: id), code);
+      check(
+        await library.get(id) == null &&
+            base64Encode(await File(importPath).readAsBytes()) ==
+                base64Encode(bytes),
+        'failed file import leaves its source intact and creates no preset: $id',
+      );
+    }
+    await File(
+      importPath,
+    ).writeAsString(await library.exportPreset(builtin.recipe.id));
+    final importedBuiltin = await transfers.importFrom(
+      importPath,
+      newId: 'builtin-file',
+    );
+    check(
+      importedBuiltin.origin == 'builtin/${builtin.recipe.id}' &&
+          !importedBuiltin.builtin &&
+          importedBuiltin.revision == 1,
+      'file import preserves built-in copy origin',
+    );
     final advanced = latest.copyWith(
       recipe: latest.recipe.copyWith(
         id: 'advanced',
@@ -482,12 +567,35 @@ Future<void> main(List<String> args) async {
     await waitFor(() => live.isNotEmpty);
     check(live.first == null, 'missing startup live file is null');
     final starting = FakeLiveRenderStatusReader.samples().first;
-    await atomicWrite(
-      liveFile,
-      jsonEncode(starting.copyWith(sequence: 1).data),
-    );
+    final legacy = starting.toJson()
+      ..remove('outputBitDepth')
+      ..remove('pixelFormatConversionReducesPrecision');
+    await atomicWrite(liveFile, jsonEncode(legacy));
     await waitFor(() => live.last?.sequence == 1);
     final good = live.last;
+    check(
+      good!.outputBitDepth == null &&
+          good.pixelFormatConversionReducesPrecision == null &&
+          !good.toJson().containsKey('outputBitDepth'),
+      'older C5 files read with unknown video facts and no implicit defaults',
+    );
+    for (final invalid in [
+      for (final depth in [0, -1, 8.0, '8', true])
+        starting.copyWith(sequence: 2, outputBitDepth: depth),
+      for (final reduces in [0, 'false'])
+        starting.copyWith(
+          sequence: 2,
+          pixelFormatConversionReducesPrecision: reduces,
+        ),
+    ]) {
+      await atomicWrite(liveFile, jsonEncode(invalid.data));
+      await rejects(() => liveReader.read(liveFile), 'INVALID-DATA');
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      check(
+        identical(live.last, good),
+        'invalid video fact retains last valid live status',
+      );
+    }
     for (final bad in [
       '{"live":1',
       jsonEncode(starting.copyWith(sequence: 0, state: RenderState.done).data),
@@ -514,10 +622,33 @@ Future<void> main(List<String> args) async {
     await atomicWrite(
       liveFile,
       jsonEncode(
-        starting.copyWith(sequence: 2, state: RenderState.encoding).data,
+        starting
+            .copyWith(
+              sequence: 2,
+              state: RenderState.encoding,
+              outputBitDepth: 10,
+              pixelFormatConversionReducesPrecision: false,
+            )
+            .data,
       ),
     );
     await waitFor(() => live.last?.sequence == 2);
+    check(
+      live.last!.outputBitDepth == 10 &&
+          live.last!.pixelFormatConversionReducesPrecision == false &&
+          (await liveReader.read(liveFile))!.outputBitDepth == 10,
+      'repaired C5 read and watch carry known depth without precision reduction',
+    );
+    await atomicWrite(
+      liveFile,
+      jsonEncode(starting.copyWith(sequence: 3).data),
+    );
+    await waitFor(() => live.last?.sequence == 3);
+    check(
+      live.last!.outputBitDepth == null &&
+          live.last!.pixelFormatConversionReducesPrecision == null,
+      'explicit null video facts stay unknown after a known status',
+    );
     await liveWatch.cancel();
 
     final jobs = FileJobRepository(core: core, paths: paths);

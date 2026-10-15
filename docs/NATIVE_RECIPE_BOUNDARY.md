@@ -1,10 +1,16 @@
-# B6 preparation: recipe bytes, editor drafts and transport
+# B6 recipe bytes, editor bridge and opt-in native candidate
 
-This is an **offline implementation checkpoint**, not completion of B6 or any
-real-host gate. The default/proof exporters do not reference these new helpers.
-No recipe page is exposed, editor/monitor launched, or saved product recipe
-rendered by VEGAS. A5–A7, real two-template/restart persistence, controlled real
-failure recovery and monitor performance remain unverified.
+The owner resumed B6 preparation and real-host testing on 2026-10-15. The opt-in
+**0.1.6-recipe-proof** candidate connects fresh native recipe templates to the
+existing frontend popup and recipe engine/C5 monitor. Default and historical proof
+builds keep their previous paths. The owner's first 0.1.4 trial rendered successfully
+but exposed text corruption and intermittent editor startup errors. The fix
+candidate has since been installed by the owner. Distinct FFV1/libx264 recipe
+renders, improved 0.1.6 startup and saved-template persistence across restarts
+are owner-confirmed on VEGAS 2026.0.3.189. See [B6_TRIAL.md](B6_TRIAL.md) for
+isolated data, testing and rollback. Foreground return after switching apps remains
+faulty. A5–A7 are not fully qualified; controlled real failure recovery,
+private-payload capacity and measured monitor performance remain open.
 
 ## Owned native payload boundary
 
@@ -28,14 +34,19 @@ The historical `VENC`/`CFG1` proof cannot be read, replaced or initialized as a
 recipe template. New product templates must be created deliberately; no proof
 migration or automatic overwrite of an unknown private format is supplied.
 
-Odd-length payloads are supported by the owned-byte helper without assuming
-aligned UTF-16. That does **not** establish VEGAS's native save/reload behavior,
-maximum private length or text alignment. The existing holder/allocator bridge
-can copy these variable-length values in the fake harness; the actual saved host
-workflow still requires qualification. No host memory or saved template is edited
-by these tests.
+The first real B6 trial exposed garbled names/notes with an odd `cbExtra=559`.
+The original tests checked only this implementation's byte-based text reader and
+missed a wchar-indexed consumer's byte shift. New native allocations round the
+private length to an even number, inserting at most one zero byte **outside** the
+strict VEnc envelope, before the preserved text suffix. Native reads strip only
+that permitted alignment byte; the portable decoder still rejects trailing data.
+Intact original odd B6 envelopes remain readable. This prevents recurrence for new
+templates; it cannot reconstruct text already corrupted by a host save/rename.
+The owner subsequently confirmed fresh template operation and persistence across
+restarts for the tested recipes. Maximum private size remains unqualified. No saved
+template is modified automatically.
 
-`ReadRecipeSnapshot` returns an independent value for a future immutable render
+`ReadRecipeSnapshot` returns an independent value for an immutable render
 job. It reads no preset library, application files or machine preferences. Core
 payload checks establish structure only; B6 must still compile/validate against
 actual delivered media and the selected FFmpeg before rendering. Source color
@@ -72,9 +83,13 @@ semantics; the adapter enforces session identity and one terminal result.
   does not mutate a previously copied render snapshot.
 
 The callback seam is only a transaction interface, not a VEGAS ABI or a public
-SDK. The offline transport below handles files and owned child lifetime. Native
-page modality, owner re-enable, startup scheduling and HWND validation are **not
-implemented here**. No host interface is handed to a worker. Render never
+SDK. The transport below handles files and owned child lifetime. `recipe_page.*`
+now supplies UI-thread startup scheduling, root-owner disable/restore and timer
+polling through the existing native holder/allocator bridge. File/process launch
+now runs in parallel through `EditorSessionTask`, with copied C4 values and a
+retained DLL lifetime. The task owns its transport entirely on its worker, while
+draft/window/holder operations remain on the page thread. No host interface is
+handed to a worker. Render never
 participates in edit sessions or waits for an editor/progress window.
 
 ## C4 file/process transport (offline)
@@ -88,7 +103,9 @@ replacement while active. Tests exposed that attributes-only directory access
 did not prevent rename; the implementation now pins with directory-list access,
 sharing read/write while denying delete. A focused check verifies directory rename
 is refused while adjacent child-file atomic publication still works.
-Production root creation and per-user ACL qualification remain bridge tasks.
+The candidate creates its per-user session root after rejecting known reparse
+ancestors; transport pins the existing root. Real-host/per-user ACL qualification
+remains open.
 
 The helper is created suspended, with no inherited handles, then assigned to a
 kill-on-close job before resume. Process polling uses a zero timeout on the
@@ -107,13 +124,15 @@ only direct known protocol files (including `.result.lock` and interrupted resul
 temps); it does not recurse or delete unknown entries/the supplied root. Cleanup
 failure is reported with the retained path available through `Directory()`.
 
-This is a transport seam, not a finished native page. Start still does synchronous
-local file/process setup; startup latency/scheduling, graceful Close editor,
-owner lifetime/re-enable, focus/modality and the actual Flutter helper are not
-qualified. The future page must cancel/discard its draft after launch failure or
-teardown, and must own these remaining UI behaviours. There are **no exporter,
-page or Render call sites**. No editor or monitor is needed to render a saved
-snapshot; this transport must never be called from Render.
+The low-level Start does synchronous local file/process setup on its owning worker.
+The native page polls one copied result without joining startup; late teardown
+retains the worker/DLL until it can terminate its owned child safely. Normal return
+from a foreground editor re-enables its original native owner and follows explicit
+GW_OWNER links to restore an iconic host. Background/crashed completion stays
+passive. Actual total startup latency and the real Apply/minimize symptom require
+the owner's 0.1.6 test; offloading alone does not prove a faster visible editor.
+No launch-cancel UI was added. No editor or monitor is needed to render a saved
+snapshot; the transport is never called from Render.
 
 Current primary references, retrieved through Context7:
 [Win32 API](https://learn.microsoft.com/en-us/windows/win32/api/) and
@@ -167,17 +186,10 @@ VEGAS, exporter installation, native page or monitor is used.
 
 ## Remaining B6 work and owner qualification
 
-Next is the native page/editor bridge against the actual F5 popup once it is ready
-and the owner resumes the native gates, followed by the recipe/C5 progress bridge
-through an opt-in candidate. No additional fake-owner framework is planned.
-Coordinate F5/F6 UI readiness via platform.md; do not edit
-app-owned files. The app's F4 metadata requests remain separately queued in that
-handoff and C2 remains unchanged by this checkpoint.
-
-Before enabling the real adapter, the owner must choose when to resume the
-previously deferred A5/A6 real Apply/Cancel/two-template/restart procedure in
-[NATIVE_CONFIGURATION.md](NATIVE_CONFIGURATION.md). This checkpoint does not
-reopen that deferred request automatically. The later real B6 candidate needs:
+The native page and recipe/C5 bridges are implemented in the opt-in candidate;
+the owner's next step is the real trial in [B6_TRIAL.md](B6_TRIAL.md), incorporating
+the deferred Apply/Cancel/two-template/restart procedure. Frontend sources remain
+app-owned and unchanged. The candidate still needs real-host evidence for:
 
 1. Deliberately fresh product templates, full recipe/origin bytes at Create,
    correct name/notes after growth/shrink and odd/even private lengths, and a
@@ -198,7 +210,7 @@ reopen that deferred request automatically. The later real B6 candidate needs:
    under 120 MB). No timing claim follows from these offline draft checks.
 
 The B5 slot-4 trial showed no useful visible text, and the owner dropped custom
-dialog text; see [NATIVE_PROGRESS.md](NATIVE_PROGRESS.md). Its installation
-authorization does not qualify or enable B6, reopen deferred persistence
-automatically, or authorize a future B6 installation. Useful numeric progress and
-the separate frontend window remain the target; real monitor performance is open.
+dialog text; see [NATIVE_PROGRESS.md](NATIVE_PROGRESS.md). The B6 candidate does not
+resume that investigation. The owner explicitly resumed B6 preparation afterward;
+installation remains a separate manual step with the prepared rollback. Useful
+numeric progress and the frontend window remain the target; performance is open.

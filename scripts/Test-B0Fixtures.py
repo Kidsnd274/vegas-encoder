@@ -156,6 +156,9 @@ for file in (FIXTURES/'live').glob('*.live.json'):
     check(live['live'] == 1 and live['framesDone'] <= live['framesTotal'],'live identity/counts')
     check(live['bytesWritten'] >= 0 and live['elapsedSec'] >= 0,'live bounds')
     check(live['hostHwnd'].isdigit() and 0 < int(live['hostHwnd']) <= 2**64-1, 'main host HWND string')
+    check(live['outputBitDepth'] == (None if live['state'] == 'starting' else 8), 'sample encoder-input video depth')
+    check(live['pixelFormatConversionReducesPrecision'] is (None if live['state'] == 'starting' else True),
+          'sample P010 to eight-bit conversion, unknown before compile')
     if live['state'] == 'done':
         check(live['ffmpegExitCode'] == 0,'done fixture exit')
 check(seen == states,'all seven live states')

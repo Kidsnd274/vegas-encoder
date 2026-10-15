@@ -59,6 +59,36 @@ Future<void> main(List<String> args) async {
       status.sequence > 0 && status.hostHwnd == '123456',
       'C5 sequence and host placement facts.',
     );
+    final liveJson =
+        jsonDecode(
+              await File('${paths.jobs}/${entry.id}.live.json').readAsString(),
+            )
+            as Map<String, dynamic>;
+    check(
+      liveJson.containsKey('outputBitDepth') &&
+          liveJson.containsKey('pixelFormatConversionReducesPrecision') &&
+          status.outputBitDepth == liveJson['outputBitDepth'] &&
+          status.pixelFormatConversionReducesPrecision ==
+              liveJson['pixelFormatConversionReducesPrecision'],
+      'C5 nullable native video facts survive the validated Dart reader.',
+    );
+    if (record.templateName.startsWith('h264-build')) {
+      check(
+        status.outputBitDepth == 8 &&
+            status.pixelFormatConversionReducesPrecision == true,
+        'C5 native H.264 test records the P010 to 8-bit precision reduction.',
+      );
+    } else if ([
+      'lossless-build',
+      'video-only-build',
+      'advanced-build',
+    ].any(record.templateName.startsWith)) {
+      check(
+        status.outputBitDepth == 10 &&
+            status.pixelFormatConversionReducesPrecision == false,
+        'C5 native lossless and seeded Advanced tests preserve 10-bit precision.',
+      );
+    }
     if (record.logFile != null &&
         await repository.logLocation(entry.id) != null) {
       final log = await repository.readLog(entry.id).join();

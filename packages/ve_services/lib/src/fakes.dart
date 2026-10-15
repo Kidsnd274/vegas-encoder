@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:ve_core/ve_core.dart';
 import 'api.dart';
 import 'models.dart';
-import 'storage_validation.dart' show validatePopupSize;
+import 'storage_validation.dart' show validatePopupSize, validateLiveVideoFacts;
 import 'service_fixture_data.dart';
 
 /// Each listen gets the latest value then later updates. Subscribe before the
@@ -541,6 +541,7 @@ class FakeLiveRenderStatusReader implements LiveRenderStatusReader {
     Map<String, LiveRenderStatus?> initial = const {},
   }) {
     for (final entry in initial.entries) {
+      if (entry.value != null) validateLiveVideoFacts(entry.value!.data);
       _stores[entry.key] = _Store(entry.value);
     }
   }
@@ -563,6 +564,7 @@ class FakeLiveRenderStatusReader implements LiveRenderStatusReader {
         'LIVE-SEQUENCE',
         'One job per file, with strictly increasing sequence.',
       );
+    validateLiveVideoFacts(status.data);
     store.set(status);
   }
 

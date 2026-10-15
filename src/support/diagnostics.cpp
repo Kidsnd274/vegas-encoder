@@ -71,6 +71,9 @@ Config LoadConfig() {
   c.showEncoderErrors = IniNumber(c.iniPath, L"ShowEncoderErrors", 1) != 0;
   c.pipeTimeoutMs = IniNumber(c.iniPath, L"PipeTimeoutMs", c.pipeTimeoutMs);
   c.finishTimeoutMs = IniNumber(c.iniPath, L"FinishTimeoutMs", c.finishTimeoutMs);
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+  c.appPath = IniString(c.iniPath, L"AppPath", L"");
+#endif
 #if defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
   const auto textProbe = IniString(c.iniPath, L"B5ProgressText", L"0");
   c.progressTextProbe = textProbe == L"4" ? 4 : textProbe == L"3" ? 3 : 0;

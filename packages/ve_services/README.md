@@ -49,8 +49,11 @@ records implicitly. WindowsFileReveal is an explicit Explorer action.
 
 `PresetPreferences.setPreferences` stores built-in stars/pins separately without
 editing their recipes/revisions. `PresetLocations.location` returns user-preset
-paths. `PresetTransfer` provides duplicate/History origins, selected-path export
-and versioned share strings; `FakePresetTransfer` captures exports without I/O.
+paths. `PresetTransfer` provides duplicate/History origins, selected-path export,
+bounded selected-file import (`importFrom(path, newId: ...)`) and versioned share
+strings. File import uses the repository's validation/create-only save and preserves
+the source. `FakePresetTransfer(files: ...)` supplies selected-file fixtures and
+captures exports without I/O.
 `JobLogs` streams recorded full logs; `FakeJobRepository(logs: ...)` supplies them
 in tests. `FakeFileReveal` captures reveal requests. Unknown data round-trips.
 

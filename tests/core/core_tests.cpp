@@ -49,10 +49,12 @@ int main(int argc, char** argv) {
             const auto result = CallJson(ve_compile,{{"recipe",f.at("recipe")},{"media",f.at("media")},{"paths",f.at("paths")}});
             Check(!ve::HasErrors(result.at("issues")),"built-in semantics");
             Check(result.at("argv") == goldens.at("argv").at(ve::Str(f.at("recipe"),"id")),"B1 real-core golden argv parity");
+            Check(result.at("outputContainerId") == f.at("recipe").at("container").at("format"),"Basic container is an established core fact");
             auto advancedRecipe = f.at("recipe"); advancedRecipe["command"]["mode"] = "template";
             advancedRecipe["command"]["template"] = result.at("advancedTemplate");
             const auto seeded = CallJson(ve_compile,{{"recipe",advancedRecipe},{"media",f.at("media")},{"paths",f.at("paths")}});
             Check(seeded.at("argv") == result.at("argv"),"Basic seed preserves input tagging in Advanced");
+            Check(seeded.at("outputContainerId") == result.at("outputContainerId"),"Advanced seed preserves the explicit output container fact");
         }
         for (size_t i = 0; i < bundle.at("additionalFixtures").size(); ++i) {
             const auto& popup = bundle.at("additionalFixtures")[i];
@@ -74,6 +76,23 @@ int main(int argc, char** argv) {
         const auto original = recipe.dump();
         auto request = ve::Json{{"recipe",recipe},{"media",f.at("media")},{"paths",f.at("paths")}};
         const auto result = CallJson(ve_compile,request);
+        auto containerRequest = request;
+        containerRequest["recipe"]["container"]["format"] = "unknown-container";
+        Check(CallJson(ve_compile,containerRequest).at("outputContainerId").is_null(),"invalid Basic container remains unknown");
+        containerRequest = request;
+        containerRequest["recipe"]["command"] = {{"mode","template"},{"template","{inputs} -c:v ffv1 -f matroska {output}"}};
+        Check(CallJson(ve_compile,containerRequest).at("outputContainerId") == "mkv","Advanced explicit muxer overrides inactive Basic container and filename");
+        containerRequest["recipe"]["command"]["template"] = "{inputs} -c:v ffv1 -f matroska -f mov {output}";
+        Check(CallJson(ve_compile,containerRequest).at("outputContainerId") == "mov","last known output muxer owns container fact");
+        for (const auto* text : {"{inputs} -c:v ffv1 {output}",
+                                 "-f matroska {inputs} -c:v ffv1 {output}",
+                                 "{inputs} -c:v ffv1 -f matroska -f unknown-muxer {output}",
+                                 "{inputs} -i extra.mkv -c:v ffv1 -f matroska {output}",
+                                 "{inputs} -c:v ffv1 -f matroska extra.mkv {output}",
+                                 "{inputs} -c:v ffv1 -f matroska {output} -metadata \"unfinished"}) {
+            containerRequest["recipe"]["command"]["template"] = text;
+            Check(CallJson(ve_compile,containerRequest).at("outputContainerId").is_null(),"absent/input/unknown/general/partial Advanced muxer facts remain unknown");
+        }
         Check(result.at("expectedStreams") == ve::Json::array({{{"kind","video"},{"encoder","libx264"},{"codec","h264"}},{{"kind","audio"},{"encoder","aac"},{"codec","aac"}}}),"Basic verification codecs are native facts");
         auto verificationRequest = request;
         verificationRequest["recipe"]["audio"][0]["enabled"] = false;
@@ -134,6 +153,21 @@ int main(int argc, char** argv) {
             Check(!ve::HasErrors(CallJson(ve_recipe_validate,b1Request).at("issues")) && b1Result.at("resolved").is_null() &&
                   b1Result.at("signalPath").at("video").at("outputBits").is_null(),"automatic or unmodeled exact format remains unknown");
         }
+        b1Request["recipe"] = f.at("recipe"); b1Request["capabilities"] = nullptr;
+        for (const auto* selector : {"-pix_fmt:v:1","-pix_fmt:0"}) {
+            b1Request["recipe"]["video"]["extra"] = std::string(selector) + " yuv420p";
+            b1Result = CallJson(ve_compile,b1Request);
+            Check(b1Result.at("signalPath").at("video").at("outputBits").is_null() && b1Result.at("signalPath").at("video").at("conversion").is_null(),"Basic unsupported pixel-format selectors do not label the first video output");
+            Check(std::find(b1Result.at("argv").begin(),b1Result.at("argv").end(),ve::Json(selector)) != b1Result.at("argv").end(),"unknown format scope preserves authored argv");
+        }
+        for (const auto* filter : {"-vf","-filter:v","-filter:v:0"}) {
+            b1Request["recipe"]["video"]["extra"] = std::string(filter) + " format=yuv420p";
+            b1Result = CallJson(ve_compile,b1Request);
+            Check(b1Result.at("signalPath").at("video").at("outputBits") == 8 && b1Result.at("signalPath").at("video").at("conversion").is_null(),"Basic arbitrary filter aliases preserve explicit depth but leave conversion unknown");
+        }
+        b1Request["recipe"] = f.at("recipe"); b1Request["recipe"]["video"]["depth"] = 10; b1Request["recipe"]["video"]["profile"] = "high10";
+        b1Request["recipe"]["audio"][0]["extra"] = "-pix_fmt yuv420p";
+        Check(CallJson(ve_compile,b1Request).at("signalPath").at("video").at("outputBits").is_null(),"Basic cross-stream audio Extra pixel format cannot leave stale generated video facts");
         b1Request["recipe"] = f.at("recipe"); b1Request["recipe"]["video"]["extra"] = "-crf 16 -preset faster -g 90";
         b1Result = CallJson(ve_compile,b1Request);
         for (const auto& token : b1Result.at("display")) if (ve::Str(token,"field") == "video.extra") {
@@ -273,6 +307,21 @@ int main(int argc, char** argv) {
         Check(CallJson(ve_compile,metadataRequest).at("summary").at("videoEncoderId").is_null(),"general codec scope ID remains unknown");
         metadataRequest["recipe"]["command"]["template"] = "{inputs} -c:v libx264 -map 2:v {output}";
         Check(CallJson(ve_compile,metadataRequest).at("summary").at("videoEncoderId").is_null(),"general source mapping ID remains unknown");
+        for (const auto* text : {"-pix_fmt yuv420p {inputs} -map 0:v:0 -c:v libx264 {output}",
+                                 "{inputs} -map 0:v:0 -c:v libx264 -pix_fmt:v:1 yuv420p {output}",
+                                 "{inputs} -map 1:a:0 -map 0:v:0 -c:v libx264 -c:a aac -pix_fmt:0 yuv420p {output}"}) {
+            metadataRequest["recipe"]["command"]["template"] = text;
+            const auto scoped = CallJson(ve_compile,metadataRequest);
+            Check(scoped.at("signalPath").at("video").at("outputBits").is_null(),"Advanced input or unsupported pixel-format scope stays unknown");
+        }
+        metadataRequest["recipe"]["command"]["template"] = "-c:v libx265 -pix_fmt yuv420p {inputs} -map 0:v:0 -c:v libx264 -pix_fmt:v:0 yuv420p10le {output}";
+        auto scoped = CallJson(ve_compile,metadataRequest);
+        Check(scoped.at("summary").at("videoEncoderId") == "libx264" && scoped.at("signalPath").at("video").at("outputBits") == 10,"Advanced input options do not displace established output encoder/format facts");
+        metadataRequest["recipe"]["command"]["template"] = "{inputs} -map 0:v:0 -c:v libx264 -filter:v format=yuv420p,format=yuv420p10le -pix_fmt:v:0 yuv420p10le {output}";
+        scoped = CallJson(ve_compile,metadataRequest);
+        Check(scoped.at("signalPath").at("video").at("outputBits") == 10 && scoped.at("signalPath").at("video").at("conversion").is_null(),"Advanced filter alias leaves possible intermediate precision loss unknown");
+        metadataRequest["recipe"]["command"]["template"] = "{inputs} -map 0:v:0 -c:v libx264 -pix_fmt yuv420p10le -c:a aac -filter format=yuv420p,format=yuv420p10le {output}";
+        Check(CallJson(ve_compile,metadataRequest).at("signalPath").at("video").at("conversion").is_null(),"Advanced unscoped filter keeps video conversion unknown after an audio option");
         const auto macroResult = CallJson(ve_macros,{{"media",request.at("media")},{"paths",request.at("paths")}}).at("macros");
         Check(macroResult.size() == 10 && macroResult[0].at("required") == true && macroResult[1].at("required") == true,"shared catalogue required macros");
         Check(macroResult[9].at("value") == "60","catalogue GOP expansion matches compile");

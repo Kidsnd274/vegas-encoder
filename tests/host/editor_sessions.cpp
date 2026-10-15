@@ -244,6 +244,44 @@ void Run(const fs::path& parent, const Json& recipe) {
   Check(counted && handlesAfter == handlesBefore,
     "success/crash/cancel/teardown/launch-failure paths balance process/job/thread/directory handles");
 }
+void AsyncRun(const fs::path& parent, const Json& recipe) {
+  const auto root = parent / vegas_encoder::Widen("async-" + NewEditSessionId()); fs::create_directory(root);
+  const auto value = Template(recipe); RecipeTemplateDraft draft(value,owner,"async-test");
+  auto request = draft.BeginEdit(Request());
+  struct Gate {
+    HANDLE entered = CreateEventW(nullptr,TRUE,FALSE,nullptr), release = CreateEventW(nullptr,TRUE,FALSE,nullptr);
+    ~Gate() { CloseHandle(entered); CloseHandle(release); }
+  };
+  auto gate = std::make_shared<Gate>();
+  auto hold = [gate] { SetEvent(gate->entered); WaitForSingleObject(gate->release,5000); };
+  const auto started = GetTickCount64();
+  auto task = std::make_unique<EditorSessionTask>(root.wstring(),request,Launch(L"apply"),hold);
+  Check(GetTickCount64()-started < 250,"UI scheduling returns before deliberately held startup");
+  Check(WaitForSingleObject(gate->entered,2000) == WAIT_OBJECT_0 && !task->Poll(),"slow launch runs independently while UI polling remains immediate");
+  task->Cancel(); SetEvent(gate->release);
+  std::optional<EditorExit> exit; auto until = GetTickCount64()+3000;
+  while (!exit && GetTickCount64()<until) { exit = task->Poll(); if (!exit) Sleep(10); }
+  Check(exit && exit->exitCode != 0 && exit->result.is_null() && task->ProcessId() == 0 && fs::is_empty(root),
+        "page lifetime ending during held startup prevents late helper and result");
+  task.reset(); draft.FinishEdit(nullptr,1);
+  request = draft.BeginEdit(Request());
+  EditorSessionTask good(root.wstring(),request,Launch(L"apply"));
+  exit.reset(); until=GetTickCount64()+5000;
+  while (!exit && GetTickCount64()<until) { exit=good.Poll(); if (!exit) Sleep(10); }
+  Check(exit && !exit->exitCode && exit->cleanupComplete && good.ProcessId(),"background transport owns successful child, result and cleanup");
+  Check(draft.FinishEdit(exit->result,exit->exitCode).disposition == EditDisposition::applied && !good.Poll(),"async Apply consumed once through UI draft only");
+  auto invalid=Launch(L"apply"); invalid.application=(root/L"missing.exe").wstring();
+  EditorSessionTask failure(root.wstring(),request,invalid);
+  exit.reset(); until=GetTickCount64()+3000;
+  while (!exit && GetTickCount64()<until) { exit=failure.Poll(); if (!exit) Sleep(10); }
+  Check(exit && exit->exitCode && !exit->diagnostic.empty() && fs::is_empty(root),"asynchronous startup failure reports without retained session files");
+  ResetEvent(gate->entered); ResetEvent(gate->release);
+  task = std::make_unique<EditorSessionTask>(root.wstring(),request,Launch(L"apply"),hold);
+  Check(WaitForSingleObject(gate->entered,2000)==WAIT_OBJECT_0,"teardown startup is deliberately held");
+  const auto teardown=GetTickCount64(); task.reset();
+  Check(GetTickCount64()-teardown<100,"page teardown never joins a blocked Windows launch");
+  SetEvent(gate->release);
+}
 }
 int wmain(int argc, wchar_t** argv) {
   try {
@@ -251,6 +289,7 @@ int wmain(int argc, wchar_t** argv) {
     if (argc >= 2 && std::wstring(argv[1]) == L"--fake-editor") return FakeEditor(argc, argv);
     if (argc != 3) throw std::runtime_error("Pass fixture and isolated existing test root.");
     Run(fs::absolute(argv[2]).lexically_normal(), Read(argv[1]).at("fixtures")[0].at("recipe"));
+    AsyncRun(fs::absolute(argv[2]).lexically_normal(), Read(argv[1]).at("fixtures")[0].at("recipe"));
     printf("B6 OFFLINE EDITOR TRANSPORT PASSED: %d checks; real Windows files/processes, fake children, no VEGAS/app/UI\n", checks);
     return 0;
   } catch (const std::exception& error) {

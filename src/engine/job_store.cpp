@@ -92,12 +92,13 @@ std::string RecipeHash(const ve::Json& recipe) {
 }
 struct JobStore::State {
   std::wstring root; std::string id;
+  std::wstring monitorApplication;
   mutable std::mutex mutex; std::condition_variable changed;
   std::deque<ve::Json> phases; ve::Json latest = nullptr, record = nullptr;
   bool closing = false; std::atomic<bool> completed{false}; std::string failure;
   HMODULE module = nullptr;
 };
-std::shared_ptr<JobStore> JobStore::Create(const std::wstring& root, const std::string& id) {
+std::shared_ptr<JobStore> JobStore::Create(const std::wstring& root, const std::string& id, const std::wstring& monitorApplication) {
   Check(std::filesystem::path(root).is_absolute() && root.find(L'\0') == std::wstring::npos, "job root must be an absolute path");
   Check(id.size() == 36, "job ID must be a generated UUID");
   for (size_t i = 0; i < id.size(); ++i) {
@@ -105,6 +106,7 @@ std::shared_ptr<JobStore> JobStore::Create(const std::wstring& root, const std::
     Check(separator ? id[i] == '-' : std::isxdigit(static_cast<unsigned char>(id[i])) != 0, "unsafe job ID");
   }
   auto state = std::make_shared<State>(); state->root = root; state->id = id;
+  state->monitorApplication = monitorApplication;
   Check(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
     reinterpret_cast<LPCWSTR>(&Worker), &state->module) != FALSE, "cannot retain job writer module");
   auto* context = new std::shared_ptr<State>(state);
@@ -131,11 +133,24 @@ std::string JobStore::Failure() const { std::lock_guard<std::mutex> lock(state_-
 DWORD WINAPI JobStore::Worker(void* context) {
   auto state = *static_cast<std::shared_ptr<State>*>(context); delete static_cast<std::shared_ptr<State>*>(context);
   ULONGLONG last = 0;
+  bool monitorAttempted = false;
   auto report = [&](const std::exception& error) { std::lock_guard<std::mutex> lock(state->mutex); state->failure = error.what(); Log("job publication nonfatal: %s", error.what()); };
   for (;;) {
     ve::Json status = nullptr, record = nullptr;
     { std::unique_lock<std::mutex> lock(state->mutex);
-      state->changed.wait_for(lock, std::chrono::milliseconds(500), [&] { return state->closing || !state->phases.empty(); });
+      // Wake for the first pending sample when the 2 Hz budget is free. A
+      // recurring 500 ms wait can add another whole interval after an idle gap.
+      for (;;) {
+        if (state->closing || !state->phases.empty()) break;
+        if (state->latest.is_null()) {
+          state->changed.wait(lock,[&] { return state->closing || !state->phases.empty() || !state->latest.is_null(); });
+        } else {
+          const auto now = GetTickCount64();
+          if (now - last >= 500) break;
+          state->changed.wait_for(lock,std::chrono::milliseconds(500 - (now - last)),
+            [&] { return state->closing || !state->phases.empty(); });
+        }
+      }
       if (!state->phases.empty()) { status = std::move(state->phases.front()); state->phases.pop_front(); }
       else if (!state->latest.is_null() && GetTickCount64() - last >= 500) { status = std::move(state->latest); state->latest = nullptr; }
       if (state->closing && state->phases.empty()) record = state->record;
@@ -144,6 +159,22 @@ DWORD WINAPI JobStore::Worker(void* context) {
     if (!status.is_null()) try {
       std::filesystem::create_directories(state->root);
       Atomic(state->root + L"\\" + Widen(state->id) + L".live.json", status); last = GetTickCount64();
+      if (!monitorAttempted && !state->monitorApplication.empty()) {
+        monitorAttempted = true;
+        // Windows app creation happens only on this independent writer, after
+        // initial C5 publication. No wait, acknowledgement or host call.
+        const auto& application = state->monitorApplication;
+        if (std::filesystem::path(application).is_absolute() && application.find(L'\0') == std::wstring::npos) {
+          auto command = Widen(ve::Quote(Utf8(application.c_str())) + " --render-monitor " +
+            ve::Quote(Utf8((state->root + L"\\" + Widen(state->id) + L".live.json").c_str())));
+          STARTUPINFOW startup{}; startup.cb = sizeof(startup); startup.dwFlags = STARTF_USESHOWWINDOW; startup.wShowWindow = SW_SHOWNOACTIVATE;
+          PROCESS_INFORMATION process{};
+          if (command.size() < 32767 && CreateProcessW(application.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,
+              std::filesystem::path(application).parent_path().c_str(),&startup,&process)) {
+            CloseHandle(process.hThread); CloseHandle(process.hProcess);
+          } else Log("monitor launch failed (nonfatal): %lu",GetLastError());
+        } else Log("monitor launch path is invalid (nonfatal)");
+      }
     } catch (const std::exception& error) { report(error); }
     if (!record.is_null()) {
       try { std::filesystem::create_directories(state->root); Atomic(state->root + L"\\" + Widen(state->id) + L".json", record); Index(state->root, record); }

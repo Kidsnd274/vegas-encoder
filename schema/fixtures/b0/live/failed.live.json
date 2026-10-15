@@ -17,6 +17,8 @@
   "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
   "templateName": "YouTube 4K upload (Lakeside)",
   "encoderSummary": "libx264 + aac",
+  "outputBitDepth": 8,
+  "pixelFormatConversionReducesPrecision": true,
   "message": "FFmpeg exited with code 1. Partial file removed.",
   "ffmpegExitCode": 1
 }

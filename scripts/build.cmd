@@ -27,13 +27,20 @@ if "%~2"=="progress-text-proof" (
   set "VE_BUILD_PROOF_OBJECTS=template_draft.obj proof_page.obj native_store.obj"
 )
 set "VE_BUILD_TESTS=%VE_BUILD_ROOT%\build\fiohost"
+if "%~2"=="recipe-proof" (
+  set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\recipe-proof\vegas-encoder"
+  set "VE_BUILD_PROOF_FLAGS=/DVEGAS_ENCODER_B6_RECIPE_PROOF"
+  set VE_BUILD_PROOF_SOURCES="%VE_BUILD_ROOT%\src\vegas\configuration\recipe_template.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\editor_session.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\recipe_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\recipe_runtime.cpp"
+  set "VE_BUILD_PROOF_OBJECTS=recipe_template.obj editor_session.obj recipe_page.obj native_store.obj recipe_runtime.obj"
+)
 set "VE_BUILD_HELPERS=%VE_BUILD_ROOT%\build\host-tests"
 if not exist "%VE_BUILD_PLUGIN%" mkdir "%VE_BUILD_PLUGIN%"
 if not exist "%VE_BUILD_TESTS%" mkdir "%VE_BUILD_TESTS%"
 if not exist "%VE_BUILD_HELPERS%" mkdir "%VE_BUILD_HELPERS%"
 pushd "%VE_BUILD_PLUGIN%" || exit /b 1
 cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 /Zi /Fd:vegas-encoder.pdb %VE_BUILD_PROOF_FLAGS% "%VE_BUILD_ROOT%\src\vegas\adapter\plugin.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\render.cpp" "%VE_BUILD_ROOT%\src\support\diagnostics.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" "%VE_BUILD_ROOT%\src\engine\encode.cpp" "%VE_BUILD_ROOT%\src\engine\progress.cpp" "%VE_BUILD_ROOT%\src\engine\job_store.cpp" "%VE_BUILD_ROOT%\src\engine\recipe_job.cpp" %VE_BUILD_PROOF_SOURCES% || goto :fail
-link /nologo /DLL /DEBUG /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj progress.obj job_store.obj recipe_job.obj "%VE_BUILD_ROOT%\build\core\ve_core_static.lib" %VE_BUILD_PROOF_OBJECTS% ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
+rc /nologo %VE_BUILD_PROOF_FLAGS% /fo vegas-encoder.res "%VE_BUILD_ROOT%\src\vegas\adapter\version.rc" || goto :fail
+link /nologo /DLL /DEBUG /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj progress.obj job_store.obj recipe_job.obj "%VE_BUILD_ROOT%\build\core\ve_core_static.lib" %VE_BUILD_PROOF_OBJECTS% vegas-encoder.res ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
 copy /y "%VE_BUILD_ROOT%\config\vegas-encoder.ini" vegas-encoder.ini >nul || goto :fail
 popd
 pushd "%VE_BUILD_TESTS%" || exit /b 1

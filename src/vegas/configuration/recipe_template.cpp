@@ -15,7 +15,12 @@ void RequireTemplate(const host::Tpl& value, const GUID& owner) {
 host::Tpl Place(const host::Tpl& value, const std::vector<uint8_t>& payload) {
   const size_t oldExtra = value.U32(sfio::tpl::cbExtra);
   const size_t suffix = sfio::tpl::abExtra + oldExtra;
-  const size_t size = value.b.size() - oldExtra + payload.size();
+  // VEGAS accesses the following strings as UTF-16. Odd VEnc envelopes made
+  // names/notes appear byte-shifted in the first real B6 trial (cbExtra=559).
+  // The native allocation includes one zero pad when needed; the core envelope
+  // remains exact and does not include that pad in its length or checksum.
+  const size_t privateBytes = payload.size() + payload.size() % sizeof(wchar_t);
+  const size_t size = value.b.size() - oldExtra + privateBytes;
   if (size > host::Tpl::kMaxBytes) throw std::length_error("Template allocation exceeds the owned byte limit.");
   host::Tpl result;
   result.b.resize(size);
@@ -24,9 +29,9 @@ host::Tpl Place(const host::Tpl& value, const std::vector<uint8_t>& payload) {
   // Preserve the entire declared suffix, including raw text allocation/padding
   // and any opaque trailer; do not rebuild name/notes from interpreted strings.
   std::copy(value.b.begin() + suffix, value.b.end(),
-            result.b.begin() + sfio::tpl::abExtra + payload.size());
+            result.b.begin() + sfio::tpl::abExtra + privateBytes);
   result.SetU32(sfio::tpl::cbStruct, static_cast<DWORD>(size));
-  result.SetU32(sfio::tpl::cbExtra, static_cast<DWORD>(payload.size()));
+  result.SetU32(sfio::tpl::cbExtra, static_cast<DWORD>(privateBytes));
   return result;
 }
 EditOutcome Cancelled(const char* message) {
@@ -42,8 +47,17 @@ bool Same(const ve::Json& before, const ve::Json& after) {
 
 ve::Json ReadRecipeSnapshot(const host::Tpl& value, const GUID& owner) {
   RequireTemplate(value, owner);
-  const auto length = value.U32(sfio::tpl::cbExtra);
-  const auto decoded = ve::DecodePayload(value.b.data() + sfio::tpl::abExtra, length);
+  size_t length = value.U32(sfio::tpl::cbExtra);
+  const auto* payload = value.b.data() + sfio::tpl::abExtra;
+  // Accept only the native alignment byte above, not arbitrary envelope suffixes.
+  // Existing unpadded odd B6 envelopes remain readable without modifying them.
+  if (length >= 32 && length % sizeof(wchar_t) == 0) {
+    DWORD bodyBytes = 0;
+    std::memcpy(&bodyBytes, payload + 8, sizeof bodyBytes);
+    const uint64_t envelopeBytes = uint64_t{32} + bodyBytes;
+    if (envelopeBytes + 1 == length && payload[length - 1] == 0) --length;
+  }
+  const auto decoded = ve::DecodePayload(payload, length);
   if (ve::HasErrors(decoded.at("issues")))
     throw ve::Error(VE_INVALID_ARGUMENT, "NATIVE-PAYLOAD", decoded.at("issues")[0].at("message").get<std::string>());
   return decoded.at("snapshot");
@@ -79,7 +93,11 @@ ve::Json RecipeTemplateDraft::BeginEdit(ve::Json request, ve::Json capabilities)
   request["origin"] = pending_.value("origin", ve::Json(nullptr));
   request["templateName"] = Utf8(base_.Name().c_str());
   const auto validated = ve::SessionRequest(request);
-  if (ve::HasErrors(validated.at("issues"))) throw std::invalid_argument("Invalid edit-session request/context.");
+  for (const auto& issue : validated.at("issues")) {
+    if (ve::Str(issue, "level") != "error") continue;
+    throw std::invalid_argument("Invalid edit-session request/context (" + ve::Str(issue, "id") +
+        ", " + ve::Str(issue, "field") + "): " + ve::Str(issue, "message"));
+  }
   if (ve::Canonical(request).size() > VE_CORE_JSON_LIMIT)
     throw std::length_error("Edit-session request exceeds the C4 JSON limit.");
   // Copy the returned request before opening the transaction. Allocation errors
