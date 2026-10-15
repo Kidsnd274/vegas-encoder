@@ -274,7 +274,8 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
   underlined red (wavy), warnings amber (wavy), hints dotted. Each line's number takes its
   most severe level's colour and its message is written after the line's end. Pointing at
   an underline shows a bubble; the caret's message shows in the bar. A finding whose range
-  is the whole command (an unterminated quote, extra outputs) is listed, not underlined.
+  is the whole command (extra outputs) is listed, not underlined. An unterminated quote is
+  underlined from the quote to the end.
 - **Diagnostics** under the editor: counts ("1 error, 2 warnings, 1 hint, 1 note") and the
   FFmpeg checked; each finding with its icon, "Line N" and **Go to** (selects the range and
   focuses the editor); then whole-command findings; then the compile's recipe notes ("Not

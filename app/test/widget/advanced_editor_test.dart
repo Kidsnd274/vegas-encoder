@@ -291,14 +291,15 @@ void main() {
       expect(find.text(option.message), findsOneWidget);
     });
 
-    testWidgets('an unterminated quote is about the whole command: listed, not underlined', (tester) async {
+    testWidgets('an unterminated quote is underlined from the quote to the end', (tester) async {
       await pump(tester);
       await ctrlM(tester);
-      await setCommand(tester, '{inputs} -c:v libx264 "x {output}');
-      final model = text(tester).model;
-      expect(model.marks.single.wholeCommand, isTrue);
-      expect(model.marks.single.underlined, isFalse);
-      expect(find.text('Line 1'), findsNothing, reason: 'no line or Go to');
+      const command = '{inputs} -c:v libx264 "x {output}';
+      await setCommand(tester, command);
+      final mark = text(tester).model.marks.single;
+      expect(mark.wholeCommand, isFalse);
+      expect(mark.underlined, isTrue);
+      expect((mark.start, mark.end), (command.indexOf('"'), command.length));
     });
 
     testWidgets('errors are allowed in a draft; the library marks it', (tester) async {
