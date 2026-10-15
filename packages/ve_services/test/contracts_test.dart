@@ -221,6 +221,11 @@ Future<void> main() async {
     saved.copyWith(
       uiState: uiState.copyWith(
         desktopWindowBounds: uiState.desktopWindowBounds!.copyWith(x: -1920),
+        popupWindowSize: PopupWindowSize.fromJson({
+          'width': 1100,
+          'height': 760,
+          'future': {'dpi': 144},
+        }),
         desktopMaximized: true,
         lastSizeLengthText: '1:',
       ),
@@ -281,6 +286,32 @@ Future<void> main() async {
   check(
     !AppUiState.fromJson({}).desktopMaximized,
     'missing UI maximize defaults false',
+  );
+  check(
+    uiSaved.uiState!.popupWindowSize!.width == 1100 &&
+        (uiSaved.uiState!.popupWindowSize!.data['future'] as Map)['dpi'] == 144,
+    'popup size fake save/watch and unknown fields',
+  );
+  check(
+    uiSaved.uiState!.copyWith(popupWindowSize: null).popupWindowSize == null &&
+        AppUiState.fromJson({}).popupWindowSize == null,
+    'popup size null clears and absent stays absent',
+  );
+  for (final invalid in [0, -1, 32769]) {
+    await rejects(() async {
+      await machine.save(
+        uiSaved.copyWith(
+          uiState: uiSaved.uiState!.copyWith(
+            popupWindowSize: PopupWindowSize(width: invalid, height: 760),
+          ),
+        ),
+        expectedRevision: uiSaved.revision,
+      );
+    }, 'INVALID-DATA');
+  }
+  check(
+    (await machine.read()).revision == uiSaved.revision,
+    'invalid popup size preserves settings',
   );
   await uiSub.cancel();
 

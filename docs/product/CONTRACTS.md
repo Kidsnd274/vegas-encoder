@@ -1,6 +1,6 @@
 # App/platform contracts v1 — B1/B2/B3
 
-Updated: 2026-10-14 (Asia/Singapore). **B3 Windows services delivered.** These
+Updated: 2026-10-15 (Asia/Singapore). **B3 Windows services delivered.** These
 shapes are the shared contract. Breaking changes require the owner and both
 workstreams; additive fields stay in v1. Native core implementation/build hook is
 delivered in B2; B3 discovery, probe, hardware tests, preset tests and repositories
@@ -122,6 +122,7 @@ validate(Recipe,{MediaDescription? media,CoreCapabilities? capabilities}) -> Iss
 compile(Recipe,{required media,required CompilePaths paths,capabilities?}) -> CompileResult
 lint(String text,{capabilities?}) -> Diagnostic[]
 complete(String text,int caret,{capabilities?}) -> CompletionResult
+macros({required media,required paths,Recipe? recipe}) -> MacroDefinition[]
 estimate(Recipe,{required media,double? durationSec}) -> SizeEstimate
 diff(Recipe before,Recipe after) -> FieldDiff[]
 encodePayload(TemplateSnapshot) -> Uint8List
@@ -146,7 +147,8 @@ CompileResult {executable:string,argv:string[],display:CommandToken[],commandLin
   inputStreams:("video"|"audio")[]|null}
 ExpectedStream {kind:"video"|"audio",encoder:string|null,codec:string|null}
 CommandToken {text:string,role:"exe"|"global"|"input"|"map"|"video"|"audio"|"mux"|"output"|"extra"|"macro",
-  field,replacedField:string|null}
+  field,replacedField,stage:string|null,isOption:bool|null,macros:string[],
+  sourceStart,sourceEnd:nonnegativeInt|null}
 ResolvedSettings {videoEncoder:string,audioEncoder:string|null,videoMode:string,audioMode:string|null,
   quality:number|null,speed,profile:string|null,depth:int,pixfmt:string,gopFrames:int|null}
 SignalPathFacts {video:StreamSignalFacts|null,audio:StreamSignalFacts[],source:SourceSignalFacts|null}
@@ -156,7 +158,8 @@ StreamSignalFacts {inputFormat,outputFormat:string|null,inputBits,outputBits:pos
   inputChroma,outputChroma:string|null,chromaChanged,conversion:bool|null,
   containerSupport:"ok"|"warn"|"no"|"unknown",inputLabel,outputLabel,conversionNote:string|null}
 RecipeSummary {container,video,videoQuality,depth,audio,audioQuality,mode:string,
-  videoEncoder:string|null,speed:string|null,command:bool}
+  videoEncoder:string|null,speed:string|null,command:bool,videoEncoderId,audioEncoderId:string|null}
+MacroDefinition {name,description:string,required:bool,value:string|null}
 CompletionResult {kind:"none"|"option"|"value",of:string|null,start:int,end:int,items:Suggestion[]}
 Suggestion {value,description:string,type:string|null,defaultValue:JSON value,
   source:string|null,availability:"ok"|"missing"|"failed"|"unknown"|null}
@@ -198,6 +201,82 @@ Field paths use `audio[0].bitrateK`. Diagnostics and completion start/end/caret 
 map its UTF-8 parsing offsets; it must not return byte offsets as cursor positions.
 Apply/render is blocked when any issue is error. UI can localize id/params; message
 and fix are fallback copy. Unknown private options are warnings.
+
+### Immutable capability reuse (additive, 2026-10-15)
+
+`NativeVeCore` automatically reuses capabilities across validate/compile/lint/complete;
+existing app calls need no change. Reuse is keyed by **Dart object identity** of the
+deeply immutable CoreCapabilities, not installationId or identityKey. Lazy options,
+availability and hardware facts can change for the same FFmpeg binary: a new view
+gets a new snapshot. Retain the service's immutable views across edits. Passing null
+means no capabilities; it never silently reuses a previous installation.
+
+The facade retains at most four views (including full Advanced and compact Basic)
+and releases the least recently used on replacement. `clearCapabilitiesCache()`
+releases them early and is idempotent; it is optional, not a new VeCore lifecycle
+requirement. The DLL retains at most **eight** immutable snapshots, each limited to
+1 MiB submitted JSON and 65,536 JSON nodes (plus the existing 64-level depth bound).
+This bounds retained parse storage by both bytes and node count, including abandoned
+facades. Replacement briefly owns one incoming snapshot; synchronous in-flight calls
+pin their own snapshot until return. There are no pointers in JSON, no background
+threads and no mutex held during compile/lint. The native engine's direct C++ calls
+continue borrowing their own capabilities; Render does not use this cache or wait
+for the app.
+
+Additive ABI-1 exports, with the existing counted-buffer/free contract:
+
+- `ve_capabilities_store(capabilityObject)` returns `{capabilitiesId:string}`.
+- validate/compile/lint/complete accept `capabilitiesId` instead of `capabilities`.
+  Supplying both non-null values fails `CAPABILITIES-CONFLICT`.
+- `ve_capabilities_release({capabilitiesId})` returns `{}` and is idempotent.
+
+IDs are opaque, local to a loaded DLL and never reused during that DLL's lifetime.
+Native LRU eviction/release makes an ID fail `CAPABILITIES-STALE`; there is no fallback
+to other facts. Dart reinstalls the exact immutable object and retries once. Cache
+node/ID limits use `CAPABILITIES-LIMIT`; the facade uses legacy inline transport for
+these maps, preserving valid input semantics. Other failures remain explicit.
+`NativeVeCore(cacheCapabilities:false)` is the diagnostic/parity baseline. Inline
+requests remain supported. Neither mode performs discovery, probes or filesystem I/O.
+Fakes need no snapshot handles because their API is unchanged.
+
+### Advanced tokens and macro catalogue (additive)
+
+User words in Advanced display carry `stage` (global/input/map/video/audio/mux/output,
+or null when unestablished), `isOption` (true for an option, false for a consumed value)
+and `macros` (recognized source spellings, including embedded/quoted macros). Negative
+numbers and quoted values beginning with `-` are values. An unsuffixed option shared
+by active encoders keeps stage null. Macro words use role `macro` and retain stage
+separately. **Owned `{inputs}` / `{output}` keep roles input/output** for existing chip
+guards, plus macro identities. Other input-scoped words keep role extra so they do not
+become locked chips. Source spans are unchanged UTF-16 ranges around the original
+whole word, including its quotes. Generated tokens may omit these additions; older
+results read as null stage/marker and an empty macro list.
+
+With an open double quote, display retains only complete preceding words and expanded
+owned chips with trustworthy spans. The incomplete word is omitted. `L-QUOTE.start`
+points at the unmatched opening quote (end is text length), including escaped-quote
+and surrogate-pair handling. Blocking issues remain; **argv and commandLine are empty**
+and expectedStreams/encoder IDs remain unknown. This prefix is highlighting data,
+not an executable partial command.
+
+`summary.videoEncoderId` / `audioEncoderId` identify the actual command's explicitly
+scoped encoders. They are null for disabled/omitted streams, stream copy, unfinished
+quotes, general codec/output/source/filter scope or nonzero stream specifiers. No
+inactive Basic encoder or reverse-mapped label supplies an Advanced ID.
+
+`VeCore.macros(media:..., paths:..., recipe:...)` is exposed through an additive
+VeCoreMacros extension / optional VeCoreMacroCatalog interface, so older VeCore
+implementations still compile (unsupported implementations throw MACROS-UNAVAILABLE).
+NativeVeCore and FakeVeCore implement it. `ve_macros` takes `{media,paths,recipe?}` and
+returns `{macros:[MacroDefinition...]}`. Name includes braces, description is fallback
+copy, required marks inputs/output, and value is expanded text (null if unestablished).
+`{gop:2s}` is the catalogue example of the parameterized GOP macro. Values use supplied
+preview/render paths; the core invents no temporary filename. Supply the active recipe
+to match `{inputs}`' enabled audio and input policy exactly; without it the catalogue
+shows available media with audio enabled. The input value is quoted argument text;
+ordinary macro values are raw strings. Completion, compile expansion and the catalogue
+share native definitions. FakeVeCore takes exact context fixtures through
+`macroFixtures` / `FakeVeCore.macrosKey(media,paths,recipe:...)`, without Dart expansion.
 
 ### Command provenance and signal-path facts (app review)
 
@@ -280,6 +359,9 @@ use the same sources in B2. No C++ type, Windows header or host pointer crosses 
 | C entry point | Request | Result |
 | --- | --- | --- |
 | ve_core_version / ve_profiles | no input | CoreVersion / ProfileCatalog |
+| ve_capabilities_store | CoreCapabilities | `{capabilitiesId:string}` |
+| ve_capabilities_release | `{capabilitiesId:string}` | `{}` |
+| ve_macros | `{media,paths,recipe?:Recipe}` | `{macros:MacroDefinition[]}` |
 | ve_recipe_normalize | `{recipe:object}` | NormalizeResult |
 | ve_recipe_validate | `{recipe,media:null\|MediaDescription,capabilities:null\|CoreCapabilities}` | `{issues:Issue[]}` |
 | ve_compile | `{recipe,media,paths,capabilities:null\|CoreCapabilities}` | CompileResult |
@@ -294,7 +376,7 @@ use the same sources in B2. No C++ type, Windows header or host pointer crosses 
 
 Transport failure returns ve_status and optional UTF-8 `{error:{code,message}}`;
 output may be empty on allocation failure. Every returned allocation is freed once
-with ve_free, including error output. Input memory is never retained. Semantic
+with ve_free, including error output. Borrowed input memory is never retained; capability store retains only its parsed owned copy. Semantic
 validation errors return VE_OK with issues. All exceptions are contained at the ABI.
 Payload layout is TECH_ARCHITECTURE §6.2, total draft limit 16 KiB, little endian,
 CRC-32/IEEE of canonical UTF-8. Proof markers are rejected and never migrated. This
@@ -739,8 +821,9 @@ MachineSettings {
   verifyOutput:bool,theme:"system"|"light"|"dark",uiState:AppUiState|null
 }
 AppUiState {desktopWindowBounds:DesktopWindowBounds|null,desktopMaximized:bool,
-  lastSizeLengthText:string|null}
+  lastSizeLengthText:string|null,popupWindowSize:PopupWindowSize|null}
 DesktopWindowBounds {x,y:int,width,height:positiveInt}
+PopupWindowSize {width,height:int in 1..32768}
 ```
 
 Defaults: revision 0, no installations/default, progressWindow=true,
@@ -762,6 +845,15 @@ preserves exactly what the user typed in the File node (including empty or incom
 text), null if never typed. It is not a recipe duration or a total-size estimate;
 display parsing stays app-side and numeric duration is passed to core. Popup project
 length never overwrites this remembered desktop input automatically.
+
+`popupWindowSize` is the restored **outer window size in physical pixels**; it
+contains no position or maximized state. Null/absent means default popup size. Both
+real settings storage and its fake reject dimensions outside 1..32768 or non-integers,
+preserving the previous settings. The app owns restoring/clamping it to current DPI,
+monitor work area and its minimum size, centring on its current owner, and saving it
+through revision-checked UI writes. Desktop fields and unknown nested keys survive;
+older files require no migration. No frontend adoption or real VEGAS persistence
+qualification follows from the service field.
 
 UI-state writes use MachineSettingsRepository.save(expectedRevision) like other
 preferences: copy the latest settings, change uiState, retry a revision conflict by

@@ -5,6 +5,19 @@ Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.3-progress-text-pro
 
 ## Current progress
 
+**Advanced core/FFI checkpoint (2026-10-15, owner-authorized commit/merge):** bounded immutable
+capability reuse removes repeated Dart serialization/native lint copies. Additive
+F4 token stage/macro/option metadata, macro catalogue, conservative encoder IDs,
+partial quote prefix highlighting and C7 popup-size storage are implemented in
+platform-owned paths. Optimized native **3,020**, native-asset FFI **208**, core/service
+fake **177/64** and Windows repository **114** focused checks pass; both packages
+analyze cleanly and B1 argv goldens are unchanged. Full real capability-map edits now measure **2.08–2.10 ms median / 2.14–2.31 ms
+p95** (lint + Advanced + Basic compile, JIT; first transfer **12.9–16.1 ms**).
+Method, limits and app adoption are in the [platform handoff](product/workstreams/platform.md).
+No exporter/app integration or real VEGAS run; A5–A7, real persistence, controlled
+real failure recovery and monitor performance remain **unverified**. Existing B6
+sanitizer limitation is unchanged; no sanitizer/process/thread debugging resumed.
+
 **B6 editor transport checkpoint (2026-10-15, offline):** fresh UUID session
 directories, bounded atomic C4 requests, explicit owned-helper launch, creator-thread
 zero-time exit polling and one validated result are implemented. Cancel/crash/

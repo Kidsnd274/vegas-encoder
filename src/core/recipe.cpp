@@ -155,18 +155,18 @@ void CheckMedia(const Json& media) {
             throw Error(VE_INVALID_ARGUMENT,"MEDIA","Invalid delivered audio facts.");
     }
 }
-Json Validate(const Json& request) {
+Json Validate(const Json& request, const Json* capabilities) {
     const auto& r = request.at("recipe"); Json issues = Structural(r);
     if (HasErrors(issues)) return issues;
     const auto& v = r.at("video"); const auto& a = r.at("audio")[0]; const auto& c = r.at("container");
     const auto media = request.value("media",Json(nullptr)); const Json noCaps = nullptr;
-    const Json& caps = request.contains("capabilities") ? request.at("capabilities") : noCaps;
+    const Json& caps = capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCaps;
     if (!media.is_null()) CheckMedia(media);
     const bool withVideo = Bool(v,"enabled",true), withAudio = Bool(a,"enabled",true);
     if (!withVideo && !withAudio) issues.push_back(Issue("V-STREAMS","error","video.enabled","Turn on video, audio, or both."));
     else if (!withVideo) issues.push_back(Issue("V-AUDIO-ONLY","error","video.enabled","Audio-only renders are not supported by the VEGAS adapter yet."));
     if (Str(r.at("command"),"mode") == "template") {
-        for (const auto& d : Lint(Json{{"text",Str(r.at("command"),"template")},{"capabilities",caps}})) {
+        for (const auto& d : Lint(Json{{"text",Str(r.at("command"),"template")}},&caps)) {
             Json params = d.at("params"); params["start"] = d.at("start"); params["end"] = d.at("end");
             issues.push_back(Issue(Str(d,"id"),Str(d,"level"),"command.template",Str(d,"message"),params));
         }
@@ -216,7 +216,7 @@ Json Validate(const Json& request) {
             support == "no" ? "The container cannot hold this stream in the measured FFmpeg rule set." : "Compatibility depends on FFmpeg version, stream settings or player support; check this combination before rendering.",{{"stream",field},{"support",support},{"encoder",encoder},{"container",Str(c,"format")}}));
         const auto extra = Str(settings,"extra");
         if (!extra.empty()) {
-            for (const auto& d : Lint(Json{{"text",extra},{"capabilities",caps},{"extra",true},{"encoder",encoder},{"kind",kind}})) {
+            for (const auto& d : Lint(Json{{"text",extra},{"extra",true},{"encoder",encoder},{"kind",kind}},&caps)) {
                 Json params = d.at("params"); params["start"] = d.at("start"); params["end"] = d.at("end");
                 issues.push_back(Issue(Str(d,"id"),Str(d,"level"),field + ".extra",Str(d,"message"),params));
             }

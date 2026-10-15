@@ -28,7 +28,8 @@ size_t Utf8Offset(const std::string& text, size_t position) {
     if (units != position) throw Error(VE_INVALID_ARGUMENT,"CARET-BOUNDARY","Caret splits a surrogate pair or lies outside the text.");
     return i;
 }
-std::vector<Word> Tokenize(const std::string& text) {
+std::vector<Word> Tokenize(const std::string& text, size_t* openQuote) {
+    if (openQuote) *openQuote = text.size();
     std::vector<Word> words;
     size_t i = 0;
     while (i < text.size()) {
@@ -38,7 +39,7 @@ std::vector<Word> Tokenize(const std::string& text) {
         if ((text[i] == '^' || text[i] == '\\' || text[i] == '`') && i + 1 < text.size() &&
             (text[i+1] == '\r' || text[i+1] == '\n')) { ++i; continue; }
         Word word; word.start = i;
-        bool quoted = false;
+        bool quoted = false; size_t quoteStart = text.size();
         while (i < text.size() && (quoted || !std::isspace(static_cast<unsigned char>(text[i])))) {
             if (text[i] == '\\') {
                 const size_t start = i;
@@ -48,18 +49,21 @@ std::vector<Word> Tokenize(const std::string& text) {
                     word.text.append(slashCount / 2, '\\');
                     if (slashCount % 2) word.text += '"';
                     else if (quoted && i + 1 < text.size() && text[i+1] == '"') { word.text += '"'; ++i; }
-                    else quoted = !quoted;
+                    else { quoted = !quoted; if (quoted) { quoteStart = i; word.quoted = true; } }
                     ++i;
                 } else if (!quoted && slashCount == 1 && i < text.size() && (text[i] == '\r' || text[i] == '\n')) break;
                 else word.text.append(slashCount, '\\');
             } else if (text[i] == '"') {
                 if (quoted && i + 1 < text.size() && text[i+1] == '"') { word.text += '"'; i += 2; }
-                else { quoted = !quoted; ++i; }
+                else { quoted = !quoted; if (quoted) { quoteStart = i; word.quoted = true; } ++i; }
             } else if (!quoted && (text[i] == '^' || text[i] == '`') && i + 1 < text.size() && (text[i+1] == '\r' || text[i+1] == '\n')) { ++i; break; }
             else word.text += text[i++];
         }
         word.end = i;
-        if (quoted) throw Error(VE_INVALID_ARGUMENT,"UNTERMINATED-QUOTE","Close the double quote in the command.");
+        if (quoted) {
+            if (openQuote) { *openQuote = quoteStart; return words; }
+            throw Error(VE_INVALID_ARGUMENT,"UNTERMINATED-QUOTE","Close the double quote in the command.");
+        }
         words.push_back(std::move(word));
         if (words.size() > 16384) throw Error(VE_LIMIT_EXCEEDED,"TOKEN-LIMIT","Command exceeds 16384 tokens.");
     }

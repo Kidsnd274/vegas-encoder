@@ -21,6 +21,12 @@ ve::Json CallJson(Call operation, const ve::Json& request) {
     if (status != VE_OK) throw std::runtime_error("C ABI status " + std::to_string(status) + ": " + returned);
     return ve::Json::parse(returned);
 }
+void Reject(Call operation, const ve::Json& request, const std::string& code) {
+    const auto text = request.dump(); ve_buffer out{};
+    const auto status = operation(reinterpret_cast<const uint8_t*>(text.data()),static_cast<uint32_t>(text.size()),&out);
+    const auto error = out.data ? ve::Json::parse(out.data,out.data+out.length) : ve::Json(); ve_free(out.data);
+    Check(status != VE_OK && error.at("error").at("code") == code,"contained " + code);
+}
 void BadJson(const std::string& text, ve_status expected) {
     ve_buffer out{};
     const auto status = ve_recipe_normalize(reinterpret_cast<const uint8_t*>(text.data()),static_cast<uint32_t>(text.size()),&out);
@@ -224,6 +230,81 @@ int main(int argc, char** argv) {
         Check(ve::ErrorTokenIndices(diagnosticCommand,"Unrecognized option 'wrong'.") == ve::Json::array({0}),"runtime diagnostic index excludes executable");
         Check(ve::ErrorTokenIndices(diagnosticCommand,"Error setting option other to value 2.") == ve::Json::array({2}),"runtime option setting diagnostic");
         Check(ve::ErrorTokenIndices(diagnosticCommand,"Generic hardware failure.").empty(),"unknown runtime provenance remains empty");
+        // Immutable capability references: same results, bounded retention, no aliasing.
+        const ve::Json capability{{"identityKey","same-binary"},{"encoders",{{"libx264",{{"kind","video"},{"options",ve::Json::array()}}},{"aac",{{"kind","audio"},{"options",ve::Json::array()}}}}}};
+        auto id = CallJson(ve_capabilities_store,capability).at("capabilitiesId");
+        auto cachedRequest = request; cachedRequest["capabilitiesId"] = id;
+        auto inlineRequest = request; inlineRequest["capabilities"] = capability;
+        Check(CallJson(ve_compile,cachedRequest) == CallJson(ve_compile,inlineRequest),"snapshot/inline compile parity");
+        Check(CallJson(ve_recipe_validate,cachedRequest) == CallJson(ve_recipe_validate,inlineRequest),"snapshot/inline validation parity");
+        const std::string command = "{inputs} -c:v libx264 -c:a aac -g {gop:2s} -b:a -2 -metadata \"-literal\" {output}";
+        Check(CallJson(ve_template_lint,{{"text",command},{"capabilitiesId",id}}) == CallJson(ve_template_lint,{{"text",command},{"capabilities",capability}}),"snapshot lint parity");
+        Check(CallJson(ve_template_complete,{{"text","-c:v "},{"caret",5},{"capabilitiesId",id}}) == CallJson(ve_template_complete,{{"text","-c:v "},{"caret",5},{"capabilities",capability}}),"snapshot completion parity");
+        Reject(ve_compile,{{"capabilitiesId",id},{"capabilities",capability}},"CAPABILITIES-CONFLICT");
+        Reject(ve_template_lint,{{"text",command},{"capabilitiesId",7}},"CAPABILITIES-ID");
+        auto invalidSnapshot = capability; invalidSnapshot["huge"] = ve::Json::array();
+        for (size_t i = 0; i < 65536; ++i) invalidSnapshot["huge"].push_back(0);
+        Reject(ve_capabilities_store,invalidSnapshot,"CAPABILITIES-LIMIT");
+        Reject(ve_capabilities_store,ve::Json::array(),"CAPABILITIES-SHAPE");
+        Check(CallJson(ve_compile,cachedRequest) == CallJson(ve_compile,inlineRequest),"failed replacement preserves snapshot");
+        std::vector<ve::Json> retainedIds;
+        for (int i = 0; i < 8; ++i) retainedIds.push_back(CallJson(ve_capabilities_store,capability).at("capabilitiesId"));
+        Reject(ve_template_lint,{{"text",command},{"capabilitiesId",id}},"CAPABILITIES-STALE");
+        CallJson(ve_template_lint,{{"text",command},{"capabilitiesId",retainedIds.front()}});
+        const auto lruId = CallJson(ve_capabilities_store,capability).at("capabilitiesId");
+        Check(!CallJson(ve_template_lint,{{"text",command},{"capabilitiesId",retainedIds.front()}}).at("diagnostics").is_null(),"access refreshes native LRU");
+        Reject(ve_template_lint,{{"text",command},{"capabilitiesId",retainedIds[1]}},"CAPABILITIES-STALE");
+        CallJson(ve_capabilities_release,{{"capabilitiesId",lruId}});
+        auto newestId = retainedIds.back();
+        CallJson(ve_capabilities_release,{{"capabilitiesId",newestId}});
+        CallJson(ve_capabilities_release,{{"capabilitiesId",newestId}});
+        Reject(ve_template_lint,{{"text",command},{"capabilitiesId",newestId}},"CAPABILITIES-STALE");
+        for (const auto& released : retainedIds) CallJson(ve_capabilities_release,{{"capabilitiesId",released}});
+        auto metadataRequest = request; metadataRequest["recipe"]["command"] = {{"mode","template"},{"template",command}};
+        const auto metadataResult = CallJson(ve_compile,metadataRequest);
+        auto userToken = [&](const std::string& text) -> ve::Json { for (const auto& t : metadataResult.at("display")) if (ve::Str(t,"field") == "command.template" && ve::Str(t,"text") == text) return t; throw std::runtime_error("Missing user token " + text); };
+        Check(userToken("-c:v").at("stage") == "video" && userToken("-c:v").at("isOption") == true,"Advanced video option stage/marker");
+        Check(userToken("aac").at("stage") == "audio" && userToken("aac").at("isOption") == false,"Advanced audio value stage/marker");
+        Check(userToken("-2").at("isOption") == false && userToken("-literal").at("isOption") == false,"negative and quoted dash values are values");
+        Check(userToken("60").at("role") == "macro" && userToken("60").at("stage") == "video" && userToken("60").at("macros") == ve::Json::array({"{gop:2s}"}),"macro identity retains stage");
+        Check(userToken(ve::Str(request.at("paths"),"output")).at("role") == "output","output macro retains locked-chip role");
+        Check(metadataResult.at("summary").at("videoEncoderId") == "libx264" && metadataResult.at("summary").at("audioEncoderId") == "aac","Advanced encoder IDs");
+        metadataRequest["recipe"]["command"]["template"] = "{inputs} -c libx264 {output}";
+        Check(CallJson(ve_compile,metadataRequest).at("summary").at("videoEncoderId").is_null(),"general codec scope ID remains unknown");
+        metadataRequest["recipe"]["command"]["template"] = "{inputs} -c:v libx264 -map 2:v {output}";
+        Check(CallJson(ve_compile,metadataRequest).at("summary").at("videoEncoderId").is_null(),"general source mapping ID remains unknown");
+        const auto macroResult = CallJson(ve_macros,{{"media",request.at("media")},{"paths",request.at("paths")}}).at("macros");
+        Check(macroResult.size() == 10 && macroResult[0].at("required") == true && macroResult[1].at("required") == true,"shared catalogue required macros");
+        Check(macroResult[9].at("value") == "60","catalogue GOP expansion matches compile");
+        const auto suggestions = CallJson(ve_template_complete,{{"text","{"},{"caret",1}}).at("items");
+        Check(suggestions.size() == macroResult.size() && suggestions[2].at("description") == macroResult[2].at("description"),"completion shares catalogue definitions");
+        const auto scopes = ve::TokenMetadata(ve::Tokenize("{inputs} -c:v:0 libx264 -c:a aac -b 500k -unknown -g 30 {output}"),capability);
+        Check(scopes[1].at("stage") == "video" && scopes[5].at("stage").is_null(),"stream specifier stage and ambiguous unsuffixed bitrate");
+        Check(scopes[8].at("isOption") == true && scopes[8].at("stage") == "video","missing option value does not swallow following option metadata");
+        const auto inputStages = ve::TokenMetadata(ve::Tokenize("-color_primaries bt709 {inputs} -f lavfi -i other -c:v libx264 {output}"),capability);
+        Check(inputStages[0].at("stage") == "input" && inputStages[3].at("stage") == "input" && inputStages[7].at("stage") == "video","input groups do not masquerade as output video/mux stages");
+        auto monoRecipe = request.at("recipe"); monoRecipe["audio"][0]["enabled"] = false;
+        const auto monoMacros = CallJson(ve_macros,{{"media",request.at("media")},{"paths",request.at("paths")},{"recipe",monoRecipe}}).at("macros");
+        Check(ve::Str(monoMacros[0],"value").find(ve::Str(request.at("paths"),"audioPipe")) == std::string::npos,"catalogue active recipe excludes disabled input audio");
+        size_t unfinishedQuote = 0;
+        const std::string escapedQuote = "ok \"closed\" word\"open";
+        const auto prefixWords = ve::Tokenize(escapedQuote,&unfinishedQuote);
+        Check(prefixWords.size() == 2 && unfinishedQuote == escapedQuote.rfind('"'),"quote tracking preserves completed words and last unmatched quote");
+        Reject(ve_compile,{{"recipe",request.at("recipe")},{"media",request.at("media")},{"paths",request.at("paths")},{"capabilitiesId","released-foreign-id"}},"CAPABILITIES-STALE");
+        const std::string prefix = u8"{inputs} -metadata title=编码😀 {output} -metadata ";
+        const auto unfinished = prefix + "\"unfinished";
+        const auto quoteDiagnostic = CallJson(ve_template_lint,{{"text",unfinished}}).at("diagnostics")[0];
+        Check(quoteDiagnostic.at("id") == "L-QUOTE" && quoteDiagnostic.at("start") == ve::Utf16Offset(prefix,prefix.size()),"open quote diagnostic UTF-16 position");
+        metadataRequest["recipe"]["command"]["template"] = unfinished;
+        const auto partial = CallJson(ve_compile,metadataRequest);
+        Check(partial.at("argv").empty() && partial.at("commandLine") == "" && ve::HasErrors(partial.at("issues")),"partial highlighting cannot produce executable argv");
+        bool inputChip = false, outputChip = false;
+        for (const auto& token : partial.at("display")) if (token.contains("sourceStart")) {
+            Check(ve::Num(token,"sourceEnd") <= static_cast<double>(ve::Utf16Offset(prefix,prefix.size())),"prefix spans end before unfinished word");
+            if (ve::Str(token,"role") == "input") inputChip = true;
+            if (ve::Str(token,"role") == "output") outputChip = true;
+        }
+        Check(inputChip && outputChip,"completed locked macros survive unfinished quote");
         std::cout << "Native/static core: " << checks << " ownership, bounds, quoting, payload, fuzz and concurrency checks passed. No host or encoder process.\n";
         return 0;
     } catch (const std::exception& e) { std::cerr << "CORE TEST FAILED: " << e.what() << '\n'; return 1; }

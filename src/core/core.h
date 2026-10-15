@@ -25,23 +25,26 @@ Json Issue(const std::string& id, const std::string& level, const std::string& f
            const std::string& message, Json params = Json::object(), Json refs = Json::array());
 bool HasErrors(const Json& issues);
 Json Structural(const Json& recipe);
-Json Validate(const Json& request);
+Json Validate(const Json& request, const Json* capabilities = nullptr);
 Json Normalize(const Json& request);
-Json Compile(const Json& request);
+Json Compile(const Json& request, const Json* capabilities = nullptr);
 // Conservative runtime diagnostic provenance: argv indexes, executable excluded.
 Json ErrorTokenIndices(const Json& compiled, const std::string& stderrTail);
 Json Estimate(const Json& request);
 Json Diff(const Json& request);
-Json Lint(const Json& request);
-Json Complete(const Json& request);
+Json Lint(const Json& request, const Json* capabilities = nullptr);
+Json Complete(const Json& request, const Json* capabilities = nullptr);
 std::vector<uint8_t> EncodePayload(const Json& snapshot);
 Json DecodePayload(const uint8_t* bytes, size_t length);
 // Pure serialization checks; session file I/O belongs to ve_services/adapter.
 Json SessionRequest(const Json& request);
 Json SessionResult(const Json& result);
 
-struct Word { std::string text; size_t start = 0; size_t end = 0; };
-std::vector<Word> Tokenize(const std::string& text);
+struct Word { std::string text; size_t start = 0; size_t end = 0; bool quoted = false; };
+std::vector<Word> Tokenize(const std::string& text, size_t* openQuote = nullptr);
+Json TokenMetadata(const std::vector<Word>& words, const Json& capabilities);
+const Json& MacroDefinitions();
+Json Macros(const Json& request);
 std::string Quote(const std::string& text);
 size_t Utf16Offset(const std::string& text, size_t byteOffset);
 size_t Utf8Offset(const std::string& text, size_t utf16Offset);

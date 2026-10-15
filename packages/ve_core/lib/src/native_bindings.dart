@@ -89,6 +89,25 @@ external int nativeSessionResult(
   Pointer<NativeBuffer> result,
 );
 
+@Native<NativeSignature>(symbol: 've_macros')
+external int nativeMacros(
+  Pointer<Uint8> json,
+  int length,
+  Pointer<NativeBuffer> result,
+);
+@Native<NativeSignature>(symbol: 've_capabilities_store')
+external int nativeCapabilitiesStore(
+  Pointer<Uint8> json,
+  int length,
+  Pointer<NativeBuffer> result,
+);
+@Native<NativeSignature>(symbol: 've_capabilities_release')
+external int nativeCapabilitiesRelease(
+  Pointer<Uint8> json,
+  int length,
+  Pointer<NativeBuffer> result,
+);
+
 class NativeBindings {
   NativeBindings.assets()
     : abiVersion = nativeAbiVersion,
@@ -96,6 +115,9 @@ class NativeBindings {
       version = nativeVersion,
       profiles = nativeProfiles,
       calls = {
+        'macros': nativeMacros,
+        'capabilitiesStore': nativeCapabilitiesStore,
+        'capabilitiesRelease': nativeCapabilitiesRelease,
         'normalize': nativeNormalize,
         'validate': nativeValidate,
         'compile': nativeCompile,
@@ -125,6 +147,9 @@ class NativeBindings {
       ),
       calls = {
         for (final entry in {
+          'macros': 've_macros',
+          'capabilitiesStore': 've_capabilities_store',
+          'capabilitiesRelease': 've_capabilities_release',
           'normalize': 've_recipe_normalize',
           'validate': 've_recipe_validate',
           'compile': 've_compile',

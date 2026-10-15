@@ -688,14 +688,39 @@ class DesktopWindowBounds extends JsonModel {
   );
 }
 
+/// Physical outer-window size; position is intentionally not persisted.
+class PopupWindowSize extends JsonModel {
+  PopupWindowSize({
+    required int width,
+    required int height,
+    JsonMap extensions = const {},
+  }) : super({'width': width, 'height': height, 'extensions': extensions});
+  PopupWindowSize.fromJson(super.json);
+  int get width => data['width'] as int;
+  int get height => data['height'] as int;
+  PopupWindowSize copyWith({
+    Object? width = absent,
+    Object? height = absent,
+    Object? extensions = absent,
+  }) => PopupWindowSize.fromJson(
+    changed({
+      if (!identical(width, absent)) 'width': width,
+      if (!identical(height, absent)) 'height': height,
+      if (!identical(extensions, absent)) 'extensions': extensions,
+    }),
+  );
+}
+
 class AppUiState extends JsonModel {
   AppUiState({
     DesktopWindowBounds? desktopWindowBounds = null,
+    PopupWindowSize? popupWindowSize,
     bool desktopMaximized = false,
     String? lastSizeLengthText = null,
     JsonMap extensions = const {},
   }) : super({
          'desktopWindowBounds': desktopWindowBounds?.toJson(),
+         'popupWindowSize': popupWindowSize?.toJson(),
          'desktopMaximized': desktopMaximized,
          'lastSizeLengthText': lastSizeLengthText,
          'extensions': extensions,
@@ -705,10 +730,14 @@ class AppUiState extends JsonModel {
       data['desktopWindowBounds'] == null
       ? null
       : DesktopWindowBounds.fromJson(jsonMap(data['desktopWindowBounds']));
+  PopupWindowSize? get popupWindowSize => data['popupWindowSize'] == null
+      ? null
+      : PopupWindowSize.fromJson(jsonMap(data['popupWindowSize']));
   bool get desktopMaximized => data['desktopMaximized'] as bool? ?? false;
   String? get lastSizeLengthText => data['lastSizeLengthText'] as String?;
   AppUiState copyWith({
     Object? desktopWindowBounds = absent,
+    Object? popupWindowSize = absent,
     Object? desktopMaximized = absent,
     Object? lastSizeLengthText = absent,
     Object? extensions = absent,
@@ -717,6 +746,8 @@ class AppUiState extends JsonModel {
       if (!identical(desktopWindowBounds, absent))
         'desktopWindowBounds': (desktopWindowBounds as DesktopWindowBounds?)
             ?.toJson(),
+      if (!identical(popupWindowSize, absent))
+        'popupWindowSize': (popupWindowSize as PopupWindowSize?)?.toJson(),
       if (!identical(desktopMaximized, absent))
         'desktopMaximized': desktopMaximized,
       if (!identical(lastSizeLengthText, absent))

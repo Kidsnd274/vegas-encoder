@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:ve_core/ve_core.dart';
 import 'api.dart';
 import 'models.dart';
+import 'storage_validation.dart' show validatePopupSize;
 import 'service_fixture_data.dart';
 
 /// Each listen gets the latest value then later updates. Subscribe before the
@@ -467,6 +468,7 @@ class FakeMachineSettingsRepository implements MachineSettingsRepository {
         'DEFAULT-NOT-FOUND',
         'Default FFmpeg must name a registered installation.',
       );
+    if (settings.uiState != null) validatePopupSize(settings.uiState!.data);
     final saved = settings.copyWith(revision: expectedRevision + 1);
     _store.set(saved);
     return saved;

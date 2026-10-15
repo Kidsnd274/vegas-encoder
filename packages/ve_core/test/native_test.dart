@@ -830,6 +830,105 @@ Future<void> main(List<String> args) async {
     ).any((i) => i['id'] == 'S-CANCEL'),
     'cancel cannot serialize a draft',
   );
+  final snapshotCaps = CoreCapabilities(
+    installationId: 'snapshot-test',
+    identityKey: 'same-key',
+    encoders: {
+      'libx264': {'kind': 'video', 'options': []},
+    },
+  );
+  final snapshotText = '{inputs} -c:v libx264 {output}';
+  check(
+    !core
+        .lint(snapshotText, capabilities: snapshotCaps)
+        .any((d) => d.id == 'L-ENCODER'),
+    'snapshot uses supplied capability facts',
+  );
+  final replacement = snapshotCaps.copyWith(encoders: {});
+  check(
+    core
+        .lint(snapshotText, capabilities: replacement)
+        .any((d) => d.id == 'L-ENCODER'),
+    'same binary identity with new facts creates a new snapshot',
+  );
+  check(
+    !core
+        .lint(snapshotText, capabilities: snapshotCaps)
+        .any((d) => d.id == 'L-ENCODER'),
+    'old immutable capability view stays independent',
+  );
+  final abandoned = <NativeVeCore>[];
+  for (var i = 0; i < 12; i++) {
+    final other = NativeVeCore();
+    abandoned.add(other);
+    other.lint(snapshotText, capabilities: replacement);
+  }
+  check(
+    !core
+        .lint(snapshotText, capabilities: snapshotCaps)
+        .any((d) => d.id == 'L-ENCODER'),
+    'evicted reference transparently reloads exact facts',
+  );
+  for (final other in abandoned) other.clearCapabilitiesCache();
+  for (var i = 0; i < 40; i++)
+    core.lint(snapshotText, capabilities: snapshotCaps.copyWith(label: '$i'));
+  core.clearCapabilitiesCache();
+  core.clearCapabilitiesCache();
+  check(
+    !core
+        .lint(snapshotText, capabilities: snapshotCaps)
+        .any((d) => d.id == 'L-ENCODER'),
+    'bounded churn and repeated release remain usable',
+  );
+  final uncachedLarge = snapshotCaps.copyWith(
+    extensions: {'wide': List.filled(66000, 0)},
+  );
+  check(
+    !core
+        .lint(snapshotText, capabilities: uncachedLarge)
+        .any((d) => d.id == 'L-ENCODER'),
+    'optional snapshot node limit preserves legacy inline semantics',
+  );
+  final macros = core.macros(media: f.media, paths: f.paths);
+  check(
+    macros.length == 10 && macros.where((m) => m.required).length == 2,
+    'typed native macro catalogue',
+  );
+  check(
+    macros.firstWhere((m) => m.name == '{output}').value == f.paths.output,
+    'catalogue output is the supplied preview path',
+  );
+  final partialText = '{inputs} -c:v libx264 {output} -metadata "open';
+  final partial = core.compile(
+    f.recipe.copyWith(
+      command: CommandSettings(mode: 'template', template: partialText),
+    ),
+    media: f.media,
+    paths: f.paths,
+  );
+  check(
+    partial.argv.isEmpty &&
+        partial.commandLine.isEmpty &&
+        errors(partial.issues),
+    'invalid quote gives no executable argv through Dart FFI',
+  );
+  check(
+    partial.display.any((t) => t.role == TokenRole.output) &&
+        partial.display.any((t) => t.role == TokenRole.input),
+    'partial FFI result retains locked chips',
+  );
+  final option = partial.display.firstWhere((t) => t.text == '-c:v');
+  check(
+    option.stage == 'video' &&
+        option.isOption == true &&
+        option.sourceStart == partialText.indexOf('-c:v'),
+    'typed stage, marker and source span',
+  );
+  check(
+    core.lint(partialText).single.start == partialText.indexOf('"'),
+    'quote position through FFI',
+  );
+  core.clearCapabilitiesCache();
   final concurrent = await Future.wait(
     List.generate(
       4,

@@ -611,12 +611,22 @@ class CommandToken extends JsonModel {
     TokenRole role = TokenRole.extra,
     String? field = null,
     String? replacedField = null,
+    String? stage,
+    bool? isOption,
+    List<String> macros = const [],
+    int? sourceStart,
+    int? sourceEnd,
     JsonMap extensions = const {},
   }) : super({
          'text': text,
          'role': role.name,
          'field': field,
          'replacedField': replacedField,
+         'stage': stage,
+         'isOption': isOption,
+         'macros': macros,
+         'sourceStart': sourceStart,
+         'sourceEnd': sourceEnd,
          'extensions': extensions,
        });
   CommandToken.fromJson(super.json);
@@ -625,11 +635,22 @@ class CommandToken extends JsonModel {
       TokenRole.values.byName(data['role'] as String? ?? 'extra');
   String? get field => data['field'] as String?;
   String? get replacedField => data['replacedField'] as String?;
+  String? get stage => data['stage'] as String?;
+  bool? get isOption => data['isOption'] as bool?;
+  List<String> get macros =>
+      List<String>.unmodifiable((data['macros'] as List? ?? []).cast<String>());
+  int? get sourceStart => data['sourceStart'] as int?;
+  int? get sourceEnd => data['sourceEnd'] as int?;
   CommandToken copyWith({
     Object? text = absent,
     Object? role = absent,
     Object? field = absent,
     Object? replacedField = absent,
+    Object? stage = absent,
+    Object? isOption = absent,
+    Object? macros = absent,
+    Object? sourceStart = absent,
+    Object? sourceEnd = absent,
     Object? extensions = absent,
   }) => CommandToken.fromJson(
     changed({
@@ -637,6 +658,11 @@ class CommandToken extends JsonModel {
       if (!identical(role, absent)) 'role': (role as TokenRole).name,
       if (!identical(field, absent)) 'field': field,
       if (!identical(replacedField, absent)) 'replacedField': replacedField,
+      if (!identical(stage, absent)) 'stage': stage,
+      if (!identical(isOption, absent)) 'isOption': isOption,
+      if (!identical(macros, absent)) 'macros': macros,
+      if (!identical(sourceStart, absent)) 'sourceStart': sourceStart,
+      if (!identical(sourceEnd, absent)) 'sourceEnd': sourceEnd,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1810,4 +1836,23 @@ class PayloadResult extends JsonModel {
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
+}
+
+class MacroDefinition extends JsonModel {
+  MacroDefinition({
+    required String name,
+    required String description,
+    bool required = false,
+    String? value,
+  }) : super({
+         'name': name,
+         'description': description,
+         'required': required,
+         'value': value,
+       });
+  MacroDefinition.fromJson(super.json);
+  String get name => data['name'] as String;
+  String get description => data['description'] as String;
+  bool get required => data['required'] as bool? ?? false;
+  String? get value => data['value'] as String?;
 }

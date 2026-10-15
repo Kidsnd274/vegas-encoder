@@ -88,7 +88,10 @@ Future<void> main(List<String> args) async {
     final written = await machineB.save(
       fresh.copyWith(
         theme: 'dark',
-        uiState: AppUiState(lastSizeLengthText: '1:02.5'),
+        uiState: AppUiState(
+          lastSizeLengthText: '1:02.5',
+          popupWindowSize: PopupWindowSize(width: 1152, height: 864),
+        ),
         extensions: {
           'future': {'mode': 9},
         },
@@ -101,6 +104,7 @@ Future<void> main(List<String> args) async {
     check(
       restarted.theme == 'dark' &&
           restarted.uiState!.lastSizeLengthText == '1:02.5' &&
+          restarted.uiState!.popupWindowSize!.height == 864 &&
           jsonMap(restarted.extensions['future'])['mode'] == 9,
       'settings survive repository restart with extensions',
     );
@@ -116,6 +120,23 @@ Future<void> main(List<String> args) async {
     check(
       (await machineA.read()).revision == 1,
       'failed save retains revision',
+    );
+    for (final size in [0, -1, 32769]) {
+      await rejects(
+        () => machineA.save(
+          written.copyWith(
+            uiState: written.uiState!.copyWith(
+              popupWindowSize: PopupWindowSize(width: 1000, height: size),
+            ),
+          ),
+          expectedRevision: 1,
+        ),
+        'INVALID-DATA',
+      );
+    }
+    check(
+      (await machineA.read()).uiState!.popupWindowSize!.width == 1152,
+      'failed popup size write preserves prior persisted size',
     );
     final races = await Future.wait(
       [machineA, machineB].map((repository) async {

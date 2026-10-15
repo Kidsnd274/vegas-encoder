@@ -76,9 +76,10 @@ class CoreFixture {
 
 /// A fixture lookup, never a second implementation of the product rules.
 /// Modified recipes/contexts require injected fixtures; unmatched calls throw.
-class FakeVeCore implements VeCore {
+class FakeVeCore implements VeCore, VeCoreMacroCatalog {
   FakeVeCore({
     List<CoreFixture>? fixtures,
+    Map<String, List<MacroDefinition>> macroFixtures = const {},
     ProfileCatalog? catalog,
     Map<String, List<Diagnostic>>? lintFixtures,
     Map<String, CompletionResult>? completionFixtures,
@@ -86,7 +87,13 @@ class FakeVeCore implements VeCore {
     Map<String, SizeEstimate>? estimateFixtures,
     Map<String, Uint8List>? encodedPayloadFixtures,
     Map<String, PayloadResult>? decodedPayloadFixtures,
-  }) : fixtures = List.unmodifiable(
+  }) : _macros = Map.unmodifiable(
+         macroFixtures.map(
+           (key, value) =>
+               MapEntry(key, List<MacroDefinition>.unmodifiable(value)),
+         ),
+       ),
+       fixtures = List.unmodifiable(
          fixtures ??
              [
                ...jsonMaps(b0Fixtures()['fixtures']),
@@ -141,6 +148,7 @@ class FakeVeCore implements VeCore {
              ).map((k, v) => MapEntry(k, PayloadResult.fromJson(jsonMap(v)))),
        );
 
+  final Map<String, List<MacroDefinition>> _macros;
   final List<CoreFixture> fixtures;
   final ProfileCatalog _catalog;
   final Map<String, List<Diagnostic>> _lint;
@@ -149,6 +157,21 @@ class FakeVeCore implements VeCore {
   final Map<String, SizeEstimate> _estimate;
   final Map<String, Uint8List> _encode;
   final Map<String, PayloadResult> _decode;
+  static String macrosKey(
+    MediaDescription media,
+    CompilePaths paths, {
+    Recipe? recipe,
+  }) => _key({
+    'media': media.data,
+    'paths': paths.data,
+    if (recipe != null) 'recipe': recipe.data,
+  });
+  @override
+  List<MacroDefinition> macros({
+    required MediaDescription media,
+    required CompilePaths paths,
+    Recipe? recipe,
+  }) => _macros[macrosKey(media, paths, recipe: recipe)] ?? _missing('macros');
   @override
   CoreVersion get version => CoreVersion();
   @override

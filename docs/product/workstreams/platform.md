@@ -8,50 +8,99 @@ B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
-## Next-agent priority (2026-10-15)
+## Advanced capability reuse / F4 / popup size (reviewed checkpoint)
 
-Source checkpoint **`6ebd79c`** is committed on ws/platform and fast-forwarded
-into master. Platform is clean; master retains the pre-existing `.claude/`.
-The latest ws/app handoff now reports **F5 popup done; F6 progress window next**.
-This supersedes the earlier observation below that F5 was upcoming. Nothing in
-F5 establishes real VEGAS page/persistence gates.
+Continued on **ws/platform at `1e14d64`**, initially clean. Read the latest ws/app
+handoff directly from its worktree (F5 done, F6 next); app.md in this worktree is
+older and was not edited or merged. All changes remain platform-owned and
+reviewed; the owner subsequently requested committing/merging this checkpoint
+and continuing platform work. No app/runner files changed.
 
-Work that can proceed without frontend completion, in priority order:
+- **Capability-transfer bottleneck:** NativeVeCore now automatically stores and
+  reuses immutable capability snapshots for validate/compile/lint/complete. No app
+  call-site change is required. Identity is the actual immutable CoreCapabilities
+  object, not the installation/binary key: lazy options and hardware facts may
+  change independently. Native validation borrows the same snapshot into lint
+  instead of copying it again. The native C++ compiler/validator remains sole
+  authority; direct engine calls still use their own borrowed capabilities.
+- **Bounded lifetime:** facade LRU retains four views (full Advanced plus compact
+  Basic fit together), releasing old entries; DLL LRU retains eight, each <=1 MiB
+  submitted JSON / 65,536 nodes / 64 levels. IDs never recycle within the DLL;
+  release is idempotent, eviction yields CAPABILITIES-STALE, and Dart reinstalls
+  exact facts with one retry. A synchronous caller pins its immutable snapshot
+  without holding the registry mutex during work. Abandoned facades are bounded
+  by native eviction; optional clearCapabilitiesCache releases early. Cache limits
+  preserve legacy inline semantics. cacheCapabilities:false is the parity/timing
+  baseline. No finalizer, host pointer, background thread or new process exists.
+- **F4 metadata:** Advanced user tokens have stage, isOption, recognized macro
+  identities and typed UTF-16 spans. Ambiguous unsuffixed options stay unknown;
+  negative/quoted dash values remain values. Macro role retains separate stage,
+  while owned input/output roles remain intact for existing chip guards. Shared
+  native macro definitions supply completion, expansion and the new catalogue.
+  VeCore.macros(media:...,paths:...,recipe:...) is additive through an optional
+  interface/extension, with exact-context FakeVeCore fixtures. Pass the recipe for
+  exact generated-input/audio policy; omitted recipe shows available media.
+- **Encoder IDs / partial quotes:** summary videoEncoderId/audioEncoderId come
+  from established scoped command facts; ambiguous maps/outputs/codec scope,
+  nonzero stream selectors, copy, disabled streams and unfinished quotes stay
+  null. Complete words/chips before an unfinished quote retain UTF-16 spans;
+  L-QUOTE starts at the actual unmatched quote. Incomplete word is omitted;
+  argv/commandLine are empty and Apply/render stays blocked.
+- **C7 popup size:** optional AppUiState.popupWindowSize stores physical outer
+  width/height (1..32768), no position/maximized state. Services/fake share bounds
+  checks, preserve desktop/unknown fields and reject invalid writes atomically.
+  Frontend owns adoption, clamping/centring and revision-conflict retry.
 
-1. **Advanced edit latency:** app measures **25–32 ms per edit** against the
-   4 ms budget because lint and compile each serialize a **156–236K-character**
-   capability map through FFI. Choose the smallest additive fix: reuse an immutable
-   core capability snapshot across calls, or provide a combined lint/compile call.
-   Keep the core the sole validator/compiler. If using handles, bound memory and
-   define identity, replacement, release and stale-handle behaviour. Measure the
-   full real capability path through Dart FFI; a tiny fake map is insufficient.
-   Implement in src/core and packages/ve_core, including fakes/contract/tests;
-   app adoption stays with its owner.
-2. **F4 token metadata:** deliver stage, macro identity and option/value markers,
-   preserving UTF-16 spans and actual argv. Keep ambiguous stages unknown. Then
-   deliver the shared core macro catalogue, established Advanced encoder IDs and
-   trustworthy prefix spans/quote position for unfinished commands, without
-   producing executable argv from invalid input. Detailed requests are below.
-3. **Popup size contract:** add bounded optional popup size to C7 AppUiState and
-   its services/fakes; preserve existing desktop fields. Frontend adopts it.
+Focused verification (offline; no FFmpeg execution, fake host or real VEGAS):
+**3,020 optimized native/static checks**, C/C++17 ABI header `/W4 /WX`, unchanged
+B1 argv goldens; **208 native-asset Dart FFI** and **177 core fake** checks;
+**64 service fake** and **114 real Windows file/lock/native-core repository**
+checks. Both packages analyze cleanly. Existing repository runner uses synthetic
+records/owned test children, without exporter/session changes. No sanitizer run
+or process/thread investigation was resumed; the previous B6 sanitizer limitation
+remains as recorded.
 
-F5 additionally requests `DesktopApp.openPreset(presetId)` and optional
-`context.outputPath`. Coordinate the desktop launch/selection protocol with app
-before implementation; do not edit its runner or invent single-instance behaviour.
-Only provide outputPath if the native page actually knows it; keep unknown/sample
-facts explicit. Saving invalid desktop drafts is marked an owner decision in
-app.md; do not silently change save policy. Temporary render-path naming remains
-engine-owned, not a new portable-core filename rule.
+Timing: the existing capability_views_test.dart now compares inline/snapshot
+validate/lint/compile/complete results and times a changing Advanced command's
+lint + Advanced compile + Basic compile using all three **full real captured probe
+maps** (156,163 / 236,118 / 234,172 bytes), with the same DLL/build and immutable
+views. It separates first transfer from 25 warm-ups / 100 measured edits.
+Isolated JIT run (Dart 3.13.5, optimized MSVC x64 native asset, Windows on this PC;
+320x180/30 P010 + stereo float sample, no overlapping builds/tests):
 
-Read latest app.md and this handoff before implementation. Keep changes additive,
-inside platform paths, with focused native/core/FFI/package checks and measured
-results. Update CONTRACTS and this file for adoption. Do not resume sanitizer
-thread/process debugging or add another fake-owner framework. Current sanitizer
-validation is incomplete and already recorded. No installation, exporter
-replacement, push, machine-tool change or antivirus exclusion is authorized by
-this handoff. A5–A7, real persistence, controlled real failure recovery and monitor
-performance remain unverified. Native host calls stay on Render's caller thread,
-release frames before waits, and Render never waits for app/monitor.
+| Full captured map | Inline median / p95 ms | Snapshot median / p95 ms | First snapshot edit ms |
+| --- | --- | --- | --- |
+| gyan 5.1.2, 156,163 bytes | 21.985 / 23.887 | **2.087 / 2.314** | 12.906 |
+| gyan git 615b07170e, 236,118 bytes | 27.729 / 29.297 | **2.103 / 2.232** | 16.114 |
+| BtbN git 24e860f6d3, 234,172 bytes | 27.048 / 28.758 | **2.081 / 2.142** | 15.814 |
+
+Warm snapshot means are **2.091–2.132 ms**, below the 4 ms core-sequence budget;
+first transfer is explicitly **12.9–16.1 ms**, outside that budget. Earlier runs
+with overlapping builds had isolated >4 ms tails; the table is the final isolated
+run, not a universal latency guarantee. The inline baseline uses this same build,
+including the native-copy removal, rather than claiming an exact rerun of the
+app's old 25–32 ms measurement. These are core/FFI sequence costs, not a qualified
+Flutter frame/provider/UI budget; app owns its full F7 rerun.
+
+Reproduce from packages/ve_services with the existing installed Dart:
+`dart run test/capability_views_test.dart ../../build/test-results/b3-runtime-cc92c463`.
+**73 real-map parity/reuse checks** pass. Output stays in ignored
+`build/test-results/b3-runtime-cc92c463/snapshot-timings.json`; no probe executes.
+Fake map timings are not substituted. Both native-asset and explicit-DLL FFI
+paths pass the focused 208 checks.
+
+App adoption: no changes for snapshot reuse; consume the F4 additions/catalogue
+and C7 popup size in app-owned code/tests/goldens. Contracts spell out exact API,
+identity, eviction/release and unknown facts. Temporary output naming remains
+engine-owned; preview uses CompilePaths.output. DesktopApp.openPreset still needs
+app launch/selection coordination. The latest app's separate library-watch cost
+request is **not addressed by this task**. Do not change invalid desktop save policy.
+
+**A5–A7, real two-template/restart persistence, controlled real failure recovery
+and monitor performance remain unverified.** No B6 activation, app/monitor launch,
+installation, exporter replacement, commit/push, machine-tool change or antivirus
+exclusion was performed. Render caller-thread host calls, copy/release-before-wait
+and no wait for app/monitor remain unchanged.
 
 ## Master integration (2026-10-14)
 
@@ -239,11 +288,11 @@ custom dialog text and prioritizing the separate window; this is the request for
 those files, not an edit to them. A5–A7, real persistence, controlled failure
 recovery and real monitor performance remain **unverified**.
 
-## F4 core metadata coordination (queued; C2 unchanged in B5)
+## F4 core metadata coordination (delivered above; unchanged during B5)
 
-The app's outstanding requests in app.md were read after the master merge.
-Continue its documented reduced display/fallbacks until native facts land;
-do not infer stages, encoder IDs or macro semantics in the app.
+The queued requests were implemented in this reviewed continuation; the table
+retains their intent and scope. See the additive C2 contract and verification above.
+App adopts the metadata/catalogue and refreshes its own light/dark goldens.
 
 | Request | Platform handoff / next implementation |
 | --- | --- |
@@ -253,10 +302,9 @@ do not infer stages, encoder IDs or macro semantics in the app.
 | Temporary output preview | C2 already takes `CompilePaths.output`; B4 passes its uniquely allocated temp path before core compile, and C6 records actual argv. Naming belongs to the engine, not portable compile. Keep the current selected/sample preview path explicitly labelled as a preview; no invented collision-free runtime filename in C2. Coordinate a services/context helper only if the owner wants an illustrative temp preview. |
 | Partial highlighting with an open quote | Add trustworthy prefix spans/quote diagnostic position without treating an invalid command as renderable or emitting partial executable argv. Preserve UTF-16 offsets, macro guards and the error that blocks Apply/render. |
 
-These changes are queued after B5 review, with focused core/FFI/fake tests and
-CONTRACTS updates together. App owns adoption/widget/light-dark goldens through
-its workstream. No C2 shape, core compile semantics or app-owned source changed
-for B5. Owner-owned TECH_ARCHITECTURE §5.6 can now link NATIVE_PROGRESS.md and
+These additions now include focused core/FFI/fake tests and CONTRACTS updates.
+App owns adoption/widget/light-dark goldens through its workstream. No C2 shape,
+core compile semantics or app-owned source changed during B5 itself. Owner-owned TECH_ARCHITECTURE §5.6 can now link NATIVE_PROGRESS.md and
 replace the earlier "unmapped meaning" with the precise borrowed-description
 effects; this workstream proposes that update, without editing the owner's file.
 
@@ -470,11 +518,13 @@ B4's engine/C5/C6 writers are delivered above; app F7 consumes them through the
 existing readers. B5 normal trials and the owner's drop-text decision are recorded
 above; further marker trials are ended. Connect B6 to the actual F5 popup when
 ready and the native gates resume, then the recipe/C5 progress bridge. Avoid adding
-another fake-owner framework. F4 core metadata remains the actionable queued work
-while that integration is gated; keep adoption requests in this handoff.
+another fake-owner framework. The additive F4/core/C7 changes above await review
+and app adoption; the library-watch request remains separate queued platform work.
 
 B6 adapter/progress performance needs the owner with real VEGAS and gated
-evidence. The owner authorized source commit/master merge, with no push.
+evidence. Prior checkpoints had owner authorization to commit/merge; **this
+checkpoint was reviewed; the owner now authorizes committing/merging it and
+continuing with the library-watch bottleneck**, with no push.
 The B5 installation/trial is authorized with rollback only for issues; current
 mode-0 control and mode-4 normal renders pass; the owner drops custom status-line
 testing after no useful visible change. Mode 4 is retained, with no rollback.

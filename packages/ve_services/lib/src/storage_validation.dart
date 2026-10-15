@@ -99,6 +99,7 @@ MachineSettings decodeMachine(JsonMap data) {
   if (data['uiState'] != null) {
     final state = objectField(data, 'uiState');
     validateExtensions(state);
+    validatePopupSize(state);
     boolField(state, 'desktopMaximized');
     stringField(state, 'lastSizeLengthText', required: false, nullable: true);
     if (state['desktopWindowBounds'] != null) {
@@ -382,4 +383,15 @@ JobRecord decodeJob(JsonMap data, VeCore core) {
   if (data['status'] != 'succeeded' && data['published'] == true)
     invalid('Stopped job cannot report publication.');
   return JobRecord.fromJson(data);
+}
+
+void validatePopupSize(JsonMap state) {
+  if (state['popupWindowSize'] == null) return;
+  final size = objectField(state, 'popupWindowSize');
+  validateExtensions(size);
+  for (final key in ['width', 'height']) {
+    intField(size, key, min: 1);
+    if ((size[key] as int) > 32768)
+      invalid('$key exceeds 32768 physical pixels.');
+  }
 }

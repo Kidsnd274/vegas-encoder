@@ -83,10 +83,15 @@ Json Suggestion(const std::string& value, const std::string& description, const 
 }
 std::map<std::string,std::string> Encoders(const std::vector<Word>& words) {
     std::map<std::string,std::string> encoders;
-    for (size_t i = 0; i + 1 < words.size(); ++i) if (IsOption(words[i].text) && OptionKey(words[i].text) == "c") {
-        const auto kind = Kind(words[i].text);
-        if (!kind.empty()) encoders[kind] = words[i+1].text;
-        else { encoders["video"] = words[i+1].text; encoders["audio"] = words[i+1].text; }
+    for (size_t i = 0; i < words.size(); ++i) {
+        if (!IsOption(words[i].text) || switches.count(OptionKey(words[i].text))) continue;
+        if (i + 1 >= words.size() || (IsOption(words[i+1].text) && !words[i+1].quoted)) continue;
+        if (OptionKey(words[i].text) == "c") {
+            const auto kind = Kind(words[i].text);
+            if (!kind.empty()) encoders[kind] = words[i+1].text;
+            else { encoders["video"] = words[i+1].text; encoders["audio"] = words[i+1].text; }
+        }
+        ++i;
     }
     return encoders;
 }
@@ -98,14 +103,73 @@ bool ValidEncoderOption(const Json& caps, const std::string& encoder, const std:
     const auto choice = Choice(encoder,kind,key);
     return (!choice || AllowedChoice(*choice,value)) && (!option || PrivateValue(*option,value)) && GenericValue(key,value);
 }
-Json Lint(const Json& request) {
+Json TokenMetadata(const std::vector<Word>& words, const Json& caps) {
+    const auto encoders = Encoders(words);
+    const std::set<std::string> video{"crf","qp","cq","g","bf","refs","pix_fmt","vf","r","s","aspect","vtag","color_primaries","color_trc","colorspace","color_range","vn"};
+    const std::set<std::string> audio{"ar","ac","af","sample_fmt","channel_layout","atag","an"};
+    const std::set<std::string> global{"hide_banner","nostdin","loglevel","stats","progress","stats_period","y","n"};
+    const std::set<std::string> mux{"f","movflags","max_muxing_queue_size","shortest"};
+    // Reverse scope pass keeps metadata linear at the 16384-word limit.
+    std::vector<bool> inputScope(words.size()); bool beforeInput = false;
+    for (size_t next = words.size(); next > 0;) {
+        --next;
+        if (words[next].text == "{output}") beforeInput = false;
+        if (words[next].text == "{inputs}" || (words[next].text == "-i" && !words[next].quoted)) beforeInput = true;
+        inputScope[next] = beforeInput;
+    }
+    Json result = Json::array();
+    std::string valueStage; bool value = false;
+    for (size_t index = 0; index < words.size(); ++index) {
+        const auto& word = words[index];
+        const auto key = OptionKey(word.text);
+        const bool option = !value && IsOption(word.text);
+        std::string stage;
+        if (value) { stage = valueStage; value = false; }
+        else if (word.text == "{inputs}") stage = "input";
+        else if (word.text == "{output}") stage = "output";
+        else if (option) {
+            stage = Kind(word.text);
+            if (stage.empty()) {
+                if (global.count(key)) stage = "global";
+                else if (video.count(key)) stage = "video";
+                else if (audio.count(key)) stage = "audio";
+                else if (mux.count(key)) stage = "mux";
+                else if (key == "map") stage = "map";
+                else if (key == "i") stage = "input";
+                else {
+                    for (const auto& [kind,encoder] : encoders) if (PrivateOption(caps,encoder,key) || Choice(encoder,kind,key)) {
+                        if (!stage.empty() && stage != kind) { stage.clear(); break; }
+                        stage = kind;
+                    }
+                }
+            }
+            if (stage != "global" && inputScope[index]) stage = "input";
+            value = !switches.count(key) && index + 1 < words.size() &&
+                (!IsOption(words[index+1].text) || words[index+1].quoted) && words[index+1].text != "{inputs}" && words[index+1].text != "{output}";
+            valueStage = stage;
+        }
+        Json macros = Json::array();
+        for (size_t i = 0; (i = word.text.find('{',i)) != std::string::npos;) {
+            const auto end = word.text.find('}',i); if (end == std::string::npos) break;
+            const auto name = word.text.substr(i,end-i+1);
+            bool known = name.rfind("{gop:",0) == 0 && name.size() > 7 && name[name.size()-2] == 's';
+            for (const auto& macro : MacroDefinitions()) if (Str(macro,"name") == name) known = true;
+            if (known && std::find(macros.begin(),macros.end(),Json(name)) == macros.end()) macros.push_back(name);
+            i = end+1;
+        }
+        result.push_back(Json{{"stage",stage.empty() ? Json(nullptr) : Json(stage)},{"isOption",option},{"macros",macros}});
+    }
+    return result;
+}
+Json Lint(const Json& request, const Json* capabilities) {
     const auto text = Str(request,"text"); const Json noCaps = nullptr;
-    const Json& caps = request.contains("capabilities") ? request.at("capabilities") : noCaps;
+    const Json& caps = capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCaps;
     const auto offsets = Utf16Map(text);
     const bool extra = Bool(request,"extra"); Json diagnostics = Json::array(); std::vector<Word> words;
     auto emit = [&](const std::string& id, const std::string& level, size_t start, size_t end, const std::string& message, Json params = Json::object()) { diagnostics.push_back(Diagnostic(id,level,offsets,start,end,message,params)); };
     if (text.find('\0') != std::string::npos) { emit("L-NUL","error",0,text.size(),"Commands cannot contain a NUL character."); return diagnostics; }
-    try { words = Tokenize(text); } catch (const Error& e) { emit("L-QUOTE","error",0,text.size(),e.what()); return diagnostics; }
+    size_t quote = text.size(); words = Tokenize(text,&quote);
+    if (quote != text.size()) { emit("L-QUOTE","error",quote,text.size(),"Close the double quote in the command."); return diagnostics; }
     auto encoders = Encoders(words);
     if (extra) encoders[Str(request,"kind","video")] = Str(request,"encoder");
     if (!extra) for (const auto& macro : {"{inputs}","{output}"}) {
@@ -125,7 +189,7 @@ Json Lint(const Json& request) {
             continue;
         }
         const auto key = OptionKey(word.text); const auto kind = Kind(word.text);
-        const bool hasValue = i + 1 < words.size() && !IsOption(words[i+1].text) && !switches.count(key);
+        const bool hasValue = i + 1 < words.size() && (!IsOption(words[i+1].text) || words[i+1].quoted) && !switches.count(key);
         const Word* next = hasValue ? &words[i+1] : nullptr;
         if (extra && (key == "c" || key == "i" || key == "f" || key == "map" || key == "vn" || key == "an" || key == "progress")) emit("V-EXTRA-OWNED","error",word.start,next ? next->end : word.end,"Use the stream/container controls or Advanced mode for this option.");
         if (!extra && (key == "hide_banner" || key == "nostdin")) emit("L-GLOBAL","hint",word.start,word.end,"Vegas Encoder always adds this option.");
@@ -155,7 +219,7 @@ Json Lint(const Json& request) {
     if (!extra && outputs > 1) emit("L-OUTPUTS","warn",0,text.size(),"Only {output} is published and cleaned up; other output files are left as FFmpeg writes them.");
     return diagnostics;
 }
-Json Complete(const Json& request) {
+Json Complete(const Json& request, const Json* capabilities) {
     const auto text = Str(request,"text"); const auto caret = request.at("caret");
     if (!caret.is_number_integer() || caret.get<int64_t>() < 0) throw Error(VE_INVALID_ARGUMENT,"CARET","Caret must be a nonnegative UTF-16 offset.");
     const auto offset = Utf8Offset(text,static_cast<size_t>(caret.get<int64_t>()));
@@ -169,7 +233,7 @@ Json Complete(const Json& request) {
     while (endByte < text.size() && text[endByte] != ' ' && text[endByte] != '\t' && text[endByte] != '\n' && text[endByte] != '\r') ++endByte;
     result["start"] = Utf16Offset(text,startByte); result["end"] = Utf16Offset(text,endByte);
     const auto encoders = Encoders(words); const Json noCaps = nullptr;
-    const Json& caps = request.contains("capabilities") ? request.at("capabilities") : noCaps;
+    const Json& caps = capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCaps;
     const size_t prevIndex = space ? words.size() : words.empty() ? 0 : words.size() - 1;
     const auto previous = prevIndex ? words[prevIndex-1].text : "";
     std::set<std::string> seen;
@@ -192,7 +256,7 @@ Json Complete(const Json& request) {
     }
     if (!partial.empty() && partial[0] == '{') {
         result["kind"] = "value";
-        for (const auto& macro : {"{inputs}","{output}","{v}","{a}","{width}","{height}","{fps}","{sample_rate}","{project}","{gop:2s}"}) add(Suggestion(macro,"VEGAS media or output macro",nullptr,nullptr,"Macro"));
+        for (const auto& macro : MacroDefinitions()) add(Suggestion(Str(macro,"name"),Str(macro,"description"),nullptr,nullptr,"Macro"));
         return result;
     }
     result["kind"] = "option";

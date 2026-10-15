@@ -91,7 +91,7 @@ double Bitrate(const std::string& text, double fallback) {
 void ReadStream(const Json& tokens, Json& resolved, bool video) {
     for (size_t i = 0; i + 1 < tokens.size(); ++i) {
         const auto key = OptionKey(Str(tokens[i],"text")); const auto value = Str(tokens[i+1],"text");
-        if (!IsOption(Str(tokens[i],"text"))) continue;
+        if (!IsOption(Str(tokens[i],"text")) || (tokens[i].contains("isOption") && !Bool(tokens[i],"isOption"))) continue;
         const std::string prefix = video ? "video" : "audio";
         if (video) ReflectVideoFormatOption(resolved,key,value);
         if ((key == "crf" || key == "cq" || key == "global_quality" || key == "qp_i") && video) {
@@ -177,13 +177,10 @@ Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
     if (container) Pair(out,"mux","container.format","-f",Str(*container,"muxer"));
     return out;
 }
-std::string Expand(const std::string& token, const Json& media, const Json& paths, Json& issues) {
-    const auto& v = media.at("video"); const auto& fps = v.at("fps");
-    const Json a = media.value("audio",Json(nullptr));
-    const std::map<std::string,std::string> macros{{"{v}","0:v:0"},{"{a}","1:a:0"},
-        {"{output}",Str(paths,"output")},{"{project}",Str(paths,"project")},
-        {"{width}",Number(Num(v,"width"))},{"{height}",Number(Num(v,"height"))},
-        {"{fps}",fps[0].dump() + "/" + fps[1].dump()},{"{sample_rate}",a.is_null() ? "" : Number(Num(a,"rate"))}};
+std::string Expand(const std::string& token, const Json& media, const Json& catalogue, Json& issues) {
+    const auto& fps = media.at("video").at("fps");
+    std::map<std::string,std::string> macros;
+    for (const auto& item : catalogue) if (Str(item,"name") != "{inputs}" && item.at("value").is_string()) macros[Str(item,"name")] = Str(item,"value");
     std::string result;
     auto append = [&](const std::string& value) {
         if (value.size() > VE_CORE_JSON_LIMIT || result.size() > VE_CORE_JSON_LIMIT - value.size()) throw Error(VE_LIMIT_EXCEEDED,"COMMAND-LIMIT","Expanded command token exceeds 1 MiB.");
@@ -210,11 +207,11 @@ void Reflected(const Json& tokens, Json& res) {
     Json video = Json::array(), audio = Json::array();
     std::string kind = "video";
     for (size_t i = 0; i < tokens.size(); ++i) {
-        const auto option = Str(tokens[i],"text"), key = IsOption(option) ? OptionKey(option) : "";
-        if (option == "-vn") res["videoEnabled"] = false;
-        if (option == "-an") res["audioEnabled"] = false;
-        if (option.find(":a") != std::string::npos || option == "-acodec" || key == "ar" || key == "ac" || key == "af" || key == "sample_fmt") kind = "audio";
-        if (option.find(":v") != std::string::npos || option == "-vcodec" || key == "pix_fmt" || key == "vf") kind = "video";
+        const auto option = Str(tokens[i],"text"), key = IsOption(option) && (!tokens[i].contains("isOption") || Bool(tokens[i],"isOption")) ? OptionKey(option) : "";
+        if (!key.empty() && option == "-vn") res["videoEnabled"] = false;
+        if (!key.empty() && option == "-an") res["audioEnabled"] = false;
+        if (!key.empty() && (option.find(":a") != std::string::npos || option == "-acodec" || key == "ar" || key == "ac" || key == "af" || key == "sample_fmt")) kind = "audio";
+        if (!key.empty() && (option.find(":v") != std::string::npos || option == "-vcodec" || key == "pix_fmt" || key == "vf")) kind = "video";
         if (key == "c" && i + 1 < tokens.size()) {
             const auto encoder = Str(tokens[i+1],"text"); res[kind + "Encoder"] = encoder;
             const auto p = FindProfile(kind,encoder); res[kind + "Profile"] = p ? *p : Json{{"family","unknown"}};
@@ -241,16 +238,47 @@ Json InputTokens(const Json& r, const Json& media, const Json& paths) {
     }
     return result;
 }
-Json Compile(const Json& request) {
+const Json& MacroDefinitions() {
+    static const Json definitions = Json::array({
+        {{"name","{inputs}"},{"description","Raw video and available audio from VEGAS"},{"required",true}},
+        {{"name","{output}"},{"description","Selected preview path or allocated render output path"},{"required",true}},
+        {{"name","{v}"},{"description","First VEGAS video stream (0:v:0)"},{"required",false}},
+        {{"name","{a}"},{"description","First VEGAS audio stream (1:a:0)"},{"required",false}},
+        {{"name","{width}"},{"description","Delivered video width in pixels"},{"required",false}},
+        {{"name","{height}"},{"description","Delivered video height in pixels"},{"required",false}},
+        {{"name","{fps}"},{"description","Delivered rational video frame rate"},{"required",false}},
+        {{"name","{sample_rate}"},{"description","Delivered audio sample rate; empty without audio"},{"required",false}},
+        {{"name","{project}"},{"description","Supplied project name (may be empty)"},{"required",false}},
+        {{"name","{gop:2s}"},{"description","Keyframe interval in frames; replace 2 with seconds"},{"required",false}}
+    });
+    return definitions;
+}
+Json Macros(const Json& request) {
+    const auto& media = request.at("media"); const auto& paths = request.at("paths"); CheckMedia(media);
+    const auto& v = media.at("video"); const auto& fps = v.at("fps");
+    const auto a = media.value("audio",Json(nullptr));
+    auto recipe = request.value("recipe",Json{{"video",{{"enabled",true}}},{"audio",Json::array({{{"enabled",true}}})},{"command",{{"mode","template"}}}});
+    std::string inputs;
+    for (const auto& token : InputTokens(recipe,media,paths)) { if (!inputs.empty()) inputs += " "; inputs += Quote(Str(token,"text")); }
+    const auto frames = std::round(2 * fps[0].get<double>() / fps[1].get<double>());
+    const std::vector<Json> values{inputs,Str(paths,"output"),"0:v:0","1:a:0",Number(Num(v,"width")),Number(Num(v,"height")),
+        fps[0].dump() + "/" + fps[1].dump(),a.is_null() ? "" : Number(Num(a,"rate")),Str(paths,"project"),
+        frames >= 1 && frames <= 2147483647 ? Json(Number(frames)) : Json(nullptr)};
+    auto result = MacroDefinitions();
+    for (size_t i = 0; i < result.size(); ++i) result[i]["value"] = values[i];
+    return result;
+}
+Json Compile(const Json& request, const Json* capabilities) {
     const auto& r = request.at("recipe"); const auto& media = request.at("media"); const auto& paths = request.at("paths");
     CheckMedia(media);
     if (!paths.is_object() || Str(paths,"ffmpeg","ffmpeg").empty() || Str(paths,"videoPipe").empty() || Str(paths,"output").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Executable, video pipe and output path must be nonempty strings.");
-    Json issues = Validate(request); const auto exe = Str(paths,"ffmpeg","ffmpeg");
+    Json issues = Validate(request,capabilities); const auto exe = Str(paths,"ffmpeg","ffmpeg");
     Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr}};
     if (HasErrors(Structural(r))) return result;
     const bool audioInput = Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null();
     result["inputStreams"] = audioInput ? Json::array({"video","audio"}) : Json::array({"video"});
     if (audioInput && Str(paths,"audioPipe").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Enabled audio needs a pipe path.");
+    bool partialCommand = false;
     Json tokens = Json::array(); Push(tokens,"exe",nullptr,{exe});
     Push(tokens,"global",nullptr,{"-hide_banner","-nostdin","-loglevel","info","-stats_period","0.5","-progress","pipe:1"});
     if (Bool(paths,"overwriteOutput")) Push(tokens,"global",nullptr,{"-y"});
@@ -278,24 +306,31 @@ Json Compile(const Json& request) {
                    {"videoMode",""},{"audioMode",""},{"pixfmt",""},{"depth",0},{"container",""},{"gopFrames",nullptr},
                    {"quality",nullptr},{"speed",nullptr},{"tune",nullptr},{"profile",nullptr},{"videoEnabled",true},{"audioEnabled",audioInput}};
         std::vector<Word> words;
-        try { words = Tokenize(text); } catch (const Error&) {} // Lint already contains the blocking quote issue.
+        size_t quote = text.size(); words = Tokenize(text,&quote); partialCommand = quote != text.size();
+        const Json noCapabilities = nullptr;
+        const auto metadata = TokenMetadata(words,capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCapabilities);
         Json reflected = Json::array();
         size_t expandedBytes = 0;
+        const auto catalogue = Macros(Json{{"media",media},{"paths",paths},{"recipe",r}});
         for (size_t i = 0; i < words.size(); ++i) {
             const auto& word = words[i];
             if (i == 0 && (word.text == "ffmpeg" || word.text == "ffmpeg.exe")) continue;
             if (word.text == "-hide_banner" || word.text == "-nostdin") continue;
             if (word.text == "{inputs}") {
-                for (auto token : input) { expandedBytes += Str(token,"text").size(); token["sourceStart"] = offsets[word.start]; token["sourceEnd"] = offsets[word.end]; tokens.push_back(token); }
+                for (auto token : input) { token["macros"] = Json::array({"{inputs}"}); token["stage"] = "input"; expandedBytes += Str(token,"text").size(); token["sourceStart"] = offsets[word.start]; token["sourceEnd"] = offsets[word.end]; tokens.push_back(token); }
                 if (expandedBytes > VE_CORE_JSON_LIMIT) throw Error(VE_LIMIT_EXCEEDED,"COMMAND-LIMIT","Expanded command exceeds 1 MiB.");
                 continue;
             }
-            const auto prior = issues.size(); const auto expanded = Expand(word.text,media,paths,issues);
+            const auto prior = issues.size(); const auto expanded = Expand(word.text,media,catalogue,issues);
             expandedBytes += expanded.size();
             if (expandedBytes > VE_CORE_JSON_LIMIT) throw Error(VE_LIMIT_EXCEEDED,"COMMAND-LIMIT","Expanded command exceeds 1 MiB.");
             for (size_t j = prior; j < issues.size(); ++j) { issues[j]["params"]["start"] = offsets[word.start]; issues[j]["params"]["end"] = offsets[word.end]; }
             auto token = Json{{"text",expanded},{"role",word.text == "{output}" ? "output" : "extra"},{"field","command.template"},
                               {"sourceStart",offsets[word.start]},{"sourceEnd",offsets[word.end]}};
+            token["stage"] = metadata[i].at("stage"); token["isOption"] = metadata[i].at("isOption"); token["macros"] = metadata[i].at("macros");
+            if (word.text == "{output}") token["role"] = "output";
+            else if (!token.at("macros").empty()) token["role"] = "macro";
+            else if (token.at("stage").is_string() && token.at("stage") != "input" && token.at("stage") != "output") token["role"] = token.at("stage");
             tokens.push_back(token); reflected.push_back(token);
         }
         Reflected(reflected,res);
@@ -312,7 +347,7 @@ Json Compile(const Json& request) {
         result["resolved"] = nullptr;
     }
     const Json noCaps = nullptr;
-    const Json& caps = request.contains("capabilities") ? request.at("capabilities") : noCaps;
+    const Json& caps = capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCaps;
     // Validate actual emitted generated values against this build's private help.
     // Extra text was linted in Validate; it keeps its own spans and issue fields.
     if (!advanced && caps.is_object()) for (size_t i = 0; i + 1 < tokens.size(); ++i) {
@@ -357,14 +392,17 @@ Json Compile(const Json& request) {
     std::string commandLine;
     for (size_t i = 0; i < tokens.size(); ++i) { if (i) commandLine += " "; commandLine += Quote(Str(tokens[i],"text")); if (i) result["argv"].push_back(Str(tokens[i],"text")); }
     result["display"] = tokens; result["commandLine"] = commandLine; result["signalPath"] = signal; result["issues"] = issues; result["summary"] = Summary(r,res);
-    bool expectedScope = !Bool(res,"unknownOutputScope");
+    // IDs are established below only after conservative stream-map qualification.
+    result["summary"]["videoEncoderId"] = nullptr; result["summary"]["audioEncoderId"] = nullptr;
+    if (partialCommand) { result["argv"] = Json::array(); result["commandLine"] = ""; }
+    bool expectedScope = !Bool(res,"unknownOutputScope") && !partialCommand;
     bool expectedVideo = Bool(res,"videoEnabled",Bool(r.at("video"),"enabled",true));
     bool expectedAudio = Bool(res,"audioEnabled",audioInput);
     if (advanced && expectedScope) {
         size_t videoMaps = 0, audioMaps = 0; bool mapped = false;
         for (size_t i = 0; i < tokens.size(); ++i) {
             if (Str(tokens[i],"field") != "command.template") continue;
-            if (!IsOption(Str(tokens[i],"text"))) continue;
+            if (!IsOption(Str(tokens[i],"text")) || (tokens[i].contains("isOption") && !Bool(tokens[i],"isOption"))) continue;
             const auto key = OptionKey(Str(tokens[i],"text"));
             if (key == "filter_complex") expectedScope = false;
             if (key != "map") continue;
@@ -400,6 +438,15 @@ Json Compile(const Json& request) {
             expected.push_back({{"kind",kind},{"encoder",encoder.empty() ? Json(nullptr) : Json(encoder)},{"codec",codec.empty() ? Json(nullptr) : Json(codec)}});
         }
         result["expectedStreams"] = expected;
+        bool explicitScope = true;
+        if (advanced) for (const auto& token : tokens) {
+            if (Str(token,"field") != "command.template" || !Bool(token,"isOption")) continue;
+            const auto name = Str(token,"text");
+            if (OptionKey(name) == "c" && name != "-c:v" && name != "-c:a" && name != "-c:v:0" && name != "-c:a:0" && name != "-vcodec" && name != "-acodec" && name != "-codec:v" && name != "-codec:a") explicitScope = false;
+        }
+        if (explicitScope) for (const auto& stream : expected) {
+            result["summary"][Str(stream,"kind") + "EncoderId"] = Str(stream,"encoder") == "copy" ? Json(nullptr) : stream.at("encoder");
+        }
     }
     return result;
 }

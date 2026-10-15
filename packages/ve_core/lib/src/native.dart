@@ -8,17 +8,23 @@ import 'json_model.dart';
 import 'models.dart';
 import 'native_bindings.dart';
 
-/// Isolate-local facade over the stateless C++ core. No domain rules live in Dart.
-class NativeVeCore implements VeCore {
-  factory NativeVeCore() => NativeVeCore._load(NativeBindings.assets);
+/// Isolate-local facade over the C++ core. No domain rules live in Dart.
+class NativeVeCore implements VeCore, VeCoreMacroCatalog {
+  factory NativeVeCore({bool cacheCapabilities = true}) =>
+      NativeVeCore._load(NativeBindings.assets, cacheCapabilities);
 
   /// Explicit DLL loading for adapter parity tests and deployment diagnostics.
   /// Normal app usage uses the bundled native asset from hook/build.dart.
-  factory NativeVeCore.open(String dllPath) => NativeVeCore._load(
-    () => NativeBindings.library(DynamicLibrary.open(dllPath)),
-  );
+  factory NativeVeCore.open(String dllPath, {bool cacheCapabilities = true}) =>
+      NativeVeCore._load(
+        () => NativeBindings.library(DynamicLibrary.open(dllPath)),
+        cacheCapabilities,
+      );
 
-  static NativeVeCore _load(NativeBindings Function() load) {
+  static NativeVeCore _load(
+    NativeBindings Function() load,
+    bool cacheCapabilities,
+  ) {
     if (!Platform.isWindows || Abi.current() != Abi.windowsX64) {
       throw const CoreException(
         'UNSUPPORTED-PLATFORM',
@@ -33,7 +39,7 @@ class NativeVeCore implements VeCore {
           'Core ABI does not match this app.',
         );
       }
-      return NativeVeCore._(bindings);
+      return NativeVeCore._(bindings, cacheCapabilities);
     } on CoreException {
       rethrow;
     } catch (e) {
@@ -41,7 +47,8 @@ class NativeVeCore implements VeCore {
     }
   }
 
-  NativeVeCore._(this._bindings);
+  NativeVeCore._(this._bindings, this._cacheCapabilities);
+  final bool _cacheCapabilities;
   final NativeBindings _bindings;
   static const _jsonLimit = 1048576;
 
@@ -116,6 +123,68 @@ class NativeVeCore implements VeCore {
     ),
   );
 
+  // Identity, not installationId/identityKey: lazy details and hardware facts can
+  // change without changing the binary identity. CoreCapabilities is immutable.
+  final _capabilities = Map<CoreCapabilities, String>.identity();
+
+  /// Optional early release; abandoned facades still occupy at most the DLL's
+  /// bounded eight-entry LRU. Existing VeCore callers need no lifecycle changes.
+  void clearCapabilitiesCache() {
+    for (final id in _capabilities.values) {
+      _call('capabilitiesRelease', {'capabilitiesId': id});
+    }
+    _capabilities.clear();
+  }
+
+  String _snapshot(CoreCapabilities capabilities) {
+    final prior = _capabilities.remove(capabilities);
+    if (prior != null) {
+      _capabilities[capabilities] = prior;
+      return prior;
+    }
+    final id =
+        _call('capabilitiesStore', capabilities.data)['capabilitiesId']
+            as String;
+    _capabilities[capabilities] = id;
+    if (_capabilities.length > 4) {
+      final oldest = _capabilities.keys.first;
+      _call('capabilitiesRelease', {
+        'capabilitiesId': _capabilities.remove(oldest),
+      });
+    }
+    return id;
+  }
+
+  JsonMap _withCapabilities(
+    String operation,
+    JsonMap request,
+    CoreCapabilities? capabilities,
+  ) {
+    if (capabilities == null) return _call(operation, request);
+    if (!_cacheCapabilities)
+      return _call(operation, {...request, 'capabilities': capabilities.data});
+    JsonMap invoke() => _call(operation, {
+      ...request,
+      'capabilitiesId': _snapshot(capabilities),
+    });
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return invoke();
+      } on CoreException catch (e) {
+        // The optional cache has a tighter node bound than the legacy transport.
+        // Valid larger maps still use the original inline request semantics.
+        if (e.code == 'CAPABILITIES-LIMIT') {
+          return _call(operation, {
+            ...request,
+            'capabilities': capabilities.data,
+          });
+        }
+        if (e.code != 'CAPABILITIES-STALE' || attempt != 0) rethrow;
+        _capabilities.remove(capabilities);
+      }
+    }
+  }
+
   @override
   CoreVersion get version =>
       CoreVersion.fromJson(_decode(_buffer(null, read: _bindings.version)));
@@ -131,12 +200,10 @@ class NativeVeCore implements VeCore {
     MediaDescription? media,
     CoreCapabilities? capabilities,
   }) => jsonMaps(
-    _call('validate', {
+    _withCapabilities('validate', {
       'recipe': recipe.toJson(),
       'media': media?.toJson(),
-      // Already deeply immutable; serialization does not need a mutable copy.
-      'capabilities': capabilities?.data,
-    })['issues'],
+    }, capabilities)['issues'],
   ).map(Issue.fromJson).toList(growable: false);
   @override
   CompileResult compile(
@@ -145,20 +212,16 @@ class NativeVeCore implements VeCore {
     required CompilePaths paths,
     CoreCapabilities? capabilities,
   }) => CompileResult.fromJson(
-    _call('compile', {
+    _withCapabilities('compile', {
       'recipe': recipe.toJson(),
       'media': media.toJson(),
       'paths': paths.toJson(),
-      'capabilities': capabilities?.data,
-    }),
+    }, capabilities),
   );
   @override
   List<Diagnostic> lint(String text, {CoreCapabilities? capabilities}) =>
       jsonMaps(
-        _call('lint', {
-          'text': text,
-          'capabilities': capabilities?.data,
-        })['diagnostics'],
+        _withCapabilities('lint', {'text': text}, capabilities)['diagnostics'],
       ).map(Diagnostic.fromJson).toList(growable: false);
   @override
   CompletionResult complete(
@@ -166,11 +229,7 @@ class NativeVeCore implements VeCore {
     int caret, {
     CoreCapabilities? capabilities,
   }) => CompletionResult.fromJson(
-    _call('complete', {
-      'text': text,
-      'caret': caret,
-      'capabilities': capabilities?.data,
-    }),
+    _withCapabilities('complete', {'text': text, 'caret': caret}, capabilities),
   );
   @override
   SizeEstimate estimate(
@@ -197,6 +256,19 @@ class NativeVeCore implements VeCore {
   PayloadResult decodePayload(Uint8List bytes) => PayloadResult.fromJson(
     _decode(_buffer(bytes, call: _bindings.calls['decode']!)),
   );
+
+  @override
+  List<MacroDefinition> macros({
+    required MediaDescription media,
+    required CompilePaths paths,
+    Recipe? recipe,
+  }) => jsonMaps(
+    _call('macros', {
+      'media': media.toJson(),
+      'paths': paths.toJson(),
+      if (recipe != null) 'recipe': recipe.toJson(),
+    })['macros'],
+  ).map(MacroDefinition.fromJson).toList(growable: false);
 
   /// C4 pure checks; ve_services/adapter still own file I/O and session lifetime.
   JsonMap validateSessionRequest(JsonMap request) =>

@@ -49,3 +49,15 @@ checks use the existing `C:\ffmpeg\bin\ffmpeg.exe` by default, with FFprobe besi
 and write only ignored build/test-results/. `scripts/Test-B0.ps1` retains model/fake
 and fixture checks. Read [third-party notices](THIRD_PARTY_NOTICES.md) for the pinned
 MIT/BSD source and build dependencies; no project license is selected.
+
+Capability transfer is cached automatically by immutable CoreCapabilities object
+identity (four facade views / eight DLL snapshots). Keep the service's views across
+edits; no new app call sites or dispose requirement. clearCapabilitiesCache() permits
+early release; cacheCapabilities:false supplies the inline diagnostic baseline.
+See CONTRACTS C2 for bounds, stale-ID retry and optional inline fallback.
+
+Advanced tokens now expose stage, isOption, macros and typed UTF-16 source spans;
+owned macro roles stay input/output. An unfinished quote retains prefix display but
+has empty argv/commandLine. summary supplies conservative videoEncoderId/audioEncoderId.
+VeCore.macros(media:..., paths:..., recipe:...) supplies native catalogue/values;
+FakeVeCore takes exact-context macroFixtures rather than expanding in Dart.

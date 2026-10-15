@@ -465,5 +465,50 @@ void main() {
     'default payload fixture',
   );
   check(core.diff(f.recipe, f.recipe).isEmpty, 'identical recipe diff fixture');
+  final macroList = [
+    MacroDefinition(
+      name: '{output}',
+      description: 'fixture output',
+      required: true,
+      value: f.paths.output,
+    ),
+  ];
+  final macroFake = FakeVeCore(
+    macroFixtures: {FakeVeCore.macrosKey(f.media, f.paths): macroList},
+  );
+  macroList.clear();
+  VeCore catalogCore = macroFake;
+  check(
+    catalogCore.macros(media: f.media, paths: f.paths).single.value ==
+        f.paths.output,
+    'additive catalogue interface and copied fixture',
+  );
+  throwsCode(
+    () => macroFake.macros(
+      media: f.media,
+      paths: f.paths.copyWith(output: 'different'),
+    ),
+    'B0-FIXTURE-MISSING',
+  );
+  final token = CommandToken(
+    text: '60',
+    role: TokenRole.macro,
+    stage: 'video',
+    isOption: false,
+    macros: ['{gop:2s}'],
+    sourceStart: 2,
+    sourceEnd: 10,
+  );
+  check(
+    token.copyWith(stage: null).stage == null &&
+        token.macros.single == '{gop:2s}' &&
+        token.sourceEnd == 10,
+    'token metadata round-trip and nullable stage',
+  );
+  check(
+    CommandToken.fromJson({'text': 'old'}).isOption == null &&
+        CommandToken.fromJson({'text': 'old'}).macros.isEmpty,
+    'older tokens keep unknown metadata',
+  );
   print('ve_core: $checks contract checks passed (fixtures only).');
 }

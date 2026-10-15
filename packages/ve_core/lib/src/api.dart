@@ -41,3 +41,32 @@ class CoreException implements Exception {
   @override
   String toString() => 'CoreException($code): $message';
 }
+
+/// Additive optional interface: existing VeCore implementations remain valid.
+abstract interface class VeCoreMacroCatalog {
+  List<MacroDefinition> macros({
+    required MediaDescription media,
+    required CompilePaths paths,
+    Recipe? recipe,
+  });
+}
+
+extension VeCoreMacros on VeCore {
+  List<MacroDefinition> macros({
+    required MediaDescription media,
+    required CompilePaths paths,
+    Recipe? recipe,
+  }) {
+    final core = this;
+    if (core is VeCoreMacroCatalog)
+      return (core as VeCoreMacroCatalog).macros(
+        media: media,
+        paths: paths,
+        recipe: recipe,
+      );
+    throw const CoreException(
+      'MACROS-UNAVAILABLE',
+      'This core does not supply a macro catalogue.',
+    );
+  }
+}

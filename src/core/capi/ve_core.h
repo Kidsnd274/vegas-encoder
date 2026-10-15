@@ -50,9 +50,19 @@ VE_CORE_API uint32_t ve_schema_max(void);
 VE_CORE_API void ve_free(void* allocation);
 VE_CORE_API ve_status ve_core_version(ve_buffer* result);
 VE_CORE_API ve_status ve_profiles(ve_buffer* result);
+/* Optional immutable capability cache. store takes the capability object and
+ * returns {capabilitiesId:string}. Up to 8 snapshots of <=1 MiB / 65536 JSON
+ * nodes are retained per DLL, least-recently-used eviction; IDs never reused.
+ * validate/compile/lint/complete accept capabilitiesId instead of capabilities.
+ * An evicted/released ID returns CAPABILITIES-STALE (never fallback).
+ * release takes {capabilitiesId:string}, is idempotent, and returns {}.
+ * Concurrent calls pin their snapshot only for their synchronous operation. */
+VE_CORE_API ve_status ve_capabilities_store(const uint8_t* json, uint32_t length, ve_buffer* result);
+VE_CORE_API ve_status ve_capabilities_release(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_recipe_normalize(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_recipe_validate(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_compile(const uint8_t* json, uint32_t length, ve_buffer* result);
+VE_CORE_API ve_status ve_macros(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_template_lint(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_template_complete(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_estimate(const uint8_t* json, uint32_t length, ve_buffer* result);
