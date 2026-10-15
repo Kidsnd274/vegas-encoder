@@ -5,6 +5,7 @@ import 'package:ve_services/ve_services.dart';
 import '../../design/components/button.dart';
 import '../../design/icons.dart';
 import '../../design/tokens.dart';
+import '../../state/history.dart';
 import '../../state/services.dart';
 import 'display.dart';
 import 'job_list.dart' show JobStatus;
@@ -18,6 +19,7 @@ class JobDetail extends ConsumerWidget {
     required this.onCopy,
     required this.onCopyCommand,
     required this.onOpenAsPreset,
+    required this.onReveal,
   });
 
   final JobIndexEntry? entry;
@@ -26,6 +28,9 @@ class JobDetail extends ConsumerWidget {
   final void Function(String text, String toast) onCopy;
   final ValueChanged<JobRecord> onCopyCommand;
   final ValueChanged<JobRecord> onOpenAsPreset;
+
+  /// Shows a file in Explorer (Open folder, the log's Show in folder).
+  final ValueChanged<String> onReveal;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,6 +49,7 @@ class JobDetail extends ConsumerWidget {
           onCopy: onCopy,
           onCopyCommand: onCopyCommand,
           onOpenAsPreset: onOpenAsPreset,
+          onReveal: onReveal,
         ),
         AsyncValue(hasError: true, :final error) => _Problem(e, 'This render’s record couldn’t be read: $error'),
         AsyncData() => _Problem(e, 'This render’s record is missing. Only its line in the history index is left.'),
@@ -84,12 +90,14 @@ class _Record extends StatelessWidget {
     required this.onCopy,
     required this.onCopyCommand,
     required this.onOpenAsPreset,
+    required this.onReveal,
   });
 
   final JobRecord record;
   final void Function(String text, String toast) onCopy;
   final ValueChanged<JobRecord> onCopyCommand;
   final ValueChanged<JobRecord> onOpenAsPreset;
+  final ValueChanged<String> onReveal;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +108,9 @@ class _Record extends StatelessWidget {
     final v = r.verification;
     final ffmpeg = r.ffmpeg;
     final p = t.text.small.copyWith(color: c.text2, height: 1.5);
+    // The published file, else an unfinished one the render kept.
+    final shown = r.published ? r.outputPath : r.retainedPartialPath;
+    final marked = markedArguments(r);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,12 +143,16 @@ class _Record extends StatelessWidget {
               tooltip: 'Ctrl+Shift+C',
               onPressed: () => onCopyCommand(r),
             ),
-            const VeButton(
+            VeButton(
               label: 'Open folder',
               icon: VeIcons.folder,
               size: VeButtonSize.small,
-              onPressed: null,
-              tooltip: 'Opening the folder needs the platform’s reveal service; the app doesn’t open Explorer itself.',
+              onPressed: shown == null ? null : () => onReveal(shown),
+              tooltip: shown == null
+                  ? 'This render left no file to show.'
+                  : r.published
+                  ? 'Show the file in Explorer'
+                  : 'Show the unfinished file in Explorer',
             ),
           ],
         ),
@@ -186,6 +201,27 @@ class _Record extends StatelessWidget {
         ]),
         const _Heading('Command'),
         _CommandBlock(r),
+        if (marked != null) ...[
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: VeIcon(VeIcons.error, color: c.error, size: 14),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'FFmpeg’s error points at “$marked”, underlined above.',
+                  style: t.text.caption.copyWith(color: c.text2),
+                ),
+              ),
+            ],
+          ),
+        ],
+        const _Heading('FFmpeg log'),
+        _FullLog(jobId: r.id, onReveal: onReveal),
       ],
     );
   }
@@ -288,7 +324,8 @@ class _PathBox extends StatelessWidget {
   }
 }
 
-/// The command that ran, wrapped, executable first.
+/// The command that ran, wrapped, executable first. Arguments FFmpeg's error
+/// points at (C6 `errorTokenIndices`) are underlined in the error colour.
 class _CommandBlock extends StatelessWidget {
   const _CommandBlock(this.record);
   final JobRecord record;
@@ -298,7 +335,14 @@ class _CommandBlock extends StatelessWidget {
     final t = VeTokens.of(context);
     final c = t.colors;
     final style = t.text.monoSmall.copyWith(color: c.ink2);
-    final args = record.argv.map(quoteArgument).toList();
+    final parts = commandParts(record);
+    final marked = style.copyWith(
+      color: c.errorText,
+      backgroundColor: c.errorBackground,
+      decoration: TextDecoration.underline,
+      decorationStyle: TextDecorationStyle.wavy,
+      decorationColor: c.error,
+    );
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
@@ -312,13 +356,134 @@ class _CommandBlock extends StatelessWidget {
           style: style,
           children: [
             TextSpan(
-              text: quoteArgument(record.ffmpeg.path),
+              text: parts.first.text,
               style: style.copyWith(color: c.ink, fontWeight: const FontWeight(600)),
             ),
-            for (final a in args) TextSpan(text: ' $a'),
+            for (final a in parts.skip(1)) ...[
+              const TextSpan(text: ' '),
+              TextSpan(text: a.text, style: a.error ? marked : null),
+            ],
           ],
         ),
         semanticsLabel: 'Command: ${commandLine(record)}',
+      ),
+    );
+  }
+}
+
+/// FFmpeg's whole log for the render (C6 `logFile`), read only when asked
+/// for: its last lines in a box that opens at the end, how many lines there
+/// are, and Show in folder for the whole file. A render without a log says so.
+class _FullLog extends ConsumerStatefulWidget {
+  _FullLog({required this.jobId, required this.onReveal}) : super(key: ValueKey('log/$jobId'));
+  final String jobId;
+  final ValueChanged<String> onReveal;
+
+  @override
+  ConsumerState<_FullLog> createState() => _FullLogState();
+}
+
+class _FullLogState extends ConsumerState<_FullLog> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = VeTokens.of(context);
+    final c = t.colors;
+    final quiet = t.text.small.copyWith(color: c.muted);
+    final location = ref.watch(jobLogLocationProvider(widget.jobId));
+    if (!location.hasValue) return const SizedBox.shrink();
+    final path = location.value;
+    if (path == null) return Text('FFmpeg left no log for this render.', style: quiet);
+
+    final actions = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        VeButton(
+          label: _open ? 'Hide log' : 'Show log',
+          size: VeButtonSize.small,
+          onPressed: () => setState(() => _open = !_open),
+        ),
+        VeButton(
+          label: 'Show in folder',
+          icon: VeIcons.folder,
+          size: VeButtonSize.small,
+          variant: VeButtonVariant.ghost,
+          tooltip: 'Show the whole log file in Explorer',
+          onPressed: () => widget.onReveal(path),
+        ),
+      ],
+    );
+    if (!_open) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Everything FFmpeg wrote while it rendered.', style: quiet),
+          const SizedBox(height: 8),
+          actions,
+        ],
+      );
+    }
+
+    final log = ref.watch(jobLogProvider(widget.jobId));
+    final Widget body = switch (log) {
+      AsyncValue(value: final v?) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            liveRegion: !v.complete,
+            child: Text(
+              logSummary(totalLines: v.totalLines, shownLines: v.shownLines, complete: v.complete),
+              style: quiet,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _LogBox(v.text),
+        ],
+      ),
+      AsyncValue(hasError: true, :final error) => Text(
+        'The log couldn’t be read: ${error is ServiceException ? error.message : error}',
+        style: t.text.small.copyWith(color: c.error),
+      ),
+      AsyncData() => Text('The log file isn’t there any more.', style: quiet),
+      _ => Text('Reading the log…', style: quiet),
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(alignment: Alignment.centerLeft, child: actions),
+        const SizedBox(height: 10),
+        body,
+      ],
+    );
+  }
+}
+
+/// The log's last lines in mono on paper, at most 320 px tall, opening at the
+/// end (the wheel scrolls back).
+class _LogBox extends StatelessWidget {
+  const _LogBox(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = VeTokens.of(context);
+    final c = t.colors;
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 320),
+      decoration: BoxDecoration(
+        color: c.paper,
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(VeRadius.lg),
+      ),
+      child: SingleChildScrollView(
+        reverse: true,
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        child: SizedBox(
+          width: double.infinity,
+          child: Text(text, style: t.text.monoSmall.copyWith(color: c.ink2)),
+        ),
       ),
     );
   }

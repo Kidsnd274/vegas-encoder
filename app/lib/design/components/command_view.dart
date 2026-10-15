@@ -101,11 +101,46 @@ class _Range {
   final bool chip;
 }
 
+/// One piece of text in the command: a token, the program name, or the
+/// inputs chip.
+class _Piece {
+  const _Piece(this.text, this.style, {this.token, this.role, this.chip = false});
+  final String text;
+  final TextStyle style;
+  final CommandToken? token;
+  final CommandRole? role;
+  final bool chip;
+}
+
+/// Pieces that stay on one visual line: an option and its value
+/// (`-profile:v high`), or a piece on its own. Joined by single spaces.
+class _Unit {
+  _Unit(this.pieces);
+  final List<_Piece> pieces;
+}
+
 class _CommandViewState extends State<CommandView> {
   bool _inputsOpen = false;
   MouseCursor _cursor = SystemMouseCursors.basic;
   TextPainter? _painter;
   double? _laidOutWidth;
+
+  /// Measured widths of pieces, for [_build]'s line breaking. Cleared when the
+  /// text scale or the theme changes.
+  final Map<(String, TextStyle), double> _widths = {};
+  TextScaler? _measuredScaler;
+  VeTokens? _measuredTokens;
+
+  double _width(String text, TextStyle style, TextScaler scaler) => _widths.putIfAbsent((text, style), () {
+    final p = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      textScaler: scaler,
+    )..layout();
+    final w = p.width;
+    p.dispose();
+    return w;
+  });
 
   /// The same layout RichText makes, for backgrounds and hit testing.
   TextPainter _layout(TextSpan span, double width, TextScaler scaler) {
@@ -127,7 +162,6 @@ class _CommandViewState extends State<CommandView> {
   Widget build(BuildContext context) {
     final t = VeTokens.of(context);
     final c = t.colors;
-    final built = _build(t);
     return Semantics(
       label: 'FFmpeg command',
       value: widget.command.copyText,
@@ -145,6 +179,7 @@ class _CommandViewState extends State<CommandView> {
           child: LayoutBuilder(
             builder: (context, box) {
               final scaler = MediaQuery.textScalerOf(context);
+              final built = _build(t, box.maxWidth, scaler);
               final painter = _layout(built.span, box.maxWidth, scaler);
               _Range? hit(Offset p) {
                 final pos = painter.getPositionForOffset(p).offset;
@@ -190,17 +225,17 @@ class _CommandViewState extends State<CommandView> {
     );
   }
 
-  ({TextSpan span, List<_Range> ranges}) _build(VeTokens t) {
+  /// The command as one span for [maxWidth]. Line breaks are chosen here, not
+  /// by the paragraph: a line breaks only between units, so an option stays
+  /// with its value, and a wrapped line starts with a hanging indent
+  /// ([hangingIndent] spaces) so it reads as a continuation, not a new group.
+  ({TextSpan span, List<_Range> ranges}) _build(VeTokens t, double maxWidth, TextScaler scaler) {
     final c = t.colors;
     final mono = t.text.mono.copyWith(color: c.ink);
-    final spans = <TextSpan>[];
-    final ranges = <_Range>[];
-    var offset = 0;
-
-    void add(String text, TextStyle style, {CommandToken? token, CommandRole? role, bool chip = false}) {
-      spans.add(TextSpan(text: text, style: style));
-      if (token != null || chip) ranges.add(_Range(offset, offset + text.length, token: token, role: role, chip: chip));
-      offset += text.length;
+    if (_measuredScaler != scaler || _measuredTokens != t) {
+      _widths.clear();
+      _measuredScaler = scaler;
+      _measuredTokens = t;
     }
 
     Color roleColor(CommandRole r) => switch (r) {
@@ -210,59 +245,123 @@ class _CommandViewState extends State<CommandView> {
       CommandRole.inputs => c.muted,
     };
 
-    void tokens(List<CommandToken> list, CommandRole role) {
-      final start = offset;
-      for (var i = 0; i < list.length; i++) {
-        final tok = list[i];
-        if (i > 0) add(' ', mono);
-        var style = mono;
-        if (tok.isFlag) {
-          style = style.copyWith(color: roleColor(role), fontWeight: const FontWeight(600));
-        }
-        if (tok.extra) style = style.copyWith(color: c.warning);
-        if (tok.error) {
-          style = style.copyWith(
-            decoration: TextDecoration.underline,
-            decorationStyle: TextDecorationStyle.wavy,
-            decorationColor: c.error,
-          );
-        }
-        add(tok.text, style, token: tok, role: role);
+    _Piece piece(CommandToken tok, CommandRole role) {
+      var style = mono;
+      if (tok.isFlag) {
+        style = style.copyWith(color: roleColor(role), fontWeight: const FontWeight(600));
       }
-      ranges.add(_Range(start, offset, role: role));
+      if (tok.extra) style = style.copyWith(color: c.warning);
+      if (tok.error) {
+        style = style.copyWith(
+          decoration: TextDecoration.underline,
+          decorationStyle: TextDecorationStyle.wavy,
+          decorationColor: c.error,
+        );
+      }
+      return _Piece(tok.text, style, token: tok, role: role);
+    }
+
+    // An option and the value after it form one unit.
+    List<_Unit> units(List<CommandToken> list, CommandRole role) {
+      final out = <_Unit>[];
+      for (var i = 0; i < list.length; i++) {
+        final glued = list[i].isFlag && i + 1 < list.length && !list[i + 1].isFlag;
+        out.add(_Unit([piece(list[i], role), if (glued) piece(list[++i], role)]));
+      }
+      return out;
     }
 
     final cmd = widget.command;
-    final lines = [...cmd.lines];
-    final mapLine = lines.isNotEmpty && lines.first.role == CommandRole.inputs ? lines.removeAt(0) : null;
-    final joiner = widget.multiline ? ' ^\n  ' : ' ';
+    final groups = [...cmd.lines];
+    final mapLine = groups.isNotEmpty && groups.first.role == CommandRole.inputs ? groups.removeAt(0) : null;
 
     // Program line: ffmpeg, the inputs chip (or the pipes), the maps.
-    final groupStart = offset;
-    add(cmd.program, mono);
-    add(' ', mono);
-    if (_inputsOpen) {
-      tokens(cmd.inputs, CommandRole.inputs);
-    } else {
-      add(
-        ' ${cmd.inputsLabel} ',
-        t.text.caption.copyWith(color: c.text2, fontWeight: const FontWeight(600), height: 1.7 * 12.5 / 12),
-        chip: true,
-      );
-    }
-    if (mapLine != null && mapLine.tokens.isNotEmpty) {
-      add(' ', mono);
-      tokens(mapLine.tokens, CommandRole.inputs);
-    }
-    ranges.add(_Range(groupStart, offset, role: CommandRole.inputs));
+    final programLine = (
+      role: CommandRole.inputs,
+      units: [
+        _Unit([_Piece(cmd.program, mono)]),
+        if (_inputsOpen)
+          ...units(cmd.inputs, CommandRole.inputs)
+        else
+          _Unit([
+            _Piece(
+              ' ${cmd.inputsLabel} ',
+              t.text.caption.copyWith(color: c.text2, fontWeight: const FontWeight(600), height: 1.7 * 12.5 / 12),
+              chip: true,
+            ),
+          ]),
+        if (mapLine != null) ...units(mapLine.tokens, CommandRole.inputs),
+      ],
+    );
+    final lines = [
+      programLine,
+      for (final g in groups)
+        if (g.tokens.isNotEmpty) (role: g.role, units: units(g.tokens, g.role)),
+    ];
+    // One line: everything flows as one logical line.
+    final logical = widget.multiline
+        ? lines
+        : [
+            (role: CommandRole.inputs, units: [for (final l in lines) ...l.units]),
+          ];
 
-    for (final line in lines) {
-      if (line.tokens.isEmpty) continue;
-      add(joiner, mono);
-      tokens(line.tokens, line.role);
+    final spans = <TextSpan>[];
+    final ranges = <_Range>[];
+    var offset = 0;
+    void add(String text, TextStyle style, {CommandToken? token, CommandRole? role, bool chip = false}) {
+      spans.add(TextSpan(text: text, style: style));
+      if (token != null || chip) ranges.add(_Range(offset, offset + text.length, token: token, role: role, chip: chip));
+      offset += text.length;
+    }
+
+    final space = _width(' ', mono, scaler);
+    double unitWidth(_Unit u) =>
+        u.pieces.fold(0.0, (w, p) => w + _width(p.text, p.style, scaler)) + space * (u.pieces.length - 1);
+    // A little slack, so the paragraph never wraps a line this fitting kept.
+    final room = maxWidth - 2;
+    final hang = ' ' * (widget.multiline ? hangingIndent : hangingIndent - 2);
+
+    for (var li = 0; li < logical.length; li++) {
+      final line = logical[li];
+      final last = li == logical.length - 1;
+      final lead = li == 0 ? '' : '  ';
+      if (li > 0) add(' ^\n$lead', mono);
+      var x = space * lead.length;
+      // The selected node's tint: one range per visual line, so it never
+      // covers the hanging indent.
+      var segment = offset;
+      // In the grouped layout each line but the last ends with " ^".
+      final caret = widget.multiline && !last ? 2 * space : 0.0;
+      for (var ui = 0; ui < line.units.length; ui++) {
+        final unit = line.units[ui];
+        final w = unitWidth(unit);
+        final tail = ui == line.units.length - 1 ? caret : 0.0;
+        if (ui > 0) {
+          if (x + space + w + tail > room) {
+            ranges.add(_Range(segment, offset, role: line.role));
+            add('\n$hang', mono);
+            segment = offset;
+            x = space * hang.length;
+          } else {
+            add(' ', mono);
+            x += space;
+          }
+        }
+        for (var pi = 0; pi < unit.pieces.length; pi++) {
+          final p = unit.pieces[pi];
+          if (pi > 0) add(' ', mono);
+          add(p.text, p.style, token: p.token, role: p.role, chip: p.chip);
+        }
+        x += w;
+      }
+      ranges.add(_Range(segment, offset, role: line.role));
     }
     return (span: TextSpan(children: spans, style: mono), ranges: ranges);
   }
+
+  /// Spaces before a wrapped part of a line in the grouped layout (two in the
+  /// one-line layout), past the two that start each group.
+  static const int hangingIndent = 4;
 }
 
 /// Group tints, lit tokens and the inputs chip, under the text.

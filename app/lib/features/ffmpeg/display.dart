@@ -125,6 +125,70 @@ String probePhaseLabel(String phase) => switch (phase) {
   _ => 'Checking',
 };
 
+/// What the card offers for an installation's health.
+enum HealthAction {
+  /// Scan again: discovery identifies the files again, then a check runs.
+  scanAgain('Scan again'),
+
+  /// Locate…: the Open dialog, to add ffmpeg.exe where it is now.
+  locate('Locate…');
+
+  const HealthAction(this.label);
+  final String label;
+}
+
+/// An installation whose files aren't as they were checked (C3 `health`):
+/// what it means for renders and what to do.
+@immutable
+class InstallationHealth {
+  const InstallationHealth({required this.error, required this.text, required this.action, this.detail});
+
+  /// Renders with it fail (missing); otherwise a warning.
+  final bool error;
+  final String text;
+  final HealthAction action;
+
+  /// Discovery's own words (`healthMessage`), for the tooltip.
+  final String? detail;
+}
+
+/// The card's health note, or null when the files are as checked or their
+/// health isn't known yet (C3 `unchanged`, `unknown`).
+InstallationHealth? installationHealth(FFmpegInstallation i, {required bool isDefault}) {
+  final detail = i.healthMessage.trim().isEmpty ? null : i.healthMessage.trim();
+  return switch (i.health) {
+    'changed' => InstallationHealth(
+      error: false,
+      text: 'This FFmpeg changed since it was checked. Scan again to check it before the next render.',
+      action: HealthAction.scanAgain,
+      detail: detail,
+    ),
+    'missing' => InstallationHealth(
+      error: true,
+      text:
+          '${i.path} isn’t there any more, or can’t be read. '
+          '${isDefault ? 'Renders fail until you locate it or choose another default.' : 'Locate it, or remove it from the list.'}',
+      action: HealthAction.locate,
+      detail: detail,
+    ),
+    'ffprobe-missing' => InstallationHealth(
+      error: false,
+      text:
+          'ffprobe.exe must be next to ffmpeg.exe so renders can be checked. '
+          'Put it in ${_folder(i.path)}, then scan again.',
+      action: HealthAction.scanAgain,
+      detail: detail,
+    ),
+    _ => null,
+  };
+}
+
+/// The folder of a Windows path, as written ("C:\ffmpeg\bin").
+String _folder(String path) {
+  final at = path.lastIndexOf(RegExp(r'[\\/]'));
+  return at <= 0 ? path : path.substring(0, at);
+}
+
 /// One installation card (`.ic`).
 @immutable
 class InstallationCardModel {
@@ -141,6 +205,7 @@ class InstallationCardModel {
     this.failure,
     this.blocked = const [],
     this.blockedNeeds = const [],
+    this.health,
   });
 
   final String id;
@@ -169,6 +234,9 @@ class InstallationCardModel {
 
   /// The encoders those presets need and this FFmpeg can't run ("x264").
   final List<String> blockedNeeds;
+
+  /// Changed on disk, missing, or no ffprobe; null when as checked.
+  final InstallationHealth? health;
 }
 
 InstallationCardModel installationCard(
@@ -224,6 +292,7 @@ InstallationCardModel installationCard(
     failure: state.probeFailures[installation.id],
     blocked: blocked,
     blockedNeeds: needs.toList(),
+    health: installationHealth(installation, isDefault: isDefault),
   );
 }
 

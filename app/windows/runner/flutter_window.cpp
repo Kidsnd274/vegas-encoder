@@ -242,6 +242,22 @@ void FlutterWindow::HandleMethodCall(
     }
     const auto path = ShowOpenFileDialog(GetHandle(), request);
     result->Success(path ? EncodableValue(*path) : EncodableValue());
+  } else if (method == "saveFile") {
+    SaveFileRequest request;
+    for (auto [key, field] :
+         {std::pair{"title", &request.title},
+          std::pair{"fileName", &request.file_name},
+          std::pair{"filterName", &request.filter_name},
+          std::pair{"filterPattern", &request.filter_pattern},
+          std::pair{"defaultExtension", &request.default_extension}}) {
+      if (const auto* value = Find(args, key)) {
+        if (const auto* text = std::get_if<std::string>(value)) {
+          *field = *text;
+        }
+      }
+    }
+    const auto path = ShowSaveFileDialog(GetHandle(), request);
+    result->Success(path ? EncodableValue(*path) : EncodableValue());
   } else if (method == "trace") {
     if (const auto* label = Find(args, "label")) {
       if (const auto* text = std::get_if<std::string>(label)) {

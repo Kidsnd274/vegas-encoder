@@ -12,6 +12,7 @@ import '../../design/components/signal_path/signal_path.dart';
 import '../../design/components/toast.dart';
 import '../../design/icons.dart';
 import '../../design/tokens.dart';
+import '../../state/app_state.dart';
 import '../../state/editor.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
@@ -29,6 +30,7 @@ import 'panels/other_panels.dart';
 import 'panels/panel_kit.dart';
 import 'panels/video_panel.dart';
 import 'preset_header.dart';
+import 'preset_test_dialog.dart';
 import 'save_check.dart';
 
 /// Below this window width the library collapses to a rail (UI_SPEC §1).
@@ -227,6 +229,23 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
           confirmLabel: 'Rename',
         );
         if (name != null && name != entry.name) await _write('rename it', () => _controller.rename(entry.id, name));
+      case LibraryAction.export:
+        await _export(entry);
+      case LibraryAction.copyShareString:
+        await _write('copy its share string', () async {
+          final text = await ref.read(presetTransferProvider).shareString(entry.id);
+          await Clipboard.setData(ClipboardData(text: text));
+          if (mounted) _showToast('Share string copied. Import share string… adds it to a library.');
+        });
+      case LibraryAction.showInFolder:
+        await _write('show it', () async {
+          final path = await ref.read(presetLocationsProvider).location(entry.id);
+          if (path == null) {
+            if (mounted) _showToast('“${entry.name}” has no file of its own: built-in presets are part of the app.');
+            return;
+          }
+          await ref.read(fileRevealProvider).reveal(path);
+        });
       case LibraryAction.delete:
         final ok = await showVeDialog<bool>(
           context,
@@ -244,6 +263,48 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
           });
         }
     }
+  }
+
+  /// Export…: the Save dialog, then the library writes the saved preset
+  /// there (C3 `PresetTransfer.exportTo`). Unsaved changes aren't included.
+  Future<void> _export(LibraryEntry entry) async {
+    final path = await ref
+        .read(windowControllerProvider)
+        .saveFile(
+          title: 'Export “${entry.name}”',
+          fileName: presetFileName(entry.name),
+          filterName: 'Vegas Encoder preset',
+          filterPattern: '*.vepreset',
+          defaultExtension: 'vepreset',
+        );
+    if (path == null || !mounted) return;
+    await _write('export it', () async {
+      await ref.read(presetTransferProvider).exportTo(entry.id, path);
+      if (mounted) _showToast('Exported “${entry.name}” to $path');
+    });
+  }
+
+  /// Import share string… (add menu): pastes a `vepreset:1:` string into a
+  /// new preset in Mine. The field starts with the clipboard when it holds
+  /// one.
+  Future<void> _importShareString() async {
+    final clip = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim() ?? '';
+    if (!mounted) return;
+    final text = await showVeTextDialog(
+      context,
+      title: 'Import share string',
+      label: 'Share string (starts with vepreset:)',
+      initial: clip.startsWith('vepreset:') ? clip : '',
+      confirmLabel: 'Import',
+    );
+    if (text == null || !mounted) return;
+    await _write('import it', () async {
+      final created = await _controller.importShareString(text);
+      if (mounted) {
+        setState(() => _libraryOpen = false);
+        _showToast('Imported “${created.recipe.name}” into Mine');
+      }
+    });
   }
 
   void _copyCommand() {
@@ -380,6 +441,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
           onAction: _libraryAction,
           onFavorite: (e) => unawaited(_toggleFavorite(e)),
           onNewPreset: _newPreset,
+          onImportShareString: () => unawaited(_importShareString()),
           onPicked: narrow ? () => setState(() => _libraryOpen = false) : null,
         );
         return CallbackShortcuts(
@@ -593,6 +655,10 @@ class _Editor extends ConsumerWidget {
           onDuplicate: onDuplicate,
           onRevert: onRevert,
           onSave: onSave,
+          onTest: () => unawaited(
+            showPresetTest(context, name: data.recipe.name, recipe: data.recipe, installation: data.installation!),
+          ),
+          testBlocked: presetTestBlocked(data),
         ),
         if (data.changedElsewhere)
           _Banner(

@@ -71,6 +71,68 @@ String encoderLabel(core.JobRecord r, core.ProfileCatalog catalog) {
 /// The file's size when the render published it, else why there is none.
 String sizeLabel(core.JobRecord r) => r.published ? VeFormat.bytes(r.sizeBytes) : 'No file';
 
+// ------------------------------------------------------------ the list (index)
+//
+// The list reads only the index (C6 `jobs.jsonl`), never a record per row.
+// Its summary fields are optional: an entry written before they existed
+// leaves them null, and an unknown figure stays a dash.
+
+/// The encoders as the engine summarised them ("x264 CRF 18 / AAC 320 kb/s");
+/// null when the index doesn't say.
+String? indexEncoder(core.JobIndexEntry e) {
+  final s = e.encoderSummary?.trim();
+  return s == null || s.isEmpty ? null : s;
+}
+
+/// The project ("Lakeside wedding final.veg"); null when the index doesn't say.
+String? indexProject(core.JobIndexEntry e) {
+  final p = e.project?.trim();
+  return p == null || p.isEmpty ? null : p;
+}
+
+/// The file's size, "No file" when the render published none (C6 records
+/// zero then), or null when the index doesn't say.
+String? indexSize(core.JobIndexEntry e) => switch (e.sizeBytes) {
+  null => null,
+  0 => 'No file',
+  final n => VeFormat.bytes(n),
+};
+
+/// A recorded length in seconds as "12:43"; null stays unknown.
+String? indexDuration(double? seconds) => seconds == null ? null : VeFormat.duration(seconds);
+
+// ------------------------------------------------------------ the detail
+
+/// The command that ran as display parts: the executable, then each argument
+/// quoted as [commandLine] quotes it, marked when FFmpeg named it (C6
+/// `errorTokenIndices`: zero-based indexes into `argv`, the executable not
+/// counted). Indexes outside `argv` are ignored.
+List<({String text, bool error})> commandParts(core.JobRecord r) {
+  final marked = r.errorTokenIndices.toSet();
+  return [
+    (text: quoteArgument(r.ffmpeg.path), error: false),
+    for (var i = 0; i < r.argv.length; i++) (text: quoteArgument(r.argv[i]), error: marked.contains(i)),
+  ];
+}
+
+/// The marked arguments, for the note under the command: "-preset 14".
+String? markedArguments(core.JobRecord r) {
+  final marked = [
+    for (final i in r.errorTokenIndices.toSet().toList()..sort())
+      if (i >= 0 && i < r.argv.length) r.argv[i],
+  ];
+  return marked.isEmpty ? null : marked.join(' ');
+}
+
+/// "1,204 lines." or "The last 1,000 of 12,345 lines." while it reads,
+/// "Reading… 3,200 lines so far."
+String logSummary({required int totalLines, required int shownLines, required bool complete}) {
+  final total = VeFormat.count(totalLines);
+  if (!complete) return 'Reading the log… $total ${totalLines == 1 ? 'line' : 'lines'} so far.';
+  if (shownLines < totalLines) return 'The last ${VeFormat.count(shownLines)} of $total lines.';
+  return '$total ${totalLines == 1 ? 'line' : 'lines'}.';
+}
+
 /// One sentence for how the render went:
 /// "Rendered 12:43 in 24:46, 0.51× realtime, 9.84 GB."
 /// "Failed after 0:03. FFmpeg exited with code 1 before reading any frames."

@@ -5,6 +5,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/features/ffmpeg/capability_table.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
@@ -26,7 +27,11 @@ Future<void> openFFmpeg(WidgetTester tester, {List<Override> overrides = const [
   await tester.pumpAndSettle();
 }
 
+late List<FFmpegInstallation> _unhealthy;
+
 void main() {
+  setUpAll(() async => _unhealthy = await unhealthyInstallations());
+
   Future<void> tapRow(WidgetTester tester, String ffmpegName) async {
     await tester.tap(find.descendant(of: find.byType(CapabilityTable), matching: find.text(ffmpegName)));
     await tester.pumpAndSettle();
@@ -54,6 +59,12 @@ void main() {
         await tester.tap(find.text('Audio encoders'));
         await tester.pumpAndSettle();
       },
+    ),
+    // Installation health: the default changed on disk, 7.1.1 missing, the
+    // LGPL build without ffprobe; each card says what to do.
+    'health': (
+      overrides: [ffmpegDiscoveryProvider.overrideWith((ref) => FakeFFmpegDiscovery(installations: _unhealthy))],
+      act: (tester) async {},
     ),
     // Scan again while a check is still running: progress on the card.
     'probing': (

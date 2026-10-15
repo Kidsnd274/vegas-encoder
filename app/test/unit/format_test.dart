@@ -2,20 +2,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:vegas_encoder/design/format.dart';
 
 void main() {
-  test('bytes use decimal units and three significant figures, like the prototype', () {
-    expect(VeFormat.bytes(0), '0 B');
-    expect(VeFormat.bytes(537000000), '537 MB');
-    expect(VeFormat.bytes(53700000), '53.7 MB');
-    expect(VeFormat.bytes(2930000000), '2.93 GB');
-    expect(VeFormat.bytes(999), '999 B');
-    expect(VeFormat.bytes(1000), '1.00 KB');
+  test('bytes use decimal units and three significant figures, like the prototype, with a no-break space', () {
+    expect(VeFormat.bytes(0), '0\u00A0B');
+    expect(VeFormat.bytes(537000000), '537\u00A0MB');
+    expect(VeFormat.bytes(53700000), '53.7\u00A0MB');
+    expect(VeFormat.bytes(2930000000), '2.93\u00A0GB');
+    expect(VeFormat.bytes(999), '999\u00A0B');
+    expect(VeFormat.bytes(1000), '1.00\u00A0KB');
   });
 
-  test('rates switch to Mb/s at 1000 kb/s', () {
-    expect(VeFormat.rate(320), '320 kb/s');
-    expect(VeFormat.rate(8000), '8 Mb/s');
-    expect(VeFormat.rate(6840), '6.8 Mb/s');
-    expect(VeFormat.rate(30700), '30.7 Mb/s');
+  test('rates switch to Mb/s at 1000 kb/s, with a no-break space before the unit', () {
+    expect(VeFormat.rate(320), '320\u00A0kb/s');
+    expect(VeFormat.rate(8000), '8\u00A0Mb/s');
+    expect(VeFormat.rate(6840), '6.8\u00A0Mb/s');
+    expect(VeFormat.rate(30700), '30.7\u00A0Mb/s');
   });
 
   test('durations are m:ss or h:mm:ss', () {

@@ -20,8 +20,8 @@ void main() {
 
   group('result sentence', () {
     test('a finished render: length, time taken, realtime and size', () {
-      expect(resultSentence(jobs['j-1042']!), 'Rendered 12:43 in 24:46, 0.51× realtime, 9.84 GB.');
-      expect(resultSentence(jobs['j-1040']!), 'Rendered 1:35 in 0:41, 2.30× realtime, 310 MB.');
+      expect(resultSentence(jobs['j-1042']!), 'Rendered 12:43 in 24:46, 0.51× realtime, 9.84\u00A0GB.');
+      expect(resultSentence(jobs['j-1040']!), 'Rendered 1:35 in 0:41, 2.30× realtime, 310\u00A0MB.');
     });
 
     test('failed and cancelled renders give the record’s reason', () {
@@ -37,7 +37,7 @@ void main() {
       final r = jobs['j-1042']!;
       final noLength = r.copyWith(media: MediaDescription.fromJson({...r.media.toJson(), 'durationSec': null}));
       expect(realtimeRatio(noLength), isNull);
-      expect(resultSentence(noLength), 'Rendered in 24:46, 9.84 GB.');
+      expect(resultSentence(noLength), 'Rendered in 24:46, 9.84\u00A0GB.');
     });
   });
 
@@ -53,7 +53,7 @@ void main() {
   });
 
   test('size shows only for a published file', () {
-    expect(sizeLabel(jobs['j-1038']!), '5.02 GB');
+    expect(sizeLabel(jobs['j-1038']!), '5.02\u00A0GB');
     expect(sizeLabel(jobs['j-1039']!), 'No file');
   });
 
@@ -174,4 +174,118 @@ void main() {
       expect(again.recipe.id, isNot(created.recipe.id));
     });
   });
+
+  group('the list reads the index', () {
+    JobIndexEntry entry({String? encoder, String? project, double? duration, int? size}) => JobIndexEntry(
+      id: 'j-1',
+      recordFile: 'j-1.json',
+      startedAt: '2026-10-12T06:00:00Z',
+      status: 'succeeded',
+      templateName: 'T',
+      outputPath: r'D:\Renders\a.mp4',
+      encoderSummary: encoder,
+      project: project,
+      durationSec: duration,
+      sizeBytes: size,
+    );
+
+    test('summaries show as the engine wrote them; absent or blank ones stay unknown', () {
+      expect(indexEncoder(entry(encoder: 'x264 CRF 18 / AAC 320 kb/s')), 'x264 CRF 18 / AAC 320 kb/s');
+      expect(indexEncoder(entry(encoder: '  ')), isNull, reason: 'the engine writes "" before it knows');
+      expect(indexEncoder(entry()), isNull);
+      expect(indexProject(entry(project: 'Lakeside.veg')), 'Lakeside.veg');
+      expect(indexProject(entry(project: '')), isNull);
+      expect(indexDuration(763.2), '12:43');
+      expect(indexDuration(null), isNull);
+    });
+
+    test('size: the published bytes, "No file" for zero, unknown when absent', () {
+      expect(indexSize(entry(size: 9840000000)), '9.84\u00A0GB');
+      expect(indexSize(entry(size: 0)), 'No file');
+      expect(indexSize(entry()), isNull);
+    });
+  });
+
+  group('FFmpeg’s error tokens', () {
+    test('mark argv entries by zero-based index, the executable not counted', () {
+      final r = jobs['j-1039']!;
+      final at = r.argv.indexOf('-preset');
+      final parts = commandParts(r.copyWith(errorTokenIndices: [at, at + 1]));
+      expect(parts.first, (text: quoteArgument(r.ffmpeg.path), error: false));
+      expect(parts.length, r.argv.length + 1);
+      expect(
+        [
+          for (final p in parts)
+            if (p.error) p.text,
+        ],
+        ['-preset', '14'],
+      );
+      expect(markedArguments(r.copyWith(errorTokenIndices: [at + 1, at])), '-preset 14');
+    });
+
+    test('indexes outside argv are ignored; none means no note', () {
+      final r = jobs['j-1039']!;
+      final parts = commandParts(r.copyWith(errorTokenIndices: [-1, r.argv.length, 999]));
+      expect(parts.where((p) => p.error), isEmpty);
+      expect(markedArguments(r.copyWith(errorTokenIndices: [r.argv.length])), isNull);
+      expect(markedArguments(r), isNull);
+    });
+  });
+
+  group('the full log', () {
+    test('summary while reading, whole, and cut to its last lines', () {
+      expect(logSummary(totalLines: 3200, shownLines: 1000, complete: false), 'Reading the log… 3,200 lines so far.');
+      expect(logSummary(totalLines: 13, shownLines: 13, complete: true), '13 lines.');
+      expect(logSummary(totalLines: 1, shownLines: 1, complete: true), '1 line.');
+      expect(logSummary(totalLines: 12345, shownLines: 1000, complete: true), 'The last 1,000 of 12,345 lines.');
+    });
+
+    test('streams in chunks and keeps only the last lines', () async {
+      final text = [for (var i = 1; i <= 2500; i++) 'line $i'].join('\r\n');
+      final logs = _ChunkedLogs({'j-1': text});
+      final container = testContainer(overrides: [jobLogsProvider.overrideWithValue(logs)]);
+      addTearDown(container.dispose);
+      final sub = container.listen(jobLogProvider('j-1'), (_, _) {});
+      addTearDown(sub.close);
+      final view = await container.read(jobLogProvider('j-1').future);
+      // The provider's first value may be a partial read; wait for the end.
+      var last = view;
+      while (last != null && !last.complete) {
+        await Future<void>.delayed(Duration.zero);
+        last = container.read(jobLogProvider('j-1')).value;
+      }
+      expect(last!.totalLines, 2500);
+      expect(last.shownLines, jobLogMaxLines);
+      expect(last.truncated, isTrue);
+      expect(last.text.split('\n').first, 'line 1501');
+      expect(last.text.split('\n').last, 'line 2500');
+      expect(last.text, isNot(contains('\r')));
+    });
+
+    test('a job without a log is null, not an error', () async {
+      final container = testContainer(overrides: [jobLogsProvider.overrideWithValue(FakeJobRepository())]);
+      addTearDown(container.dispose);
+      final sub = container.listen(jobLogProvider('j-1042'), (_, _) {});
+      addTearDown(sub.close);
+      expect(await container.read(jobLogProvider('j-1042').future), isNull);
+      expect(await container.read(jobLogLocationProvider('j-1042').future), isNull);
+    });
+  });
+}
+
+/// A log delivered in 4 KB chunks that split lines, as the file service does.
+class _ChunkedLogs implements JobLogs {
+  _ChunkedLogs(this.logs);
+  final Map<String, String> logs;
+
+  @override
+  Stream<String> readLog(String id) async* {
+    final text = logs[id]!;
+    for (var at = 0; at < text.length; at += 4096) {
+      yield text.substring(at, at + 4096 > text.length ? text.length : at + 4096);
+    }
+  }
+
+  @override
+  Future<String?> logLocation(String id) async => 'logs/$id.ffmpeg.log';
 }

@@ -44,6 +44,11 @@ void main() {
       await tester.tap(find.text('Bitrate'));
       await tester.pumpAndSettle();
     },
+    // Test this preset: the fake test service's passed run, its output.
+    'test': (tester) async {
+      await tester.tap(find.text('Test').first);
+      await tester.pumpAndSettle();
+    },
     // An FFmpeg without x264: red node, library mark, the core's error.
     'lgpl': (tester) async {
       await tester.tap(find.text('FFmpeg 8.1 full (default)'));

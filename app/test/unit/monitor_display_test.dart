@@ -72,9 +72,9 @@ void main() {
       expect(figuresOf(encoding).map((f) => f.toString()), [
         'Encoding: 61.8 fps',
         'Speed: 2.06× realtime',
-        'Bitrate: 30.7 Mb/s',
-        'Size so far: 1.23 GB',
-        'Final size: about 2.93 GB',
+        'Bitrate: 30.7\u00A0Mb/s',
+        'Size so far: 1.23\u00A0GB',
+        'Final size: about 2.93\u00A0GB',
         'Time left: 4:10 of 8:14',
       ]);
     });
@@ -92,7 +92,7 @@ void main() {
         'Encoding: –',
         'Speed: –',
         'Bitrate: –',
-        'Size so far: 0 B',
+        'Size so far: 0\u00A0B',
         'Final size: –',
         'Time left: –',
       ]);
@@ -118,13 +118,16 @@ void main() {
     test('done: History\'s sentence and the output check', () {
       expect(
         endSentence(liveSample(RenderState.done), done),
-        'Rendered 12:43 in 4:07, 3.09× realtime, 2.93 GB. Output checked: h264 and aac, as set.',
+        'Rendered 12:43 in 4:07, 3.09× realtime, 2.93\u00A0GB. Output checked: h264 and aac, as set.',
       );
       final unchecked = JobRecord.fromJson({
         ...done.toJson(),
         'verification': {'state': 'skipped', 'message': '', 'expectedCodecs': [], 'actualCodecs': []},
       });
-      expect(endSentence(liveSample(RenderState.done), unchecked), endsWith('2.93 GB. The output wasn’t checked (Settings).'));
+      expect(
+        endSentence(liveSample(RenderState.done), unchecked),
+        endsWith('2.93\u00A0GB. The output wasn’t checked (Settings).'),
+      );
     });
 
     test('done without its record: what the live file says', () {
@@ -153,10 +156,7 @@ void main() {
     });
 
     test('FFmpeg\'s last lines, without blank ones', () {
-      expect(
-        ffmpegLastLines(failed, lines: 2),
-        '[vost#0:0/libsvtav1] Error while opening encoder\nConversion failed!',
-      );
+      expect(ffmpegLastLines(failed, lines: 2), '[vost#0:0/libsvtav1] Error while opening encoder\nConversion failed!');
       expect(ffmpegLastLines(failed).split('\n'), hasLength(3));
       expect(ffmpegLastLines(null), '');
       expect(ffmpegLastLines(done), '', reason: 'nothing on stderr');

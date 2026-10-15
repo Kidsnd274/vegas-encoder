@@ -13,8 +13,11 @@ import '../../state/presets.dart';
 import '../../state/services.dart';
 import 'library_model.dart';
 
-/// What the library's context menu can do with a preset.
-enum LibraryAction { duplicate, rename, delete }
+/// What the library's context menu can do with a preset (UI_SPEC §2).
+enum LibraryAction { duplicate, rename, export, copyShareString, showInFolder, delete }
+
+/// The library's add menu (+): a new preset, or one someone shared.
+enum LibraryAdd { newPreset, importShareString, importFile }
 
 /// The preset library (UI_SPEC §2, Library): search, Built-in/Mine filter,
 /// favorites, and the grouped list.
@@ -25,6 +28,7 @@ class LibraryPane extends ConsumerWidget {
     required this.onAction,
     required this.onFavorite,
     required this.onNewPreset,
+    required this.onImportShareString,
     this.onPicked,
   });
 
@@ -34,8 +38,11 @@ class LibraryPane extends ConsumerWidget {
   /// The row's star.
   final ValueChanged<LibraryEntry> onFavorite;
 
-  /// "New preset" from an empty search.
+  /// "New preset" from an empty search or the add menu.
   final VoidCallback onNewPreset;
+
+  /// "Import share string…" from the add menu.
+  final VoidCallback onImportShareString;
 
   /// After a preset is chosen, for the narrow layout's library overlay.
   final VoidCallback? onPicked;
@@ -93,7 +100,21 @@ class LibraryPane extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _SearchField(focusNode: searchFocus, query: state.query, onChanged: controller.setQuery),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SearchField(focusNode: searchFocus, query: state.query, onChanged: controller.setQuery),
+                    ),
+                    const SizedBox(width: 6),
+                    _AddMenu(
+                      onPick: (a) => switch (a) {
+                        LibraryAdd.newPreset => onNewPreset(),
+                        LibraryAdd.importShareString => onImportShareString(),
+                        LibraryAdd.importFile => null,
+                      },
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -383,11 +404,66 @@ class _LibraryRow extends StatelessWidget {
               enabled: !e.builtin,
               detail: e.builtin ? 'Built-in presets can’t be changed.' : null,
             ),
+          ]),
+          VeOptionGroup([
+            VeOption(
+              LibraryAction.export,
+              'Export…',
+              detail: e.dirty ? 'The saved version, without unsaved changes.' : 'Save it as a .vepreset file.',
+            ),
+            VeOption(
+              LibraryAction.copyShareString,
+              'Copy share string',
+              detail: e.dirty ? 'The saved version, without unsaved changes.' : 'Text to paste anywhere to share it.',
+            ),
+            VeOption(
+              LibraryAction.showInFolder,
+              'Show in folder',
+              enabled: !e.builtin,
+              detail: e.builtin ? 'Built-in presets are part of the app.' : null,
+            ),
+          ]),
+          VeOptionGroup([
             VeOption(
               LibraryAction.delete,
               'Delete…',
               enabled: !e.builtin,
               detail: e.builtin ? 'Built-in presets can’t be deleted.' : null,
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+/// `+` beside the filters: New preset, Import share string…, and Import
+/// file… (disabled: the library can't read a `.vepreset` the user picks yet;
+/// workstreams/app.md, Needs).
+class _AddMenu extends StatelessWidget {
+  const _AddMenu({required this.onPick});
+  final ValueChanged<LibraryAdd> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return VePopover(
+      width: 260,
+      anchorBuilder: (context, open, toggle) =>
+          VeIconButton(icon: VeIcons.plus, label: 'Add a preset', selected: open, bordered: true, onPressed: toggle),
+      contentBuilder: (context, close) => VeListbox<LibraryAdd>(
+        semanticLabel: 'Add a preset',
+        selected: null,
+        onClose: close,
+        onPick: onPick,
+        groups: const [
+          VeOptionGroup([
+            VeOption(LibraryAdd.newPreset, 'New preset', detail: 'Start one in Mine from the first built-in.'),
+            VeOption(LibraryAdd.importShareString, 'Import share string…', detail: 'Paste a preset someone shared.'),
+            VeOption(
+              LibraryAdd.importFile,
+              'Import file…',
+              enabled: false,
+              detail: 'Not available yet: the library can’t read a .vepreset file you choose.',
             ),
           ]),
         ],
