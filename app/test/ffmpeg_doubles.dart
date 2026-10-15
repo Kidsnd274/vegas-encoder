@@ -53,3 +53,18 @@ class StalledHardwareTests implements HardwareTests {
   @override
   Future<void> cancel(String installationId) async => cancelled.add(installationId);
 }
+
+/// The fixture installations with discovery's health facts (C3 `health`): the
+/// default changed on disk, 7.1.1 missing, the LGPL build without ffprobe.
+Future<List<FFmpegInstallation>> unhealthyInstallations() async => [
+  for (final i in await FakeFFmpegDiscovery().list())
+    switch (i.label) {
+      'FFmpeg 8.1 full' => i.copyWith(
+        health: 'changed',
+        healthMessage: 'FFmpeg files changed since they were checked.',
+      ),
+      'FFmpeg 7.1.1' => i.copyWith(health: 'missing', healthMessage: 'FFmpeg executable or libraries are missing.'),
+      'FFmpeg 8.0 LGPL' => i.copyWith(health: 'ffprobe-missing', healthMessage: 'FFprobe is missing beside FFmpeg.'),
+      _ => i,
+    },
+];

@@ -71,6 +71,34 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
     }, failure: 'Couldn’t add $path');
   }
 
+  /// Locate… on a missing installation: the Open dialog, then discovery adds
+  /// ffmpeg.exe where it is now (the same folder again updates the same
+  /// installation). A missing default hands its role to the one found, so
+  /// renders have an FFmpeg again; the missing one stays listed until removed.
+  Future<void> _locate(FFmpegInstallation missing) async {
+    final path = await ref
+        .read(windowControllerProvider)
+        .pickFile(title: 'Locate ffmpeg.exe', filterName: 'FFmpeg', filterPattern: 'ffmpeg.exe');
+    if (path == null || !mounted) return;
+    final wasDefault = ref.read(machineSettingsProvider).value?.defaultFFmpegId == missing.id;
+    FFmpegInstallation? added;
+    await _guard(() async {
+      added = await _controller.add(path);
+      if (mounted) showToast('Added ${added!.label}');
+    }, failure: 'Couldn’t add $path');
+    final found = added;
+    if (found == null || !wasDefault || found.id == missing.id || !mounted) return;
+    await _guard(() async {
+      await _controller.setDefault(found);
+      if (mounted) showToast('Added ${found.label}. It is now the default.');
+    }, failure: 'Added ${found.label}, but couldn’t make it the default');
+  }
+
+  void _healthAction(FFmpegInstallation installation, HealthAction action) => switch (action) {
+    HealthAction.scanAgain => unawaited(_scan()),
+    HealthAction.locate => unawaited(_locate(installation)),
+  };
+
   Future<void> _scan() => _guard(() async {
     final found = await _controller.scan();
     if (mounted) {
@@ -199,6 +227,7 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
                       onSetDefault: () => _setDefault(i),
                       onCopyPath: () => _copyPath(i),
                       onRemove: () => _remove(i),
+                      onHealthAction: (a) => _healthAction(i, a),
                     ),
                 ],
               ),

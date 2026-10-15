@@ -348,4 +348,60 @@ void main() {
       expect(tests.cancelled, ['gyan-8.1']);
     });
   });
+
+  group('installation health (C3 health)', () {
+    test('changed, missing and no ffprobe each say what to do; the service’s words go in the detail', () {
+      final full = inst('gyan-8.1');
+      final changed = installationHealth(
+        full.copyWith(health: 'changed', healthMessage: 'FFmpeg files changed since they were checked.'),
+        isDefault: true,
+      )!;
+      expect(changed.error, isFalse);
+      expect(changed.action, HealthAction.scanAgain);
+      expect(changed.text, startsWith('This FFmpeg changed since it was checked.'));
+      expect(changed.detail, 'FFmpeg files changed since they were checked.');
+
+      final missing = installationHealth(full.copyWith(health: 'missing'), isDefault: false)!;
+      expect(missing.error, isTrue);
+      expect(missing.action, HealthAction.locate);
+      expect(
+        missing.text,
+        '${full.path} isn’t there any more, or can’t be read. Locate it, or remove it from the list.',
+      );
+      expect(missing.detail, isNull, reason: 'no healthMessage');
+      expect(
+        installationHealth(full.copyWith(health: 'missing'), isDefault: true)!.text,
+        endsWith('Renders fail until you locate it or choose another default.'),
+      );
+
+      final probe = installationHealth(
+        full.copyWith(health: 'ffprobe-missing', path: r'C:\ffmpeg\bin\ffmpeg.exe'),
+        isDefault: false,
+      )!;
+      expect(probe.error, isFalse);
+      expect(probe.action, HealthAction.scanAgain);
+      expect(
+        probe.text,
+        r'ffprobe.exe must be next to ffmpeg.exe so renders can be checked. Put it in C:\ffmpeg\bin, then scan again.',
+      );
+    });
+
+    test('unchanged, unknown and unfamiliar values show nothing', () {
+      final full = inst('gyan-8.1');
+      for (final h in ['unchanged', 'unknown', 'something-new']) {
+        expect(installationHealth(full.copyWith(health: h), isDefault: true), isNull, reason: h);
+      }
+    });
+
+    test('the card carries it', () {
+      final model = installationCard(
+        inst('manual-7.1').copyWith(health: 'missing'),
+        isDefault: false,
+        state: const FFmpegState(),
+        presets: presets,
+        catalog: catalog,
+      );
+      expect(model.health?.action, HealthAction.locate);
+    });
+  });
 }

@@ -28,6 +28,15 @@ const presetCategories = <String, String>{
 
 String categoryLabel(String id) => presetCategories[id] ?? 'Other';
 
+/// The Save dialog's suggested name for an exported preset: the preset's
+/// name with the characters Windows doesn't allow in a file name replaced,
+/// plus `.vepreset` ("YouTube upload, H.264.vepreset").
+String presetFileName(String name) {
+  var base = name.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '-').trim();
+  base = base.replaceAll(RegExp(r'[. ]+$'), '');
+  return '${base.isEmpty ? 'Preset' : base}.vepreset';
+}
+
 /// Display labels for what VEGAS delivers. The adapter sends P010 frames and
 /// 32-bit float samples (ARCHITECTURE); other values show as FFmpeg names.
 const _deliveredVideo = <String, ({String label, String short, int depth})>{

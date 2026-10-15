@@ -2,9 +2,13 @@
 /// (`docs/product/design/shared/model.js`). Formatting only: every number comes
 /// from the core or the services.
 abstract final class VeFormat {
-  /// Decimal units: "537 MB", "53.7 MB", "2.93 GB".
+  /// A no-break space between a figure and its unit, so a line never
+  /// wraps between them ("859 / MB").
+  static const String unitSpace = '\u00A0';
+
+  /// Decimal units: "537 MB", "53.7 MB", "2.93 GB", with a [unitSpace].
   static String bytes(num value) {
-    if (value <= 0) return '0 B';
+    if (value <= 0) return '0${unitSpace}B';
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     var b = value.toDouble();
     var i = 0;
@@ -13,14 +17,15 @@ abstract final class VeFormat {
       i++;
     }
     final digits = b >= 100 ? 0 : (b >= 10 ? 1 : 2);
-    return '${b.toStringAsFixed(digits)} ${units[i]}';
+    return '${b.toStringAsFixed(digits)}$unitSpace${units[i]}';
   }
 
-  /// "320 kb/s", "8 Mb/s", "6.8 Mb/s" from kilobits per second.
+  /// "320 kb/s", "8 Mb/s", "6.8 Mb/s" from kilobits per second, with a
+  /// [unitSpace].
   static String rate(num kbps) {
     final k = kbps.round();
-    if (k >= 1000) return '${(k / 1000).toStringAsFixed(k % 1000 == 0 ? 0 : 1)} Mb/s';
-    return '$k kb/s';
+    if (k >= 1000) return '${(k / 1000).toStringAsFixed(k % 1000 == 0 ? 0 : 1)}${unitSpace}Mb/s';
+    return '$k${unitSpace}kb/s';
   }
 
   /// "10:00", "1:02:03" from seconds.

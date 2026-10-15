@@ -1,16 +1,13 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
 
 import '../../design/components/button.dart';
 import '../../design/components/interactive.dart';
 import '../../design/components/segmented.dart';
-import '../../design/format.dart';
 import '../../design/icons.dart';
 import '../../design/tokens.dart';
 import '../../state/history.dart';
-import '../../state/services.dart';
 import 'display.dart';
 
 /// Status as an icon and a word, coloured; never colour alone.
@@ -53,23 +50,25 @@ class JobStatus extends StatelessWidget {
   }
 }
 
-/// The list's columns. Below [compactWidth] the length and time-taken columns
-/// give way to the template; the detail still has both.
+/// The list's columns, all from the index (C6 `jobs.jsonl`). Below
+/// [compactWidth] the length and time-taken columns give way; the detail
+/// still has both. Speed (× realtime) shows in the detail only: the index
+/// has no realtime figure (workstreams/app.md, Needs).
 enum JobColumn {
   status('Status', 104),
   started('Started', 104),
-  template('Template and project', null),
-  encoder('Encoder', 104),
+  template('Template and project', null, flex: 5),
+  encoder('Encoder', null, flex: 4),
   length('Length', 60, end: true),
   took('Took', 60, end: true),
-  speed('Speed', 60, end: true),
   size('Size', 76, end: true);
 
-  const JobColumn(this.label, this.width, {this.end = false});
+  const JobColumn(this.label, this.width, {this.end = false, this.flex = 1});
   final String label;
 
-  /// Null shares the remaining width.
+  /// Null shares the remaining width, by [flex].
   final double? width;
+  final int flex;
 
   /// Figures align at the end.
   final bool end;
@@ -87,6 +86,7 @@ Widget _cells(List<JobColumn> cols, Widget Function(JobColumn c) cell) => Row(
     for (final c in cols)
       if (c.width == null)
         Expanded(
+          flex: c.flex,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: _cellPad),
             child: cell(c),
@@ -211,9 +211,9 @@ class JobList extends StatelessWidget {
   }
 }
 
-/// One render (`.ctab tr.r`): the index line, filled in from its record as
-/// that loads.
-class JobRow extends ConsumerWidget {
+/// One render (`.ctab tr.r`): its line in the index. The row reads no record;
+/// only the selected render's detail does.
+class JobRow extends StatelessWidget {
   const JobRow({
     super.key,
     required this.entry,
@@ -232,35 +232,28 @@ class JobRow extends ConsumerWidget {
   final ValueChanged<int> onMove;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final t = VeTokens.of(context);
     final c = t.colors;
-    final record = ref.watch(jobRecordProvider(entry.id));
-    final r = record.value;
-    final outcome = JobOutcome.of(entry.status);
+    final e = entry;
+    final outcome = JobOutcome.of(e.status);
     final figure = t.text.small.copyWith(color: c.ink);
     final quiet = t.text.small.copyWith(color: c.muted);
 
-    Widget text(String? value, {TextStyle? style}) => Text(
-      value ?? '–',
-      maxLines: 1,
-      softWrap: false,
-      overflow: TextOverflow.ellipsis,
-      style: value == null ? quiet : (style ?? figure),
-    );
+    Widget text(String? value, {TextStyle? style, String? tooltip}) {
+      final label = Text(
+        value ?? '–',
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.ellipsis,
+        style: value == null ? quiet : (style ?? figure),
+      );
+      return tooltip == null ? label : VeTooltip(message: tooltip, child: label);
+    }
 
-    final ratio = r == null ? null : realtimeRatio(r);
-    final length = r?.media.durationSec;
-    // A failed read stays an error while Riverpod retries it (a loading value
-    // that still carries the error), so ask hasError rather than the type.
-    final second = r != null
-        ? r.project
-        : record.hasError
-        ? 'The record couldn’t be read'
-        : record.hasValue
-        ? 'The record is missing'
-        : '';
-    final recordProblem = r == null && (record.hasError || record.hasValue);
+    final project = indexProject(e);
+    final encoder = indexEncoder(e);
+    final size = indexSize(e);
 
     Widget cell(JobColumn col) => switch (col) {
       JobColumn.status => JobStatus(outcome),
@@ -276,29 +269,23 @@ class JobRow extends ConsumerWidget {
             style: t.text.bodyStrong.copyWith(height: 18 / 13),
           ),
           Text(
-            second,
+            project ?? '',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: t.text.caption.copyWith(color: recordProblem ? c.error : c.muted),
+            style: t.text.caption.copyWith(color: c.muted),
           ),
         ],
       ),
-      JobColumn.encoder => text(r == null ? null : encoderLabel(r, ref.watch(profilesProvider))),
-      JobColumn.length => text(length == null ? null : VeFormat.duration(length)),
-      JobColumn.took => text(r == null ? null : VeFormat.duration(r.elapsedSec)),
-      JobColumn.speed => text(ratio == null ? null : ratioLabel(ratio)),
-      JobColumn.size => text(r == null ? null : sizeLabel(r), style: r != null && !r.published ? quiet : null),
+      JobColumn.encoder => text(encoder, tooltip: encoder),
+      JobColumn.length => text(indexDuration(e.durationSec)),
+      JobColumn.took => text(indexDuration(e.elapsedSec)),
+      JobColumn.size => text(size, style: e.sizeBytes == 0 ? quiet : null),
     };
 
     return Semantics(
       button: true,
       selected: selected,
-      label: [
-        outcome.label,
-        entry.templateName,
-        if (second.isNotEmpty) second,
-        jobTime(entry.startedAt, year: true),
-      ].join(', '),
+      label: [outcome.label, e.templateName, ?project, ?encoder, jobTime(e.startedAt, year: true)].join(', '),
       child: VeInteractive(
         focusNode: focusNode,
         onTap: onSelect,

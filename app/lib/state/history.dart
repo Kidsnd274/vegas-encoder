@@ -43,6 +43,83 @@ class HistoryController extends Notifier<HistoryState> {
   void select(String id) => state = state.copyWith(selectedId: id);
 }
 
+/// The part of a job's FFmpeg log the detail shows: its last lines, so a
+/// long log (C6 allows megabytes) stays quick to lay out. The whole file is
+/// a click away (Show in folder).
+@immutable
+class JobLogView {
+  const JobLogView({required this.text, required this.totalLines, required this.shownLines, required this.complete});
+
+  /// The last [shownLines] lines.
+  final String text;
+
+  /// Lines read so far (all of them once [complete]).
+  final int totalLines;
+  final int shownLines;
+
+  /// The whole log has been read.
+  final bool complete;
+
+  bool get truncated => shownLines < totalLines;
+}
+
+/// How much of a log [jobLogProvider] keeps: the last lines, at most this
+/// many characters of them.
+const int jobLogMaxLines = 1000;
+const int jobLogMaxChars = 200000;
+
+/// A job's full FFmpeg log (C6 `logFile`, C3 `JobLogs.readLog`), read as it
+/// streams in and kept to its last [jobLogMaxLines] lines. Null when the job
+/// has no log (FFmpeg never started, or the file was removed: `NOT-FOUND`).
+/// Read only when the detail asks for it; a failure isn't retried.
+final jobLogProvider = StreamProvider.autoDispose.family<JobLogView?, String>((ref, id) async* {
+  final tail = <String>[];
+  var total = 0;
+  var pending = '';
+  JobLogView view({required bool complete}) {
+    var lines = [...tail, if (pending.isNotEmpty) pending];
+    if (lines.length > jobLogMaxLines) lines = lines.sublist(lines.length - jobLogMaxLines);
+    // Whole lines only: drop from the front until the rest fits.
+    var length = lines.fold(0, (n, l) => n + l.length + 1);
+    var from = 0;
+    while (length > jobLogMaxChars && from < lines.length - 1) {
+      length -= lines[from++].length + 1;
+    }
+    lines = lines.sublist(from);
+    final text = lines.join('\n');
+    final shown = lines.length;
+    final all = total + (pending.isNotEmpty ? 1 : 0);
+    return JobLogView(text: text, totalLines: all, shownLines: shown, complete: complete);
+  }
+
+  try {
+    await for (final chunk in ref.watch(jobLogsProvider).readLog(id)) {
+      final parts = (pending + chunk.replaceAll('\r\n', '\n')).split('\n');
+      pending = parts.removeLast();
+      tail.addAll(parts);
+      total += parts.length;
+      if (tail.length > jobLogMaxLines) tail.removeRange(0, tail.length - jobLogMaxLines);
+      yield view(complete: false);
+    }
+  } on ServiceException catch (e) {
+    if (e.code == 'NOT-FOUND') {
+      yield null;
+      return;
+    }
+    rethrow;
+  }
+  yield view(complete: true);
+}, retry: (_, _) => null);
+
+/// Where a job's FFmpeg log file is, for Show in folder; null when it has none.
+final jobLogLocationProvider = FutureProvider.autoDispose.family<String?, String>((ref, id) async {
+  try {
+    return await ref.watch(jobLogsProvider).logLocation(id);
+  } on ServiceException {
+    return null;
+  }
+}, retry: (_, _) => null);
+
 /// What the list shows: the jobs the filter keeps, newest first as the index
 /// gives them, and the job whose detail shows (the picked one while the
 /// filter keeps it, else the first). Null while the index is being read.

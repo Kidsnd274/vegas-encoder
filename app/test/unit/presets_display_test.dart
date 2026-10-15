@@ -100,7 +100,7 @@ void main() {
       final m = signalPathModel(recipe: edited, catalog: catalog, media: f.media);
       expect(m.video!.detail, 'CRF 17, slow');
       expect(m.video!.conversion, isNull, reason: 'conversions come only from the core');
-      expect(m.audio!.detail, '320 kb/s');
+      expect(m.audio!.detail, '320\u00A0kb/s');
     });
 
     test('an encoder missing from the chosen FFmpeg turns its node red', () {

@@ -1083,7 +1083,10 @@ class _FrontPainter extends CustomPainter {
       final boxes = glyphRects(g.editable, chip.start, chip.end);
       if (boxes.isEmpty) continue;
       final r = MatrixUtils.transformRect(g.transform, boxes.last);
-      _lockBadge(canvas, Offset(r.right, r.top), c);
+      // At the chip's top-right corner, but kept inside its own line box so
+      // it doesn't cover the line above (a wrapped `{inputs}`).
+      final lineTop = r.center.dy - args.lineHeight / 2;
+      _lockBadge(canvas, Offset(r.right, math.max(r.top, lineTop + _badgeRadius)), c);
     }
 
     final lines = _lines(text);
@@ -1115,9 +1118,11 @@ class _FrontPainter extends CustomPainter {
     });
   }
 
+  static const double _badgeRadius = 6;
+
   /// The mockup's `.t-lock::after`: a 12 px dark disc with a white padlock.
   static void _lockBadge(Canvas canvas, Offset center, VePalette c) {
-    canvas.drawCircle(center, 6, Paint()..color = c.lockBackground);
+    canvas.drawCircle(center, _badgeRadius, Paint()..color = c.lockBackground);
     final o = center - const Offset(6, 6);
     canvas.drawRRect(
       RRect.fromRectAndRadius(Rect.fromLTWH(o.dx + 3, o.dy + 5.5, 6, 4.5), const Radius.circular(1)),

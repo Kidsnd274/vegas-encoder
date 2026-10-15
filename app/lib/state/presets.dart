@@ -297,6 +297,23 @@ class PresetsController extends Notifier<PresetsState> implements RecipeEditor {
     return created;
   }
 
+  /// Adds the preset in a share string (`vepreset:1:…`, C3
+  /// `PresetTransfer.importShareString`) to Mine and selects it, with the
+  /// library's search and filters cleared so it shows. The library decodes,
+  /// bounds and checks it; its refusal (`SHARE-VERSION`, `SHARE-INVALID`,
+  /// `RECIPE-INVALID`…) reaches the caller. The name stays as shared; the ID is
+  /// new ("imported-preset", "imported-preset-2"…), since the name is only
+  /// known once the library has read it.
+  Future<Preset> importShareString(String text) async {
+    final created = await ref
+        .read(presetTransferProvider)
+        .importShareString(text.trim(), newId: uniqueId('imported preset', _presets.map((p) => p.recipe.id).toSet()));
+    await _refresh();
+    if (!ref.mounted) return created;
+    state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
+    return created;
+  }
+
   /// Saves [recipe] as a new preset in Mine copied from [source], with the
   /// origin C3 defines for a copy: `builtin/<id>`, or `preset/<id>@<revision>`
   /// (the revision the edit started from).

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/app/app.dart';
+import 'package:vegas_encoder/design/components/button.dart' show VeTooltip;
 import 'package:vegas_encoder/features/ffmpeg/capability_table.dart';
 import 'package:vegas_encoder/features/ffmpeg/encoder_detail.dart';
 import 'package:vegas_encoder/features/ffmpeg/installation_card.dart';
@@ -33,6 +34,7 @@ void main() {
     List<Override> overrides = const [],
     Size? view,
     FakeFFmpegDiscovery? withDiscovery,
+    FakeMachineSettingsRepository? withMachine,
   }) async {
     final manual = await tester.runAsync(() => fixture('manual-7.1'));
     final extra = FFmpegInstallation.fromJson({
@@ -43,7 +45,7 @@ void main() {
       'identity': {...manual.identity.toJson(), 'key': 'b0-fixture-manual-8.1'},
     });
     window = FakeWindowController();
-    machine = FakeMachineSettingsRepository();
+    machine = withMachine ?? FakeMachineSettingsRepository();
     discovery = withDiscovery ?? FakeFFmpegDiscovery(additions: {addedPath: extra});
     await pumpApp(
       tester,
@@ -263,5 +265,110 @@ void main() {
     expect(find.text('FFmpeg name'), findsNothing);
     expect(find.text('Reason'), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  group('installation health', () {
+    testWidgets('each card says what changed and offers the fix; healthy cards say nothing', (tester) async {
+      await open(tester, withDiscovery: FakeFFmpegDiscovery(installations: await unhealthyInstallations()));
+      expect(
+        inCard(
+          'FFmpeg 8.1 full',
+          'This FFmpeg changed since it was checked. Scan again to check it before the next render.',
+        ),
+        findsOneWidget,
+      );
+      expect(inCard('FFmpeg 8.1 full', 'Scan again'), findsOneWidget);
+      final seven = (await tester.runAsync(() => fixture('manual-7.1')))!;
+      expect(
+        inCard(
+          'FFmpeg 7.1.1',
+          '${seven.path} isn’t there any more, or can’t be read. Locate it, or remove it from the list.',
+        ),
+        findsOneWidget,
+      );
+      expect(inCard('FFmpeg 7.1.1', 'Locate…'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: card('FFmpeg 8.0 LGPL'),
+          matching: find.textContaining('ffprobe.exe must be next to ffmpeg.exe'),
+        ),
+        findsOneWidget,
+      );
+      // The service's own words are in the tooltip.
+      expect(
+        find.byWidgetPredicate((w) => w is VeTooltip && w.message.endsWith('FFprobe is missing beside FFmpeg.')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the fixtures as shipped (health unknown) show no note', (tester) async {
+      await open(tester);
+      expect(find.textContaining('changed since it was checked'), findsNothing);
+      expect(find.text('Locate…'), findsNothing);
+    });
+
+    testWidgets('Scan again on a changed card scans', (tester) async {
+      await open(tester, withDiscovery: FakeFFmpegDiscovery(installations: await unhealthyInstallations()));
+      await tester.tap(inCard('FFmpeg 8.1 full', 'Scan again'));
+      await tester.pumpAndSettle();
+      expect(find.text('Scanned again. Found 3 installations.'), findsOneWidget);
+    });
+
+    testWidgets('Locate… on a missing installation adds the file chosen', (tester) async {
+      final unhealthy = await unhealthyInstallations();
+      final seven = unhealthy.singleWhere((i) => i.label == 'FFmpeg 7.1.1');
+      final moved = seven.copyWith(id: 'manual-7.1-moved', path: addedPath, health: 'unknown', healthMessage: '');
+      await open(
+        tester,
+        withDiscovery: FakeFFmpegDiscovery(installations: unhealthy, additions: {addedPath: moved}),
+      );
+      window.pickedFile = addedPath;
+      await tester.tap(inCard('FFmpeg 7.1.1', 'Locate…'));
+      await tester.pumpAndSettle();
+      expect(window.calls, contains('pickFile(ffmpeg.exe)'));
+      expect(find.byType(InstallationCard), findsNWidgets(4));
+      expect(find.text('Added FFmpeg 7.1.1'), findsOneWidget);
+      final saved = await tester.runAsync(machine.read);
+      expect(saved!.defaultFFmpegId, 'gyan-8.1', reason: 'it wasn’t the default, so the default stays');
+    });
+
+    testWidgets('Locate… on a missing default makes the file found the default', (tester) async {
+      final unhealthy = [
+        for (final i in await unhealthyInstallations())
+          i.label == 'FFmpeg 8.1 full'
+              ? i.copyWith(health: 'missing', healthMessage: 'FFmpeg files are inaccessible.')
+              : i,
+      ];
+      final gone = unhealthy.singleWhere((i) => i.label == 'FFmpeg 8.1 full');
+      final found = gone.copyWith(
+        id: 'gyan-8.1-moved',
+        label: 'FFmpeg 8.1 full (moved)',
+        path: addedPath,
+        health: 'unknown',
+      );
+      final settings = await FakeMachineSettingsRepository().read();
+      await open(
+        tester,
+        withDiscovery: FakeFFmpegDiscovery(installations: unhealthy, additions: {addedPath: found}),
+        // Discovery records what it adds in C7 itself; the fake doesn't, so
+        // the settings already know the moved copy.
+        withMachine: FakeMachineSettingsRepository(
+          settings: settings.copyWith(installations: [...settings.installations, found]),
+        ),
+      );
+      expect(
+        inCard(
+          'FFmpeg 8.1 full',
+          '${gone.path} isn’t there any more, or can’t be read. Renders fail until you locate it or choose another default.',
+        ),
+        findsOneWidget,
+      );
+      window.pickedFile = addedPath;
+      await tester.tap(inCard('FFmpeg 8.1 full', 'Locate…'));
+      await tester.pumpAndSettle();
+      expect(find.text('Added FFmpeg 8.1 full (moved). It is now the default.'), findsOneWidget);
+      expect((await tester.runAsync(machine.read))!.defaultFFmpegId, 'gyan-8.1-moved');
+      expect(inCard('FFmpeg 8.1 full (moved)', 'Default'), findsOneWidget);
+    });
   });
 }

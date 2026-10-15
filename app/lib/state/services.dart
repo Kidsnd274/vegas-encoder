@@ -82,6 +82,9 @@ abstract interface class AppServices {
   FFmpegProbe get probe;
   HardwareTests get hardwareTests;
   CapabilityCache get capabilityCache;
+
+  /// "Test this preset": a short synthetic encode with an installation.
+  PresetTests get presetTests;
   JobRepository get jobs;
 
   /// A job's full FFmpeg log (C6 `logFile`).
@@ -115,6 +118,7 @@ final class WindowsAppServices implements AppServices {
   ServicePaths get paths => _paths;
   @override
   PresetLibrary get library => _windows.library;
+
   /// The settings file on its own, without the core, so the progress window
   /// can read keep on top (C7). Discovery writes through the copy inside
   /// [WindowsServices]; both use the same file, lock and revision check.
@@ -128,6 +132,8 @@ final class WindowsAppServices implements AppServices {
   HardwareTests get hardwareTests => _windows.hardwareTests;
   @override
   CapabilityCache get capabilityCache => _windows.capabilityCache;
+  @override
+  PresetTests get presetTests => _windows.presetTests;
   @override
   JobRepository get jobs => _windows.jobs;
   @override
@@ -176,8 +182,17 @@ final presetPreferencesProvider = Provider<PresetPreferences>(
   (ref) => ref.watch(presetLibraryProvider) as PresetPreferences,
 );
 
-/// Duplicates and History copies with their C3 origins.
+/// Duplicates and History copies with their C3 origins; export, share
+/// strings and import.
 final presetTransferProvider = Provider<PresetTransfer>((ref) => PresetTransfer(ref.watch(presetLibraryProvider)));
+
+/// Where a preset's file is, for Show in folder (C3 `PresetLocations`; null
+/// for a built-in). The library implements it, real and fake alike.
+final presetLocationsProvider = Provider<PresetLocations>((ref) => ref.watch(presetLibraryProvider) as PresetLocations);
+
+/// "Test this preset" (UI_SPEC §2): FFmpeg encodes synthetic frames with the
+/// preset, then the output is checked as a render's is.
+final presetTestsProvider = Provider<PresetTests>((ref) => ref.watch(servicesProvider).presetTests);
 
 /// The machine settings store (C7).
 final machineSettingsRepositoryProvider = Provider<MachineSettingsRepository>(

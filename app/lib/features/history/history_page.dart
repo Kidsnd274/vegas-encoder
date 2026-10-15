@@ -64,6 +64,16 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with VeToastHost {
     ref.read(desktopSectionProvider.notifier).go(DesktopSection.presets);
   }
 
+  /// Open folder and the log's Show in folder: Explorer with the file
+  /// selected. A file moved or removed since says so.
+  Future<void> _reveal(String path) async {
+    try {
+      await ref.read(fileRevealProvider).reveal(path);
+    } on ServiceException catch (e) {
+      if (mounted) showToast('Couldn’t show $path: ${e.message}');
+    }
+  }
+
   /// Up and Down in the list move the selection and keyboard focus with it.
   void _move(int delta) {
     final view = ref.read(historyViewProvider).value;
@@ -120,6 +130,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with VeToastHost {
                   onCopy: _copy,
                   onCopyCommand: _copyCommand,
                   onOpenAsPreset: (r) => unawaited(_openAsPreset(r)),
+                  onReveal: (path) => unawaited(_reveal(path)),
                 ),
               ),
             ],
