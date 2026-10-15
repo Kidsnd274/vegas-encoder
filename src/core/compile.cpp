@@ -233,6 +233,7 @@ void Reflected(const Json& tokens, Json& res) {
         }
         if (key == "f" && i + 1 < tokens.size()) {
             const auto muxer = Str(tokens[i+1],"text");
+            res["container"] = ""; // A later unknown muxer must not retain an earlier fact.
             for (const auto& c : Profiles().at("containers")) if (Str(c,"muxer") == muxer) res["container"] = Str(c,"id");
         }
         (kind == "video" ? video : audio).push_back(tokens[i]);
@@ -288,7 +289,7 @@ Json Compile(const Json& request, const Json* capabilities) {
     CheckMedia(media);
     if (!paths.is_object() || Str(paths,"ffmpeg","ffmpeg").empty() || Str(paths,"videoPipe").empty() || Str(paths,"output").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Executable, video pipe and output path must be nonempty strings.");
     Json issues = Validate(request,capabilities); const auto exe = Str(paths,"ffmpeg","ffmpeg");
-    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr}};
+    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr},{"outputContainerId",nullptr}};
     if (HasErrors(Structural(r))) return result;
     const bool audioInput = Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null();
     result["inputStreams"] = audioInput ? Json::array({"video","audio"}) : Json::array({"video"});
@@ -407,6 +408,13 @@ Json Compile(const Json& request, const Json* capabilities) {
     std::string commandLine;
     for (size_t i = 0; i < tokens.size(); ++i) { if (i) commandLine += " "; commandLine += Quote(Str(tokens[i],"text")); if (i) result["argv"].push_back(Str(tokens[i],"text")); }
     result["display"] = tokens; result["commandLine"] = commandLine; result["signalPath"] = signal; result["issues"] = issues; result["summary"] = Summary(r,res);
+    // This is an established command fact, independent of the path's extension
+    // and the inactive Basic controls in Advanced mode. An explicit, known muxer
+    // is required there; partial/general output scope leaves it unknown.
+    if (!partialCommand && !Bool(res,"unknownOutputScope")) {
+        const auto container = FindContainer(advanced ? Str(res,"container") : Str(r.at("container"),"format"));
+        if (container) result["outputContainerId"] = Str(*container,"id");
+    }
     // IDs are established below only after conservative stream-map qualification.
     result["summary"]["videoEncoderId"] = nullptr; result["summary"]["audioEncoderId"] = nullptr;
     if (partialCommand) { result["argv"] = Json::array(); result["commandLine"] = ""; }

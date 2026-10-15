@@ -175,7 +175,7 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
     std::filesystem::create_directories(options.jobsRoot);
     log = options.jobsRoot + L"\\" + Widen(id_) + L".ffmpeg.log";
   } catch (const std::exception& e) { Log("job log root unavailable: %s",e.what()); }
-  try { store_ = JobStore::Create(options.jobsRoot,id_); store_->Status(live_,true); }
+  try { store_ = JobStore::Create(options.jobsRoot,id_,options.monitorApplication); store_->Status(live_,true); }
   catch (const std::exception& e) { Log("job status writer unavailable (nonfatal): %s",e.what()); }
   try {
     if (!Check(poll)) { Stop(error_,message_,cancelled_); return false; }
@@ -203,6 +203,11 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
         const auto& summary = compiled_.at("summary");
         { std::lock_guard<std::mutex> lock(liveMutex_); live_["encoderSummary"] = ve::Str(summary,"video") + " / " + ve::Str(summary,"audio"); }
         if (ve::HasErrors(compiled_.at("issues"))) throw std::runtime_error("Core validation refused this render recipe.");
+        if (!options.requiredOutputContainerId.empty() && compiled_.value("outputContainerId",ve::Json(nullptr)) != options.requiredOutputContainerId)
+          throw std::runtime_error("This VEGAS candidate requires Matroska (.mkv). Choose Matroska or explicit -f matroska in Advanced mode.");
+        if (options.requiredVideoOutput && (!compiled_.at("expectedStreams").is_array() ||
+            std::none_of(compiled_.at("expectedStreams").begin(),compiled_.at("expectedStreams").end(),[](const ve::Json& stream) { return ve::Str(stream,"kind") == "video"; })))
+          throw std::runtime_error("This VEGAS candidate requires an established video output; general maps/filters and audio-only commands are not supported yet.");
         const auto videoFacts = LiveVideoFacts(compiled_);
         { std::lock_guard<std::mutex> lock(liveMutex_);
           for (auto it = videoFacts.begin(); it != videoFacts.end(); ++it) live_[it.key()] = it.value();

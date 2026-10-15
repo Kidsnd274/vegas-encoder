@@ -5,6 +5,26 @@ Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.3-progress-text-pro
 
 ## Current progress
 
+**B6 connected candidate (2026-10-15):** owner resumed B6 and offered to test
+VEGAS. Prepared **0.1.4-recipe-proof** with the existing **0.1.4+1** frontend:
+fresh native recipe template → popup draft/Apply → immutable recipe render →
+real FFmpeg → C5 monitor/History. Opt-in MKV/P010/square-pixel/48 kHz stereo scope;
+general Advanced output remains unsupported/unknown. Default/proof build paths
+remain available. Candidate, isolated C7 settings and exact prior-exporter backup
+are in `build/b6-candidate`; **nothing was installed**. Owner instructions and
+rollback: [B6_TRIAL.md](B6_TRIAL.md).
+
+Focused optimized checks: **3,055 core**, **230 real-FFI**, **95 snapshot**,
+**87 transport**, **102 native-page**, **19 C7 runtime**, **94 adapter checks /
+9 real-FFmpeg fake-host cases**, plus the actual staged DLL's discovery/conformance/
+render fake-host pass and writer-owned monitor launch checks. Existing frontend
+release builds; real popup/monitor window checks with the existing fake owner pass
+the primary placement/Cancel/no-activate paths. Some secondary foreground checks
+had failed foreground prerequisites; these are not claimed as passes. No frontend
+source changes. A5–A7, real persistence, controlled real failure recovery, payload
+capacity and monitor performance stay **unverified pending owner VEGAS tests**.
+Earlier “B6 disabled/on hold” entries below describe their historical checkpoints.
+
 **Selected-file preset import (2026-10-15):** added the C3
 PresetTransfer.importFrom(path, newId: ...) service requested by the app. It uses
 bounded file reads and existing native validation/create-only Save, preserving the

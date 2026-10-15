@@ -5,8 +5,8 @@
 
 namespace vegas_encoder::configuration {
 
-// B6 offline preparation. No discovery/page/Render call site uses this yet;
-// native placement/persistence and production activation remain gated A5-A7.
+// Used by the opt-in B6 recipe candidate. Native persistence and production
+// activation remain unqualified until the owner's real-host A5-A7 tests.
 ve::Json ReadRecipeSnapshot(const host::Tpl& value, const GUID& owner);
 // Only a fresh product template with NO private bytes can be initialized.
 // Never interpret/convert the historical VENC/CFG1 proof marker as a recipe.
@@ -20,7 +20,7 @@ struct EditOutcome {
 };
 
 // One creator UI thread, owned copies only. C++ core owns payload/session/domain
-// validation. File/process/modality transport will be a separate gated layer.
+// validation. The native page owns file/process/modality transport separately.
 class RecipeTemplateDraft final {
  public:
   RecipeTemplateDraft(const host::Tpl& value, const GUID& owner, std::string writer);

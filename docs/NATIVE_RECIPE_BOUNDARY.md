@@ -1,10 +1,12 @@
-# B6 preparation: recipe bytes, editor drafts and transport
+# B6 recipe bytes, editor bridge and opt-in native candidate
 
-This is an **offline implementation checkpoint**, not completion of B6 or any
-real-host gate. The default/proof exporters do not reference these new helpers.
-No recipe page is exposed, editor/monitor launched, or saved product recipe
-rendered by VEGAS. A5–A7, real two-template/restart persistence, controlled real
-failure recovery and monitor performance remain unverified.
+The owner resumed B6 preparation and real-host testing on 2026-10-15. The opt-in
+**0.1.4-recipe-proof** candidate now connects fresh native recipe templates to the
+existing frontend popup and recipe engine/C5 monitor. Default and historical proof
+builds keep their previous paths. The candidate is staged, **not installed**;
+see [B6_TRIAL.md](B6_TRIAL.md) for installation, isolated data, testing and rollback.
+A5–A7, real two-template/restart persistence, controlled real failure recovery,
+private-payload capacity and monitor performance remain unverified.
 
 ## Owned native payload boundary
 
@@ -35,7 +37,7 @@ can copy these variable-length values in the fake harness; the actual saved host
 workflow still requires qualification. No host memory or saved template is edited
 by these tests.
 
-`ReadRecipeSnapshot` returns an independent value for a future immutable render
+`ReadRecipeSnapshot` returns an independent value for an immutable render
 job. It reads no preset library, application files or machine preferences. Core
 payload checks establish structure only; B6 must still compile/validate against
 actual delivered media and the selected FFmpeg before rendering. Source color
@@ -72,9 +74,10 @@ semantics; the adapter enforces session identity and one terminal result.
   does not mutate a previously copied render snapshot.
 
 The callback seam is only a transaction interface, not a VEGAS ABI or a public
-SDK. The offline transport below handles files and owned child lifetime. Native
-page modality, owner re-enable, startup scheduling and HWND validation are **not
-implemented here**. No host interface is handed to a worker. Render never
+SDK. The transport below handles files and owned child lifetime. `recipe_page.*`
+now supplies UI-thread startup scheduling, root-owner disable/restore and timer
+polling through the existing native holder/allocator bridge. No host interface is
+handed to a worker. Render never
 participates in edit sessions or waits for an editor/progress window.
 
 ## C4 file/process transport (offline)
@@ -88,7 +91,9 @@ replacement while active. Tests exposed that attributes-only directory access
 did not prevent rename; the implementation now pins with directory-list access,
 sharing read/write while denying delete. A focused check verifies directory rename
 is refused while adjacent child-file atomic publication still works.
-Production root creation and per-user ACL qualification remain bridge tasks.
+The candidate creates its per-user session root after rejecting known reparse
+ancestors; transport pins the existing root. Real-host/per-user ACL qualification
+remains open.
 
 The helper is created suspended, with no inherited handles, then assigned to a
 kill-on-close job before resume. Process polling uses a zero timeout on the
@@ -167,17 +172,10 @@ VEGAS, exporter installation, native page or monitor is used.
 
 ## Remaining B6 work and owner qualification
 
-Next is the native page/editor bridge against the actual F5 popup once it is ready
-and the owner resumes the native gates, followed by the recipe/C5 progress bridge
-through an opt-in candidate. No additional fake-owner framework is planned.
-Coordinate F5/F6 UI readiness via platform.md; do not edit
-app-owned files. The app's F4 metadata requests remain separately queued in that
-handoff and C2 remains unchanged by this checkpoint.
-
-Before enabling the real adapter, the owner must choose when to resume the
-previously deferred A5/A6 real Apply/Cancel/two-template/restart procedure in
-[NATIVE_CONFIGURATION.md](NATIVE_CONFIGURATION.md). This checkpoint does not
-reopen that deferred request automatically. The later real B6 candidate needs:
+The native page and recipe/C5 bridges are implemented in the opt-in candidate;
+the owner's next step is the real trial in [B6_TRIAL.md](B6_TRIAL.md), incorporating
+the deferred Apply/Cancel/two-template/restart procedure. Frontend sources remain
+app-owned and unchanged. The candidate still needs real-host evidence for:
 
 1. Deliberately fresh product templates, full recipe/origin bytes at Create,
    correct name/notes after growth/shrink and odd/even private lengths, and a
@@ -198,7 +196,7 @@ reopen that deferred request automatically. The later real B6 candidate needs:
    under 120 MB). No timing claim follows from these offline draft checks.
 
 The B5 slot-4 trial showed no useful visible text, and the owner dropped custom
-dialog text; see [NATIVE_PROGRESS.md](NATIVE_PROGRESS.md). Its installation
-authorization does not qualify or enable B6, reopen deferred persistence
-automatically, or authorize a future B6 installation. Useful numeric progress and
-the separate frontend window remain the target; real monitor performance is open.
+dialog text; see [NATIVE_PROGRESS.md](NATIVE_PROGRESS.md). The B6 candidate does not
+resume that investigation. The owner explicitly resumed B6 preparation afterward;
+installation remains a separate manual step with the prepared rollback. Useful
+numeric progress and the frontend window remain the target; performance is open.

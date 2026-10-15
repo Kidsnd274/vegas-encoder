@@ -11,6 +11,9 @@ struct RecipeJobOptions {
   std::string templateName, project;
   ve::Json hostHwnd = nullptr;
   bool verifyOutput = true;
+  std::wstring monitorApplication;
+  std::string requiredOutputContainerId;
+  bool requiredVideoOutput = false;
   DWORD pipeTimeoutMs = 10000, finishTimeoutMs = 120000, probeTimeoutMs = 120000;
 };
 // Immutable, already-selected installation/capability snapshot from C7/C3; B6

@@ -4,6 +4,10 @@
 // F-038); unobserved methods return E_NOTIMPL and are logged so a capture
 // shows whether the host relies on them.
 #include "vegas_encoder.h"
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+#include "recipe_runtime.h"
+#include "../configuration/recipe_template.h"
+#endif
 #if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
 #include "../configuration/proof_page.h"
 #endif
@@ -41,6 +45,12 @@ struct Preset {
 // start at id 1. P010 was delivered to Voukoder (F-031, F-036); BI_RGB 32 was
 // delivered bottom-up through a direct-pointer token (F-041).
 const Preset kPresets[] = {
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    {{0x8f4af392, 0x31b0, 0x48c1, {0xa2, 0xa0, 0x4b, 0x40, 0xdf, 0x3f, 0x9c, 0x20}},
+     MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder recipe (id 0)", L"Recipe candidate; use the visible settings preset."},
+    {{0x381851c2, 0x9c94, 0x4bd2, {0x81, 0x76, 0xb4, 0xb8, 0x59, 0x8b, 0xe8, 0x0d}},
+     MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder settings (MKV)", L"Edit settings in the Vegas Encoder popup. Matroska video output only in this candidate."},
+#else
     {{0x5ac92e42, 0xf7bd, 0x4e84, {0x86, 0xe4, 0xaa, 0x50, 0xe4, 0xce, 0x44, 0x9b}},
      MAKEFOURCC('P', '0', '1', '0'),
      L"Raw P010 (id 0 probe; please report if visible)",
@@ -53,10 +63,12 @@ const Preset kPresets[] = {
      BI_RGB,
      L"Raw BI_RGB 32-bit + float WAV",
      L"Diagnostic: 8-bit BGRA, bottom-up rows, as VEGAS delivers it."},
+#endif
 };
 constexpr LONG kPresetCount = (LONG)(sizeof kPresets / sizeof kPresets[0]);
 LONG PresetCount() { return Cfg().encode ? 2 : kPresetCount; }
 
+#if !defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
 void SetExtra(Tpl& t, DWORD preset) {
   Extra e{};
   e.magic = kExtraMagic;
@@ -64,12 +76,17 @@ void SetExtra(Tpl& t, DWORD preset) {
   e.preset = preset;
   memcpy(t.b.data() + tpl::abExtra, &e, sizeof e);
 }
+#endif
 
 Tpl BuildPreset(LONG index) {
   const Preset& p = kPresets[index];
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+  Tpl t = Tpl::Make(p.name, p.notes, 0);
+#else
   const wchar_t* name = Cfg().encode && index == 1 ? L"Lossless P010 10-bit + float audio (MKV)" : p.name;
   const wchar_t* notes = Cfg().encode ? L"Fixed FFmpeg proof: FFV1 video + PCM float stereo; settings in vegas-encoder.ini." : p.notes;
   Tpl t = Tpl::Make(name, notes, sizeof(Extra));
+#endif
   // Byte pattern mirrors Voukoder Pro's presets (F-033): zero audio records
   // and zero size/fps mean "use the project".
   t.SetU32(tpl::id, (DWORD)index);
@@ -91,7 +108,11 @@ Tpl BuildPreset(LONG index) {
   t.SetU32(tpl::videoRenderVex + 0xC, 0xFFFFFFFF);
   t.SetF64(tpl::vexPixelAspect, 1.0);
   t.SetU32(tpl::keyFrameEvery, 1);
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+  t = configuration::CreateRecipeTemplate(t, GUID_VegasEncoderType, DefaultRecipeSnapshot());
+#else
   SetExtra(t, (DWORD)index);
+#endif
   return t;
 }
 
@@ -297,7 +318,11 @@ class RenderClass final : public ISfRenderFileClass {
       }
       if (!Tpl::Valid(src)) return E_INVALIDARG;
       Tpl s = Tpl::Copy(src);
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      Tpl t = Tpl::Make(L"Project Settings", L"Vegas Encoder recipe (MKV)", 0);
+#else
       Tpl t = Tpl::Make(L"Project Settings", L"Render Audio and Video", sizeof(Extra));
+#endif
       t.SetU32(tpl::id, s.U32(tpl::id));
       t.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
       t.SetU32(tpl::audioCb, tpl::sectionCb);
@@ -313,7 +338,17 @@ class RenderClass final : public ISfRenderFileClass {
       memcpy(t.b.data() + tpl::videoRenderVex, s.b.data() + tpl::videoRenderVex, tpl::vexSize);
       BITMAPINFOHEADER codec = s.Bih(tpl::videoCodecBih);
       t.SetBih(tpl::videoCodecBih, codec.biWidth ? codec : t.Bih(tpl::videoRenderBih));
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      auto snapshot = s.Guid(tpl::iidOwner) == GUID_VegasEncoderType ?
+          configuration::ReadRecipeSnapshot(s, GUID_VegasEncoderType) : DefaultRecipeSnapshot();
+      // The candidate accepts P010 input only. Never inherit a project RGB codec.
+      auto input = t.Bih(tpl::videoRenderBih);
+      input.biCompression = MAKEFOURCC('P', '0', '1', '0'); input.biBitCount = 32;
+      t.SetBih(tpl::videoRenderBih, input); t.SetBih(tpl::videoCodecBih, input);
+      t = configuration::CreateRecipeTemplate(t, GUID_VegasEncoderType, snapshot);
+#else
       SetExtra(t, 0xFFFFFFFF);
+#endif
       HRESULT hr = ToHost(t, out);
       if (detail || FAILED(hr)) {
         BestEffortDiagnostic([&] { Log("ConformTemplate -> %s", Hr(hr).c_str()); });
@@ -382,7 +417,7 @@ class RenderClass final : public ISfRenderFileClass {
   HRESULT STDMETHODCALLTYPE GetPropertyPageCount(LONG* free, LONG* forSale, LONG* options) override {
     return NativeBoundary([&]() -> HRESULT {
       constexpr LONG count =
-#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
+#if defined(VEGAS_ENCODER_CONFIGURATION_PROOF) || defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
           1;
 #else
           0;
@@ -400,6 +435,9 @@ class RenderClass final : public ISfRenderFileClass {
 #if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
       if (!page) return E_POINTER;
       if (index == 0) return configuration::CreateNativeProofPage(alloc_, page);
+#elif defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      if (!page) return E_POINTER;
+      if (index == 0) return configuration::CreateNativeRecipePage(alloc_, RecipeEditorOptions(), page);
 #endif
       BestEffortDiagnostic([&] { Log("GetPropertyPage(%ld) -> E_INVALIDARG", index); });
       return E_INVALIDARG;
@@ -421,7 +459,11 @@ class RenderClass final : public ISfRenderFileClass {
     return NativeBoundary([&]() -> HRESULT {
       BestEffortDiagnostic([&] { Log("ShowAboutBox"); });
       std::wstring text = std::wstring(kDisplayName) + L" " + Widen(kVersion) +
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+                          L"\n\nRecipe-based Matroska candidate.\nLog folder: " +
+#else
                           L"\n\nFixed FFmpeg lossless MKV or raw diagnostic output.\nLog folder: " +
+#endif
                           Cfg().logDir;
       MessageBoxW(parent, text.c_str(), kDisplayName, MB_OK | MB_ICONINFORMATION);
       return S_OK;

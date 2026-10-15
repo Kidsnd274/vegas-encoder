@@ -24,8 +24,20 @@ if "%~2"=="asan" set VE_B6_SESSION_CORE=json.obj text.obj recipe.obj signal.obj 
 cl /nologo %VE_B6_FLAGS% /MT /W4 /WX /EHsc /std:c++17 /utf-8 "%VE_B6_ROOT%\tests\host\editor_sessions.cpp" "%VE_B6_ROOT%\src\vegas\configuration\editor_session.cpp" "%VE_B6_ROOT%\src\vegas\configuration\recipe_template.cpp" "%VE_B6_ROOT%\src\vegas\host\template.cpp" "%VE_B6_ROOT%\src\support\diagnostics.cpp" %VE_B6_SESSION_CORE% /link /OUT:editor-sessions.exe ole32.lib oleaut32.lib user32.lib version.lib bcrypt.lib || goto :fail
 if not defined VEGAS_ENCODER_B6_TEST_ROOT set "VEGAS_ENCODER_B6_TEST_ROOT=%VE_B6_OUT%"
 editor-sessions.exe "%VE_B6_ROOT%\schema\fixtures\b0\core-and-services.json" "%VEGAS_ENCODER_B6_TEST_ROOT%" || goto :fail
+cl /nologo %VE_B6_FLAGS% /MT /W4 /WX /EHsc /std:c++17 /utf-8 "%VE_B6_ROOT%\tests\host\recipe_pages.cpp" "%VE_B6_ROOT%\src\vegas\configuration\recipe_page.cpp" "%VE_B6_ROOT%\src\vegas\configuration\editor_session.cpp" "%VE_B6_ROOT%\src\vegas\configuration\recipe_template.cpp" "%VE_B6_ROOT%\src\vegas\configuration\native_store.cpp" "%VE_B6_ROOT%\src\vegas\host\template.cpp" "%VE_B6_ROOT%\src\support\diagnostics.cpp" %VE_B6_SESSION_CORE% /link /OUT:recipe-pages.exe ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
+recipe-pages.exe "%VE_B6_ROOT%\schema\fixtures\b0\core-and-services.json" "%VEGAS_ENCODER_B6_TEST_ROOT%" || goto :fail
+if "%~2"=="asan" goto :complete
+cl /nologo %VE_B6_FLAGS% /MT /W4 /WX /EHsc /std:c++17 /utf-8 /DVEGAS_ENCODER_B6_RECIPE_PROOF "%VE_B6_ROOT%\tests\host\recipe_render.cpp" "%VE_B6_ROOT%\tests\fiohost\fakehost.cpp" "%VE_B6_ROOT%\src\vegas\adapter\render.cpp" "%VE_B6_ROOT%\src\vegas\configuration\recipe_template.cpp" "%VE_B6_ROOT%\src\vegas\host\template.cpp" "%VE_B6_ROOT%\src\support\diagnostics.cpp" "%VE_B6_ROOT%\src\engine\encode.cpp" "%VE_B6_ROOT%\src\engine\progress.cpp" "%VE_B6_ROOT%\src\engine\job_store.cpp" "%VE_B6_ROOT%\src\engine\recipe_job.cpp" %VE_B6_CORE% /link /OUT:recipe-render.exe ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib psapi.lib || goto :fail
+:complete
+if "%~2"=="asan" goto :finished
+cl /nologo %VE_B6_FLAGS% /MT /W4 /WX /EHsc /std:c++17 /utf-8 /DVEGAS_ENCODER_B6_RECIPE_PROOF "%VE_B6_ROOT%\tests\host\recipe_runtime_checks.cpp" "%VE_B6_ROOT%\src\vegas\adapter\recipe_runtime.cpp" "%VE_B6_ROOT%\src\vegas\host\template.cpp" "%VE_B6_ROOT%\src\support\diagnostics.cpp" %VE_B6_CORE% /link /OUT:recipe-runtime.exe ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
+:finished
+if "%~2"=="asan" goto :exitbuild
+cl /nologo %VE_B6_FLAGS% /MT /W4 /WX /EHsc /std:c++17 /utf-8 "%VE_B6_ROOT%\tests\engine\job_store_monitor.cpp" "%VE_B6_ROOT%\src\engine\job_store.cpp" "%VE_B6_ROOT%\src\support\diagnostics.cpp" "%VE_B6_ROOT%\src\vegas\host\template.cpp" %VE_B6_CORE% /link /OUT:job-store-monitor.exe ole32.lib oleaut32.lib user32.lib version.lib bcrypt.lib || goto :fail
+job-store-monitor.exe "%VE_B6_OUT%\monitor-%RANDOM%-%RANDOM%" || goto :fail
+:exitbuild
 popd
-echo B6 OFFLINE SNAPSHOT/SESSION/FAKE-CHILD TRANSPORT CHECKS OK; exporter integration remains disabled
+echo B6 OFFLINE SNAPSHOT/SESSION/PAGE/MONITOR CHECKS OK; adapter/runtime tests built for explicit trial inputs
 exit /b 0
 :fail
 popd

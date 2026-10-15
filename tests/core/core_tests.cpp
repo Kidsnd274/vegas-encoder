@@ -49,10 +49,12 @@ int main(int argc, char** argv) {
             const auto result = CallJson(ve_compile,{{"recipe",f.at("recipe")},{"media",f.at("media")},{"paths",f.at("paths")}});
             Check(!ve::HasErrors(result.at("issues")),"built-in semantics");
             Check(result.at("argv") == goldens.at("argv").at(ve::Str(f.at("recipe"),"id")),"B1 real-core golden argv parity");
+            Check(result.at("outputContainerId") == f.at("recipe").at("container").at("format"),"Basic container is an established core fact");
             auto advancedRecipe = f.at("recipe"); advancedRecipe["command"]["mode"] = "template";
             advancedRecipe["command"]["template"] = result.at("advancedTemplate");
             const auto seeded = CallJson(ve_compile,{{"recipe",advancedRecipe},{"media",f.at("media")},{"paths",f.at("paths")}});
             Check(seeded.at("argv") == result.at("argv"),"Basic seed preserves input tagging in Advanced");
+            Check(seeded.at("outputContainerId") == result.at("outputContainerId"),"Advanced seed preserves the explicit output container fact");
         }
         for (size_t i = 0; i < bundle.at("additionalFixtures").size(); ++i) {
             const auto& popup = bundle.at("additionalFixtures")[i];
@@ -74,6 +76,23 @@ int main(int argc, char** argv) {
         const auto original = recipe.dump();
         auto request = ve::Json{{"recipe",recipe},{"media",f.at("media")},{"paths",f.at("paths")}};
         const auto result = CallJson(ve_compile,request);
+        auto containerRequest = request;
+        containerRequest["recipe"]["container"]["format"] = "unknown-container";
+        Check(CallJson(ve_compile,containerRequest).at("outputContainerId").is_null(),"invalid Basic container remains unknown");
+        containerRequest = request;
+        containerRequest["recipe"]["command"] = {{"mode","template"},{"template","{inputs} -c:v ffv1 -f matroska {output}"}};
+        Check(CallJson(ve_compile,containerRequest).at("outputContainerId") == "mkv","Advanced explicit muxer overrides inactive Basic container and filename");
+        containerRequest["recipe"]["command"]["template"] = "{inputs} -c:v ffv1 -f matroska -f mov {output}";
+        Check(CallJson(ve_compile,containerRequest).at("outputContainerId") == "mov","last known output muxer owns container fact");
+        for (const auto* text : {"{inputs} -c:v ffv1 {output}",
+                                 "-f matroska {inputs} -c:v ffv1 {output}",
+                                 "{inputs} -c:v ffv1 -f matroska -f unknown-muxer {output}",
+                                 "{inputs} -i extra.mkv -c:v ffv1 -f matroska {output}",
+                                 "{inputs} -c:v ffv1 -f matroska extra.mkv {output}",
+                                 "{inputs} -c:v ffv1 -f matroska {output} -metadata \"unfinished"}) {
+            containerRequest["recipe"]["command"]["template"] = text;
+            Check(CallJson(ve_compile,containerRequest).at("outputContainerId").is_null(),"absent/input/unknown/general/partial Advanced muxer facts remain unknown");
+        }
         Check(result.at("expectedStreams") == ve::Json::array({{{"kind","video"},{"encoder","libx264"},{"codec","h264"}},{{"kind","audio"},{"encoder","aac"},{"codec","aac"}}}),"Basic verification codecs are native facts");
         auto verificationRequest = request;
         verificationRequest["recipe"]["audio"][0]["enabled"] = false;

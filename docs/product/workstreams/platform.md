@@ -8,6 +8,69 @@ B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
+## B6 connected candidate ready for the owner's VEGAS trial
+
+The owner explicitly resumed B6 after clarifying that the antivirus restriction
+came from earlier debugging/quarantined builds. Prepared the actual connection,
+without resuming sanitizers, debugger/process/thread investigations, machine tool
+changes or AV exclusions. Local milestone commits are authorized. No installation,
+master merge or push occurred. Earlier B6 hold statements below are historical.
+
+Opt-in `build.cmd "" recipe-proof` produces **0.1.4-recipe-proof**. Its fresh
+**Vegas Encoder settings (MKV)** preset has distinct preset GUIDs and the core VEnc
+recipe payload; proof bytes are never migrated. Existing holder/allocator storage
+backs the native page. Queued UI-thread C4 launch, root-owner disable/restore,
+timer polling, retryable native Apply and teardown preserve the prior template.
+The complete existing frontend is rebuilt as **0.1.4+1**, with no frontend edits.
+
+Create copies the recipe/origin; Render uses actual delivered media, selected C7
+installation and the existing B4 engine. Host calls stay on Render's caller thread
+and every frame is copied/released before settings reads, hashing or transport
+waits. Unused audio is not read. Native C7/cache reads are bounded to 1 MiB; engine
+identity checks remain authoritative. Cached hardware readiness stays unknown.
+The existing job writer launches the monitor after atomic initial C5 publication,
+with the app parent cwd and no Render wait/acknowledgement. Launch failure is nonfatal.
+
+Additive C2 `outputContainerId` keeps output format decisions inside the core.
+Advanced requires a known explicit final muxer; absent/input-only/unknown/general/
+partially quoted output stays null. Candidate constraints check that fact and
+established video output before spawn, with the same refusal on editor return.
+This candidate deliberately supports the evidenced MKV/P010/square-pixel and
+48 kHz stereo float input path. General Advanced/audio-only/non-MKV is refused.
+
+Prepared `build/b6-candidate/{app,plugin,data,rollback}`. The data root has a real
+C3-registered default `C:\ffmpeg\bin\ffmpeg.exe`, verification/progress enabled,
+and no inferred capability qualification. The exact installed DLL/PDB/INI/manifest
+and discovery file were copied before any installation; hashes are retained for
+rollback verification. `Start-B6Trial.ps1` launches the app/VEGAS with process-local
+isolated data and verifies the installed candidate DLL before VEGAS launch.
+See [B6_TRIAL.md](../../B6_TRIAL.md) for the owner's steps and rollback command.
+
+Validation: optimized native DLL build and **3,055 core** checks; real FFI **230**;
+snapshot **95**, transport **87** (no optional junction fixture), page **102**,
+C7 runtime **19**; actual adapter **94 checks / 9 fake-host real-FFmpeg cases**
+(immutable Create, video-only, Cancel, host error, Advanced MKV, wrong/unknown muxer,
+recovery and preserved existing destination). The staged DLL itself passes the
+existing fiohost discovery/conformance/render test with production C7 selection,
+balanced frames/allocator references and real FFmpeg. Monitor writer checks cover
+initial publication, argv/cwd, stalled child independence and nonfatal refusal.
+New trial preparation tool analysis and launcher syntax/refusal checks pass.
+
+The actual staged frontend's existing window probe shows the primary popup owner,
+centering, minimize/restore, Cancel result and owner re-enable paths working; the
+monitor shows no-activate, remembered pin and placement on the named host monitor.
+Secondary multi-monitor/crash foreground observations include NO results where
+foreground acquisition prerequisites were also NO; they do not prove focus recovery.
+App handoff: confirm secondary foreground behavior in the real host, and update the
+stale comment in app/lib/state/services.dart saying the exporter ignores the trial
+root (this opt-in candidate honors it). No frontend files changed here.
+
+**Still unverified:** A5–A7, real native Apply/Cancel/save/restart and maximum payload
+capacity, real render/cancellation, controlled real failure recovery, and the
+three-with/three-without monitor performance comparison. Offline tests do not pass
+these gates. Next: owner follows the short first-popup/two-template trial, then
+render/Cancel. No more offline scaffolding or B5 custom-text investigation is queued.
+
 ## Selected-file preset import (completed service feature)
 
 After F6 precision checkpoint **84de5f4**, added the app-requested

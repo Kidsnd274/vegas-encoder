@@ -51,6 +51,10 @@ Future<void> main(List<String> args) async {
       'B1 real-core argv parity ${f.recipe.id}',
     );
     check(
+      result.outputContainerId == f.recipe.container.format,
+      'Basic output container is an established fact',
+    );
+    check(
       result.argv.last == f.paths.output &&
           result.argv.contains(f.paths.videoPipe),
       'supplied paths preserved',
@@ -73,6 +77,10 @@ Future<void> main(List<String> args) async {
     check(
       seeded.argv.join('\n') == result.argv.join('\n'),
       'Basic seed preserves input metadata and argv in Advanced',
+    );
+    check(
+      seeded.outputContainerId == result.outputContainerId,
+      'Advanced seed preserves explicit output container',
     );
     check(
       result.display
@@ -525,6 +533,38 @@ Future<void> main(List<String> args) async {
     ),
   );
   check(!errors(avr.issues), 'advanced macro compile');
+  check(avr.outputContainerId == 'mkv', 'typed Advanced output container');
+  check(
+    avr.copyWith().outputContainerId == 'mkv' &&
+        avr.copyWith(outputContainerId: null).outputContainerId == null &&
+        CompileResult(executable: 'ffmpeg', argv: const []).outputContainerId ==
+            null &&
+        CompileResult.fromJson({'executable': 'ffmpeg'}).outputContainerId ==
+            null,
+    'container fact preserves nullable copy and historical-model semantics',
+  );
+  for (final text in [
+    '{inputs} -c:v ffv1 {output}',
+    '-f matroska {inputs} -c:v ffv1 {output}',
+    '{inputs} -c:v ffv1 -f matroska -f unknown-muxer {output}',
+    '{inputs} -i extra.mkv -c:v ffv1 -f matroska {output}',
+    '{inputs} -c:v ffv1 -f matroska extra.mkv {output}',
+    '{inputs} -c:v ffv1 -f matroska {output} -metadata "unfinished',
+  ]) {
+    check(
+      core
+              .compile(
+                f.recipe.copyWith(
+                  command: CommandSettings(mode: 'template', template: text),
+                ),
+                media: f.media,
+                paths: f.paths,
+              )
+              .outputContainerId ==
+          null,
+      'Advanced absent/input/unknown/general/partial container remains unknown',
+    );
+  }
   check(
     avr.argv.last == r'C:\出力\movie name.mkv' && after(avr.argv, '-g') == '60',
     'advanced delivered macros and Unicode path',

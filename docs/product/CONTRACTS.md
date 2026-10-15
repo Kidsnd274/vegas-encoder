@@ -144,7 +144,7 @@ Diagnostic {id,level,message,params,fix as above,start:int,end:int}
 CompileResult {executable:string,argv:string[],display:CommandToken[],commandLine:string,
   advancedTemplate:string,resolved:ResolvedSettings|null,signalPath:SignalPathFacts|null,
   issues:Issue[],summary:RecipeSummary,overriddenFields:string[],expectedStreams:ExpectedStream[]|null,
-  inputStreams:("video"|"audio")[]|null}
+  inputStreams:("video"|"audio")[]|null,outputContainerId:string|null}
 ExpectedStream {kind:"video"|"audio",encoder:string|null,codec:string|null}
 CommandToken {text:string,role:"exe"|"global"|"input"|"map"|"video"|"audio"|"mux"|"output"|"extra"|"macro",
   field,replacedField,stage:string|null,isOption:bool|null,macros:string[],
@@ -187,6 +187,36 @@ startup probing (`-probesize 32 -analyzeduration 0`), and `overwriteOutput:true`
 supplies `-y` for its exclusively created temporary output. Defaults remain false
 for existing previews/file tests. These are transport context, not recipe settings;
 the core still produces every argv token. No rejected input queue flag is restored.
+
+B6 adds nullable `outputContainerId`, an established catalog ID (`mkv`, `mov`,
+etc.). Basic uses its emitted muxer; Advanced requires an explicit known final
+output `-f`. An absent/input-only/unknown muxer, partial quote or general output
+scope stays null. Neither filename extensions nor inactive Basic controls supply
+Advanced facts. The opt-in MKV native candidate uses this fact plus an established
+video `expectedStreams` entry before spawning FFmpeg. Historical fakes may omit
+the additive field and readers expose null; argv/validation remain core-owned.
+
+### B6 opt-in native trial (2026-10-15)
+
+`build.cmd "" recipe-proof` connects fresh `VEnc` templates to C4 and immutable
+Render recipes to the B4 engine. This is an owner-authorized trial candidate,
+not qualification of A5–A7 or a default-exporter switch. It reads C7 v1 and matching
+parser-2 cache files with the 1 MiB bound. Selected FFmpeg identity is rechecked
+by the engine; native cached hardware readiness is downgraded to unknown.
+`VEGAS_ENCODER_DATA_ROOT` maps to the same `Roaming`/`Local` trial roots as the app.
+Unknown popup media/project facts remain null. The configured app's numeric file
+version must be 0.1.4.1 for this candidate; the full frontend folder is required.
+
+The page queues C4 launch on its UI thread, disables only its enabled root owner,
+polls child exit with a window timer and restores owner state on all terminal
+paths. Editor Apply changes only its draft; native Apply commits the owned bytes.
+Render owns its decoded snapshot from Create and never reads the preset library.
+It releases copied host frames before C7 reads, hashing, queues or process waits.
+C5 monitor creation belongs to the independent job writer after its first atomic
+live publication, with the app directory as cwd, no inherited handles and no
+acknowledgement or process wait on Render. Monitor launch failure is nonfatal.
+The candidate requires MKV video, square pixels and the established P010/48 kHz
+stereo float input path; it does not activate arbitrary native formats/containers.
 
 `minTotalBytes` / `maxTotalBytes` are the range for the user-entered length, null if
 there is no length, estimate or range. They are not figures the app scales itself.

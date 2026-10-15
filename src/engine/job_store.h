@@ -13,7 +13,8 @@ std::string NewJobId();
 // transitions and the final record are bounded. Render never joins this worker.
 class JobStore {
  public:
-  static std::shared_ptr<JobStore> Create(const std::wstring& root, const std::string& id);
+  static std::shared_ptr<JobStore> Create(const std::wstring& root, const std::string& id,
+                                        const std::wstring& monitorApplication = {});
   ~JobStore();
   void Status(ve::Json snapshot, bool phase);
   void Complete(ve::Json snapshot, ve::Json record);

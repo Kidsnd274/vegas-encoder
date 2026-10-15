@@ -952,6 +952,7 @@ class CompileResult extends JsonModel {
     JsonMap summary = const {},
     List<String> overriddenFields = const [],
     List<ExpectedStream>? expectedStreams = null,
+    String? outputContainerId = null,
     JsonMap extensions = const {},
   }) : super({
          'executable': executable,
@@ -965,6 +966,7 @@ class CompileResult extends JsonModel {
          'summary': summary,
          'overriddenFields': overriddenFields,
          'expectedStreams': expectedStreams?.map((v) => v.data).toList(),
+         'outputContainerId': outputContainerId,
          'extensions': extensions,
        });
   CompileResult.fromJson(super.json);
@@ -987,6 +989,9 @@ class CompileResult extends JsonModel {
       : List.unmodifiable(
           jsonMaps(data['expectedStreams']).map(ExpectedStream.fromJson),
         );
+
+  /// Established output container; unknown in unscoped Advanced commands.
+  String? get outputContainerId => data['outputContainerId'] as String?;
   String get advancedTemplate => data['advancedTemplate'] as String? ?? '';
   ResolvedSettings? get resolved => data['resolved'] == null
       ? null
@@ -1013,6 +1018,7 @@ class CompileResult extends JsonModel {
     Object? summary = absent,
     Object? overriddenFields = absent,
     Object? expectedStreams = absent,
+    Object? outputContainerId = absent,
     Object? extensions = absent,
   }) => CompileResult.fromJson(
     changed({
@@ -1038,6 +1044,8 @@ class CompileResult extends JsonModel {
         'expectedStreams': (expectedStreams as List<ExpectedStream>?)
             ?.map((v) => v.data)
             .toList(),
+      if (!identical(outputContainerId, absent))
+        'outputContainerId': outputContainerId,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
