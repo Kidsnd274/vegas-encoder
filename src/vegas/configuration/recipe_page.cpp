@@ -216,8 +216,14 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
   void LaunchEditor() {
     if (!launching_ || !draft_ || !window_) return;
     launching_ = false;
+    const auto started = NowMs();
     try {
+      Status(L"Starting the editor...");
+      // A posted launch can run before WM_PAINT. Paint the status child before
+      // any cold OS/file work, without pumping a nested host message loop.
+      if (status_) UpdateWindow(status_);
       if (options_.beforeLaunch) options_.beforeLaunch();
+      const auto prepared = NowMs();
       const auto parent = GetParent(window_);
       owner_ = GetAncestor(parent, GA_ROOT);
       if (!IsWindow(owner_) || GetWindowThreadProcessId(owner_, nullptr) != thread_)
@@ -232,6 +238,7 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
       ownerDisabled_ = IsWindowEnabled(owner_) != FALSE;
       if (ownerDisabled_) EnableWindow(owner_, FALSE);
       transport->Start(request, options_.launch);
+      BestEffortDiagnostic([&] { Log("B6 editor startup: preflight=%.1f ms request/spawn=%.1f ms",prepared-started,NowMs()-prepared); });
       editor_ = std::move(transport);
       if (!SetTimer(window_, kPollEditor, 100, nullptr)) throw std::runtime_error("Cannot poll the editor session.");
       Status(L"Editor is open. Apply there to return changes to this template.");

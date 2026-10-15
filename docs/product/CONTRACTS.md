@@ -205,7 +205,7 @@ parser-2 cache files with the 1 MiB bound. Selected FFmpeg identity is rechecked
 by the engine; native cached hardware readiness is downgraded to unknown.
 `VEGAS_ENCODER_DATA_ROOT` maps to the same `Roaming`/`Local` trial roots as the app.
 Unknown popup media/project facts remain null. The configured app's numeric file
-version must be 0.1.4.1 for this candidate; the full frontend folder is required.
+version must be 0.1.5.1 for the current fix candidate; the full frontend folder is required.
 
 The page queues C4 launch on its UI thread, disables only its enabled root owner,
 polls child exit with a window timer and restores owner state on all terminal
@@ -217,6 +217,10 @@ live publication, with the app directory as cwd, no inherited handles and no
 acknowledgement or process wait on Render. Monitor launch failure is nonfatal.
 The candidate requires MKV video, square pixels and the established P010/48 kHz
 stereo float input path; it does not activate arbitrary native formats/containers.
+The native private allocation rounds odd VEnc lengths up by one zero byte before
+the host's UTF-16 suffix. That byte is outside the core's strict envelope/checksum;
+only this exact padding is accepted. Earlier intact unpadded B6 envelopes still
+read. No proof migration or reconstruction of corrupted native names is performed.
 
 `minTotalBytes` / `maxTotalBytes` are the range for the user-entered length, null if
 there is no length, estimate or range. They are not figures the app scales itself.
@@ -549,6 +553,9 @@ PresetPreferences and PresetLocations. `FileMachineSettingsRepository(paths?)`,
 implement their existing C3 interfaces. The app injects these explicitly; platform
 does not change app providers. Production uses NativeVeCore. No repository invokes
 FFmpeg or VEGAS. FileReveal launches Explorer only on an explicit reveal call.
+Windows file reveal passes `/select,` separately from the unchanged absolute
+file path, keeping Dart's automatic path quoting from obscuring the switch.
+Directories open directly; invalid/missing targets fail before launching.
 
 ServicePaths defaults to the C3/C6/C7 Windows user roots; injectable roaming/local
 roots keep tests isolated. Cache files are `%LOCALAPPDATA%\VegasEncoder\cache\<identityKey>.json`,
@@ -789,8 +796,9 @@ launches an explicitly selected owned helper and polls its exit before consuming
 one core-validated result. Nonzero exit, missing/invalid/foreign results or explicit
 Cancel preserve the draft; no Render wait or app lookup is introduced. Direct
 known-file cleanup preserves unknown entries and reports incomplete cleanup.
-These helpers are not linked into exporter discovery/pages/Render. Actual Flutter
-launch, startup scheduling/modality, native persistence and monitor integration remain gated;
+The default/proof exporters retain their previous paths; the opt-in B6 candidate
+now links these helpers into discovery/pages/Render as described above. Real
+native persistence/capacity and monitor performance remain unqualified;
 details/tests are in [NATIVE_RECIPE_BOUNDARY.md](../NATIVE_RECIPE_BOUNDARY.md).
 No C4/C5 shape or C2 API changed for this checkpoint.
 
@@ -846,6 +854,9 @@ The fake transports supplied facts without calculating them. Samples show unknow
 at startup and illustrative P010-to-8-bit reduction in subsequent phases.
 
 Worker writes at most twice a second plus phase/terminal changes, atomically.
+A pending metric wakes an idle writer as soon as this rate budget is free; there
+is no extra periodic half-second wait after an idle gap. Phase changes bypass
+ordinary metric coalescing.
 Render never waits for the app, monitor startup, or file-reader acknowledgements;
 failed monitor launch/status publication is logged and does not fail the render.
 Missing initial file produces null. Malformed/incomplete replacements retain the
@@ -919,6 +930,13 @@ complete per-job files. `rebuildIndex()` explicitly replaces an interrupted/corr
 index under the index lock. Watches never repair files as a side effect. Stopped
 jobs cannot claim publication or published bytes; success requires zero exit,
 publication and a passed/explicitly skipped output check.
+
+The engine's output readback samples the first 32 packets (`-read_intervals %+#32`)
+after ordinary stream discovery. It retains all streams, requires a positive
+decoded count and dimensions for every video stream, and checks stream kinds/count
+and known core codecs. Cancellation, timeout, diagnostics, JSON bounds and refusal
+to publish on failure remain enforced. This is sampled readability, not an exact
+frame count or a full-file corruption scan. Full decode qualification is separate.
 
 ## C7 — machine.json
 

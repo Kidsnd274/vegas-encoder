@@ -1,9 +1,34 @@
 # Vegas Encoder status
 
-Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.3-progress-text-proof
-(B5 owner-authorized trial completed for normal renders; mode 4 retained).
+Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.4-recipe-proof
+(owner's first connected B6 trial; 0.1.5 fixes staged separately, not installed).
 
 ## Current progress
+
+**First real B6 trial and fixes (2026-10-15):** owner reports popup edits and a
+successful render/progress window on VEGAS 2026.0.3.189. Native C6 confirms FFV1,
+PCM float, 182 frames of 1920×1080 P010 input, success/publication and passed
+FFprobe readback. This is a real smoke result, not persistence/recovery/performance
+qualification. The trial exposed byte-shifted template names/notes, intermittent
+invalid edit requests, about three-second popup startup and Explorer opening Documents.
+
+The **0.1.5-recipe-proof / app 0.1.5+1** candidate aligns the native UTF-16 suffix
+with at most one zero byte outside the strict payload; old intact odd envelopes
+still read, but corrupted names cannot be reconstructed. No template-index change:
+the historical hidden id-0 workaround was already present. Explorer now receives
+its switch separately from quoted paths. Progress no longer adds a periodic idle
+wait, keeping the two-Hz budget. Sampled readback replaces a full recount: on the
+owner's output, the same FFprobe fell from **9.897 s to 0.743 s**. All stream/codec/
+positive-video and publication/cancellation/error guards remain. Late-file corruption
+is outside this sampled check. Popup startup gets immediate status/timings; its
+three-second cold latency remains **unresolved pending measured retest**.
+
+Staged separately in `build/b6-candidate-0.1.5`, preserving the first candidate,
+its data, existing native templates and installed exporter; rollback copies the
+currently installed 0.1.4 files/manifest. See [B6_TRIAL.md](B6_TRIAL.md). Focused
+checks and app-owned startup follow-up are in the platform handoff. A5–A7, real
+save/restart persistence, capacity, controlled real failure recovery and monitor
+performance remain unverified.
 
 **B6 connected candidate (2026-10-15):** owner resumed B6 and offered to test
 VEGAS. Prepared **0.1.4-recipe-proof** with the existing **0.1.4+1** frontend:

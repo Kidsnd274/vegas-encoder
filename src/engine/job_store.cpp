@@ -138,7 +138,19 @@ DWORD WINAPI JobStore::Worker(void* context) {
   for (;;) {
     ve::Json status = nullptr, record = nullptr;
     { std::unique_lock<std::mutex> lock(state->mutex);
-      state->changed.wait_for(lock, std::chrono::milliseconds(500), [&] { return state->closing || !state->phases.empty(); });
+      // Wake for the first pending sample when the 2 Hz budget is free. A
+      // recurring 500 ms wait can add another whole interval after an idle gap.
+      for (;;) {
+        if (state->closing || !state->phases.empty()) break;
+        if (state->latest.is_null()) {
+          state->changed.wait(lock,[&] { return state->closing || !state->phases.empty() || !state->latest.is_null(); });
+        } else {
+          const auto now = GetTickCount64();
+          if (now - last >= 500) break;
+          state->changed.wait_for(lock,std::chrono::milliseconds(500 - (now - last)),
+            [&] { return state->closing || !state->phases.empty(); });
+        }
+      }
       if (!state->phases.empty()) { status = std::move(state->phases.front()); state->phases.pop_front(); }
       else if (!state->latest.is_null() && GetTickCount64() - last >= 500) { status = std::move(state->latest); state->latest = nullptr; }
       if (state->closing && state->phases.empty()) record = state->record;

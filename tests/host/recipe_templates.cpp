@@ -8,6 +8,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <cstring>
+#include <cwchar>
 #include <thread>
 
 using ve::Json;
@@ -49,6 +51,39 @@ bool PreservesHost(const Tpl& before, const Tpl& after) {
   return std::equal(fixedBefore.begin(), fixedBefore.begin()+sfio::tpl::abExtra, fixedAfter.begin()) &&
     std::equal(before.b.begin()+sfio::tpl::abExtra+before.U32(sfio::tpl::cbExtra), before.b.end(),
                after.b.begin()+sfio::tpl::abExtra+after.U32(sfio::tpl::cbExtra), after.b.end());
+}
+// Exercise a wchar-indexed host consumer, rather than only the byte-oriented
+// reader which previously hid odd private sizes from all the fake checks.
+size_t WordTextStart(const Tpl& value) {
+  return sfio::tpl::abExtra + sizeof(wchar_t) * (value.U32(sfio::tpl::cbExtra) / sizeof(wchar_t));
+}
+std::wstring WordText(const Tpl& value, unsigned field) {
+  size_t at = WordTextStart(value);
+  size_t remaining = value.U32(sfio::tpl::cchAllocText);
+  std::wstring result;
+  while (remaining--) {
+    wchar_t unit = 0;
+    std::memcpy(&unit, value.b.data() + at, sizeof unit); at += sizeof unit;
+    if (!unit) { if (!field) return result; --field; result.clear(); }
+    else if (!field) result += unit;
+  }
+  throw std::runtime_error("Missing host-style text terminator.");
+}
+void WordRename(Tpl& value, const wchar_t* name, const wchar_t* notes) {
+  const size_t nameChars = std::wcslen(name) + 1, notesChars = std::wcslen(notes) + 1;
+  if (nameChars + notesChars > value.U32(sfio::tpl::cchAllocText))
+    throw std::runtime_error("Host rename exceeds this fixture's text allocation.");
+  const size_t start = WordTextStart(value);
+  std::fill_n(value.b.begin() + start, sizeof(wchar_t) * value.U32(sfio::tpl::cchAllocText), BYTE{0});
+  std::memcpy(value.b.data() + start, name, sizeof(wchar_t) * nameChars);
+  std::memcpy(value.b.data() + start + sizeof(wchar_t) * nameChars, notes, sizeof(wchar_t) * notesChars);
+}
+Tpl Unpadded(const Tpl& empty, const std::vector<uint8_t>& payload) {
+  auto value = empty;
+  value.b.insert(value.b.begin() + sfio::tpl::abExtra, payload.begin(), payload.end());
+  value.SetU32(sfio::tpl::cbStruct, static_cast<DWORD>(value.b.size()));
+  value.SetU32(sfio::tpl::cbExtra, static_cast<DWORD>(payload.size()));
+  return value;
 }
 Json Request(const char* id = "session-one") {
   return {{"protocol",1}, {"sessionId",id}, {"templateName","wrong/stale name"},
@@ -123,8 +158,22 @@ void Placement(const Json& bundle) {
       odd["extensions"]["parity"] = "x";
       if (ve::EncodePayload(odd).size()%2 != static_cast<size_t>(parity)) odd["extensions"]["parity"] = "xx";
       const auto placed = ReplaceRecipeSnapshot(value,owner,odd);
-      Check(placed.U32(sfio::tpl::cbExtra)%2 == static_cast<DWORD>(parity) && PreservesHost(value,placed) &&
-            placed.Name() == empty.Name(), "odd/even payload spans do not assume wchar alignment");
+      const auto encoded = ve::EncodePayload(odd);
+      Check(placed.U32(sfio::tpl::cbExtra) == encoded.size() + encoded.size()%2 && PreservesHost(value,placed) &&
+            placed.Name() == empty.Name() && WordText(placed,0) == empty.Name() && WordText(placed,1) == empty.Notes(),
+            "odd/even envelopes align UTF-16 for both byte and wchar-indexed readers");
+      Check(Same(ReadRecipeSnapshot(placed,owner),odd), "native alignment byte is outside strict core envelope");
+      if (parity) {
+        auto badPad = placed; badPad.b[sfio::tpl::abExtra+encoded.size()] = 1;
+        Check(Rejects([&] { ReadRecipeSnapshot(badPad,owner); }), "nonzero native alignment byte rejected");
+        Check(ve::HasErrors(ve::DecodePayload(placed.b.data()+sfio::tpl::abExtra,placed.U32(sfio::tpl::cbExtra)).at("issues")),
+              "core envelope decoder still rejects native padding directly");
+        const auto legacy = Unpadded(empty,encoded);
+        Check(Same(ReadRecipeSnapshot(legacy,owner),odd) && legacy.Name() == empty.Name() && WordText(legacy,0) != empty.Name(),
+              "old odd B6 bytes remain readable while reproducing a wchar-offset text mismatch");
+        const auto repaired = ReplaceRecipeSnapshot(legacy,owner,odd);
+        Check(repaired.b == placed.b, "replacement safely aligns legacy private allocation without interpreting text");
+      }
     }
   }
   const auto snapshot = Snapshot(bundle.at("fixtures")[0].at("recipe"));
@@ -153,6 +202,43 @@ void Placement(const Json& bundle) {
   Check(Rejects([&] { CreateRecipeTemplate(huge,owner,snapshot); }), "host allocation growth limit enforced");
   auto tooLarge = snapshot; tooLarge["extensions"]["huge"] = std::string(VE_CORE_PAYLOAD_LIMIT,'x');
   Check(Rejects([&] { ReplaceRecipeSnapshot(value,owner,tooLarge); }), "core 16 KiB envelope limit retained at native boundary");
+  for (const auto suffix : {std::vector<uint8_t>{0,0},std::vector<uint8_t>{1},std::vector<uint8_t>{0,0,0}}) {
+    auto raw = ve::EncodePayload(snapshot); raw.insert(raw.end(),suffix.begin(),suffix.end());
+    const auto invalid = Unpadded(Empty(),raw);
+    Check(Rejects([&] { ReadRecipeSnapshot(invalid,owner); }), "arbitrary private suffix never becomes permitted alignment padding");
+  }
+}
+
+void HostTextRoundtrips(const Json& recipe) {
+  auto snapshot = Snapshot(recipe);
+  auto value = CreateRecipeTemplate(Empty(),owner,snapshot);
+  Allocator allocator; Holder holder(value,allocator);
+  IProofTemplateStore* store = nullptr;
+  Check(CreateNativeTemplateStore(&holder,&allocator,&store) == S_OK && store, "host text regression binds measured holder seam");
+  for (size_t i = 0; i < 6; ++i) {
+    snapshot["extensions"]["growShrink"] = std::string(i%2 ? 1 : 1001,'x');
+    // Cross both envelope parities, independently of growth and native names.
+    snapshot["extensions"]["parity"] = "x";
+    if (ve::EncodePayload(snapshot).size()%2 != i%2) snapshot["extensions"]["parity"] = "xx";
+    value = ReplaceRecipeSnapshot(value,owner,snapshot);
+    const auto payload = std::vector<BYTE>(value.b.begin()+sfio::tpl::abExtra,
+                                         value.b.begin()+sfio::tpl::abExtra+value.U32(sfio::tpl::cbExtra));
+    const wchar_t* name = i%2 ? L"B6 H264 8" : L"B6 Lossless 10";
+    WordRename(value,name,L"\u03a9 \u6d4b\u8bd5");
+    Check(std::equal(payload.begin(),payload.end(),value.b.begin()+sfio::tpl::abExtra) && value.Name() == name &&
+          value.Notes() == L"\u03a9 \u6d4b\u8bd5", "wchar-indexed rename preserves private settings and Unicode notes");
+    Check(store->Commit(&value) == S_OK, "host commits renamed variable-size template");
+    Tpl reopened;
+    Check(store->Load(&reopened) == S_OK && reopened.b == value.b && WordText(reopened,0) == name &&
+          Same(ReadRecipeSnapshot(reopened,owner),snapshot), "holder reopen retains separate name, notes and recipe across parity changes");
+    RecipeTemplateDraft draft(reopened,owner,"reopened");
+    const auto request = draft.BeginEdit(Request());
+    Check(request.at("templateName") == vegas_encoder::Utf8(name) &&
+          !ve::HasErrors(ve::SessionRequest(request).at("issues")), "reopened renamed template creates a valid editor request");
+  }
+  store->Release();
+  Check(allocator.allocs == allocator.frees && allocator.refs == 1 && holder.refs == 1,
+        "host text roundtrip returns every owned buffer/reference");
 }
 
 void Sessions(const Json& recipe) {
@@ -224,6 +310,16 @@ void Sessions(const Json& recipe) {
   }
   auto badRequest = Request(); badRequest["ownerHwnd"] = "0";
   Check(Rejects([&] { draft.BeginEdit(badRequest); }) && !draft.Editing(), "invalid request never opens transaction");
+  std::string contextError;
+  try { draft.BeginEdit(badRequest); } catch (const std::invalid_argument& error) { contextError = error.what(); }
+  Check(contextError.find("S-HWND, ownerHwnd") != std::string::npos,
+        "request failure reports precise core issue and field without logging template contents");
+  auto unnamed = Tpl::Make(L"",L"Empty name",0); unnamed.SetGuid(sfio::tpl::iidOwner,owner);
+  RecipeTemplateDraft unnamedDraft(CreateRecipeTemplate(unnamed,owner,snapshot),owner,"unnamed");
+  contextError.clear();
+  try { unnamedDraft.BeginEdit(Request()); } catch (const std::invalid_argument& error) { contextError = error.what(); }
+  Check(contextError.find("S-REQUEST, templateName") != std::string::npos && !unnamedDraft.Editing(),
+        "empty host template name identifies the failed field instead of an ambiguous context error");
   auto hugeRequest = Request(); hugeRequest["extensions"]["huge"] = std::string(VE_CORE_JSON_LIMIT,'x');
   Check(Rejects([&] { draft.BeginEdit(hugeRequest); }) && !draft.Editing(), "oversize C4 request never opens transaction");
   draft.BeginEdit(Request("oversize-result"));
@@ -282,6 +378,7 @@ int main(int argc, char** argv) {
     const std::string bytes((std::istreambuf_iterator<char>(file)),{});
     const auto bundle = ve::Parse(reinterpret_cast<const uint8_t*>(bytes.data()),bytes.size());
     Placement(bundle);
+    HostTextRoundtrips(bundle.at("fixtures")[0].at("recipe"));
     Sessions(bundle.at("fixtures")[0].at("recipe"));
     printf("B6 OFFLINE SNAPSHOT/SESSION PASSED: %d checks; owned bytes/fake holder, no VEGAS/process/UI\n", checks);
     return 0;

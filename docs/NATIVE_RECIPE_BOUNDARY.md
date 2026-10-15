@@ -1,9 +1,11 @@
 # B6 recipe bytes, editor bridge and opt-in native candidate
 
 The owner resumed B6 preparation and real-host testing on 2026-10-15. The opt-in
-**0.1.4-recipe-proof** candidate now connects fresh native recipe templates to the
+**0.1.5-recipe-proof** fix candidate connects fresh native recipe templates to the
 existing frontend popup and recipe engine/C5 monitor. Default and historical proof
-builds keep their previous paths. The candidate is staged, **not installed**;
+builds keep their previous paths. The owner's first 0.1.4 trial rendered successfully
+but exposed text corruption and intermittent editor startup errors. The fix
+candidate is staged, **not installed**;
 see [B6_TRIAL.md](B6_TRIAL.md) for installation, isolated data, testing and rollback.
 A5–A7, real two-template/restart persistence, controlled real failure recovery,
 private-payload capacity and monitor performance remain unverified.
@@ -30,12 +32,16 @@ The historical `VENC`/`CFG1` proof cannot be read, replaced or initialized as a
 recipe template. New product templates must be created deliberately; no proof
 migration or automatic overwrite of an unknown private format is supplied.
 
-Odd-length payloads are supported by the owned-byte helper without assuming
-aligned UTF-16. That does **not** establish VEGAS's native save/reload behavior,
-maximum private length or text alignment. The existing holder/allocator bridge
-can copy these variable-length values in the fake harness; the actual saved host
-workflow still requires qualification. No host memory or saved template is edited
-by these tests.
+The first real B6 trial exposed garbled names/notes with an odd `cbExtra=559`.
+The original tests checked only this implementation's byte-based text reader and
+missed a wchar-indexed consumer's byte shift. New native allocations round the
+private length to an even number, inserting at most one zero byte **outside** the
+strict VEnc envelope, before the preserved text suffix. Native reads strip only
+that permitted alignment byte; the portable decoder still rejects trailing data.
+Intact original odd B6 envelopes remain readable. This prevents recurrence for new
+templates; it cannot reconstruct text already corrupted by a host save/rename.
+Fresh named templates require the owner's retest. Maximum private size and real
+restart persistence remain unqualified. No saved template is modified automatically.
 
 `ReadRecipeSnapshot` returns an independent value for an immutable render
 job. It reads no preset library, application files or machine preferences. Core

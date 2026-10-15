@@ -126,6 +126,23 @@ abstract interface class FileReveal {
 }
 
 class WindowsFileReveal implements FileReveal {
+  WindowsFileReveal({Future<void> Function(String, List<String>)? launch})
+    : _launch = launch ?? _startExplorer;
+
+  final Future<void> Function(String, List<String>) _launch;
+
+  static Future<void> _startExplorer(
+    String executable,
+    List<String> arguments,
+  ) async {
+    await Process.start(
+      executable,
+      arguments,
+      runInShell: false,
+      mode: ProcessStartMode.detached,
+    );
+  }
+
   @override
   Future<void> reveal(String path) async {
     if (!Platform.isWindows)
@@ -151,11 +168,11 @@ class WindowsFileReveal implements FileReveal {
         'Windows directory is unavailable.',
       );
     try {
-      await Process.start(
+      await _launch(
         joinPath(windows, 'explorer.exe'),
-        [entity == FileSystemEntityType.directory ? path : '/select,$path'],
-        runInShell: false,
-        mode: ProcessStartMode.detached,
+        // Keep the switch separate: Dart quotes an entire argument containing
+        // spaces, and Explorer ignores a quoted "/select,<path>" token.
+        entity == FileSystemEntityType.directory ? [path] : ['/select,', path],
       );
     } on ProcessException catch (e) {
       throw ServiceException('REVEAL-FAILED', e.message);

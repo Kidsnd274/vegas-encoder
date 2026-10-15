@@ -24,7 +24,7 @@ static_assert(sizeof(void*) == 8 && sizeof(LONG_PTR) == 8, "VEGAS x64 pointer wi
 namespace vegas_encoder {
 
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-inline constexpr const char* kVersion = "0.1.4-recipe-proof";
+inline constexpr const char* kVersion = "0.1.5-recipe-proof";
 #elif defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
 inline constexpr const char* kVersion = "0.1.3-progress-text-proof";
 #elif defined(VEGAS_ENCODER_CONFIGURATION_PROOF)

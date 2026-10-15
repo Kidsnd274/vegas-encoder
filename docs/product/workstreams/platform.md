@@ -1,14 +1,85 @@
 # Platform workstream
 
 Updated: 2026-10-15 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
-branch `ws/platform`. **B5 committed/merged; B6 owned snapshot/session checkpoint
-validated offline; C4 file/process transport added, still disabled in exporters.** B1–B4 and app F4 are merged. Continued
+branch `ws/platform`. **B6 connected candidate trialled by the owner; 0.1.5 fixes
+prepared for native text, Explorer reveal and progress/readback latency.** B1–B4 and app F4 are merged. Continued
 from `659fe02`; F3 master `0be99dc` was fast-forwarded before the B1 commit.
 B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
-## B6 connected candidate ready for the owner's VEGAS trial
+## First real B6 feedback and 0.1.5 fix candidate
+
+The owner installed **0.1.4-recipe-proof** and tried popup edits/save/restart and a
+render. Screenshots show Chinese-looking/byte-shifted names and notes, native/popup
+name disagreement and intermittent “Invalid edit-session request/context”. One
+successful real render produced C6 job `B5941A06-6823-4AC5-B19F-FF900E22F509`:
+VEGAS **2026.0.3.189**, supplied gyan FFmpeg **5.1.2**, FFV1/PCM float, 182 frames,
+1920×1080 P010/29.97 input, final publication and passed readback. The owner reports
+the monitor works, with slow updates and Open Folder incorrectly opening Documents.
+This is real smoke evidence only. Apply/Cancel/persistence and performance gates
+are **not** passed; the trial found failures rather than qualifying them.
+
+Fixes staged as **0.1.5-recipe-proof / frontend 0.1.5+1**, with no frontend source
+edits. The old candidate/data, saved native templates and installed 0.1.4 files are
+preserved; the new candidate has its own copied trial data and exact 0.1.4 rollback.
+
+- Native payload placement now rounds odd private allocations to even and places
+  at most one zero byte outside the core VEnc envelope. Real logs show `cbExtra=559`;
+  a wchar-indexed regression reproduces the old mismatch and new aligned behavior.
+  Core length/checksum validation stays strict, arbitrary padding is refused,
+  intact old odd envelopes remain readable, and suffix/unknown bytes are preserved.
+  Names/notes already damaged cannot be reconstructed; retest with fresh built-in
+  templates and new saved names. Historical id-0 hiding is already present and
+  is unchanged; no speculative index/GUID reassignment.
+- Invalid C4 requests identify the exact core issue/field instead of a generic
+  context message. The name corruption is a plausible cause of intermittent empty
+  templateName, but that connection requires real retest rather than an assumed fix.
+- Open Folder now passes Explorer `['/select,', path]`. The previous combined token
+  was quoted by Dart when the path contained spaces, causing Explorer to ignore
+  it and open Documents. Actual Explorer reproduced both failure and corrected
+  target selection in isolated test files; those windows were closed.
+- The writer wakes for pending idle metrics when its two-Hz budget is free, with
+  phase updates immediate. It no longer adds a periodic half-second idle wait.
+  Existing coalescing/nonblocking Render rules remain.
+- The owner's 2.140 s encode spent another **9.015 s verifying**. The old probe
+  decoded every output frame to establish only a positive frame count. New
+  `-read_intervals %+#32` bounds the sample, retaining all stream metadata, a
+  positive decoded count for every video, kind/count/known-codec checks and all
+  cancellation/timeout/diagnostic/publication guards. Read-only comparison on that
+  output: **9.897 s → 0.743 s**. It samples readability; corruption later in the
+  file is not scanned. Full decode qualification remains separate. CLI semantics
+  checked against [official FFprobe docs](https://ffmpeg.org/ffprobe.html#Main-options).
+
+Popup startup: the owner observes about three seconds; this remains unresolved.
+The native page now paints its status child with “Starting the editor...” before
+startup and records preflight/files/spawn durations in the existing log. Launch
+still has synchronous OS/file setup on the native UI thread. Replacing it with an
+async state/lifetime mechanism without latency evidence would expand scope and
+risk cancellation/teardown. Next real click will distinguish native startup from
+the helper's first frame. App handoff: use the existing startup trace when native
+setup is fast; do not count sample previews as established project facts. No new
+debugger, sanitizer, AV exclusions or process/thread investigation was used.
+
+Validation: optimized candidate builds; **162 snapshot/host-text** regressions,
+**87 transport**, **102 native-page**, **19 C7 runtime**, writer monitor/cadence
+checks, **94 adapter checks / 9 fake-host real-FFmpeg cases**, and **24,502 engine
+checks / 23 fake-host/real-FFmpeg + controlled-child cases** pass. The engine adds
+an actual owned probe-child test that requires the bounded interval and all-stream
+view, plus malformed/absent/zero sample-count regressions; cancellation/error/
+timeout/destination/recovery cases retain their guards. **12 reveal service checks**
+and targeted analysis pass; release frontend rebuild includes the corrected service.
+The AOT repository runner passes **150** checks; package analysis is clean. The
+actual staged DLL passes the existing fiohost discovery/conformance/render check
+with 24 frames released, six matching allocator frees and `cbExtra=560`; its
+UTF-16 preset name reads “Vegas Encoder settings (MKV)” at the aligned offset.
+
+Owner retest and rollback commands: [B6_TRIAL.md](../../B6_TRIAL.md). Keep A5–A7,
+real restart persistence/capacity, controlled real failure recovery and monitor
+performance unverified. First retest: fresh built-in → two new names → reopen/
+restart; render to a new filename and check Open Folder/terminal latency.
+
+## B6 connected candidate ready for the owner's VEGAS trial (0.1.4 checkpoint)
 
 The owner explicitly resumed B6 after clarifying that the antivirus restriction
 came from earlier debugging/quarantined builds. Prepared the actual connection,

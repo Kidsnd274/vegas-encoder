@@ -13,6 +13,9 @@ Json Read(const fs::path& path) {
   return ve::Parse(reinterpret_cast<const uint8_t*>(bytes.data()),bytes.size());
 }
 void Check(bool ok, const char* message) { if (!ok) throw std::runtime_error(message); }
+bool Sequence(const fs::path& path, int expected) {
+  try { return Read(path).value("sequence",-1) == expected; } catch (const std::exception&) { return false; }
+}
 }
 int wmain(int argc, wchar_t** argv) {
   try {
@@ -52,7 +55,25 @@ int wmain(int argc, wchar_t** argv) {
     const auto deadline = GetTickCount64() + 2000;
     while (GetTickCount64() < deadline && !fs::exists(failedLive)) Sleep(10);
     Check(fs::exists(failedLive) && failed->Failure().empty(),"monitor launch refusal is nonfatal to publication");
-    printf("B6 MONITOR LAUNCH PASSED: initial publication, argv/cwd, stalled child independence and nonfatal launch refusal; fake child only\n");
+    const auto timingId = NewJobId(); const auto timingRoot = root / L"timing";
+    const auto timingFile = timingRoot / (Widen(timingId) + L".live.json");
+    auto timing = JobStore::Create(timingRoot.wstring(),timingId);
+    timing->Status({{"sequence",0}},true);
+    auto end = GetTickCount64() + 2000;
+    while (GetTickCount64() < end && !Sequence(timingFile,0)) Sleep(5);
+    Check(Sequence(timingFile,0),"initial timing snapshot published");
+    Sleep(550); // Idle beyond the 2 Hz deadline; a new sample should wake immediately.
+    const auto sample = GetTickCount64(); timing->Status({{"sequence",1}},false);
+    end = sample + 350;
+    while (GetTickCount64() < end && !Sequence(timingFile,1)) Sleep(5);
+    Check(Sequence(timingFile,1),"idle progress update has no extra half-second timer wait");
+    timing->Status({{"sequence",2}},false); Sleep(100);
+    Check(Sequence(timingFile,1),"ordinary samples remain coalesced within the 2 Hz budget");
+    timing->Status({{"sequence",3}},true);
+    end = GetTickCount64() + 350;
+    while (GetTickCount64() < end && !Sequence(timingFile,3)) Sleep(5);
+    Check(Sequence(timingFile,3),"phase changes bypass sample coalescing");
+    printf("B6 MONITOR LAUNCH/CADENCE PASSED: initial publication, argv/cwd, stalled child independence, nonfatal refusal and 2 Hz wake/coalescing; fake child only\n");
     return 0;
   } catch (const std::exception& error) { printf("B6 MONITOR LAUNCH FAILED: %s\n",error.what()); return 1; }
 }

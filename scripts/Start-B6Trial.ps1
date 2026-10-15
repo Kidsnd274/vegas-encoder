@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
   [ValidateSet('App','Vegas')][string]$Target = 'App',
-  [string]$CandidateRoot = (Join-Path $PSScriptRoot '..\build\b6-candidate'),
+  [string]$CandidateRoot = (Join-Path $PSScriptRoot '..\build\b6-candidate-0.1.5'),
   [string]$VegasDir = 'C:\Program Files\BorisFX\Vegas Pro 2026'
 )
 $ErrorActionPreference = 'Stop'

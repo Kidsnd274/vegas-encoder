@@ -7,6 +7,8 @@ namespace vegas_encoder::configuration {
 
 // Used by the opt-in B6 recipe candidate. Native persistence and production
 // activation remain unqualified until the owner's real-host A5-A7 tests.
+// Native private allocations align the following UTF-16 text with at most one
+// zero byte outside the strict core envelope. Earlier unpadded bytes still read.
 ve::Json ReadRecipeSnapshot(const host::Tpl& value, const GUID& owner);
 // Only a fresh product template with NO private bytes can be initialized.
 // Never interpret/convert the historical VENC/CFG1 proof marker as a recipe.

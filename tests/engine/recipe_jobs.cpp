@@ -80,6 +80,18 @@ void PureChecks() {
   Require(VerifyProbe(changed,expected)["state"] == "failed","duplicate stream refuses publication");
   changed = probe; changed["streams"][0]["nb_read_frames"] = "0";
   Require(VerifyProbe(changed,expected)["state"] == "failed","unreadable video refuses publication");
+  changed = probe; changed["streams"][0]["nb_read_frames"] = "1";
+  Require(VerifyProbe(changed,expected)["state"] == "passed","one decoded sample frame proves readability without requiring a full recount");
+  for (const auto* count : {"", "N/A", "-1", "1.5", "000"}) {
+    changed = probe; changed["streams"][0]["nb_read_frames"] = count;
+    Require(VerifyProbe(changed,expected)["state"] == "failed","invalid sampled video count refuses publication");
+  }
+  changed = probe; changed["streams"][0].erase("nb_read_frames");
+  Require(VerifyProbe(changed,expected)["state"] == "failed","uncounted video refuses publication");
+  changed = probe; changed["streams"][0]["width"] = 0;
+  Require(VerifyProbe(changed,expected)["state"] == "failed","invalid sampled video dimensions refuse publication");
+  changed = probe; changed["streams"][1]["codec_type"] = "subtitle";
+  Require(VerifyProbe(changed,expected)["state"] == "failed","unexpected stream kind refuses publication");
   expected[0]["codec"] = nullptr;
   Require(VerifyProbe(probe,expected)["state"] == "passed","unknown codec remains unknown");
   Require(VerifyProbe(probe,nullptr)["state"] == "passed","unknown Advanced scope readback is explicit");
@@ -287,6 +299,9 @@ Json Run(const Case& test, const std::wstring& root) {
     Require(stats.published && stats.exitCode == 0 && job.Record()["sizeBytes"] > 0,"success means exit/output publication");
     Require(!withAudio || samples == endpoint,"cumulative fractional samples exact");
     Require(stats.videoBytes == uint64_t(test.frames)*test.width*test.height*3 && stats.audioBytes == uint64_t(samples)*8,"every owned frame/sample byte reaches input EOF");
+    if (test.name == "probe-sampled")
+      Require(job.Record()["verification"]["state"] == "passed" &&
+              job.Record()["verification"]["ffprobeVersion"] == "B4 bounded sample fixture","actual probe child accepted bounded readback args and one decoded frame");
   } else {
     Require(!stats.published && job.Record()["sizeBytes"] == 0,"stopped job never publishes bytes");
     if (test.cancelAt >= 0 || test.timedCancel || test.cancelDuringProbe) Require(job.Record()["status"] == "cancelled","cancellation remains distinct");
@@ -316,15 +331,24 @@ Json Run(const Case& test, const std::wstring& root) {
 }
 int Child(int argc, wchar_t** argv) {
   std::wstring mode, output; std::vector<std::wstring> inputs;
-  bool probe = false;
+  bool probe = false, selectedStreams = false;
+  int boundedIntervals = 0;
   for (int i=1;i<argc;++i) {
     if (std::wstring(argv[i]) == L"-b4-fixture" && i+1<argc) mode=argv[++i];
     else if (std::wstring(argv[i]) == L"-count_frames") probe=true;
+    else if (std::wstring(argv[i]) == L"-read_intervals" && i+1<argc) {
+      if (std::wstring(argv[++i]) == L"%+#32") ++boundedIntervals;
+    }
+    else if (std::wstring(argv[i]) == L"-select_streams") selectedStreams=true;
     else if (std::wstring(argv[i]) == L"-i" && i+1<argc) inputs.emplace_back(argv[++i]);
   }
   if (mode.empty() && !probe) return -1;
   output=argv[argc-1];
   if (probe) {
+    if (boundedIntervals != 1 || selectedStreams) { fputs("Probe must sample 32 packets and retain all streams.\n",stderr); return 11; }
+    if (output.find(L"probe-sampled")!=std::wstring::npos) {
+      puts("{\"program_version\":{\"version\":\"B4 bounded sample fixture\"},\"streams\":[{\"codec_type\":\"video\",\"codec_name\":\"ffv1\",\"width\":320,\"height\":180,\"nb_read_frames\":\"1\"},{\"codec_type\":\"audio\",\"codec_name\":\"pcm_f32le\"}]}"); return 0;
+    }
     if (output.find(L"probe-timeout")!=std::wstring::npos || output.find(L"probe-cancel")!=std::wstring::npos) { Sleep(20000); return 0; }
     if (output.find(L"probe-limit")!=std::wstring::npos) { const std::string bytes(2*1024*1024,'a'); fwrite(bytes.data(),1,bytes.size(),stdout); return 0; }
     if (output.find(L"probe-malformed")!=std::wstring::npos) { puts("{broken-json"); return 0; }
@@ -380,7 +404,9 @@ int wmain(int argc, wchar_t** argv) {
     test.width=320; test.height=180; test.name="index-blocked"; test.blockedIndex=true; summaries.push_back(Run(test,root));
     test.blockedIndex=false; test.name="live-blocked"; test.blockedLive=true; summaries.push_back(Run(test,root));
     test.blockedLive=false; test.name="status-root-failure"; test.invalidRoot=true; summaries.push_back(Run(test,root));
-    test.invalidRoot=false; test.installation=Installation(argv[firstBuild],Self()); test.success=false;
+    test.invalidRoot=false; test.installation=Installation(argv[firstBuild],Self());
+    test.name="probe-sampled"; summaries.push_back(Run(test,root));
+    test.success=false;
     for (const auto* name : {"probe-mismatch","probe-malformed","probe-limit","probe-timeout"}) { test.name=name; test.probeTimeout=300; summaries.push_back(Run(test,root)); }
     test.name="probe-cancel"; test.probeTimeout=3000; test.cancelDuringProbe=true; summaries.push_back(Run(test,root)); test.cancelDuringProbe=false;
     test.installation=Installation(Self(),Self()); test.verify=false;

@@ -122,8 +122,8 @@ ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expected) {
     }
   }
   result["state"] = "passed"; result["message"] = expected.is_array() ?
-    "FFprobe readback passed; stream kinds/count and known core codecs match." :
-    "FFprobe readback passed; exact Advanced output scope is unknown to the core.";
+    "FFprobe sample readback passed; stream kinds/count and known core codecs match." :
+    "FFprobe sample readback passed; exact Advanced output scope is unknown to the core.";
   return result;
 }
 ve::Json LiveVideoFacts(const ve::Json& compiled) {
@@ -266,11 +266,14 @@ void RecipeJob::Phase(const std::string& state, const std::string& message) {
 }
 bool RecipeJob::Verify(const Poll& poll) {
   if (!options_.verifyOutput) { verification_ = Verification("skipped","Output verification explicitly disabled by machine settings."); return true; }
-  Phase("verifying","Checking encoded output.");
+  Phase("verifying","Checking an encoded output sample.");
   std::string bytes, failure;
   const auto stats = encoder_.Stats();
+  // Positive decoded video counts prove sampled readability; they are not an
+  // exact output frame-count check. Bound decoding to the first 32 packets,
+  // retaining all stream metadata for kind/count/known-codec validation.
   const bool ok = ProbeChild(Widen(ve::Str(installation_,"ffprobePath")),
-    {L"-v",L"error",L"-count_frames",L"-show_entries",L"program_version=version:stream=codec_type,codec_name,width,height,nb_read_frames:format=duration",
+    {L"-v",L"error",L"-read_intervals",L"%+#32",L"-count_frames",L"-show_entries",L"program_version=version:stream=codec_type,codec_name,width,height,nb_read_frames:format=duration",
      L"-show_program_version",L"-of",L"json",stats.tempPath}, options_.probeTimeoutMs,[&] { return Check(poll); },bytes,failure);
   if (!ok) { verification_ = Verification("failed",failure); return false; }
   try { verification_ = VerifyProbe(ve::Parse(reinterpret_cast<const uint8_t*>(bytes.data()),bytes.size()),compiled_.at("expectedStreams")); }

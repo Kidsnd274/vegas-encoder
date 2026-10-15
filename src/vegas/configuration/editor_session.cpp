@@ -1,5 +1,6 @@
 #include "editor_session.h"
 #include "../../support/diagnostics.h"
+#include "../../support/native_boundary.h"
 #include <algorithm>
 #include <filesystem>
 
@@ -167,6 +168,7 @@ bool EditorSessionTransport::Active() const { impl_->RequireCaller(); return imp
 std::wstring EditorSessionTransport::Directory() const { impl_->RequireCaller(); return impl_->directory.wstring(); }
 DWORD EditorSessionTransport::ProcessId() const { impl_->RequireCaller(); return impl_->pid; }
 void EditorSessionTransport::Start(const ve::Json& request, const EditorLaunch& launch) {
+  const auto started = NowMs();
   auto& p = *impl_; p.RequireCaller();
   Require(!p.attempted, "Editor transport permits one launch only.");
   p.attempted = true;
@@ -186,6 +188,7 @@ void EditorSessionTransport::Start(const ve::Json& request, const EditorLaunch& 
   try {
     auto pin = PinDirectory(p.directory); p.directoryPin.h = pin.h; pin.h = INVALID_HANDLE_VALUE;
     WriteRequest(p.directory, bytes);
+    const auto prepared = NowMs();
     std::wstring command = Quote(application);
     for (const auto& argument : launch.arguments) command += L" " + Quote(argument);
     command += L" --edit-session " + Quote(p.directory.wstring());
@@ -208,6 +211,7 @@ void EditorSessionTransport::Start(const ve::Json& request, const EditorLaunch& 
       throw std::runtime_error("Cannot own/resume editor helper.");
     }
     p.active = true;
+    BestEffortDiagnostic([&] { Log("B6 editor transport: files/validation=%.1f ms spawn=%.1f ms",prepared-started,NowMs()-prepared); });
   } catch (...) {
     p.job.Close();
     (void)p.Cleanup();
