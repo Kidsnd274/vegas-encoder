@@ -20,6 +20,8 @@ const String b0ServiceFixtureJson = r'''{
       "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
       "templateName": "YouTube 4K upload (Lakeside)",
       "encoderSummary": "libx264 + aac",
+      "outputBitDepth": null,
+      "pixelFormatConversionReducesPrecision": null,
       "message": "",
       "ffmpegExitCode": null
     },
@@ -42,6 +44,8 @@ const String b0ServiceFixtureJson = r'''{
       "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
       "templateName": "YouTube 4K upload (Lakeside)",
       "encoderSummary": "libx264 + aac",
+      "outputBitDepth": 8,
+      "pixelFormatConversionReducesPrecision": true,
       "message": "",
       "ffmpegExitCode": null
     },
@@ -64,6 +68,8 @@ const String b0ServiceFixtureJson = r'''{
       "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
       "templateName": "YouTube 4K upload (Lakeside)",
       "encoderSummary": "libx264 + aac",
+      "outputBitDepth": 8,
+      "pixelFormatConversionReducesPrecision": true,
       "message": "",
       "ffmpegExitCode": null
     },
@@ -86,6 +92,8 @@ const String b0ServiceFixtureJson = r'''{
       "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
       "templateName": "YouTube 4K upload (Lakeside)",
       "encoderSummary": "libx264 + aac",
+      "outputBitDepth": 8,
+      "pixelFormatConversionReducesPrecision": true,
       "message": "",
       "ffmpegExitCode": null
     },
@@ -108,6 +116,8 @@ const String b0ServiceFixtureJson = r'''{
       "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
       "templateName": "YouTube 4K upload (Lakeside)",
       "encoderSummary": "libx264 + aac",
+      "outputBitDepth": 8,
+      "pixelFormatConversionReducesPrecision": true,
       "message": "",
       "ffmpegExitCode": 0
     },
@@ -130,6 +140,8 @@ const String b0ServiceFixtureJson = r'''{
       "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
       "templateName": "YouTube 4K upload (Lakeside)",
       "encoderSummary": "libx264 + aac",
+      "outputBitDepth": 8,
+      "pixelFormatConversionReducesPrecision": true,
       "message": "FFmpeg exited with code 1. Partial file removed.",
       "ffmpegExitCode": 1
     },
@@ -152,6 +164,8 @@ const String b0ServiceFixtureJson = r'''{
       "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
       "templateName": "YouTube 4K upload (Lakeside)",
       "encoderSummary": "libx264 + aac",
+      "outputBitDepth": 8,
+      "pixelFormatConversionReducesPrecision": true,
       "message": "Cancelled in VEGAS. Partial file removed.",
       "ffmpegExitCode": null
     }

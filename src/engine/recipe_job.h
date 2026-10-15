@@ -53,4 +53,7 @@ class RecipeJob {
 };
 // Pure fact comparison, independently exercised with malformed/mismatched probes.
 ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expectedStreams);
+// C5's nullable video facts come only from a successfully compiled, scoped
+// native-core result. No FFmpeg command or human-readable summary is parsed.
+ve::Json LiveVideoFacts(const ve::Json& compiled);
 } // namespace vegas_encoder

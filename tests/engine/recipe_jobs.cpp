@@ -88,6 +88,79 @@ void PureChecks() {
   Require(ve::ErrorTokenIndices(compiled,"Unrecognized option 'wrong'.") == Json::array({2}),"runtime argv indexes exclude executable");
   Require(ve::ErrorTokenIndices(compiled,"generic encoder failure").empty(),"unknown error provenance stays empty");
 }
+void LiveFactChecks(const Json& fixtures) {
+  const auto& fixture = fixtures.at("fixtures")[0];
+  auto recipe = fixture.at("recipe"), media = fixture.at("media");
+  auto compile = [&] { return ve::Compile({{"recipe",recipe},{"media",media},{"paths",fixture.at("paths")}}); };
+  auto facts = [&](const Json& compiled, const Json& depth, const Json& reduced, const char* message) {
+    const auto actual = LiveVideoFacts(compiled);
+    Require(actual.at("outputBitDepth") == depth && actual.at("pixelFormatConversionReducesPrecision") == reduced,message);
+  };
+  const auto basic = compile();
+  Require(!ve::HasErrors(basic.at("issues")),"C5 basic fact source is a valid real-core compile");
+  facts(basic,8,true,"C5 P010 to 8-bit lowers pixel precision");
+  media["video"]["pixfmt"] = "yuv420p";
+  facts(compile(),8,false,"C5 unchanged 8-bit has no precision reduction");
+  recipe["video"]["depth"] = 10; recipe["video"]["profile"] = "high10";
+  facts(compile(),10,false,"C5 increased depth is not a precision reduction");
+  media = fixture.at("media");
+  facts(compile(),10,false,"C5 planar layout conversion preserves 10-bit precision");
+  recipe["video"]["extra"] = "-pix_fmt p010le";
+  const auto unchanged = compile();
+  Require(unchanged.at("signalPath").at("video").at("conversion") == false,"C5 unchanged P010 uses established no-conversion core fact");
+  facts(unchanged,10,false,"C5 unchanged P010 preserves precision");
+  media["video"]["pixfmt"] = "unmodeled-input-format";
+  facts(compile(),10,nullptr,"C5 known output keeps unknown input precision nullable");
+  media = fixture.at("media");
+  for (const auto* extra : {"-pix_fmt +","-pix_fmt +unmodeled-output-format","-pix_fmt:v:1 yuv420p","-pix_fmt:0 yuv420p"}) {
+    recipe["video"]["extra"] = extra;
+    facts(compile(),nullptr,nullptr,"C5 Basic unknown or unsupported pixel-format scope stays unknown");
+  }
+  recipe["video"]["extra"] = ""; recipe["audio"][0]["extra"] = "-pix_fmt yuv420p";
+  facts(compile(),nullptr,nullptr,"C5 cross-stream Basic audio Extra pixel format keeps final video unknown");
+  recipe["audio"][0]["extra"] = "";
+  for (const auto* extra : {"-vf format=yuv420p,format=yuv420p10le","-filter:v format=yuv420p,format=yuv420p10le","-filter:v:0 format=yuv420p,format=yuv420p10le"}) {
+    recipe["video"]["extra"] = extra;
+    facts(compile(),10,nullptr,"C5 arbitrary Basic graph keeps precision change unknown");
+  }
+  recipe = fixture.at("recipe"); recipe["video"]["enabled"] = false;
+  facts(compile(),nullptr,nullptr,"C5 disabled video has no depth or conversion claim");
+  recipe = fixture.at("recipe"); recipe["video"]["profile"] = "main10";
+  facts(compile(),nullptr,nullptr,"C5 failed core compile has no video facts");
+  recipe = fixture.at("recipe"); recipe["command"] = {{"mode","template"},{"template",basic.at("advancedTemplate")}};
+  facts(compile(),8,true,"C5 Basic-derived Advanced seed retains established depth facts");
+  for (const auto* option : {"-pix_fmt","-pix_fmt:v","-pix_fmt:v:0"}) {
+    recipe["command"]["template"] = std::string("{inputs} -map 0:v:0 -c:v libx264 ") + option + " yuv420p -f matroska {output}";
+    facts(compile(),8,true,"C5 explicitly scoped Advanced first-video pixel format is established");
+  }
+  for (const auto* text : {
+      "{inputs} -map 1:a:0 -c:a aac -c:v libx264 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -map 0:v:0 -map 0:v:0 -c:v libx264 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -map 0:v -c:v libx264 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -map 2:v:0 -c:v libx264 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -map 0:v:0 -c:v:1 libx264 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -map 0:v:0 -c libx264 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -map 0:v:0 -c:v copy -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -i other.mkv -c:v libx264 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -c:v libx264 -pix_fmt yuv420p other.mkv {output}",
+      "{inputs} -filter_complex null -c:v libx264 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -vn -c:v libx264 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -map 0:v:0 -c:v libx264 -pix_fmt:v:1 yuv420p -f matroska {output}",
+      "{inputs} -map 1:a:0 -map 0:v:0 -c:a aac -c:v libx264 -pix_fmt:0 yuv420p -f matroska {output}",
+      "-pix_fmt yuv420p {inputs} -map 0:v:0 -c:v libx264 -f matroska {output}",
+      "-c:v libx264 {inputs} -map 0:v:0 -pix_fmt yuv420p -f matroska {output}",
+      "{inputs} -map 0:v:0 -c:v libx264 -pix_fmt yuv420p -metadata \"unfinished"}) {
+    recipe["command"]["template"] = text;
+    facts(compile(),nullptr,nullptr,"C5 general/ambiguous/unfinished Advanced video remains unknown");
+  }
+  recipe["command"]["template"] = "-pix_fmt yuv420p {inputs} -map 0:v:0 -c:v libx264 -pix_fmt yuv420p10le -f matroska {output}";
+  facts(compile(),10,false,"C5 input pixel format does not displace explicit output format");
+  recipe["command"]["template"] = "{inputs} -map 0:v:0 -c:v libx264 -filter:v format=yuv420p,format=yuv420p10le -pix_fmt yuv420p10le -f matroska {output}";
+  facts(compile(),10,nullptr,"C5 arbitrary Advanced filter alias keeps precision change unknown");
+  recipe["command"]["template"] = "{inputs} -map 0:v:0 -c:v libx264 -pix_fmt yuv420p10le -c:a aac -filter format=yuv420p,format=yuv420p10le -f matroska {output}";
+  facts(compile(),10,nullptr,"C5 unscoped graph does not borrow the previous audio option's scope");
+  facts(Json::object(),nullptr,nullptr,"C5 absent core results do not invent facts");
+}
 struct Case {
   std::string name;
   Json recipe, installation;
@@ -206,6 +279,10 @@ Json Run(const Case& test, const std::wstring& root) {
   Require(maxPollGap < (instrumented ? 2000u : 250u),"caller progress polling gap budget");
   Require(job.Record()["published"] == test.success,"terminal publication fact");
   Require(job.Record()["recipeSha256"] == RecipeHash(test.recipe),"canonical recorded recipe hash");
+  const auto videoFacts = LiveVideoFacts(job.Compiled());
+  const auto liveStatus = job.LiveStatus();
+  Require(liveStatus["outputBitDepth"] == videoFacts.at("outputBitDepth") &&
+          liveStatus["pixelFormatConversionReducesPrecision"] == videoFacts.at("pixelFormatConversionReducesPrecision"),"C5 producer retains native facts through terminal state");
   if (test.success) {
     Require(stats.published && stats.exitCode == 0 && job.Record()["sizeBytes"] > 0,"success means exit/output publication");
     Require(!withAudio || samples == endpoint,"cumulative fractional samples exact");
@@ -228,6 +305,8 @@ Json Run(const Case& test, const std::wstring& root) {
     const auto record=Read(options.jobsRoot+L"\\"+Widen(job.Id())+L".json"); Require(record==job.Record(),"atomic record equals immutable job");
     const auto live=Read(options.jobsRoot+L"\\"+Widen(job.Id())+L".live.json"); Require(live["state"]==(test.success ? "done" : job.Record()["status"]),"terminal live state matches outcome");
     Require(live["hostHwnd"]=="123456" && live["sequence"].get<int64_t>()>0,"C5 placement/sequence facts");
+    Require(live.at("outputBitDepth") == videoFacts.at("outputBitDepth") &&
+            live.at("pixelFormatConversionReducesPrecision") == videoFacts.at("pixelFormatConversionReducesPrecision"),"C5 atomic live file preserves nullable core video facts");
   } else Require(!job.Store()->Failure().empty(),"status publication failure nonfatal");
   Json summary{{"case",test.name},{"id",job.Id()},{"success",test.success},{"elapsedMs",duration},{"polls",repolls},{"maxPollGapMs",maxPollGap},
     {"finishOrAbortMs",abortMs},{"workingSetGrowth",peak.load()-baseline},{"videoHighWater",stats.videoHighWater},{"audioHighWater",stats.audioHighWater},
@@ -268,9 +347,13 @@ int Child(int argc, wchar_t** argv) {
 int wmain(int argc, wchar_t** argv) {
   const int child = Child(argc,argv); if (child >= 0) return child;
   try {
+    if (argc == 3 && std::wstring(argv[1]) == L"--facts-only") {
+      PureChecks(); LiveFactChecks(Read(argv[2]));
+      printf("B4 pure facts PASS: %d checks; real native core, no process or host.\n",checks); return 0;
+    }
     Require(argc>=4,"usage recipe-jobs <fixtures> <fresh-output-root> <ffmpeg> [ffmpeg...]");
     CoInitializeEx(nullptr,COINIT_MULTITHREADED); PureChecks();
-    const auto fixtures=Read(argv[1]); const auto root=std::filesystem::absolute(argv[2]).wstring();
+    const auto fixtures=Read(argv[1]); LiveFactChecks(fixtures); const auto root=std::filesystem::absolute(argv[2]).wstring();
     Require(!std::filesystem::exists(root),"fresh output root required"); std::filesystem::create_directories(root);
     Json summaries=Json::array(); Json base=fixtures["fixtures"][0]["recipe"];
     base["container"]={{"format","mkv"},{"faststart",false}}; base["video"]["encoder"]="ffv1"; base["video"]["mode"]="lossless";

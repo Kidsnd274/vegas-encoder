@@ -318,15 +318,78 @@ Future<void> main() async {
   final live = FakeLiveRenderStatusReader();
   final samples = FakeLiveRenderStatusReader.samples();
   check(
+    samples.first.outputBitDepth == null &&
+        samples.first.pixelFormatConversionReducesPrecision == null &&
+        samples
+            .skip(1)
+            .every(
+              (s) =>
+                  s.outputBitDepth == 8 &&
+                  s.pixelFormatConversionReducesPrecision == true,
+            ),
+    'live fixtures distinguish precompile unknown from P010 to eight-bit output',
+  );
+  check(
     samples.every((s) => s.hostHwnd == '123456'),
     'host handle in every live phase',
   );
-  final oldLiveJson = samples.first.toJson()..remove('hostHwnd');
+  final oldLiveJson = samples.first.toJson()
+    ..remove('hostHwnd')
+    ..remove('outputBitDepth')
+    ..remove('pixelFormatConversionReducesPrecision');
   final oldLive = LiveRenderStatus.fromJson(oldLiveJson);
   check(
     oldLive.hostHwnd == null && !oldLive.toJson().containsKey('hostHwnd'),
     'older live files leave handle unavailable',
   );
+  check(
+    oldLive.outputBitDepth == null &&
+        oldLive.pixelFormatConversionReducesPrecision == null &&
+        !oldLive.toJson().containsKey('outputBitDepth') &&
+        !oldLive.toJson().containsKey('pixelFormatConversionReducesPrecision'),
+    'older live files preserve absent video facts without migration',
+  );
+  final videoJson =
+      samples[1]
+          .copyWith(
+            outputBitDepth: 10,
+            pixelFormatConversionReducesPrecision: false,
+          )
+          .toJson()
+        ..['futureVideo'] = {
+          'nested': [1],
+        };
+  final videoFacts = LiveRenderStatus.fromJson(videoJson);
+  (videoJson['futureVideo'] as Map).clear();
+  check(
+    videoFacts.outputBitDepth == 10 &&
+        videoFacts.pixelFormatConversionReducesPrecision == false &&
+        (videoFacts.toJson()['futureVideo'] as Map)['nested'][0] == 1 &&
+        videoFacts.copyWith(message: 'Later phase').outputBitDepth == 10,
+    'video facts and unknown fields survive immutable model copies',
+  );
+  final unknownVideoFacts = videoFacts.copyWith(
+    outputBitDepth: null,
+    pixelFormatConversionReducesPrecision: null,
+  );
+  check(
+    unknownVideoFacts.outputBitDepth == null &&
+        unknownVideoFacts.pixelFormatConversionReducesPrecision == null &&
+        unknownVideoFacts.toJson().containsKey('outputBitDepth'),
+    'explicit null clears both video facts',
+  );
+  final seededVideo = FakeLiveRenderStatusReader(initial: {'seed': videoFacts});
+  check(
+    (await seededVideo.read('seed'))!.pixelFormatConversionReducesPrecision ==
+        false,
+    'fake accepts supplied video facts without deriving them',
+  );
+  await seededVideo.dispose();
+  await rejects(() async {
+    FakeLiveRenderStatusReader(
+      initial: {'invalid': videoFacts.copyWith(outputBitDepth: 0)},
+    );
+  }, 'INVALID-DATA');
   check(
     samples.first.copyWith(hostHwnd: null).hostHwnd == null,
     'handle can be cleared',
@@ -357,6 +420,28 @@ Future<void> main() async {
     (await live.read('live'))!.hostHwnd == '123456' &&
         snapshots.last!.hostHwnd == '123456',
     'host placement fact survives reader and watch',
+  );
+  check(
+    snapshots.last!.outputBitDepth == 8 &&
+        snapshots.last!.pixelFormatConversionReducesPrecision == true,
+    'fake watch transports known video facts',
+  );
+  for (final invalid in [
+    for (final depth in [0, -1, 8.0, '8', true])
+      samples[1].copyWith(sequence: 3, outputBitDepth: depth),
+    for (final reduces in [0, 'false'])
+      samples[1].copyWith(
+        sequence: 3,
+        pixelFormatConversionReducesPrecision: reduces,
+      ),
+  ]) {
+    await rejects(() async {
+      live.publish('live', invalid);
+    }, 'INVALID-DATA');
+  }
+  check(
+    (await live.read('live'))!.sequence == 2,
+    'invalid fake video facts preserve the previous status',
   );
   await rejects(() async {
     live.publish('live', samples[0]);

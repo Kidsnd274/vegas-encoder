@@ -317,6 +317,14 @@ unknown facts. Missing signalPath means facts unavailable (older result), not al
 streams disabled. In Advanced mode core supplies only facts it can establish from
 the active command, with unknown formats/bits/conversion null and unknown mux support.
 It must not present the inactive Basic recipe as resolved command facts.
+Input-scoped Advanced options do not replace output facts. Pixel-format reflection
+models only unscoped `-pix_fmt`, `-pix_fmt:v` and `-pix_fmt:v:0`; other selectors
+(including absolute `:0`, whose stream may be audio) leave output format/bits
+unknown in Basic Extra and Advanced. Arbitrary video filters, including `-filter:v`,
+leave conversion unknown even when an explicit final pixel format establishes depth.
+An unscoped/absolute-selector `-filter` leaves both stream conversions unknown;
+pixel-format options in Basic audio Extra leave final video format/bits unknown,
+since those arguments follow and may override the generated video options.
 For general extra-input selection or multiple outputs, core keeps the delivered
 source node but leaves unestablished stream/output facts unknown. It does not infer
 which source/output FFmpeg's general stream-selection rules will choose.
@@ -757,7 +765,8 @@ LiveRenderStatus {
   encodeFps:number|null,speed:number|null,bitrateKbps:number|null,
   bytesWritten:nonnegativeInt,elapsedSec:number,etaSec:number|null,
   estimatedFinalBytes:nonnegativeInt|null,outputPath:string,templateName:string,
-  encoderSummary:string,message:string,ffmpegExitCode:int|null
+  encoderSummary:string,outputBitDepth:positiveInt|null,
+  pixelFormatConversionReducesPrecision:bool|null,message:string,ffmpegExitCode:int|null
 }
 ```
 
@@ -768,6 +777,29 @@ means exit zero, verification passed (or explicitly disabled), and final publica
 Finishing/verification are not success. Failed verification may retain a temp file,
 reported in the job record. bytesWritten is work so far; failure/cancellation does
 not mean it was published. Unknown metrics remain null; ETA is advisory.
+
+`outputBitDepth` is the core's useful video precision at the encoder input, after
+pixel-format conversion and before codec compression. It describes the compiled
+signal path, not measured encoded-file precision or a codec quality guarantee.
+`pixelFormatConversionReducesPrecision` is true only when established input bits
+exceed output bits and the core establishes conversion; false covers unchanged or
+increased depth and layout-only conversion. It excludes compression and chroma
+changes. Unknown input precision or arbitrary filters leave that flag null, even
+if outputBitDepth is known. Consumers must not turn null into false or derive facts
+from encoder labels, pixel-format names, the recipe or diagnostic text.
+
+The native writer initializes both fields to null and fills them only after a valid
+compile establishes exactly one video output and an unambiguous video encoder ID.
+Video-disabled/audio-only commands, stream copy, general Advanced input/output/map
+or codec scope, and unknown output formats keep both null. A simple Advanced command
+with an explicit scoped encoder and known pixel format can supply facts; inactive
+Basic settings never fill them. Facts then persist across phases and terminal states.
+An error before valid compilation retains nulls. Existing files with absent fields
+remain readable as unknown without inserting defaults; copyWith(null) explicitly
+clears them. Disk and fake readers reject nonpositive/noninteger depth or a nonbool
+nonnull precision flag; malformed replacements preserve the last valid snapshot.
+The fake transports supplied facts without calculating them. Samples show unknown
+at startup and illustrative P010-to-8-bit reduction in subsequent phases.
 
 Worker writes at most twice a second plus phase/terminal changes, atomically.
 Render never waits for the app, monitor startup, or file-reader acknowledgements;

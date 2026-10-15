@@ -17,6 +17,8 @@
   "outputPath": "D:\\Renders\\Lakeside wedding final.mp4",
   "templateName": "YouTube 4K upload (Lakeside)",
   "encoderSummary": "libx264 + aac",
+  "outputBitDepth": null,
+  "pixelFormatConversionReducesPrecision": null,
   "message": "",
   "ffmpegExitCode": null
 }

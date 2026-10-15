@@ -126,6 +126,28 @@ ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expected) {
     "FFprobe readback passed; exact Advanced output scope is unknown to the core.";
   return result;
 }
+ve::Json LiveVideoFacts(const ve::Json& compiled) {
+  ve::Json facts{{"outputBitDepth",nullptr},{"pixelFormatConversionReducesPrecision",nullptr}};
+  if (!compiled.is_object() || !compiled.contains("issues") || !compiled.at("issues").is_array() ||
+      ve::HasErrors(compiled.at("issues")) || !compiled.contains("expectedStreams") || !compiled.at("expectedStreams").is_array() ||
+      !compiled.contains("summary") || !compiled.at("summary").is_object()) return facts;
+  const auto encoder = ve::Str(compiled.at("summary"),"videoEncoderId");
+  if (encoder.empty() || encoder == "copy") return facts;
+  size_t videoStreams = 0;
+  for (const auto& stream : compiled.at("expectedStreams")) if (ve::Str(stream,"kind") == "video") ++videoStreams;
+  if (videoStreams != 1 || !compiled.contains("signalPath") || !compiled.at("signalPath").is_object()) return facts;
+  const auto& signal = compiled.at("signalPath");
+  if (!signal.contains("video") || !signal.at("video").is_object()) return facts;
+  const auto& video = signal.at("video");
+  if (!video.contains("outputBits") || !video.at("outputBits").is_number_integer() || video.at("outputBits").get<int64_t>() <= 0) return facts;
+  facts["outputBitDepth"] = video.at("outputBits");
+  // Filters can change precision inside the graph, even when its endpoints have
+  // equal depths. Core marks that conversion unknown; retain the unknown here.
+  if (video.contains("conversion") && video.at("conversion").is_boolean() && video.contains("inputBits") &&
+      video.at("inputBits").is_number_integer() && video.at("inputBits").get<int64_t>() > 0)
+    facts["pixelFormatConversionReducesPrecision"] = video.at("inputBits").get<int64_t>() > video.at("outputBits").get<int64_t>();
+  return facts;
+}
 RecipeJob::RecipeJob() : parser_([this](const ve::Json& metrics) { Progress(metrics); }) {}
 RecipeJob::~RecipeJob() { if (startedOnce_ && !terminal_) Stop(E_ABORT,"Job abandoned before completion."); }
 bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::Json& installation,
@@ -146,7 +168,8 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
   live_ = {{"live",1},{"jobId",id_},{"hostHwnd",options.hostHwnd},{"sequence",0},{"updatedAt",startedAt_},{"state","starting"},
     {"framesDone",0},{"framesTotal",media.at("video").value("frames",ve::Json(nullptr))},{"encodeFps",nullptr},{"speed",nullptr},{"bitrateKbps",nullptr},
     {"bytesWritten",0},{"elapsedSec",0},{"etaSec",nullptr},{"estimatedFinalBytes",nullptr},{"outputPath",Utf8(options.output.c_str())},
-    {"templateName",options.templateName},{"encoderSummary",""},{"message","Preparing encoder."},{"ffmpegExitCode",nullptr}};
+    {"templateName",options.templateName},{"encoderSummary",""},{"outputBitDepth",nullptr},{"pixelFormatConversionReducesPrecision",nullptr},
+    {"message","Preparing encoder."},{"ffmpegExitCode",nullptr}};
   std::wstring log = options.output + L".ffmpeg.log";
   try {
     std::filesystem::create_directories(options.jobsRoot);
@@ -180,6 +203,10 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
         const auto& summary = compiled_.at("summary");
         { std::lock_guard<std::mutex> lock(liveMutex_); live_["encoderSummary"] = ve::Str(summary,"video") + " / " + ve::Str(summary,"audio"); }
         if (ve::HasErrors(compiled_.at("issues"))) throw std::runtime_error("Core validation refused this render recipe.");
+        const auto videoFacts = LiveVideoFacts(compiled_);
+        { std::lock_guard<std::mutex> lock(liveMutex_);
+          for (auto it = videoFacts.begin(); it != videoFacts.end(); ++it) live_[it.key()] = it.value();
+        }
         FfmpegEncoder::CommandPlan plan;
         for (const auto& arg : compiled_.at("argv")) plan.argv.push_back(Widen(arg.get<std::string>()));
         const auto& inputs = compiled_.at("inputStreams"); plan.audioInput = std::find(inputs.begin(),inputs.end(),ve::Json("audio")) != inputs.end();

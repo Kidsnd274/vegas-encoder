@@ -5,13 +5,29 @@ Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.3-progress-text-pro
 
 ## Current progress
 
+**F6 C5 precision facts (2026-10-15, completed checkpoint):** after committing the library-watch
+checkpoint **b6811be**, integrated app 493f146 through **ea4d557** on ws/platform and
+fast-forwarded master. No push; master's .claude/ is preserved. The app's old quote
+diagnostic assertion/goldens were adopted in its own 493f146 commit.
+Additive nullable outputBitDepth/pixelFormatConversionReducesPrecision now travel
+from established core signal facts through the native C5 producer, models, disk
+reader and fakes. General Advanced scope and unknown precision remain null. A small
+core scope correction keeps input/other-stream pixel options and arbitrary filters
+from claiming output/conversion certainty; argv is preserved. Optimized core **3,034**,
+FFI **208**, C5 facts **59**, repository **131**, fake **79**, fixture **295** and
+selected app **65** checks pass. Optimized engine **23,160 checks / 22 fake-host cases**
+and native C5/C6 readback **279 checks / 21 jobs** pass. Both packages analyze cleanly.
+Details are in the [platform handoff](product/workstreams/platform.md). No frontend edits,
+installation or real VEGAS run. B6 remains disabled; A5–A7, real persistence,
+controlled real failure recovery and monitor performance remain **unverified**.
+
 **Merge/library-watch continuation (2026-10-15):** reviewed platform checkpoint
 fa58338 is integrated with app F6 through **9018965**, now on master; no push and
 the main checkout's .claude/ is preserved. At that checkpoint app analysis passed;
 394 unit/widget tests passed with one app-owned quote-range assertion outstanding.
 Master has since advanced to app 493f146, adopting the precise quote range and
-affected native goldens; that request is resolved in the incoming app checkpoint.
-The F7 library-watch checkpoint is reviewed and finished on ws/platform:
+affected native goldens; that request is resolved in the integrated app checkpoint.
+The F7 library-watch checkpoint is committed as b6811be and merged through ea4d557:
 500 unchanged presets now reuse native metadata/immutable snapshots, with zero
 normalization calls (**1.77–3.21 ms median / 2.05–4.03 ms p95**, JIT/AOT runs).
 Continuation medians are **1.827 ms JIT / 1.866 ms AOT**; cold reads still cost about

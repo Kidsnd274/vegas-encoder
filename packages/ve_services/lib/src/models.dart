@@ -996,6 +996,8 @@ class LiveRenderStatus extends JsonModel {
     required String outputPath,
     required String templateName,
     required String encoderSummary,
+    int? outputBitDepth = null,
+    bool? pixelFormatConversionReducesPrecision = null,
     String message = '',
     int? ffmpegExitCode = null,
     JsonMap extensions = const {},
@@ -1018,6 +1020,9 @@ class LiveRenderStatus extends JsonModel {
          'outputPath': outputPath,
          'templateName': templateName,
          'encoderSummary': encoderSummary,
+         'outputBitDepth': outputBitDepth,
+         'pixelFormatConversionReducesPrecision':
+             pixelFormatConversionReducesPrecision,
          'message': message,
          'ffmpegExitCode': ffmpegExitCode,
          'extensions': extensions,
@@ -1042,6 +1047,13 @@ class LiveRenderStatus extends JsonModel {
   String get outputPath => data['outputPath'] as String;
   String get templateName => data['templateName'] as String;
   String get encoderSummary => data['encoderSummary'] as String;
+
+  /// Encoder-input video precision from the core; null when unestablished.
+  int? get outputBitDepth => data['outputBitDepth'] as int?;
+
+  /// Pixel conversion only, excluding codec compression; null when unknown.
+  bool? get pixelFormatConversionReducesPrecision =>
+      data['pixelFormatConversionReducesPrecision'] as bool?;
   String get message => data['message'] as String? ?? '';
   int? get ffmpegExitCode => data['ffmpegExitCode'] as int?;
   LiveRenderStatus copyWith({
@@ -1063,6 +1075,8 @@ class LiveRenderStatus extends JsonModel {
     Object? outputPath = absent,
     Object? templateName = absent,
     Object? encoderSummary = absent,
+    Object? outputBitDepth = absent,
+    Object? pixelFormatConversionReducesPrecision = absent,
     Object? message = absent,
     Object? ffmpegExitCode = absent,
     Object? extensions = absent,
@@ -1087,6 +1101,10 @@ class LiveRenderStatus extends JsonModel {
       if (!identical(outputPath, absent)) 'outputPath': outputPath,
       if (!identical(templateName, absent)) 'templateName': templateName,
       if (!identical(encoderSummary, absent)) 'encoderSummary': encoderSummary,
+      if (!identical(outputBitDepth, absent)) 'outputBitDepth': outputBitDepth,
+      if (!identical(pixelFormatConversionReducesPrecision, absent))
+        'pixelFormatConversionReducesPrecision':
+            pixelFormatConversionReducesPrecision,
       if (!identical(message, absent)) 'message': message,
       if (!identical(ffmpegExitCode, absent)) 'ffmpegExitCode': ffmpegExitCode,
       if (!identical(extensions, absent)) 'extensions': extensions,

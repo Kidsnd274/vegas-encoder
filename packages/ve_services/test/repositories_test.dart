@@ -482,12 +482,35 @@ Future<void> main(List<String> args) async {
     await waitFor(() => live.isNotEmpty);
     check(live.first == null, 'missing startup live file is null');
     final starting = FakeLiveRenderStatusReader.samples().first;
-    await atomicWrite(
-      liveFile,
-      jsonEncode(starting.copyWith(sequence: 1).data),
-    );
+    final legacy = starting.toJson()
+      ..remove('outputBitDepth')
+      ..remove('pixelFormatConversionReducesPrecision');
+    await atomicWrite(liveFile, jsonEncode(legacy));
     await waitFor(() => live.last?.sequence == 1);
     final good = live.last;
+    check(
+      good!.outputBitDepth == null &&
+          good.pixelFormatConversionReducesPrecision == null &&
+          !good.toJson().containsKey('outputBitDepth'),
+      'older C5 files read with unknown video facts and no implicit defaults',
+    );
+    for (final invalid in [
+      for (final depth in [0, -1, 8.0, '8', true])
+        starting.copyWith(sequence: 2, outputBitDepth: depth),
+      for (final reduces in [0, 'false'])
+        starting.copyWith(
+          sequence: 2,
+          pixelFormatConversionReducesPrecision: reduces,
+        ),
+    ]) {
+      await atomicWrite(liveFile, jsonEncode(invalid.data));
+      await rejects(() => liveReader.read(liveFile), 'INVALID-DATA');
+      await Future<void>.delayed(const Duration(milliseconds: 60));
+      check(
+        identical(live.last, good),
+        'invalid video fact retains last valid live status',
+      );
+    }
     for (final bad in [
       '{"live":1',
       jsonEncode(starting.copyWith(sequence: 0, state: RenderState.done).data),
@@ -514,10 +537,33 @@ Future<void> main(List<String> args) async {
     await atomicWrite(
       liveFile,
       jsonEncode(
-        starting.copyWith(sequence: 2, state: RenderState.encoding).data,
+        starting
+            .copyWith(
+              sequence: 2,
+              state: RenderState.encoding,
+              outputBitDepth: 10,
+              pixelFormatConversionReducesPrecision: false,
+            )
+            .data,
       ),
     );
     await waitFor(() => live.last?.sequence == 2);
+    check(
+      live.last!.outputBitDepth == 10 &&
+          live.last!.pixelFormatConversionReducesPrecision == false &&
+          (await liveReader.read(liveFile))!.outputBitDepth == 10,
+      'repaired C5 read and watch carry known depth without precision reduction',
+    );
+    await atomicWrite(
+      liveFile,
+      jsonEncode(starting.copyWith(sequence: 3).data),
+    );
+    await waitFor(() => live.last?.sequence == 3);
+    check(
+      live.last!.outputBitDepth == null &&
+          live.last!.pixelFormatConversionReducesPrecision == null,
+      'explicit null video facts stay unknown after a known status',
+    );
     await liveWatch.cancel();
 
     final jobs = FileJobRepository(core: core, paths: paths);

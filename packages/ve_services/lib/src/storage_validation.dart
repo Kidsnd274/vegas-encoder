@@ -213,8 +213,16 @@ FFmpegCapabilities decodeCapabilities(JsonMap data) {
   return FFmpegCapabilities.fromJson(data);
 }
 
+// Shared by disk and fake readers; absent and explicit null both mean unknown.
+void validateLiveVideoFacts(JsonMap data) {
+  intField(data, 'outputBitDepth', required: false, nullable: true, min: 1);
+  if (data['pixelFormatConversionReducesPrecision'] != null)
+    boolField(data, 'pixelFormatConversionReducesPrecision');
+}
+
 LiveRenderStatus decodeLive(JsonMap data) {
   major(data, 'live');
+  validateLiveVideoFacts(data);
   for (final key in ['jobId', 'outputPath', 'templateName', 'encoderSummary']) {
     stringField(data, key);
   }

@@ -8,6 +8,69 @@ B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
+## F6 C5 video precision follow-up (completed)
+
+Continued after library checkpoint **b6811be** and integration **ea4d557**. Master
+and ws/platform include the latest app 493f146; master was fast-forwarded under
+the owner's authorization, with its .claude/ preserved. No push. The app-owned
+precise unmatched-quote assertion and affected goldens are adopted in 493f146.
+
+Additive C5 fields: `outputBitDepth` (`int?`) and
+`pixelFormatConversionReducesPrecision` (`bool?`). RecipeJob publishes the native
+core's encoder-input video precision after a valid compile, with a reduction only
+when known input bits exceed output bits and conversion is established. Equal or
+increased depth/layout-only conversion is false; filters or unknown input precision
+leave the reduction unknown. No text/recipe/codec-name inference or encoded-file
+precision claim. General Advanced source/output/map/codec scope, stream copy,
+disabled/omitted video and unknown formats stay null. Initial/precompile failures
+also stay null; known facts survive terminal phases. Existing Render scheduling,
+frame release and asynchronous publication rules are unchanged.
+
+A small core reflection correction prevents input-scoped Advanced options and
+unsupported pixel-format stream selectors from masquerading as output facts.
+Supported selectors are unscoped, `:v` and `:v:0`; absolute `:0` and more general
+selectors remain unknown. A pixel-format option in Basic audio Extra can override
+earlier video arguments, so that cross-row case also stays unknown. Arbitrary
+`-filter:v` aliases mark conversion unknown, as `-vf` already does; unscoped filters
+cannot inherit a preceding audio option's scope. Authored argv is preserved.
+Current option-scope rules were
+checked with Context7's FFmpeg documentation and the official
+[FFmpeg options/stream specifiers](https://ffmpeg.org/ffmpeg.html#Options) and
+[pixel-format option](https://ffmpeg.org/ffmpeg.html#Advanced-Video-options).
+
+The model, copyWith, persistent reader, fake seed/publish validation and generated
+live samples carry both fields. Older absent fields stay absent/unknown; explicit
+null clears them. Readers/fakes reject invalid types or nonpositive depth and retain
+the previous successful status. Samples remain design fixtures, not real render data.
+App handoff: use these getters for the F6 header wire/pip, showing less when unknown.
+No frontend files were edited; frontend adoption is app-owned. The owner now
+authorizes local commits when a stage or feature is complete, including this F6
+checkpoint on ws/platform. Gated B6 activation remains separate.
+
+Validation: optimized DLL/static builds and **3,034 native core checks** pass,
+including unchanged B1 argv goldens. **59** focused real-core C5 fact checks pass
+without processes/a host; native-asset FFI **208**, service fake **79**, Windows
+repository **131**, fixture structural/bounds **295** and selected app compatibility
+**65** checks pass. The app checks cover service wiring, monitor display/widget and
+Advanced editor (including the adopted precise quote range). Both packages analyze
+cleanly; fixture generator --check and diff whitespace checks pass.
+
+The existing optimized B4 suite passes **23,160 checks / 22 cases**, using the
+supplied gyan 5.1.2 FFmpeg, synthetic fake-host streams and controlled children.
+Its retained ownership, bounds, polling, cancellation/recovery, destination
+preservation and nonfatal storage/publication cases pass. New assertions verify
+nullable depth facts across live/terminal state and atomic C5 files. The Dart C5/C6
+readback passes **279 checks / 21 native jobs**, including P010-to-8-bit reduction
+and preserved 10-bit Basic/seeded Advanced cases. These are offline fake-host
+checks, not a real VEGAS or monitor performance test. Reproduce with
+`scripts/Test-CoreNative.cmd`, `build/b4-tests/recipe-jobs.exe --facts-only schema/fixtures/b0/core-and-services.json`,
+`scripts/Test-B3Repositories.ps1` and `scripts/Test-B4.ps1` (without -Asan).
+Compact engine output is under ignored build/test-results/b4-b34553b9.
+No goldens were regenerated here.
+No installed exporter, machine tool, antivirus setting or real VEGAS state changed.
+**A5–A7, real persistence, controlled real failure recovery and monitor performance
+remain unverified.** No sanitizer/process/thread debugging resumed.
+
 ## Merge and library-watch follow-up (2026-10-15)
 
 The owner requested merging the reviewed checkpoint and continuing. Committed it
@@ -16,16 +79,16 @@ as **9018965**, then fast-forwarded master to 9018965. No conflicts or push; mas
 pre-existing untracked .claude/ is preserved. No frontend source was edited.
 
 At 9018965, merged app integration used existing SDK/offline dependencies; app analysis passed and
-**394 unit/widget tests pass, one fails**. The remaining assertion is app-owned
+**394 unit/widget tests passed, one failed**. The assertion was app-owned
 advanced_editor_test.dart:299, named "an unterminated quote is about the whole
 command: listed, not underlined". It expects wholeCommand=true, while the reviewed
-C2 addition deliberately reports the unmatched quote's precise range. App needs to
-adopt that range/prefix contract in this test (and its own native light/dark goldens).
+C2 addition deliberately reports the unmatched quote's precise range. The app needed
+to adopt that range/prefix contract in this test and its native light/dark goldens.
 Do not restore the old whole-command diagnostic in core. **While this continuation
 was validating, master advanced through app follow-ups 84acb66 to 493f146**, which
 adopts the precise quote range and refreshes the affected native goldens. The request
-above is satisfied by that app-owned commit; it will be included in the library
-checkpoint integration. Generated runner files from
+above is satisfied by that app-owned commit, included in **ea4d557** alongside the
+library-watch commit **b6811be**; master fast-forwarded to ea4d557. Generated runner files from
 Flutter checks were restored; no app edits or SDK upgrade are retained.
 
 **Library-watch checkpoint reviewed and finished:** the app's F7 library-watch
@@ -93,7 +156,7 @@ No installation, exporter replacement, machine-tool change or antivirus exclusio
 monitor performance remain unverified.** Render threading/frame release/no-app-wait
 rules remain unchanged. F6's synthetic window figures do not pass its VEGAS render
 performance gate. Subsequent platform work: coordinate DesktopApp openPreset/openJob
-with app, output-depth C5 facts, then version checks/installer inputs under the owner's
+with app, adopt the output-depth C5 facts above, then version checks/installer inputs under the owner's
 recorded decisions. Gated B6 activation remains separate.
 
 ## Advanced capability reuse / F4 / popup size (reviewed checkpoint)
@@ -607,14 +670,16 @@ existing readers. B5 normal trials and the owner's drop-text decision are record
 above; further marker trials are ended. Connect B6 to the actual F5 popup when
 ready and the native gates resume, then the recipe/C5 progress bridge. Avoid adding
 another fake-owner framework. The additive F4/core/C7 changes are committed/merged;
-app adoption of precise unmatched-quote ranges remains requested above. The reviewed
-library-watch checkpoint is finished above. Next is the independent F6 C5 output
-bit-depth/precision fact request, to remain uncommitted under the owner's instructions.
+app adoption of precise unmatched-quote ranges is now in 493f146. The reviewed
+library-watch checkpoint is committed/merged as described above. The independent
+F6 C5 output bit-depth/precision request is complete above. The app owns its header
+wire/pip adoption.
 
 B6 adapter/progress performance needs the owner with real VEGAS and gated
-evidence. Prior checkpoints had owner authorization to commit/merge; **this
-checkpoint was reviewed; the owner now authorizes committing/merging it and
-continuing with the library-watch bottleneck**, with no push.
+evidence. The owner authorized committing/merging the library-watch checkpoint
+and continuing with F6, and subsequently authorized local commits whenever a stage
+or feature is complete. Commit completed platform work on ws/platform; further
+merges into master and pushes still require separate authorization.
 The B5 installation/trial is authorized with rollback only for issues; current
 mode-0 control and mode-4 normal renders pass; the owner drops custom status-line
 testing after no useful visible change. Mode 4 is retained, with no rollback.
