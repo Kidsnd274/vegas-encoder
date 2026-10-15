@@ -2,11 +2,31 @@
 
 Updated: 2026-10-15 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
 branch `ws/platform`. **B6 template recipes work in the owner's 0.1.5 renders;
-0.1.6 parallel startup/owner return prepared for the next real check.** B1–B4 and app F4 are merged. Continued
+the owner confirms improved editor startup with installed 0.1.6.** B1–B4 and app F4 are merged. Continued
 from `659fe02`; F3 master `0be99dc` was fast-forwarded before the B1 commit.
 B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
+
+## 0.1.6 real-host startup confirmation
+
+The owner installed 0.1.6-recipe-proof on VEGAS 2026.0.3.189 and reports opening
+is "a lot better now". Three frontend process-age traces reach `shown` at
+**748.6 / 533.3 / 526.8 ms**. Native CreateProcess durations are
+**153.1 / 32.8 / 31.8 ms**; UI request/scheduling takes **3.7 / 0.4 / 0.4 ms**.
+These measurements cover three observed launches, not a general performance
+guarantee; process-age and native launch intervals overlap and must not be added
+as an exact click-to-visible time.
+
+The normal B6 edit/Apply/template-recipe/render/progress flow is implemented and
+has real-host smoke evidence. Explicit Apply/minimize confirmation remains open;
+the startup feedback alone does not establish that focus regression passed.
+Next work is a bounded real-host qualification pass for two-template restart
+persistence/capacity, controlled cancellation/failure recovery and monitor
+overhead. A5–A7 remain unverified. No additional feature scaffolding is needed
+for this startup fix. Documentation-only recording of the owner result; checked
+against native version/launch logs and frontend startup traces, with no code/test
+or installation changes in this checkpoint.
 
 ## 0.1.5 template confirmation and 0.1.6 parallel launch/owner return
 
@@ -33,7 +53,7 @@ worker, or a new launch-cancel UI. Page lifetime and late startup remain safe vi
 owned task state, existing child job ownership and a retained DLL reference.
 Result validation/draft/native Apply and all window calls stay on the page thread.
 The goal is actual click-to-visible speed; moving the wait alone is **not** claimed
-to remove the OS delay. The next real host run must measure that result.
+to remove the OS delay. The owner retest above records the observed improvement.
 
 Owner return now follows explicit `GW_OWNER` links, because `GA_ROOTOWNER` can
 stop at an owned `WS_OVERLAPPED` window (reproduced in the window regression).
@@ -59,10 +79,11 @@ completion and restore its explicit owner chain on foreground return. These are
 fake child/window tests, not a real VEGAS latency/focus pass.
 
 Staged `build/b6-candidate-0.1.6` with a copied 0.1.5 data root and exact installed
-0.1.5 rollback. No installation/push/master merge. Existing working 0.1.5 templates
+0.1.5 rollback. Preparation did not install, push or merge master; the owner later
+installed it for the retest above. Existing working 0.1.5 templates
 remain compatible; do not repeat the codec trials just to prove them again.
-Next owner check: repeat Edit settings several times, measure time until visible,
-then Apply and confirm VEGAS remains restored. See [B6_TRIAL.md](../../B6_TRIAL.md).
+Opening has now been retested; explicit confirmation that Apply leaves VEGAS
+restored remains pending. See [B6_TRIAL.md](../../B6_TRIAL.md).
 
 App handoff if native launch remains slow after parallelizing: prioritize a reusable
 editor process/engine or an out-of-process launch path that avoids repeated cold

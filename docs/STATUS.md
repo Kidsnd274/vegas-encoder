@@ -1,9 +1,19 @@
 # Vegas Encoder status
 
-Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.5-recipe-proof
-(owner confirmed distinct recipe renders; 0.1.6 parallel-launch/owner fix staged).
+Updated: 2026-10-15 (Asia/Singapore). Owner-installed version: 0.1.6-recipe-proof
+(parallel editor startup retested on VEGAS 2026.0.3.189).
 
 ## Current progress
+
+**0.1.6 owner retest:** the owner reports editor opening is "a lot better now".
+Three frontend traces show the window visible **748.6 / 533.3 / 526.8 ms after
+process creation**; native CreateProcess took **153.1 / 32.8 / 31.8 ms**, with
+UI request/scheduling **3.7 / 0.4 / 0.4 ms**. These are observed real-host runs,
+not a general latency guarantee or a precise click-to-visible total. B6's normal
+popup/template/recipe-render/progress path is implemented, supported by this
+startup retest and the distinct-codec renders below. Explicit confirmation of
+the Apply/minimize fix, two-template restart persistence/capacity, controlled real
+failure recovery and monitor overhead remain outstanding. A5–A7 are not promoted.
 
 **0.1.5 owner retest / 0.1.6 startup work:** the owner reports both templates
 render with different intended codecs and template bugs appear resolved. C6
@@ -20,9 +30,10 @@ defaults to Skia. **0.1.6-recipe-proof**
 starts the existing transport in parallel with VEGAS's UI, using copied C4 values
 and a retained DLL lifetime. It adds explicit same-thread owner-chain restore on
 return from the foreground editor, keeping background completion passive. The
-unchanged 0.1.5+1 frontend is included. Total launch speed improvement and the
-real Apply/minimize fix still need the owner's test; offloading alone is not
-claimed to eliminate the Windows delay. No new user launch-cancel flow.
+unchanged 0.1.5+1 frontend is included. The owner subsequently confirmed faster
+opening (above); the real Apply/minimize fix still needs explicit confirmation.
+Offloading alone is not claimed to eliminate every Windows delay. No new user
+launch-cancel flow.
 
 **First real B6 trial and fixes (2026-10-15):** owner reports popup edits and a
 successful render/progress window on VEGAS 2026.0.3.189. Native C6 confirms FFV1,
