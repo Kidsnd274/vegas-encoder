@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:ffi';
+import 'dart:io';
 import 'dart:isolate';
 import 'package:crypto/crypto.dart';
 import 'package:ffi/ffi.dart';
@@ -61,4 +62,44 @@ class FakeGpuIdentity implements GpuIdentity {
   GpuSnapshot snapshot;
   @override
   Future<GpuSnapshot> read() async => snapshot;
+}
+
+// Same machine-services asset; this scans directory metadata only, not GPU state.
+@Native<Int32 Function(Pointer<Uint16>, Uint32, Pointer<Uint8>, Uint32)>(
+  symbol: 've_library_metadata',
+)
+external int _libraryMetadata(
+  Pointer<Uint16> directory,
+  int length,
+  Pointer<Uint8> buffer,
+  int capacity,
+);
+
+/// Null means the bounded fast path cannot represent this directory; use legacy
+/// enumeration in a worker. Other failures must not hide a bad library.
+String? readLibraryDirectoryMetadata(String directory) {
+  final normalized = Directory(
+    directory,
+  ).absolute.uri.normalizePath().toFilePath();
+  final path = normalized.toNativeUtf16(allocator: calloc);
+  Pointer<Uint8> buffer = nullptr;
+  try {
+    buffer = calloc<Uint8>(1048576);
+    final length = _libraryMetadata(
+      path.cast<Uint16>(),
+      normalized.length,
+      buffer,
+      1048576,
+    );
+    if (length == -2) return null;
+    if (length < 0 || length > 1048576)
+      throw ServiceException(
+        'FILE-READ',
+        'Cannot enumerate preset library ($length): $directory',
+      );
+    return utf8.decode(buffer.asTypedList(length));
+  } finally {
+    if (buffer != nullptr) calloc.free(buffer);
+    calloc.free(path);
+  }
 }

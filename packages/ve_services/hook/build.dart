@@ -14,6 +14,9 @@ void main(List<String> args) async {
       assetName: 'src/windows_gpu.dart',
       sources: [
         input.packageRoot
+            .resolve('../../src/services/windows_files.cpp')
+            .toFilePath(),
+        input.packageRoot
             .resolve('../../src/services/windows_gpu.cpp')
             .toFilePath(),
       ],

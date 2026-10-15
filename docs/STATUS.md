@@ -5,6 +5,24 @@ Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.3-progress-text-pro
 
 ## Current progress
 
+**Merge/library-watch continuation (2026-10-15):** reviewed platform checkpoint
+fa58338 is integrated with app F6 through **9018965**, now on master; no push and
+the main checkout's .claude/ is preserved. At that checkpoint app analysis passed;
+394 unit/widget tests passed with one app-owned quote-range assertion outstanding.
+Master has since advanced to app 493f146, adopting the precise quote range and
+affected native goldens; that request is resolved in the incoming app checkpoint.
+The F7 library-watch checkpoint is reviewed and finished on ws/platform:
+500 unchanged presets now reuse native metadata/immutable snapshots, with zero
+normalization calls (**1.77–3.21 ms median / 2.05–4.03 ms p95**, JIT/AOT runs).
+Continuation medians are **1.827 ms JIT / 1.866 ms AOT**; cold reads still cost about
+0.5–1.1 s. Review restored FILE-READ for preferences.json directories and verified
+authoritative get/Save/CAS despite metadata-preserving external edits.
+Focused library **99** (JIT/AOT), retained repository **114**,
+service fake **64** and app service-wiring **10** checks pass; service analysis is
+clean. Details/limits are in the [platform handoff](product/workstreams/platform.md).
+No real VEGAS run, install or exporter update. A5–A7, real persistence, controlled
+real failure recovery and monitor performance remain **unverified**.
+
 **Advanced core/FFI checkpoint (2026-10-15, owner-authorized commit/merge):** bounded immutable
 capability reuse removes repeated Dart serialization/native lint copies. Additive
 F4 token stage/macro/option metadata, macro catalogue, conservative encoder IDs,

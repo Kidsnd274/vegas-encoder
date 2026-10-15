@@ -288,6 +288,7 @@ Stream<T> watchSnapshots<T>(
   var running = false;
   Future<void>? inFlight;
   String? previous;
+  T? previousSnapshot;
   Future<void> tick() async {
     if (cancelled || paused || running) return;
     running = true;
@@ -295,6 +296,9 @@ Stream<T> watchSnapshots<T>(
     inFlight = completion.future;
     try {
       final snapshot = await read();
+      // Repository snapshots are immutable. A metadata-cached library can reuse
+      // its exact list and avoid serializing every recipe on an unchanged tick.
+      if (previous != null && identical(snapshot, previousSnapshot)) return;
       final encoded = jsonEncode(
         snapshot,
         toEncodable: (v) => (v as JsonModel).data,
@@ -303,6 +307,7 @@ Stream<T> watchSnapshots<T>(
         previous = encoded;
         controller.add(snapshot);
       }
+      previousSnapshot = snapshot;
     } catch (e, stack) {
       if (!cancelled) controller.addError(e, stack);
     } finally {

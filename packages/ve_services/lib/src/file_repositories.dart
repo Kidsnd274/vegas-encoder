@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'dart:io';
 import 'package:ve_core/ve_core.dart';
 import 'api.dart';
@@ -6,6 +7,7 @@ import 'models.dart';
 import 'storage.dart';
 import 'storage_validation.dart';
 import 'builtin_presets.dart';
+import 'windows_gpu.dart' show readLibraryDirectoryMetadata;
 
 String _utcNow() => DateTime.now().toUtc().toIso8601String();
 const _conflict = ServiceException(
@@ -40,6 +42,64 @@ class FileMachineSettingsRepository implements MachineSettingsRepository {
   });
 }
 
+// One bounded native directory query avoids per-file Dart stats. Oversized
+// directories use legacy metadata scanning in a short-lived isolate; no core
+// object, open file or application state crosses that fallback boundary.
+typedef _PresetStamp = ({String path, int size, int modified, int created});
+typedef _LibraryMetadata = ({
+  List<_PresetStamp> files,
+  _PresetStamp preferences,
+});
+_PresetStamp _presetStamp(String path) {
+  final stat = File(path).statSync();
+  return (
+    path: path,
+    size: stat.size,
+    modified: stat.modified.microsecondsSinceEpoch,
+    created: stat.changed.microsecondsSinceEpoch,
+  );
+}
+
+Future<_LibraryMetadata> _libraryMetadata(
+  String directory,
+  String preferences,
+  String? nativeJson,
+) async {
+  if (nativeJson != null) {
+    final native = jsonMap(jsonDecode(nativeJson));
+    _PresetStamp stamp(JsonMap data) => (
+      path: joinPath(directory, data['name'] as String),
+      size: data['size'] as int,
+      modified: data['modified'] as int,
+      created: data['created'] as int,
+    );
+    final files = jsonMaps(native['files']).map(stamp).toList();
+    files.sort((a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()));
+    return (
+      files: files,
+      preferences: native['preferences'] == null
+          ? (path: preferences, size: -1, modified: 0, created: 0)
+          : stamp(jsonMap(native['preferences'])),
+    );
+  }
+  return Isolate.run(() {
+    final root = Directory(directory);
+    final files = <_PresetStamp>[];
+    try {
+      for (final entity in root.listSync(followLinks: false)) {
+        if (entity is File && entity.path.endsWith('.vepreset'))
+          files.add(_presetStamp(entity.path));
+      }
+      files.sort(
+        (a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()),
+      );
+    } on FileSystemException catch (e) {
+      if (e.osError?.errorCode != 2 && e.osError?.errorCode != 3) rethrow;
+    }
+    return (files: files, preferences: _presetStamp(preferences));
+  });
+}
+
 class FilePresetLibrary
     implements PresetLibrary, PresetPreferences, PresetLocations {
   FilePresetLibrary({
@@ -60,9 +120,30 @@ class FilePresetLibrary
     joinPath(joinPath(paths.library, '.history'), safeId(id)),
     '$revision.vepreset',
   );
-  Preset? _builtin(String id) => _builtins
-      .where((p) => p.recipe.id.toLowerCase() == id.toLowerCase())
-      .firstOrNull;
+  late final _builtinsById = {
+    for (final p in _builtins) p.recipe.id.toLowerCase(): p,
+  };
+  Preset? _builtin(String id) => _builtinsById[id.toLowerCase()];
+  late final _listedBuiltins = _builtins
+      .map(_requirements)
+      .toList(growable: false);
+  Map<String, ({_PresetStamp stamp, Preset preset})> _listedFiles = {};
+  _PresetStamp? _listedPreferencesStamp;
+  JsonMap? _listedPreferences;
+  List<Preset>? _listedSnapshot;
+  Future<List<Preset>>? _listing;
+  int _listEpoch = 0;
+  int _listedEpoch = -1;
+  String? _listedMetadataJson;
+  void _invalidateList(String? id) {
+    _listEpoch++;
+    if (id == null) {
+      _listedPreferencesStamp = null;
+    } else {
+      _listedFiles.remove(_file(id).toLowerCase());
+    }
+  }
+
   Future<JsonMap> _preferences() async {
     final data = await readJson(paths.preferences);
     if (data == null) return {'preferences': 1, 'presets': <String, Object?>{}};
@@ -126,30 +207,100 @@ class FilePresetLibrary
   }
 
   @override
-  Future<List<Preset>> list() async {
-    final result = <Preset>[];
-    for (final p in _builtins) {
-      result.add((await _current(p.recipe.id))!);
-    }
-    final directory = Directory(paths.library);
-    if (await directory.exists()) {
-      final files = await directory
-          .list(followLinks: false)
-          .where((e) => e is File && e.path.endsWith('.vepreset'))
-          .toList();
-      files.sort(
-        (a, b) => a.path.toLowerCase().compareTo(b.path.toLowerCase()),
+  Future<List<Preset>> list() => _listing ??= _readList().whenComplete(() {
+    _listing = null;
+  });
+
+  Future<List<Preset>> _readList() async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final epoch = _listEpoch;
+      final metadataJson = readLibraryDirectoryMetadata(paths.library);
+      if (metadataJson != null &&
+          _listedMetadataJson == metadataJson &&
+          _listedEpoch == epoch &&
+          _listedSnapshot != null)
+        return _listedSnapshot!;
+      // Keep no successful fingerprint after observing a change that may fail
+      // validation. A later repair must pass through the normal read path.
+      _listedMetadataJson = null;
+      final metadata = await _libraryMetadata(
+        paths.library,
+        paths.preferences,
+        metadataJson,
       );
-      for (final file in files) {
-        final basename = file.uri.pathSegments.last;
-        final id = basename.substring(0, basename.length - '.vepreset'.length);
+      final entries = <String, ({_PresetStamp stamp, Preset preset})>{};
+      final result = <Preset>[];
+      JsonMap preferences;
+      if (_listedPreferencesStamp == metadata.preferences &&
+          _listedPreferences != null) {
+        preferences = _listedPreferences!;
+      } else {
+        _listedPreferencesStamp =
+            null; // A failed read must not become a cache hit on repair.
+        preferences = await _preferences();
+      }
+      final overlays = objectField(preferences, 'presets');
+      for (var i = 0; i < _listedBuiltins.length; i++) {
+        final base = _listedBuiltins[i];
+        final overlay = jsonMap(
+          overlays[base.recipe.id.toLowerCase()] ?? <String, Object?>{},
+        );
+        final favorite = overlay['favorite'] ?? base.favorite;
+        final pinned = overlay['pinned'] ?? base.pinned;
+        final prior = _listedSnapshot == null ? null : _listedSnapshot![i];
+        result.add(
+          prior != null && prior.favorite == favorite && prior.pinned == pinned
+              ? prior
+              : base.copyWith(favorite: favorite, pinned: pinned),
+        );
+      }
+      for (final stamp in metadata.files) {
+        final key = stamp.path.toLowerCase();
+        final cached = _listedFiles[key];
+        if (cached != null && cached.stamp == stamp) {
+          entries[key] = cached;
+          result.add(cached.preset);
+          continue;
+        }
+        final name = File(stamp.path).uri.pathSegments.last;
+        final id = name.substring(0, name.length - '.vepreset'.length);
+        safeId(id);
         if (_builtin(id) != null)
           invalid('User file shadows a built-in preset.');
-        final value = await _current(id);
-        if (value != null) result.add(value);
+        // Do not reuse an old successful entry after observing a malformed edit,
+        // even if a later repair restores its original size/timestamps.
+        _listedFiles.remove(key);
+        final data = await readJson(stamp.path);
+        if (data == null) continue; // Removed between enumeration and open.
+        final decoded = decodePreset(data, _core);
+        if (decoded.recipe.id.toLowerCase() != id.toLowerCase() ||
+            decoded.builtin)
+          invalid('Preset file identity mismatch.');
+        final preset = _requirements(decoded);
+        entries[key] = (stamp: stamp, preset: preset);
+        result.add(preset);
       }
+      if (epoch != _listEpoch)
+        continue; // An own write won while reads awaited.
+      final old = _listedSnapshot;
+      final same =
+          old != null &&
+          old.length == result.length &&
+          Iterable<int>.generate(
+            result.length,
+          ).every((i) => identical(old[i], result[i]));
+      _listedFiles =
+          entries; // Prune removed files; retain one revision per file.
+      _listedPreferencesStamp = metadata.preferences;
+      _listedPreferences = preferences;
+      _listedMetadataJson = metadataJson;
+      _listedEpoch = epoch;
+      return _listedSnapshot = same ? old : List<Preset>.unmodifiable(result);
     }
-    return List.unmodifiable(result);
+    throw const ServiceException(
+      'STORE-BUSY',
+      'Library changed repeatedly while being read.',
+    );
   }
 
   @override
@@ -202,6 +353,7 @@ class FilePresetLibrary
             jsonEncode(existing.data),
           );
         await atomicWrite(_file(saved.recipe.id), serialized);
+        _invalidateList(saved.recipe.id);
         await _prune(saved.recipe.id);
         return saved;
       });
@@ -251,6 +403,7 @@ class FilePresetLibrary
     // Preserve prior versions for recovery; current removal is one operation.
     await atomicWrite(_history(id, current.revision), jsonEncode(current.data));
     await File(_file(id)).delete();
+    _invalidateList(id);
   });
   @override
   Future<Preset> setPreferences(
@@ -275,6 +428,7 @@ class FilePresetLibrary
         jsonEncode(current.data),
       );
       await atomicWrite(_file(id), jsonEncode(saved.data));
+      _invalidateList(id);
       await _prune(id);
       return saved;
     }
@@ -288,6 +442,7 @@ class FilePresetLibrary
     };
     data['presets'] = entries;
     await atomicWrite(paths.preferences, jsonEncode(data));
+    _invalidateList(null);
     return (await _current(id))!;
   });
   @override

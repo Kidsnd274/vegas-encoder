@@ -8,6 +8,94 @@ B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
+## Merge and library-watch follow-up (2026-10-15)
+
+The owner requested merging the reviewed checkpoint and continuing. Committed it
+as **fa58338** on ws/platform, merged current master/app F6 d3b83ce on the workstream
+as **9018965**, then fast-forwarded master to 9018965. No conflicts or push; master's
+pre-existing untracked .claude/ is preserved. No frontend source was edited.
+
+At 9018965, merged app integration used existing SDK/offline dependencies; app analysis passed and
+**394 unit/widget tests pass, one fails**. The remaining assertion is app-owned
+advanced_editor_test.dart:299, named "an unterminated quote is about the whole
+command: listed, not underlined". It expects wholeCommand=true, while the reviewed
+C2 addition deliberately reports the unmatched quote's precise range. App needs to
+adopt that range/prefix contract in this test (and its own native light/dark goldens).
+Do not restore the old whole-command diagnostic in core. **While this continuation
+was validating, master advanced through app follow-ups 84acb66 to 493f146**, which
+adopts the precise quote range and refreshes the affected native goldens. The request
+above is satisfied by that app-owned commit; it will be included in the library
+checkpoint integration. Generated runner files from
+Flutter checks were restored; no app edits or SDK upgrade are retained.
+
+**Library-watch checkpoint reviewed and finished:** the app's F7 library-watch
+bottleneck. FilePresetLibrary now caches each current decoded preset and its native
+requirements by file metadata, plus built-in requirements/preferences. Warm polls use
+one bounded native Windows directory query in the existing ve_windows_services DLL
+instead of 500 separate stats/reads/normalizations. An unchanged metadata result
+reuses the exact immutable snapshot before Dart parsing/sorting, and watchSnapshots
+skips serializing that same snapshot again. No new C3 interface or app adoption is
+needed. Native metadata is read-only and synchronous; oversize/reparse-entry
+fallback uses a short-lived isolate. There is no persistent watcher/worker or dispose
+requirement. Handles and caller buffers are released on success/error/limit paths.
+
+Changed files are validated independently; removed entries are evicted, built-in
+star/pin changes still show, and failed reads/unsupported files emit errors while
+retaining the last published snapshot. Own writes invalidate immediately; concurrent
+lists share work and own-write races retry with a bound. get/CAS/Save remain disk
+reads. Cache storage is one current revision per present file plus one metadata/list
+snapshot, not per-poll/history accumulation. Metadata-preserving external rewrites
+can evade this cache; explicit get/Save remain authoritative. Scope/limits are in C3.
+
+Review fixed one error-parity edge: a directory named preferences.json must report
+FILE-READ rather than becoming cached default preferences. Error/snapshot retention
+and removal/recovery are covered. A deliberate same-size, timestamp-preserving
+external edit also confirms that explicit get and Save/CAS bypass the list cache.
+
+Validation: **99** focused Windows/native-asset library checks in JIT and AOT; **114** retained
+Windows file/lock/native-core repository checks; **64** service fake checks; service
+analysis clean; **10 app service-wiring tests pass** on the new implementation.
+Focused checks include 500 real files, zero warm normalize calls, single-flight
+lists, two/late listeners, same-size external edits, add/delete/re-add, preference
+changes/removal, malformed/future files and repair, immutable snapshot reuse, ignored
+entries, pause/cancel, own-write invalidation, Unicode/dot-segment paths, counted FFI
+arguments and output guard bytes. Synthetic recipe records, no FFmpeg execution,
+fake host or real VEGAS. No sanitizer or process/thread debugging resumed.
+
+Measured with the existing Dart 3.13.5 / MSVC x64 native asset on this PC's workspace
+volume, 500 presets (six built-ins + 494 files), 50 warm lists:
+
+- JIT runs measured **1.77–3.21 ms median / 2.05–4.03 ms p95**. The final 93-check
+  run was **3.206 / 4.030 ms**, max 4.204 ms; raw native enumeration median 1.414 ms.
+  Continuation JIT: **1.827 / 2.286 ms**, cold **658 ms**, zero warm normalization calls.
+  Its prior first full read was **1,081 ms** (earlier runs 592–641 ms). These are measured
+  workspace-volume timings, not a universal filesystem latency guarantee.
+- Continuation AOT: **1.866 ms median / 2.255 ms p95** (max 2.349 ms), first read **537 ms**.
+  Cold loading still decodes every preset; this does not claim a cheap initial load.
+- App's prior report was **430–470 ms every 250 ms**. The new repeated-list path makes
+  **zero core normalization calls**; data changes alone trigger file reads/validation.
+
+Reproduce: from packages/ve_services,
+`dart run test/library_watch_test.dart`; the test builds a temporary 500-preset library
+under ignored build/test-results, cleans it on completion, and writes the compact
+library-watch-timings.json summary there. AOT was bundled at build/b3-library-watch.
+No benchmark inserts timers into product code.
+
+API source checks: Context7 resolution/docs returned no matching Win32 content;
+verified directly against Microsoft's [FindFirstFileExW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstfileexw),
+[FindNextFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findnextfilew)
+and [WIN32_FIND_DATAW](https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-win32_find_dataw)
+references, plus the installed SDK's Native asset-id declaration for the focused
+FFI test. Reuses the already-attributed MIT JSON header; no new dependency.
+
+No installation, exporter replacement, machine-tool change or antivirus exclusion.
+**A5–A7, real two-template/restart persistence, controlled real failure recovery and
+monitor performance remain unverified.** Render threading/frame release/no-app-wait
+rules remain unchanged. F6's synthetic window figures do not pass its VEGAS render
+performance gate. Subsequent platform work: coordinate DesktopApp openPreset/openJob
+with app, output-depth C5 facts, then version checks/installer inputs under the owner's
+recorded decisions. Gated B6 activation remains separate.
+
 ## Advanced capability reuse / F4 / popup size (reviewed checkpoint)
 
 Continued on **ws/platform at `1e14d64`**, initially clean. Read the latest ws/app
@@ -93,8 +181,8 @@ App adoption: no changes for snapshot reuse; consume the F4 additions/catalogue
 and C7 popup size in app-owned code/tests/goldens. Contracts spell out exact API,
 identity, eviction/release and unknown facts. Temporary output naming remains
 engine-owned; preview uses CompilePaths.output. DesktopApp.openPreset still needs
-app launch/selection coordination. The latest app's separate library-watch cost
-request is **not addressed by this task**. Do not change invalid desktop save policy.
+app launch/selection coordination. The latest app's library-watch cost request is now
+implemented in the uncommitted follow-up above. Do not change invalid desktop save policy.
 
 **A5–A7, real two-template/restart persistence, controlled real failure recovery
 and monitor performance remain unverified.** No B6 activation, app/monitor launch,
@@ -518,8 +606,10 @@ B4's engine/C5/C6 writers are delivered above; app F7 consumes them through the
 existing readers. B5 normal trials and the owner's drop-text decision are recorded
 above; further marker trials are ended. Connect B6 to the actual F5 popup when
 ready and the native gates resume, then the recipe/C5 progress bridge. Avoid adding
-another fake-owner framework. The additive F4/core/C7 changes above await review
-and app adoption; the library-watch request remains separate queued platform work.
+another fake-owner framework. The additive F4/core/C7 changes are committed/merged;
+app adoption of precise unmatched-quote ranges remains requested above. The reviewed
+library-watch checkpoint is finished above. Next is the independent F6 C5 output
+bit-depth/precision fact request, to remain uncommitted under the owner's instructions.
 
 B6 adapter/progress performance needs the owner with real VEGAS and gated
 evidence. Prior checkpoints had owner authorization to commit/merge; **this

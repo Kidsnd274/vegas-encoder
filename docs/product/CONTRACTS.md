@@ -560,6 +560,45 @@ pause reads when paused and close their in-flight read on cancellation. C5 retai
 its last valid snapshot on malformed/stale/missing replacement. Large-library/app
 scroll/search timing budgets remain app-side F7 measurements.
 
+### Library list/watch caching (2026-10-15, additive implementation)
+
+C3 signatures and fakes are unchanged. FilePresetLibrary polls the current folder
+and preferences.json metadata every 250 ms while watched. Its Windows services DLL
+uses one non-recursive directory enumeration for names, size, last-write and creation
+times; it closes the search handle before return. This is a short synchronous local
+metadata query; changed file contents still use the existing bounded async reads.
+No preset is opened/decoded/normalized on an unchanged tick. The service compares
+its last metadata JSON before parsing/sorting it again, reuses the immutable preset
+list and skips the watcher's full-library JSON comparison for that same instance.
+Enumeration order is not assumed: changed results are sorted as before.
+
+Changed or added files pass through the original native recipe checks and requirements
+calculation. Removed entries are pruned; the cache retains one successful current
+entry per file, one preferences object and one list/metadata snapshot, with no
+history accumulation. Built-in requirements are stable for the core instance;
+preferences overlays are refreshed independently. Save/delete/preferences invalidate
+the affected cache immediately. Concurrent lists share one in-flight scan; writes
+winning during async reads force a retry (at most three, then STORE-BUSY). get and
+revision/Save validation remain authoritative disk reads rather than cache lookups.
+
+Every new listener receives a current snapshot, then only changed values. Malformed
+files still fail list() and emit stream errors without replacing the last successful
+snapshot; repairs are revalidated. A directory named preferences.json remains a
+FILE-READ error rather than being cached as missing/default preferences.
+Pause/cancel retains the existing timer/in-flight
+lifetime rules. No persistent watcher, process, worker thread or new dispose API is
+introduced. FakePresetLibrary continues its existing in-memory snapshot contract.
+
+The native metadata fast path is bounded to 1 MiB output, 8,192 retained entries,
+100,000 enumerated entries and 32,700 input UTF-16 units. Exceeding that bound (or a
+preset/preferences reparse point) uses the previous Dart directory/stat scan in a short-lived
+isolate. Other scan failures remain FILE-READ; no partial directory is accepted.
+Reparse entries use Dart's existing followLinks:false policy through that fallback. Metadata
+caching detects ordinary edits/atomic replacements; an external rewrite preserving
+size and all recorded timestamps can evade it. Explicit get/Save still reread bytes.
+Measured 500-preset costs and cold-load limits are in the platform handoff. This
+changes app storage only; no scan, wait or filesystem dependency enters Render.
+
 Preset history keeps the last 20 old revisions (post-commit pruning is best effort
 and retries on the next save). Delete retains the final snapshot for recovery.
 An ID with retained history cannot be recreated at revision 1; use a new ID.
