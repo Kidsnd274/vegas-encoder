@@ -207,9 +207,15 @@ by the engine; native cached hardware readiness is downgraded to unknown.
 Unknown popup media/project facts remain null. The configured app's numeric file
 version must be 0.1.5.1 for the current fix candidate; the full frontend folder is required.
 
-The page queues C4 launch on its UI thread, disables only its enabled root owner,
-polls child exit with a window timer and restores owner state on all terminal
-paths. Editor Apply changes only its draft; native Apply commits the owned bytes.
+The page queues C4 preparation on its UI thread and starts file/process transport
+on one independent worker from copied request/path/argv values. No host interface,
+draft, allocator or window calls cross to that worker. It owns its transport and
+retains the DLL through late launch completion/page teardown. The UI window timer
+polls one copied terminal result; it never joins a Windows process-creation call.
+Only the page's originally enabled root owner is disabled. Normal foreground
+editor return re-enables that owner, follows explicit GW_OWNER links and restores
+an iconic host before returning focus. Background/crashed completion remains
+passive. Editor Apply changes only its draft; native Apply commits owned bytes.
 Render owns its decoded snapshot from Create and never reads the preset library.
 It releases copied host frames before C7 reads, hashing, queues or process waits.
 C5 monitor creation belongs to the independent job writer after its first atomic

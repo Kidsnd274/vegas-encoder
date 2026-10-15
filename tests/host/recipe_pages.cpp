@@ -187,6 +187,26 @@ int wmain(int argc, wchar_t** argv) {
     fs::create_directory(root);
     for (const auto mode : {L"apply", L"cancel", L"crash", L"invalid", L"unsupported", L"hang", L"preflight", L"queued-close"})
       Run(root, recipe, mode);
+    WNDCLASSW returnClass{}; returnClass.lpfnWndProc=DefWindowProcW; returnClass.hInstance=GetModuleHandleW(nullptr);
+    returnClass.lpszClassName=L"B6_RETURN_TEST";
+    Check(RegisterClassW(&returnClass)!=0,"register real top-level owner regression class");
+    const auto main = CreateWindowExW(0,returnClass.lpszClassName,L"Owned host return regression",WS_OVERLAPPEDWINDOW,
+      0,0,320,180,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
+    const auto owner = CreateWindowExW(0,returnClass.lpszClassName,L"Owned settings return regression",WS_OVERLAPPEDWINDOW,
+      0,0,240,120,main,nullptr,GetModuleHandleW(nullptr),nullptr);
+    Check(main && owner,"create owned native return regression windows");
+    Check(GetWindow(owner,GW_OWNER)==main,"settings window belongs to the host window");
+    ShowWindow(main,SW_SHOWMINNOACTIVE); EnableWindow(owner,FALSE);
+    ReturnRecipeOwner(owner,nullptr,false);
+    Check(IsIconic(main) && IsWindowEnabled(owner),"background completion re-enables without restoring or activating host");
+    EnableWindow(owner,FALSE); ReturnRecipeOwner(owner,nullptr,true);
+    if (IsIconic(main) || !IsWindowEnabled(owner))
+      printf("Owner return diagnostic: main=%p owner=%p rootOwner=%p mainIconic=%d ownerEnabled=%d caller=%lu mainThread=%lu\n",
+        static_cast<void*>(main),static_cast<void*>(owner),static_cast<void*>(GetAncestor(owner,GA_ROOTOWNER)),
+        IsIconic(main),IsWindowEnabled(owner),GetCurrentThreadId(),GetWindowThreadProcessId(main,nullptr));
+    Check(!IsIconic(main) && IsWindowEnabled(owner),"return from foreground editor restores iconic host and its settings owner");
+    DestroyWindow(owner); DestroyWindow(main);
+    UnregisterClassW(returnClass.lpszClassName,returnClass.hInstance);
     printf("B6 NATIVE RECIPE PAGE PASSED: %d checks; hidden authored owner/fake child, no VEGAS or real app\n", checks);
     return 0;
   } catch (const std::exception& error) {

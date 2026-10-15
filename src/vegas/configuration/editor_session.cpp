@@ -3,6 +3,8 @@
 #include "../../support/native_boundary.h"
 #include <algorithm>
 #include <filesystem>
+#include <atomic>
+#include <mutex>
 
 namespace vegas_encoder::configuration {
 namespace {
@@ -198,11 +200,13 @@ void EditorSessionTransport::Start(const ve::Json& request, const EditorLaunch& 
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
     Require(p.job.h && SetInformationJobObject(p.job.h, JobObjectExtendedLimitInformation, &limits, sizeof(limits)),
       "Cannot create editor ownership job.");
+    const auto jobReady = NowMs();
     STARTUPINFOW startup{}; startup.cb = sizeof(startup);
     PROCESS_INFORMATION info{};
     Require(CreateProcessW(application.c_str(), command.data(), nullptr, nullptr, FALSE,
       CREATE_SUSPENDED | CREATE_NO_WINDOW, nullptr, fs::path(application).parent_path().c_str(), &startup, &info) != FALSE,
       "Cannot start editor helper.");
+    const auto created = NowMs();
     p.process.h = info.hProcess; p.pid = info.dwProcessId;
     Handle thread(info.hThread);
     if (!AssignProcessToJobObject(p.job.h, p.process.h) || ResumeThread(thread.h) == DWORD(-1)) {
@@ -212,6 +216,7 @@ void EditorSessionTransport::Start(const ve::Json& request, const EditorLaunch& 
     }
     p.active = true;
     BestEffortDiagnostic([&] { Log("B6 editor transport: files/validation=%.1f ms spawn=%.1f ms",prepared-started,NowMs()-prepared); });
+    BestEffortDiagnostic([&] { Log("B6 editor launch breakdown: job=%.1f ms CreateProcess=%.1f ms own/resume=%.1f ms",jobReady-prepared,created-jobReady,NowMs()-created); });
   } catch (...) {
     p.job.Close();
     (void)p.Cleanup();
@@ -248,5 +253,77 @@ std::optional<EditorExit> EditorSessionTransport::Poll() {
   exit.cleanupComplete = p.Cleanup();
   if (!exit.cleanupComplete) exit.diagnostic += " Session cleanup incomplete; directory retained.";
   return exit;
+}
+struct EditorSessionTask::State {
+  std::wstring root;
+  ve::Json request;
+  EditorLaunch launch;
+  std::function<void()> beforeStart; // Tests can hold startup; production leaves empty.
+  std::atomic<bool> cancelled{false};
+  std::atomic<DWORD> pid{0};
+  std::mutex mutex;
+  std::optional<EditorExit> exit;
+  HMODULE module = nullptr;
+};
+EditorSessionTask::EditorSessionTask(const std::wstring& root, const ve::Json& request,
+                                   const EditorLaunch& launch, std::function<void()> beforeStart)
+    : state_(std::make_shared<State>()) {
+  state_->root = root; state_->request = request; state_->launch = launch;
+  state_->beforeStart = std::move(beforeStart);
+  Require(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+    reinterpret_cast<LPCWSTR>(&Worker), &state_->module) != FALSE,"Cannot retain editor worker module.");
+  std::shared_ptr<State>* context = nullptr;
+  try { context = new std::shared_ptr<State>(state_); }
+  catch (...) { FreeLibrary(state_->module); throw; }
+  const HANDLE worker = CreateThread(nullptr,0,Worker,context,0,nullptr);
+  if (!worker) { delete context; FreeLibrary(state_->module); throw std::runtime_error("Cannot schedule editor startup."); }
+  CloseHandle(worker);
+}
+EditorSessionTask::~EditorSessionTask() { Cancel(); }
+void EditorSessionTask::Cancel() noexcept { state_->cancelled = true; }
+DWORD EditorSessionTask::ProcessId() const noexcept { return state_->pid; }
+std::optional<EditorExit> EditorSessionTask::Poll() {
+  if (GetCurrentThreadId() != caller_) throw std::logic_error("Editor task polling must stay on the page thread.");
+  if (consumed_) return std::nullopt;
+  std::lock_guard<std::mutex> lock(state_->mutex);
+  if (!state_->exit) return std::nullopt;
+  consumed_ = true;
+  auto exit = std::move(state_->exit);
+  if (state_->cancelled) { exit->result = nullptr; exit->exitCode = 1; exit->diagnostic = "Editor session cancelled; result discarded."; }
+  return exit;
+}
+DWORD WINAPI EditorSessionTask::Worker(void* context) {
+  auto state = *static_cast<std::shared_ptr<State>*>(context); delete static_cast<std::shared_ptr<State>*>(context);
+  const auto module = state->module;
+  {
+    EditorExit result;
+    try {
+      if (state->beforeStart) state->beforeStart();
+      if (!state->cancelled) {
+        EditorSessionTransport transport(state->root);
+        transport.Start(state->request,state->launch);
+        state->pid = transport.ProcessId();
+        for (;;) {
+          if (state->cancelled) {
+            transport.Cancel();
+            // Destruction owns termination without waiting. A slow OS launch
+            // can finish after the page is gone; it never acquires a host HWND.
+            result.diagnostic = "Editor startup/session cancelled; result discarded.";
+            break;
+          }
+          if (auto exit = transport.Poll()) { result = std::move(*exit); break; }
+          Sleep(25);
+        }
+      } else result.diagnostic = "Editor startup cancelled before launch.";
+    } catch (const std::exception& error) {
+      BestEffortDiagnostic([&] { result.diagnostic = error.what(); });
+    } catch (...) {
+      BestEffortDiagnostic([&] { result.diagnostic = "Editor startup failed."; });
+    }
+    { std::lock_guard<std::mutex> lock(state->mutex); state->exit = std::move(result); }
+  }
+  state.reset();
+  if (module != GetModuleHandleW(nullptr)) FreeLibraryAndExitThread(module,0);
+  FreeLibrary(module); return 0;
 }
 } // namespace vegas_encoder::configuration

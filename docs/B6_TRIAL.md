@@ -1,23 +1,39 @@
 # B6 connected candidate: owner VEGAS trial
 
-Prepared candidate: **0.1.5-recipe-proof**, frontend **0.1.5+1**. Target:
+Prepared candidate: **0.1.6-recipe-proof**, frontend **0.1.5+1** (unchanged). Target:
 Boris FX VEGAS **2026.0.3.189**. This candidate connects the existing frontend
 popup and monitor to native template recipes and the recipe engine. It is staged
-under `L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.5`; it is **not installed**.
+under `L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.6`; it is **not installed**.
 No real-host gate has passed from preparation or fake-host tests.
+
+The owner reports that both 0.1.5 templates now render with their intended codecs
+and the template-text/request bugs appear resolved. Current retest priorities are
+**click-to-visible editor time** and **VEGAS staying restored after popup Apply**.
+The 0.1.6 native path performs file/process startup on an independent worker while
+VEGAS's UI keeps running; the same frontend/Skia build is retained. This does not
+prove the variable Windows process-creation cost has disappeared. The previous
+logs show roughly 33–37 ms fast and 7–12 s slow in grouped launch/resume work.
+That points to native startup but does not isolate the exact call or establish
+a shader cause; renderer choice remains unchanged pending the detailed data.
+No launch-cancellation UI is added. The new launcher enables the frontend's
+existing first-frame trace at `logs\frontend-startup.txt`, alongside native launch
+phase timings, so the next real trial can measure total opening latency.
 
 The owner's first 0.1.4 trial reached a successful real VEGAS FFV1/PCM render and
 the progress window, but exposed garbled native text, intermittent edit requests
-and an Explorer reveal bug. This **0.1.5 fix candidate** uses aligned native text,
-correct Explorer arguments and bounded sampled verification. Its data folder is
-a copy of the first trial's data; the original candidate/data remain untouched.
+and an Explorer reveal bug. The 0.1.5 fixes supplied aligned native text, correct
+Explorer arguments and bounded sampled verification; 0.1.6 retains them. Its data
+folder is a copy of the 0.1.5 trial's data; original candidates/data remain untouched.
 
-**Use the fresh built-in preset and save new names** for this retest. Old test
+**For old corrupted 0.1.4 templates, use the fresh built-in and save new names.** Old test
 templates may already contain corrupted names/notes; the patch cannot reliably
 reconstruct those strings. Preserve them for now. Intact old recipe payloads remain
 readable, but existing garbled Recent entries are not automatically repaired.
 The historical hidden id-0 preset workaround is retained; no speculative ordering
 change was made. Start with names such as **B6 fixed lossless** and **B6 fixed H264**.
+Already-working 0.1.5 templates remain compatible with 0.1.6. Reuse those for the
+current startup/Apply checks; another codec render is not required to repeat the
+owner's successful test.
 
 ## Install and start
 
@@ -29,7 +45,7 @@ change was made. Start with names such as **B6 fixed lossless** and **B6 fixed H
 
    ```powershell
    Set-Location L:\repos\vegas-encoder-platform
-   .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.5\plugin' -Update
+   .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.6\plugin' -Update
    .\scripts\Start-B6Trial.ps1 -Target Vegas
    ```
 
@@ -39,7 +55,7 @@ VEGAS restart during the trial. It verifies the installed DLL matches the candid
 It refuses an already running VEGAS, which would retain its previous environment.
 No machine-wide environment variable or antivirus setting is changed.
 
-Trial settings, library, sessions and History live in `build\b6-candidate-0.1.5\data`.
+Trial settings, library, sessions and History live in `build\b6-candidate-0.1.6\data`.
 The default FFmpeg was registered through the production C3 discovery/settings
 services as `C:\ffmpeg\bin\ffmpeg.exe`, with output verification and progress
 window enabled. No hardware test/probe qualification is implied. To inspect or
@@ -91,14 +107,14 @@ The saved recipe should work with the desktop app and popup closed. Check:
   another fresh filename. Report any freeze, unexpected error or retained partial.
 
 Please report the exact step, template, output filename and any displayed error.
-Native logs are in `build\b6-candidate-0.1.5\logs`; C5/C6 and FFmpeg logs are in
-`build\b6-candidate-0.1.5\data\Local\jobs`. There is no need for a debugger, sanitizer,
+Native logs are in `build\b6-candidate-0.1.6\logs`; C5/C6 and FFmpeg logs are in
+`build\b6-candidate-0.1.6\data\Local\jobs`. There is no need for a debugger, sanitizer,
 antivirus exclusion or additional process/thread tracing.
 
-The native page now paints “Starting the editor...” before launch work and logs
-preflight/files/spawn timings. A three-second cold popup delay has **not** been
-proved fixed; report whether it remains. These existing per-process logs can
-separate native setup time from the app's first-frame startup without a debugger.
+The native page paints “Starting the editor...” before scheduling parallel work
+and logs preflight/files/job/process-creation/resume timings. Report total time
+until the editor is visible, including repeat opens. These existing per-process
+logs and frontend trace separate Windows launch from first-frame latency.
 Progress remains within the existing two-updates-per-second publication budget,
 with phase changes immediate; an idle sample no longer waits for an extra timer
 tick. Verification samples at most 32 packets after normal stream discovery,
@@ -122,14 +138,14 @@ needed; use fresh output names. The target is at most about 2% time cost and und
 
 ## Restore the previous exporter
 
-The exact currently installed **0.1.4** DLL/PDB/INI/install manifest and discovery file were copied to
-`build\b6-candidate-0.1.5\rollback`, with `backup-sha256.json`. The installed exporter
+The exact currently installed **0.1.5** DLL/PDB/INI/install manifest and discovery file were copied to
+`build\b6-candidate-0.1.6\rollback`, with `backup-sha256.json`. The installed exporter
 was left unchanged during preparation. Keep this backup until the trial is accepted.
 
 Close VEGAS and run:
 
 ```powershell
-.\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.5\rollback\plugin' -Update
+.\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.6\rollback\plugin' -Update
 ```
 
 This restores the previous exporter binaries and INI through the same reversible
@@ -137,9 +153,9 @@ installer, which regenerates/verifies its discovery manifest. Launch the old
 candidate's isolated data after rollback with:
 
 ```powershell
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot 'L:\repos\vegas-encoder-platform\build\b6-candidate'
+.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.5'
 ```
 
-Trial data and saved native templates remain. The old 0.1.4 reader does not
-understand 0.1.5's native alignment byte, so keep its original test templates
-separate. The backup's original discovery file and manifest remain available.
+Trial data and saved native templates remain. Versions 0.1.5 and 0.1.6 use the
+same aligned payload format. The backup's original discovery file and manifest
+remain available.

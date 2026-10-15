@@ -1,12 +1,74 @@
 # Platform workstream
 
 Updated: 2026-10-15 (Asia/Singapore). Worktree `L:\repos\vegas-encoder-platform`,
-branch `ws/platform`. **B6 connected candidate trialled by the owner; 0.1.5 fixes
-prepared for native text, Explorer reveal and progress/readback latency.** B1–B4 and app F4 are merged. Continued
+branch `ws/platform`. **B6 template recipes work in the owner's 0.1.5 renders;
+0.1.6 parallel startup/owner return prepared for the next real check.** B1–B4 and app F4 are merged. Continued
 from `659fe02`; F3 master `0be99dc` was fast-forwarded before the B1 commit.
 B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
+
+## 0.1.5 template confirmation and 0.1.6 parallel launch/owner return
+
+Owner reports that two separate templates now render with different intended
+codecs and the template corruption/request bugs appear solved. C6 confirms FFV1
+and libx264 success on VEGAS 2026.0.3.189, sampled readbacks **0.719 s / 0.187 s**.
+Keep full A5–A7, restart/capacity, controlled failure recovery and monitor overhead
+unverified; this is additional successful recipe-render evidence.
+
+The remaining report is intermittent ~6 s editor opening (some instant), plus
+VEGAS minimizing on popup Apply. The 0.1.5 native log captures **12,367.6 / 7,029.2 /
+7,893.1 ms** in its spawn section, versus about **33–37 ms** on fast launches.
+Preflight is 2–3 ms and files/validation 6–8 ms. The section creates/assigns/resumes
+a suspended process. That localizes the spike to native launch but does not
+separate creation from resume or child work overlapping resume. The unchanged
+runner already defaults to **Skia**, not Impeller; a shader cause is not established.
+The exact variable operation remains open pending the new per-call/first-frame data.
+
+Implemented **0.1.6-recipe-proof**, bundled with the unchanged **0.1.5+1 frontend**:
+`EditorSessionTask` copies C4/path/argv values and owns the existing transport on
+one independent worker. File/process setup runs in parallel with VEGAS's UI,
+without UI message pumping, joins, host/draft/allocator/window access on the
+worker, or a new launch-cancel UI. Page lifetime and late startup remain safe via
+owned task state, existing child job ownership and a retained DLL reference.
+Result validation/draft/native Apply and all window calls stay on the page thread.
+The goal is actual click-to-visible speed; moving the wait alone is **not** claimed
+to remove the OS delay. The next real host run must measure that result.
+
+Owner return now follows explicit `GW_OWNER` links, because `GA_ROOTOWNER` can
+stop at an owned `WS_OVERLAPPED` window (reproduced in the window regression).
+Normal Apply/Cancel from the foreground editor restores an iconic host and its
+settings dialog before returning focus. Background/crashed completion only
+re-enables the original owner. This guards the minimize/activation symptom;
+the exact real-host trigger and fix remain pending owner verification. The native
+code never minimizes a host. Frontend WM_CLOSE currently also re-enables its owner;
+app-owned close behavior should be reviewed if the symptom remains.
+
+Launch timings now split job setup, CreateProcess and ownership/resume. The trial
+launcher enables the existing frontend startup trace (by PID) at
+`logs/frontend-startup.txt`, allowing process launch versus first frame to be
+separated without a debugger. No shader/backend switch, AV exclusion, machine
+tool change or old process/thread debugging workflow was introduced.
+
+Validation: optimized DLL build; **162 snapshot**, **95 transport/parallel task**,
+**107 native-page/owner-window** checks; **19 C7 runtime** and monitor cadence
+checks pass. Task tests hold startup deliberately, prove scheduling/polling return,
+owned result/cleanup and late-page-lifetime safety; normal/failure/repeated Apply
+preservation tests remain. Owner-window tests retain an iconic host on background
+completion and restore its explicit owner chain on foreground return. These are
+fake child/window tests, not a real VEGAS latency/focus pass.
+
+Staged `build/b6-candidate-0.1.6` with a copied 0.1.5 data root and exact installed
+0.1.5 rollback. No installation/push/master merge. Existing working 0.1.5 templates
+remain compatible; do not repeat the codec trials just to prove them again.
+Next owner check: repeat Edit settings several times, measure time until visible,
+then Apply and confirm VEGAS remains restored. See [B6_TRIAL.md](../../B6_TRIAL.md).
+
+App handoff if native launch remains slow after parallelizing: prioritize a reusable
+editor process/engine or an out-of-process launch path that avoids repeated cold
+process creation. That requires app-owned lifecycle/C4 dispatch work; changing
+shaders or frontend controls is not justified by the current native-launch data. No
+frontend files were edited here, in keeping with workstream ownership.
 
 ## First real B6 feedback and 0.1.5 fix candidate
 

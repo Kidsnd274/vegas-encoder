@@ -1,9 +1,28 @@
 # Vegas Encoder status
 
-Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.4-recipe-proof
-(owner's first connected B6 trial; 0.1.5 fixes staged separately, not installed).
+Updated: 2026-10-15 (Asia/Singapore). Installed version: 0.1.5-recipe-proof
+(owner confirmed distinct recipe renders; 0.1.6 parallel-launch/owner fix staged).
 
 ## Current progress
+
+**0.1.5 owner retest / 0.1.6 startup work:** the owner reports both templates
+render with different intended codecs and template bugs appear resolved. C6
+confirms FFV1 and libx264 outputs succeeded, with sampled verification **0.719 s /
+0.187 s**. This strengthens recipe-render evidence; it does not by itself pass
+all persistence/capacity/recovery/performance gates. New reports: intermittent
+6-second editor opening and VEGAS minimizing after popup Apply.
+
+Native logs isolate the large spike to the grouped process launch/resume stage: fast
+33–37 ms versus slow **7.0–12.4 s**, with file/validation ~6–8 ms and preflight
+~2–3 ms. The old grouping cannot distinguish process creation from resume or
+overlapping child work; it does not establish a shader cause. The app already
+defaults to Skia. **0.1.6-recipe-proof**
+starts the existing transport in parallel with VEGAS's UI, using copied C4 values
+and a retained DLL lifetime. It adds explicit same-thread owner-chain restore on
+return from the foreground editor, keeping background completion passive. The
+unchanged 0.1.5+1 frontend is included. Total launch speed improvement and the
+real Apply/minimize fix still need the owner's test; offloading alone is not
+claimed to eliminate the Windows delay. No new user launch-cancel flow.
 
 **First real B6 trial and fixes (2026-10-15):** owner reports popup edits and a
 successful render/progress window on VEGAS 2026.0.3.189. Native C6 confirms FFV1,

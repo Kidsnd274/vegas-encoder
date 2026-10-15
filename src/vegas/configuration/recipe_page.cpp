@@ -9,6 +9,24 @@
 #include <limits>
 
 namespace vegas_encoder::configuration {
+void ReturnRecipeOwner(HWND owner, HWND focus, bool returnForeground) noexcept {
+  if (!IsWindow(owner) || GetWindowThreadProcessId(owner,nullptr) != GetCurrentThreadId()) return;
+  EnableWindow(owner,TRUE);
+  if (!returnForeground) return;
+  // GA_ROOTOWNER uses GetParent, which can stop at an owned WS_OVERLAPPED
+  // window. Follow explicit top-level owners so the real host is restored too.
+  auto main = GetAncestor(owner,GA_ROOT);
+  for (unsigned depth=0; main && depth<32; ++depth) {
+    const auto next=GetWindow(main,GW_OWNER);
+    if (!next || next==main || GetWindowThreadProcessId(next,nullptr)!=GetCurrentThreadId()) break;
+    main=next;
+  }
+  if (IsWindow(main) && GetWindowThreadProcessId(main,nullptr) == GetCurrentThreadId() && IsIconic(main))
+    ShowWindow(main,SW_RESTORE);
+  if (IsIconic(owner)) ShowWindow(owner,SW_RESTORE);
+  (void)SetForegroundWindow(owner);
+  if (GetForegroundWindow() == owner && IsWindow(focus)) SetFocus(focus);
+}
 namespace {
 constexpr UINT kLaunchEditor = WM_APP + 37;
 constexpr UINT_PTR kPollEditor = 1;
@@ -188,17 +206,16 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
     if (status_) SetWindowTextW(status_, statusText_.c_str());
   }
   void SyncButton() noexcept { if (button_) EnableWindow(button_, draft_ && !editor_ && !launching_); }
-  void RestoreOwner() noexcept {
+  void RestoreOwner(bool returnForeground = false) noexcept {
     const auto owner = owner_; const bool enable = ownerDisabled_;
     owner_ = nullptr; ownerDisabled_ = false;
     if (enable && IsWindow(owner) && GetWindowThreadProcessId(owner, nullptr) == thread_) {
-      EnableWindow(owner, TRUE);
-      // Avoid stealing focus from another program when a helper crashes in the background.
-      if (GetForegroundWindow() == owner || !GetForegroundWindow()) SetFocus(button_);
+      ReturnRecipeOwner(owner,button_,returnForeground);
     }
   }
   void EndEditor() noexcept {
     launching_ = false;
+    editorStarted_ = editorHadForeground_ = false;
     if (window_) KillTimer(window_, kPollEditor);
     if (editor_) {
       BestEffortDiagnostic([&] { editor_->Cancel(); });
@@ -228,7 +245,6 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
       owner_ = GetAncestor(parent, GA_ROOT);
       if (!IsWindow(owner_) || GetWindowThreadProcessId(owner_, nullptr) != thread_)
         throw std::runtime_error("The VEGAS settings owner is unavailable.");
-      auto transport = std::make_unique<EditorSessionTransport>(options_.sessionRoot);
       auto request = draft_->BeginEdit({{"protocol", 1}, {"sessionId", NewEditSessionId()},
           {"ownerHwnd", std::to_string(reinterpret_cast<uintptr_t>(owner_))},
           {"dllVersion", options_.dllVersion}, {"coreVersion", options_.coreVersion},
@@ -237,11 +253,12 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
       // nested dialog loop, host object or Render worker participates.
       ownerDisabled_ = IsWindowEnabled(owner_) != FALSE;
       if (ownerDisabled_) EnableWindow(owner_, FALSE);
-      transport->Start(request, options_.launch);
-      BestEffortDiagnostic([&] { Log("B6 editor startup: preflight=%.1f ms request/spawn=%.1f ms",prepared-started,NowMs()-prepared); });
+      auto transport = std::make_unique<EditorSessionTask>(options_.sessionRoot,request,options_.launch);
+      BestEffortDiagnostic([&] { Log("B6 editor scheduling: preflight=%.1f ms request/schedule=%.1f ms",prepared-started,NowMs()-prepared); });
       editor_ = std::move(transport);
+      editorStarted_ = editorHadForeground_ = false;
       if (!SetTimer(window_, kPollEditor, 100, nullptr)) throw std::runtime_error("Cannot poll the editor session.");
-      Status(L"Editor is open. Apply there to return changes to this template.");
+      Status(L"Starting the editor. Apply there to return changes to this template.");
     } catch (const std::exception& error) {
       EndEditor();
       Status(L"Could not open the editor: " + Widen(error.what()));
@@ -251,14 +268,27 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
   void PollEditor() {
     if (!editor_) return;
     try {
+      DWORD foregroundProcess = 0;
+      const auto foreground = GetForegroundWindow();
+      if (foreground) GetWindowThreadProcessId(foreground,&foregroundProcess);
+      const bool editorForeground = foregroundProcess && foregroundProcess == editor_->ProcessId();
       auto exit = editor_->Poll();
-      if (!exit) return;
+      if (!exit) {
+        editorHadForeground_ = editorForeground;
+        if (editor_->ProcessId() && !editorStarted_) {
+          editorStarted_ = true; Status(L"Editor is open. Apply there to return changes to this template.");
+        }
+        return;
+      }
       KillTimer(window_, kPollEditor);
       if (options_.validateRecipe && exit->exitCode == 0 && exit->result.is_object() &&
           ve::Str(exit->result, "action") == "apply" && exit->result.contains("recipe"))
         options_.validateRecipe(exit->result.at("recipe"));
       const auto outcome = draft_->FinishEdit(exit->result, exit->exitCode);
-      editor_.reset(); RestoreOwner(); SyncButton();
+      const auto action = ve::Str(exit->result,"action");
+      const bool returnForeground = !exit->exitCode && (action == "apply" || action == "cancel") &&
+          (editorForeground || editorHadForeground_ || foregroundProcess == GetCurrentProcessId());
+      editor_.reset(); RestoreOwner(returnForeground); SyncButton();
       if (outcome.disposition == EditDisposition::applied) {
         Status(draft_->Dirty() ? L"Settings changed. Click VEGAS Apply or OK to keep them." : L"Settings are unchanged.");
         if (draft_->Dirty() && site_) BestEffortDiagnostic([&] { site_->OnStatusChange(PROPPAGESTATUS_DIRTY); });
@@ -308,7 +338,9 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
   host::Tpl source_;
   std::array<BYTE, 28> infoScalars_{};
   std::unique_ptr<RecipeTemplateDraft> draft_;
-  std::unique_ptr<EditorSessionTransport> editor_;
+  std::unique_ptr<EditorSessionTask> editor_;
+  bool editorStarted_ = false;
+  bool editorHadForeground_ = false;
   HWND window_ = nullptr, button_ = nullptr, status_ = nullptr, owner_ = nullptr;
   bool ownerDisabled_ = false, launching_ = false;
   std::wstring statusText_ = L"Settings are stored in this VEGAS template.";

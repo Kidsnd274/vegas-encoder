@@ -1,7 +1,7 @@
 # B6 recipe bytes, editor bridge and opt-in native candidate
 
 The owner resumed B6 preparation and real-host testing on 2026-10-15. The opt-in
-**0.1.5-recipe-proof** fix candidate connects fresh native recipe templates to the
+**0.1.6-recipe-proof** candidate connects fresh native recipe templates to the
 existing frontend popup and recipe engine/C5 monitor. Default and historical proof
 builds keep their previous paths. The owner's first 0.1.4 trial rendered successfully
 but exposed text corruption and intermittent editor startup errors. The fix
@@ -82,7 +82,10 @@ semantics; the adapter enforces session identity and one terminal result.
 The callback seam is only a transaction interface, not a VEGAS ABI or a public
 SDK. The transport below handles files and owned child lifetime. `recipe_page.*`
 now supplies UI-thread startup scheduling, root-owner disable/restore and timer
-polling through the existing native holder/allocator bridge. No host interface is
+polling through the existing native holder/allocator bridge. File/process launch
+now runs in parallel through `EditorSessionTask`, with copied C4 values and a
+retained DLL lifetime. The task owns its transport entirely on its worker, while
+draft/window/holder operations remain on the page thread. No host interface is
 handed to a worker. Render never
 participates in edit sessions or waits for an editor/progress window.
 
@@ -118,13 +121,15 @@ only direct known protocol files (including `.result.lock` and interrupted resul
 temps); it does not recurse or delete unknown entries/the supplied root. Cleanup
 failure is reported with the retained path available through `Directory()`.
 
-This is a transport seam, not a finished native page. Start still does synchronous
-local file/process setup; startup latency/scheduling, graceful Close editor,
-owner lifetime/re-enable, focus/modality and the actual Flutter helper are not
-qualified. The future page must cancel/discard its draft after launch failure or
-teardown, and must own these remaining UI behaviours. There are **no exporter,
-page or Render call sites**. No editor or monitor is needed to render a saved
-snapshot; this transport must never be called from Render.
+The low-level Start does synchronous local file/process setup on its owning worker.
+The native page polls one copied result without joining startup; late teardown
+retains the worker/DLL until it can terminate its owned child safely. Normal return
+from a foreground editor re-enables its original native owner and follows explicit
+GW_OWNER links to restore an iconic host. Background/crashed completion stays
+passive. Actual total startup latency and the real Apply/minimize symptom require
+the owner's 0.1.6 test; offloading alone does not prove a faster visible editor.
+No launch-cancel UI was added. No editor or monitor is needed to render a saved
+snapshot; the transport is never called from Render.
 
 Current primary references, retrieved through Context7:
 [Win32 API](https://learn.microsoft.com/en-us/windows/win32/api/) and
