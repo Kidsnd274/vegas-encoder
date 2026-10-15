@@ -804,7 +804,9 @@ Cancel preserve the draft; no Render wait or app lookup is introduced. Direct
 known-file cleanup preserves unknown entries and reports incomplete cleanup.
 The default/proof exporters retain their previous paths; the opt-in B6 candidate
 now links these helpers into discovery/pages/Render as described above. Real
-native persistence/capacity and monitor performance remain unqualified;
+native restart persistence is owner-confirmed for the tested recipes; maximum
+payload capacity and monitor performance remain unqualified, and foreground
+return after switching apps remains an open app close-handoff issue;
 details/tests are in [NATIVE_RECIPE_BOUNDARY.md](../NATIVE_RECIPE_BOUNDARY.md).
 No C4/C5 shape or C2 API changed for this checkpoint.
 

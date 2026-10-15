@@ -5,15 +5,29 @@ Updated: 2026-10-15 (Asia/Singapore). Owner-installed version: 0.1.6-recipe-proo
 
 ## Current progress
 
+**Latest owner feedback:** saved templates persist across VEGAS restarts; record
+normal persistence for the tested recipes as owner-confirmed, rather than still
+deferred. This does not measure maximum private-payload capacity. The focus bug
+remains: switch to another full-screen app, return to VEGAS/the editor, then
+Apply; the other app reappears. Actual minimization has not been established.
+The frontend close handler enables the native owner but does not explicitly
+activate it before destroying the foreground popup. Native polling/activation
+after exit is not sufficient to establish correct handoff. App-owned close fix
+and regression request are in the [platform handoff](product/workstreams/platform.md).
+No frontend code or installed files were changed. Controlled real cancellation/
+failure recovery, capacity and measured monitor overhead remain open; subjective
+normal performance is not the prescribed on/off measurement. A5–A7 are not fully
+qualified. See [B6_TRIAL.md](B6_TRIAL.md) for the existing-toggle comparison.
+
 **0.1.6 owner retest:** the owner reports editor opening is "a lot better now".
 Three frontend traces show the window visible **748.6 / 533.3 / 526.8 ms after
 process creation**; native CreateProcess took **153.1 / 32.8 / 31.8 ms**, with
 UI request/scheduling **3.7 / 0.4 / 0.4 ms**. These are observed real-host runs,
 not a general latency guarantee or a precise click-to-visible total. B6's normal
 popup/template/recipe-render/progress path is implemented, supported by this
-startup retest and the distinct-codec renders below. Explicit confirmation of
-the Apply/minimize fix, two-template restart persistence/capacity, controlled real
-failure recovery and monitor overhead remain outstanding. A5–A7 are not promoted.
+startup retest and the distinct-codec renders below. Subsequent owner feedback
+above confirms normal restart persistence and clarifies the remaining focus bug.
+Capacity, controlled real failure recovery and monitor overhead remain outstanding.
 
 **0.1.5 owner retest / 0.1.6 startup work:** the owner reports both templates
 render with different intended codecs and template bugs appear resolved. C6
@@ -464,9 +478,9 @@ and ignored evidence. The source/research import is documented in [ORIGIN.md](..
 | A2 internal host helpers | Template/lease separation and targeted checks implemented; further stream/allocator extraction and real-host qualification remain |
 | A3 adapter/engine boundary | Internal dependencies and owned-buffer transport retained; broader job/settings and cancellation hardening remain |
 | A4 Vegas Encoder real-host parity | Normal 1080p/fractional, same-session on/off and current-build cancel/recovery pass; controlled failure/recovery and counter fixture qualification remain open |
-| A5/A6 native page and saved-setting proof | Ownership, fake persistence and real on/off render effects work; user deferred real two-template/restart qualification; Apply/Cancel remains fake-host tested |
-| A7 versioned recipe snapshots | Deferred to app design implementation; current small versioned proof is sufficient for foundation plumbing |
-| A8 foundation qualification | Implementation/scaffolding checkpoint complete; real normal/cancel/recovery pass; controlled failure, deferred persistence and broader support matrix remain qualification limits |
+| A5/A6 native page and saved-setting proof | Real popup Apply and distinct template renders work; owner confirms saved templates persist across restart. Foreground return remains faulty; full qualification is open |
+| A7 versioned recipe snapshots | Implemented in the opt-in B6 candidate; tested recipes render independently and persist per owner. Maximum native payload capacity and broader qualification remain open |
+| A8 foundation qualification | Foundation normal/cancel/recovery evidence retained; B6 normal recipe rendering/startup and owner-confirmed persistence added. Focus, controlled failure, capacity, monitor overhead and broader support matrix remain qualification limits |
 
 ## Limits
 

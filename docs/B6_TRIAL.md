@@ -3,8 +3,17 @@
 Prepared candidate: **0.1.6-recipe-proof**, frontend **0.1.5+1** (unchanged). Target:
 Boris FX VEGAS **2026.0.3.189**. This candidate connects the existing frontend
 popup and monitor to native template recipes and the recipe engine. It is staged
-under `L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.6`; it is **not installed**.
-No real-host gate has passed from preparation or fake-host tests.
+under `L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.6`; the owner has
+installed and retested it. No real-host gate passes from preparation or fake tests.
+
+Latest result: the owner confirms faster opening and saved templates surviving
+restarts. Three process-age traces reach the visible window in 0.53–0.75 s.
+The remaining focus bug is switching to another full-screen app, returning to
+VEGAS/the editor, then Apply exposing that other app. The app close-handoff request
+is in the [platform handoff](product/workstreams/platform.md). Capacity, controlled
+real failure recovery and measured monitor overhead remain open. Installation
+steps below are retained for reproducibility; no reinstall is needed for this
+documentation update.
 
 The owner reports that both 0.1.5 templates now render with their intended codecs
 and the template-text/request bugs appear resolved. Current retest priorities are
@@ -130,11 +139,36 @@ Advanced requires explicit `-f matroska`; facts outside the core's supported
 scope stay null. Do not use saved proof templates with the candidate.
 
 Controlled real failure recovery, measured private-payload capacity and monitor
-performance remain separate, unverified steps. After basic operation works,
-compare the same longer render three times with the trial Settings progress
-window enabled and three times disabled. Restart between preference changes if
-needed; use fresh output names. The target is at most about 2% time cost and under
-120 MB for the monitor. No performance claim follows from fake-host checks.
+performance remain separate, unverified steps. Normal saved-template persistence
+is now owner-confirmed for the tested recipes; it is not a maximum-capacity test.
+
+## Progress-window timing comparison
+
+No extra tool or build is required. Use the installed 0.1.6 candidate:
+
+1. Select one project, one saved template and one fixed render range. Prefer a
+   range that takes at least about a minute to render, so subsecond variation
+   does not dominate. Keep output verification and other settings unchanged.
+2. Launch the trial desktop app using `Start-B6Trial.ps1 -Target App`. In Settings
+   → Rendering, use **Show a progress window during renders**. This changes the
+   same isolated C7 settings that VEGAS reads at each render. Close prior progress
+   windows and the desktop app before each measured run. Merely closing a launched
+   monitor is not an off run: its startup cost would already have occurred.
+3. Do one unmeasured warm-up, then six renders in this order: **on, off, off, on,
+   on, off**. Reopen the trial app between runs to set the toggle as needed, allow
+   the setting to save, then close it. Use fresh names such as `monitor-on-1.mkv`
+   and `monitor-off-1.mkv`; never overwrite earlier results. Keep other app/load
+   conditions similar and leave VEGAS at the same visibility throughout.
+4. Send the six output names when done. C6 records already include precise
+   `elapsedSec` and phase timings in the trial's `data\Local\jobs`; no manual
+   stopwatch is required. Compare medians as
+   `100 * (median_on / median_off - 1)`. If run variation is comparable to the
+   difference, record the result as inconclusive rather than asserting no cost.
+
+The existing product target is at most about 2% render-time cost and under 120 MB
+for the monitor. Memory needs a separate observed measurement, not inference from
+elapsed time. Restore the preferred progress setting afterward. No performance
+claim follows from fake-host checks or subjective smoothness.
 
 ## Restore the previous exporter
 

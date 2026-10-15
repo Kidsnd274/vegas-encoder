@@ -5,10 +5,12 @@ The owner resumed B6 preparation and real-host testing on 2026-10-15. The opt-in
 existing frontend popup and recipe engine/C5 monitor. Default and historical proof
 builds keep their previous paths. The owner's first 0.1.4 trial rendered successfully
 but exposed text corruption and intermittent editor startup errors. The fix
-candidate is staged, **not installed**;
-see [B6_TRIAL.md](B6_TRIAL.md) for installation, isolated data, testing and rollback.
-A5–A7, real two-template/restart persistence, controlled real failure recovery,
-private-payload capacity and monitor performance remain unverified.
+candidate has since been installed by the owner. Distinct FFV1/libx264 recipe
+renders, improved 0.1.6 startup and saved-template persistence across restarts
+are owner-confirmed on VEGAS 2026.0.3.189. See [B6_TRIAL.md](B6_TRIAL.md) for
+isolated data, testing and rollback. Foreground return after switching apps remains
+faulty. A5–A7 are not fully qualified; controlled real failure recovery,
+private-payload capacity and measured monitor performance remain open.
 
 ## Owned native payload boundary
 
@@ -40,8 +42,9 @@ strict VEnc envelope, before the preserved text suffix. Native reads strip only
 that permitted alignment byte; the portable decoder still rejects trailing data.
 Intact original odd B6 envelopes remain readable. This prevents recurrence for new
 templates; it cannot reconstruct text already corrupted by a host save/rename.
-Fresh named templates require the owner's retest. Maximum private size and real
-restart persistence remain unqualified. No saved template is modified automatically.
+The owner subsequently confirmed fresh template operation and persistence across
+restarts for the tested recipes. Maximum private size remains unqualified. No saved
+template is modified automatically.
 
 `ReadRecipeSnapshot` returns an independent value for an immutable render
 job. It reads no preset library, application files or machine preferences. Core

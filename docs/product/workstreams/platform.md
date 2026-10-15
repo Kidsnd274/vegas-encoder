@@ -8,6 +8,50 @@ B2 is already merged (`bbcbe91`).
 The app owns its NativeVeCore/provider switches and UI mapping. WindowsServices
 now composes the real C3 providers without implicit scans/probes/writes.
 
+## Current owner feedback and app close-handoff request
+
+The owner confirms saved templates persist across restarts on the installed
+0.1.6 trial. Combined with the prior distinct FFV1/libx264 renders, normal recipe
+persistence is owner-confirmed for the tested templates. Do not keep requesting
+that same basic restart check. Maximum private-payload capacity, controlled real
+cancellation/failure recovery and measured monitor overhead remain unqualified;
+this feedback does not fully pass A5–A7.
+
+**Needs app:** foreground return remains faulty. Repro: open the template editor,
+switch to another full-screen app, return via VEGAS to the editor, then Apply.
+The previous app reappears; the owner described this as minimization, but actual
+iconic state has not been established. Also test the variant where the other app
+was foreground before opening the editor, as the reported ordering is ambiguous.
+In `app/windows/runner/win32_window.cpp`, `Win32Window::MessageHandler` currently
+only calls `EnableWindow(owner_, TRUE)` in `WM_CLOSE`, then destroys the editor.
+The native 100 ms poll samples foreground ownership and attempts activation only
+after child exit; it cannot reliably prevent the close-time activation choice,
+and Windows may deny a later foreground request. This is a code-based suspected
+handoff gap, not a reproduced real-host root-cause proof.
+
+Requested small app fix: in the accepted `WM_CLOSE` path capture whether the
+editor HWND is foreground **before** re-enabling its owner, then re-enable the
+valid original owner and explicitly `SetForegroundWindow(owner_)` **before**
+destroying the editor when that captured condition is true. Background closure
+must only re-enable, without raising VEGAS over the user's current app. Keep
+cancelled/rejected Flutter close requests open, do not alter recipe/session
+semantics, and do not change Render. Keep native fallback for crash/teardown.
+Test foreground Apply/Cancel after switching away/back, normal foreground close,
+and background close while another app stays foreground, including a maximized
+or full-screen other window. Frontend code remains unchanged under the path split.
+
+Documentation checked with the current Windows [EnableWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enablewindow)
+and [SetForegroundWindow](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow)
+rules. Context7 resolution returned UWP/WinRT/binding results, without an appropriate
+Win32 conceptual reference, so those direct Microsoft primary references were used.
+
+Monitor performance needs no new harness: trial Settings already has **Show a
+progress window during renders**, and C6 `elapsedSec`/phase timings already record
+each render. [B6_TRIAL.md](../../B6_TRIAL.md) now gives an alternating three-on /
+three-off comparison with fresh filenames and the same project/template/range.
+No real performance claim or new test run follows from this documentation-only
+checkpoint; native close behavior was inspected, not changed or fixed here.
+
 ## 0.1.6 real-host startup confirmation
 
 The owner installed 0.1.6-recipe-proof on VEGAS 2026.0.3.189 and reports opening
