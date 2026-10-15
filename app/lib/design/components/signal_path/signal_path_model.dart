@@ -17,10 +17,14 @@ class SignalSource {
     required this.stripAudio,
     required this.depth,
     required this.spokenSummary,
-  });
+    String? stripTitle,
+  }) : stripTitle = stripTitle ?? frameSize;
 
   /// "1920×1080"
   final String frameSize;
+
+  /// The strip node's title: [frameSize], or a shorter phrase that fits.
+  final String stripTitle;
 
   /// "29.97 fps"
   final String frameRate;
@@ -174,6 +178,18 @@ class SignalPathModel {
   final Map<SignalNode, SignalMarks> marks;
 
   bool get containerProblem => (video?.muxProblem ?? false) || (audio?.muxProblem ?? false);
+
+  /// The same diagram with [marks] on its nodes (the popup's origin marks).
+  SignalPathModel withMarks(Map<SignalNode, SignalMarks> marks) => SignalPathModel(
+    source: source,
+    container: container,
+    fileName: fileName,
+    video: video,
+    audio: audio,
+    contextLabel: contextLabel,
+    fromCommand: fromCommand,
+    marks: marks,
+  );
 
   /// Nodes that can be selected, in arrow-key order. Audio stays selectable
   /// when it is off, so its settings can turn it back on.

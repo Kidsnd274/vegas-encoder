@@ -123,32 +123,31 @@ void main() {
   });
 
   group('popup and progress window shells', () {
-    testWidgets('popup: owned editor shell; × behaves as Cancel', (tester) async {
+    testWidgets('popup: the template window for --edit-session; × behaves as Cancel', (tester) async {
       final window = FakeWindowController();
       await pumpApp(
         tester,
         view: const Size(1120, 740),
         overrides: [
-          launchModeProvider.overrideWithValue(const EditSessionLaunch(r'C:\sessions\a1', ownerHwnd: 42)),
+          // The platform fake's session (C4).
+          launchModeProvider.overrideWithValue(const EditSessionLaunch('b0-session')),
           windowControllerProvider.overrideWithValue(window),
         ],
       );
       expect(find.text('Vegas Encoder, editing a VEGAS render template'), findsOneWidget);
-      expect(find.text(r'Session: C:\sessions\a1'), findsOneWidget);
-      expect(
-        find.text('Apply updates this render template. Save it in VEGAS to keep it for next time.'),
-        findsOneWidget,
-      );
+      expect(find.text('YouTube 4K upload (Lakeside)'), findsOneWidget);
+      expect(find.text('Apply to template'), findsOneWidget);
       expect(find.bySemanticsLabel('Minimize'), findsNothing);
       await tester.tap(find.bySemanticsLabel('Cancel').first);
-      expect(window.calls, ['close']);
+      await tester.pumpAndSettle();
+      expect(window.calls, ['close'], reason: 'nothing changed: a cancel, no question');
     });
 
     testWidgets('progress window: keep-on-top pin toggles', (tester) async {
       final window = FakeWindowController(const WindowState(keepOnTop: true));
       await pumpApp(
         tester,
-        view: const Size(380, 250),
+        view: const Size(380, 340),
         overrides: [
           launchModeProvider.overrideWithValue(const RenderMonitorLaunch(r'D:\jobs\7.live.json')),
           windowControllerProvider.overrideWithValue(window),
@@ -164,7 +163,7 @@ void main() {
     testWidgets('a mode flag without its path is shown, not swallowed', (tester) async {
       await pumpApp(
         tester,
-        view: const Size(380, 250),
+        view: const Size(380, 340),
         overrides: [
           launchModeProvider.overrideWithValue(
             const LaunchError('--render-monitor', '--render-monitor needs a path after it.'),

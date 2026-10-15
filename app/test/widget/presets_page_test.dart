@@ -467,6 +467,26 @@ void main() {
     expect(tester.widget<CommandView>(find.byType(CommandView)).litFields, isEmpty);
   });
 
+  testWidgets('a save the library refuses says why and keeps the changes', (tester) async {
+    window = FakeWindowController(const WindowState());
+    await pumpApp(
+      tester,
+      overrides: [
+        windowControllerProvider.overrideWithValue(window),
+        presetLibraryProvider.overrideWithValue(_RefusingLibrary()),
+      ],
+    );
+    await setCrf(tester, '17');
+    await keys(tester, LogicalKeyboardKey.keyS, control: true);
+    expect(
+      find.text('Couldn’t save the preset: CRF must be between 0 and 51.', findRichText: true),
+      findsOneWidget,
+      reason: 'the library\'s own reason (C3 RECIPE-INVALID)',
+    );
+    expect(inHeader('Edited'), findsOneWidget, reason: 'the draft stays');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the size card keeps the length as typed, for next time', (tester) async {
     await pump(
       tester,
@@ -489,4 +509,12 @@ void main() {
     expect(ui.desktopWindowBounds!.width, 1500);
     expect(ui.desktopMaximized, isTrue);
   });
+}
+
+/// A library whose checks refuse every save, as the real one does when the
+/// core finds an error (C3 `RECIPE-INVALID`).
+class _RefusingLibrary extends FakePresetLibrary {
+  @override
+  Future<Preset> save(Preset preset, {int? expectedRevision}) async =>
+      throw const ServiceException('RECIPE-INVALID', 'CRF must be between 0 and 51.');
 }

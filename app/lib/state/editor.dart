@@ -35,11 +35,55 @@ class CoreResult<T> {
   }
 }
 
-/// Everything the editor shows for the selected preset.
+/// The last sample compile of each recipe object. The editor and the library
+/// row of the draft being edited compile the same recipe object with the same
+/// capability view, so they share one compile per edit (TECH_ARCHITECTURE
+/// §9.3, ≤ 4 ms per change).
+final _sampleCompiles =
+    Expando<({VeCore core, CoreCapabilities? capabilities, String? ext, CoreResult<CompileResult> result})>();
+
+/// [recipe] compiled by [core] for the documented sample, with [ext] as the
+/// output's extension.
+CoreResult<CompileResult> compileSample(VeCore core, Recipe recipe, {String? ext, CoreCapabilities? capabilities}) {
+  final last = _sampleCompiles[recipe];
+  if (last != null && identical(last.core, core) && identical(last.capabilities, capabilities) && last.ext == ext) {
+    return last.result;
+  }
+  final result = CoreResult.run(
+    () => core.compile(recipe, media: SamplePreview.media, paths: SamplePreview.paths(ext), capabilities: capabilities),
+  );
+  _sampleCompiles[recipe] = (core: core, capabilities: capabilities, ext: ext, result: result);
+  return result;
+}
+
+/// What the editor's panels change: the desktop's presets and the popup's
+/// template.
+abstract interface class RecipeEditor {
+  void edit(Recipe Function(Recipe r) change);
+}
+
+/// Where the editor's media facts come from (UI_SPEC §4: project facts may be
+/// unknown; sample facts are labelled as samples).
+enum PreviewMedia {
+  /// The documented sample: the desktop app has no project.
+  sample,
+
+  /// The VEGAS project's own facts (the popup, when VEGAS shared them).
+  project,
+
+  /// The popup when VEGAS didn't share the project's facts: they show as
+  /// "Set by the project", and the preview uses the sample.
+  projectUnknown,
+}
+
+/// Everything the editor shows for the selected preset. The size estimates
+/// are worked out when first read (the File node), not on every edit
+/// (TECH_ARCHITECTURE §9.1, §9.3).
 @immutable
 class EditorData {
-  const EditorData({
+  EditorData({
     required this.preset,
+    required this.saved,
     required this.recipe,
     required this.draft,
     required this.catalog,
@@ -47,15 +91,24 @@ class EditorData {
     required this.installation,
     required this.defaultInstallationId,
     required this.media,
+    required this.paths,
     required this.compiled,
-    required this.perMinute,
-    required this.total,
+    required this._perMinute,
+    required this._total,
     this.capabilities,
     this.lint,
     this.basic,
+    this.preview = PreviewMedia.sample,
   });
 
+  final CoreResult<SizeEstimate> Function() _perMinute;
+  final CoreResult<SizeEstimate>? Function() _total;
+
   final Preset preset;
+
+  /// What Reset goes back to and changed fields compare with: the saved
+  /// preset, or in the popup the template as it opened.
+  final Recipe saved;
 
   /// What the editor shows: the draft, else the saved recipe.
   final Recipe recipe;
@@ -67,13 +120,17 @@ class EditorData {
   final FFmpegInstallation? installation;
   final String? defaultInstallationId;
   final MediaDescription media;
+
+  /// The paths the command is compiled with (pipes, output, project).
+  final CompilePaths paths;
+  final PreviewMedia preview;
   final CoreResult<CompileResult> compiled;
 
   /// Rate per minute and range (no length).
-  final CoreResult<SizeEstimate> perMinute;
+  late final CoreResult<SizeEstimate> perMinute = _perMinute();
 
   /// The total for the typed length; null when no length is typed.
-  final CoreResult<SizeEstimate>? total;
+  late final CoreResult<SizeEstimate>? total = _total();
 
   /// What the core knows of the chosen FFmpeg, for checks, lint and
   /// suggestions; null until probed.
@@ -127,7 +184,7 @@ final editorProvider = Provider<EditorData?>((ref) {
   final state = ref.watch(presetsControllerProvider);
   final id = state.selectedId;
   if (presets == null || id == null) return null;
-  final preset = presets.where((p) => p.recipe.id == id).firstOrNull;
+  final preset = presets.where((p) => presetId(p) == id).firstOrNull;
   if (preset == null) return null;
 
   final core = ref.watch(veCoreProvider);
@@ -136,18 +193,22 @@ final editorProvider = Provider<EditorData?>((ref) {
   final installations = settings?.installations ?? const <FFmpegInstallation>[];
   final installationId = ref.watch(selectedInstallationIdProvider);
   final installation = installations.where((i) => i.id == installationId).firstOrNull;
-  final capabilities = installationId == null ? null : ref.watch(capabilitiesProvider(installationId)).value;
+  final probed = installationId == null ? null : ref.watch(capabilitiesProvider(installationId)).value;
 
   final draft = state.drafts[id];
-  final recipe = draft?.recipe ?? preset.recipe;
+  final recipe = draft?.recipe ?? presetRecipe(preset);
+  final label = installation?.label ?? '';
+  final capabilities = capabilitiesFor(probed, recipe, label: label);
   final media = SamplePreview.media;
   final ext = catalog.containers.where((c) => c.id == recipe.container.format).firstOrNull?.ext;
   final length = ref.watch(sizeLengthSecProvider);
   final paths = SamplePreview.paths(ext);
   final advanced = recipe.command.mode == 'template';
+  final asBasic = advanced ? recipe.copyWith(command: recipe.command.copyWith(mode: 'structured')) : recipe;
 
   return EditorData(
     preset: preset,
+    saved: presetRecipe(preset),
     recipe: recipe,
     draft: draft,
     catalog: catalog,
@@ -155,9 +216,10 @@ final editorProvider = Provider<EditorData?>((ref) {
     installation: installation,
     defaultInstallationId: settings?.defaultFFmpegId,
     media: media,
-    compiled: CoreResult.run(() => core.compile(recipe, media: media, paths: paths, capabilities: capabilities)),
-    perMinute: CoreResult.run(() => core.estimate(recipe, media: media)),
-    total: length == null
+    paths: paths,
+    compiled: compileSample(core, recipe, ext: ext, capabilities: capabilities),
+    perMinute: () => CoreResult.run(() => core.estimate(recipe, media: media)),
+    total: () => length == null
         ? null
         : CoreResult.run(() => core.estimate(recipe, media: media, durationSec: length.toDouble())),
     capabilities: capabilities,
@@ -165,10 +227,10 @@ final editorProvider = Provider<EditorData?>((ref) {
     basic: advanced
         ? CoreResult.run(
             () => core.compile(
-              recipe.copyWith(command: recipe.command.copyWith(mode: 'structured')),
+              asBasic,
               media: media,
               paths: paths,
-              capabilities: capabilities,
+              capabilities: capabilitiesFor(probed, asBasic, label: label),
             ),
           )
         : null,

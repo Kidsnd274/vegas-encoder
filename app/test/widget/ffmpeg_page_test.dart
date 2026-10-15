@@ -153,7 +153,7 @@ void main() {
     expect(find.text('Added FFmpeg 8.1 portable'), findsOneWidget);
     expect(find.text('FFmpeg 8.1 portable: 2 video and 1 audio encoders not ready'), findsOneWidget);
     final saved = await tester.runAsync(machine.read);
-    expect(saved!.installations.map((i) => i.id), contains('manual-8.1'));
+    expect(saved!.revision, 0, reason: 'discovery records the installation in C7 itself (B3)');
   });
 
   testWidgets('Add FFmpeg… says why discovery refused a file', (tester) async {

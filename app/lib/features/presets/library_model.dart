@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
@@ -5,14 +7,14 @@ import 'package:ve_services/ve_services.dart';
 import '../../design/components/status.dart';
 import '../../state/editor.dart';
 import '../../state/presets.dart';
-import '../../state/preview.dart';
 import '../../state/services.dart';
 import 'display.dart';
 
-/// One row in the library (UI_SPEC §2, Library).
+/// One row in the library (UI_SPEC §2, Library). Its name, ID and search
+/// text are worked out once (`Preset.recipe` copies the recipe each time).
 @immutable
 class LibraryEntry {
-  const LibraryEntry({
+  LibraryEntry({
     required this.preset,
     required this.line,
     required this.favorite,
@@ -47,25 +49,23 @@ class LibraryEntry {
   /// mark (UI_SPEC §2, Errors). Empty when the core couldn't check it.
   final List<String> errors;
 
-  String get id => preset.recipe.id;
-  String get name => preset.recipe.name;
+  late final Recipe _recipe = preset.recipe;
+  late final String id = _recipe.id;
+  late final String name = _recipe.name;
   bool get builtin => preset.builtin;
-  String get category => preset.recipe.category;
+  late final String category = _recipe.category;
 
   /// Search text: name, tags, encoders and codecs, summary.
-  String get haystack {
-    final r = preset.recipe;
-    return [
-      r.name,
-      ...r.tags,
-      r.video.encoder,
-      ...r.audio.map((a) => a.encoder),
-      ...preset.requires.encoders,
-      line,
-      if (advanced) 'advanced command',
-      categoryLabel(r.category),
-    ].join(' ').toLowerCase();
-  }
+  late final String haystack = [
+    _recipe.name,
+    ..._recipe.tags,
+    _recipe.video.encoder,
+    ..._recipe.audio.map((a) => a.encoder),
+    ...preset.requires.encoders,
+    line,
+    if (advanced) 'advanced command',
+    categoryLabel(_recipe.category),
+  ].join(' ').toLowerCase();
 }
 
 /// A header and its rows: "Favorites", "Web upload", …
@@ -82,38 +82,70 @@ class LibraryGroup {
 /// Every preset as a library row, using drafts where there are any.
 final libraryEntriesProvider = Provider<List<LibraryEntry>>((ref) {
   final presets = ref.watch(presetsProvider).value ?? const <Preset>[];
-  // Only what changes a row: drafts and session favorites. Search, filters
-  // and selection reuse the rows.
-  final (drafts, builtinFavorites) = ref.watch(presetsControllerProvider.select((s) => (s.drafts, s.builtinFavorites)));
-  final state = PresetsState(drafts: drafts, builtinFavorites: builtinFavorites);
+  // Only what changes a row: drafts. Search, filters and selection reuse the
+  // rows.
+  final drafts = ref.watch(presetsControllerProvider.select((s) => s.drafts));
   final core = ref.watch(veCoreProvider);
   final catalog = ref.watch(profilesProvider);
   final settings = ref.watch(machineSettingsProvider).value;
   final installationId = ref.watch(selectedInstallationIdProvider);
   final installation = settings?.installations.where((i) => i.id == installationId).firstOrNull;
-  final capabilities = installationId == null ? null : ref.watch(capabilitiesProvider(installationId)).value;
+  final probed = installationId == null ? null : ref.watch(capabilitiesProvider(installationId)).value;
+  // Settings writes (the remembered length, window bounds) hand out new
+  // installation objects with the same content; rows only need to know when
+  // the content changes.
+  final installationKey = installation == null ? '' : jsonEncode(installation.data);
+  final rows = ref.watch(_libraryRowCacheProvider);
   return [
     for (final p in presets)
-      libraryEntry(
-        p,
-        recipe: state.drafts[p.recipe.id]?.recipe ?? p.recipe,
-        favorite: state.isFavorite(p),
-        dirty: state.drafts.containsKey(p.recipe.id),
-        compiled: CoreResult.run(() {
-          final recipe = state.drafts[p.recipe.id]?.recipe ?? p.recipe;
-          final ext = catalog.container(recipe.container.format)?.ext;
-          return core.compile(
+      rows.entry(p, drafts[presetId(p)]?.recipe, probed, installationKey, () {
+        final recipe = drafts[presetId(p)]?.recipe ?? presetRecipe(p);
+        return libraryEntry(
+          p,
+          recipe: recipe,
+          favorite: p.favorite,
+          dirty: drafts.containsKey(presetId(p)),
+          compiled: compileSample(
+            core,
             recipe,
-            media: SamplePreview.media,
-            paths: SamplePreview.paths(ext),
-            capabilities: capabilities,
-          );
-        }).value,
-        catalog: catalog,
-        installation: installation,
-      ),
+            ext: catalog.container(recipe.container.format)?.ext,
+            capabilities: capabilitiesFor(probed, recipe, label: installation?.label ?? ''),
+          ).value,
+          catalog: catalog,
+          installation: installation,
+        );
+      }),
   ];
 });
+
+/// Library rows from the last build, so an edit recompiles only the edited
+/// preset's row (TECH_ARCHITECTURE §9.3: ≤ 4 ms per edit, 500 presets). A row
+/// is reused while its preset object, draft, capabilities and installation
+/// are unchanged; the library hands out new preset objects when a preset
+/// changes, and drafts are new objects after each edit.
+final _libraryRowCacheProvider = Provider<_LibraryRowCache>((ref) {
+  // A new core or catalog starts again.
+  ref.watch(veCoreProvider);
+  ref.watch(profilesProvider);
+  return _LibraryRowCache();
+});
+
+class _LibraryRowCache {
+  final _rows = Expando<({Recipe? draft, Object? probed, String installation, LibraryEntry entry})>();
+
+  LibraryEntry entry(Preset preset, Recipe? draft, Object? probed, String installation, LibraryEntry Function() build) {
+    final row = _rows[preset];
+    if (row != null &&
+        identical(row.draft, draft) &&
+        identical(row.probed, probed) &&
+        row.installation == installation) {
+      return row.entry;
+    }
+    final entry = build();
+    _rows[preset] = (draft: draft, probed: probed, installation: installation, entry: entry);
+    return entry;
+  }
+}
 
 LibraryEntry libraryEntry(
   Preset preset, {

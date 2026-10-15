@@ -298,7 +298,12 @@ class _SignalPathState extends State<SignalPath> {
         _strip
             ? _Lines(
                 strip: true,
-                children: [_nk(t, 'From VEGAS'), _nt(t, src.frameSize), _nd(t, src.stripVideo), _nd(t, src.stripAudio)],
+                children: [
+                  _nk(t, 'From VEGAS'),
+                  _nt(t, src.stripTitle),
+                  _nd(t, src.stripVideo),
+                  _nd(t, src.stripAudio),
+                ],
               )
             : _Lines(
                 strip: false,

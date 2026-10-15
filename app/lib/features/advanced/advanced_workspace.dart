@@ -11,8 +11,6 @@ import '../../design/components/message.dart';
 import '../../design/icons.dart';
 import '../../design/tokens.dart';
 import '../../state/editor.dart';
-import '../../state/presets.dart';
-import '../../state/preview.dart';
 import '../../state/services.dart';
 import 'display.dart';
 import 'macros.dart';
@@ -30,6 +28,8 @@ class AdvancedWorkspace extends ConsumerStatefulWidget {
     required this.onSwitchToBasic,
     required this.onReplaceWithBasic,
     required this.onCopy,
+    required this.onTemplateChanged,
+    this.compact = false,
   });
 
   final EditorData data;
@@ -43,6 +43,13 @@ class AdvancedWorkspace extends ConsumerStatefulWidget {
   final VoidCallback onSwitchToBasic;
   final VoidCallback onReplaceWithBasic;
   final VoidCallback onCopy;
+
+  /// The command as typed (`command.template`).
+  final ValueChanged<String> onTemplateChanged;
+
+  /// The popup's layout (UI_SPEC §4): no side column (the popup's own side
+  /// says how many diagnostics there are) and the resolved command closed.
+  final bool compact;
 
   /// The side column's width, as the Basic command column.
   static const double sideWidth = 432;
@@ -58,7 +65,7 @@ class AdvancedWorkspaceState extends ConsumerState<AdvancedWorkspace> {
   );
   CommandEditorModel? _model;
   EditorData? _modelFor;
-  bool _resolvedOpen = true;
+  late bool _resolvedOpen = !widget.compact;
 
   CommandEditingController get controller => _controller;
 
@@ -99,9 +106,8 @@ class AdvancedWorkspaceState extends ConsumerState<AdvancedWorkspace> {
     } else {
       final core = ref.read(veCoreProvider);
       final recipe = data.recipe.copyWith(command: data.recipe.command.copyWith(template: text));
-      final paths = SamplePreview.paths(data.containerProfile?.ext);
       compiled = CoreResult.run(
-        () => core.compile(recipe, media: data.media, paths: paths, capabilities: data.capabilities),
+        () => core.compile(recipe, media: data.media, paths: data.paths, capabilities: data.capabilities),
       ).value;
       lint = CoreResult.run(() => core.lint(text, capabilities: data.capabilities)).value ?? const [];
     }
@@ -109,7 +115,7 @@ class AdvancedWorkspaceState extends ConsumerState<AdvancedWorkspace> {
     return _model = templateEditorModel(text, compiled: compiled, lint: lint);
   }
 
-  void _changed(String text) => ref.read(presetsControllerProvider.notifier).setTemplate(text);
+  void _changed(String text) => widget.onTemplateChanged(text);
 
   /// The core's suggestions at the caret, for the chosen FFmpeg.
   EditorCompletion? _complete(String text, int caret, {required bool manual}) {
@@ -193,18 +199,19 @@ class AdvancedWorkspaceState extends ConsumerState<AdvancedWorkspace> {
             ),
           ),
         ),
-        Focus(
-          focusNode: widget.sidePane,
-          child: FocusTraversalGroup(
-            child: _SideColumn(
-              data: data,
-              model: model,
-              onSwitchToBasic: widget.onSwitchToBasic,
-              onReplaceWithBasic: widget.onReplaceWithBasic,
-              onInsert: insertMacro,
+        if (!widget.compact)
+          Focus(
+            focusNode: widget.sidePane,
+            child: FocusTraversalGroup(
+              child: _SideColumn(
+                data: data,
+                model: model,
+                onSwitchToBasic: widget.onSwitchToBasic,
+                onReplaceWithBasic: widget.onReplaceWithBasic,
+                onInsert: insertMacro,
+              ),
             ),
           ),
-        ),
       ],
     );
   }

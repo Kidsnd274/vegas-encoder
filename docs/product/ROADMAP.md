@@ -161,7 +161,10 @@ pass. Autocomplete is either done or explicitly deferred.
 ## P5: Release foundations
 
 1. Signed installer with reversible plug-in placement, upgrade policy that preserves
-   config, and uninstall.
+   config, and uninstall. The owner builds it with Inno Setup from platform's inputs
+   (owner, 2026-10-15): one release installed together, every recorded VEGAS target
+   updated by default, plus version checks between plug-in and app. Choosing older
+   VEGAS versions waits on per-version platform research.
 2. Research gate: pinned presets as exporter presets (Render As list caching, F-044).
 3. Optional "Get FFmpeg" helper, once licensing is decided.
 4. Update checks and crash/diagnostic bundle export, opt-in.

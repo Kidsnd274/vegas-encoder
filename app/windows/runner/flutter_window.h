@@ -14,9 +14,11 @@
 // channel (lib/platform/window_channel.dart).
 //
 // Dart -> runner:
-//   configure {ownerHwnd?: int, keepOnTop?: bool,
+//   configure {ownerHwnd?: int, hostHwnd?: int, keepOnTop?: bool,
 //              bounds?: {x, y, width, height}, maximized?: bool}
-//     -> {ownerSet: bool, boundsSet: bool}   (bounds: desktop, before show)
+//     -> {ownerSet: bool, boundsSet: bool, hostSet: bool}
+//     (ownerHwnd: popup; hostHwnd: progress window, VEGAS's main window;
+//      bounds: desktop; all before show)
 //   getBounds -> {x, y, width, height, maximized}   (restored outer rect,
 //     physical screen pixels)
 //   startDrag, minimize, toggleMaximize, close

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ve_services/ve_services.dart' show FakeVeCore, VeCore;
+import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/app/app.dart';
 import 'package:vegas_encoder/design/theme.dart';
 import 'package:vegas_encoder/design/tokens.dart';
@@ -22,6 +22,56 @@ String themeName(Brightness b) => b == Brightness.dark ? 'dark' : 'light';
 /// on the fake's fixtures so their results don't move with the core's data.
 /// Tests that show live edits pass `NativeVeCore()` (test/widget/native_core_test.dart).
 Override coreOverride([VeCore? core]) => veCoreProvider.overrideWithValue(core ?? FakeVeCore());
+
+/// The platform's fakes for every service (C3), so no test reads or writes
+/// the user's library or settings. The app's own `servicesProvider` refuses
+/// to build the real ones under `flutter test`. A test that needs a
+/// particular fake still overrides that service's provider on top.
+class FakeAppServices implements AppServices {
+  @override
+  final FakePresetLibrary library = FakePresetLibrary();
+  @override
+  final FakeMachineSettingsRepository machineSettings = FakeMachineSettingsRepository();
+  @override
+  final FakeFFmpegDiscovery discovery = FakeFFmpegDiscovery();
+  @override
+  final FakeFFmpegProbe probe = FakeFFmpegProbe();
+  @override
+  final FakeHardwareTests hardwareTests = FakeHardwareTests();
+  @override
+  final FakeCapabilityCache capabilityCache = FakeCapabilityCache();
+  @override
+  final FakeJobRepository jobs = FakeJobRepository();
+  @override
+  FakeJobRepository get jobLogs => jobs;
+  @override
+  final FakeLiveRenderStatusReader liveStatus = FakeLiveRenderStatusReader();
+  @override
+  final FakeEditSessionService editSessions = FakeEditSessionService();
+  @override
+  final FakeFileReveal fileReveal = FakeFileReveal();
+  @override
+  ServicePaths? get paths => null;
+
+  @override
+  Future<void> dispose() async {
+    await library.dispose();
+    await machineSettings.dispose();
+    await discovery.dispose();
+    await jobs.dispose();
+    await liveStatus.dispose();
+  }
+}
+
+Override servicesOverride() => servicesProvider.overrideWith((ref) {
+  final services = FakeAppServices();
+  ref.onDispose(services.dispose);
+  return services;
+});
+
+/// A container on the fake core and fake services, plus [overrides].
+ProviderContainer testContainer({List<Override> overrides = const [], VeCore? core}) =>
+    ProviderContainer(overrides: [coreOverride(core), servicesOverride(), ...overrides]);
 
 /// Pumps [child] in the app's theme for [brightness], at 1:1 pixels, on paper.
 /// The golden boundary wraps the child at [width] with a 16 px margin.
@@ -47,7 +97,11 @@ Future<void> pumpThemed(
     child: child,
   );
   final app = ProviderScope(
-    overrides: [coreOverride(core), windowControllerProvider.overrideWithValue(window ?? FakeWindowController())],
+    overrides: [
+      coreOverride(core),
+      servicesOverride(),
+      windowControllerProvider.overrideWithValue(window ?? FakeWindowController()),
+    ],
     child: MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: buildVeTheme(tokens),
@@ -67,13 +121,15 @@ Future<void> pumpThemed(
   if (settle) await tester.pumpAndSettle();
 }
 
-/// Pumps the whole app root ([VeApp]) for a launch mode, with a fake window
-/// and the fake core unless [core] says otherwise.
+/// Pumps the whole app root ([VeApp]) for a launch mode, with a fake window,
+/// and the fake core and fake services unless [core] or [services] say
+/// otherwise.
 Future<void> pumpApp(
   WidgetTester tester, {
   required List<Override> overrides,
   Size view = const Size(1440, 900),
   VeCore? core,
+  AppServices? services,
 }) async {
   tester.view.physicalSize = view;
   tester.view.devicePixelRatio = 1.0;
@@ -81,7 +137,14 @@ Future<void> pumpApp(
   await tester.pumpWidget(
     RepaintBoundary(
       key: goldenKey,
-      child: ProviderScope(overrides: [coreOverride(core), ...overrides], child: const VeApp()),
+      child: ProviderScope(
+        overrides: [
+          coreOverride(core),
+          services == null ? servicesOverride() : servicesProvider.overrideWithValue(services),
+          ...overrides,
+        ],
+        child: const VeApp(),
+      ),
     ),
   );
   await tester.pumpAndSettle();

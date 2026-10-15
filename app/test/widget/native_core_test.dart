@@ -1,7 +1,11 @@
+import 'dart:ui' show AppExitResponse;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart' hide SizeEstimate;
+import 'package:vegas_encoder/design/components/button.dart' show VeButton;
 import 'package:vegas_encoder/design/components/command_view.dart' show CommandView;
 import 'package:vegas_encoder/design/components/field.dart' show VeField;
 import 'package:vegas_encoder/design/components/message.dart';
@@ -23,8 +27,8 @@ import '../helpers.dart';
 /// The Presets screen on the native core (B2): edits now reach the C++ core
 /// through `dart:ffi`, so the command, checks, signal path and estimate
 /// follow them. Fake services, no FFmpeg, no VEGAS. The core's profile data is
-/// B0/Linux bootstrap, not Windows-qualified, so these tests check what moves
-/// and where it shows rather than the core's figures or wording.
+/// B1's Windows data; these tests still check what moves and where it shows
+/// rather than the core's figures or wording.
 void main() {
   late NativeVeCore core;
 
@@ -147,6 +151,22 @@ void main() {
       findsOneWidget,
       reason: 'the core\'s final -g, without the seconds Extra replaced',
     );
+    final view = tester.widget<CommandView>(find.byType(CommandView));
+    final tokens = [for (final line in view.command.lines) ...line.tokens];
+    expect(
+      [
+        for (final t in tokens.where((t) => t.litBy({'video.speed'}))) t.text,
+      ],
+      ['-preset', 'fast'],
+      reason: 'pointing at Encoder speed lights the Extra option that replaced it (replacedField)',
+    );
+    expect(
+      [
+        for (final t in tokens.where((t) => t.litBy({'video.gopSec'}))) t.text,
+      ],
+      ['-g', '120'],
+    );
+    expect(tokens.where((t) => t.text == 'fast').single.field, 'video.extra', reason: 'a click still opens Extra');
 
     await type(tester, extraField(), '');
     expect(setInExtra(), findsNothing, reason: 'clearing Extra arguments gives the controls back');
@@ -159,6 +179,72 @@ void main() {
     expect(setInExtra(), findsOneWidget);
   });
 
+  group('saving with errors (owner decision, 2026-10-15)', () {
+    Future<void> save(WidgetTester tester) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+    }
+
+    Future<List<Preset>> mine(WidgetTester tester) async {
+      final all = await tester.runAsync(() => container(tester).read(presetLibraryProvider).list());
+      return all!.where((p) => !p.builtin).toList();
+    }
+
+    testWidgets('settings with errors aren’t saved; the warning says why and can show the setting', (tester) async {
+      await pump(tester);
+      // Extra arguments can't choose the encoder: an error in the settings.
+      await type(tester, extraField(), '-c:v libx265');
+      expect(core.validate(editor(tester).recipe).where((i) => i.level == IssueLevel.error), isNotEmpty);
+      await save(tester);
+      expect(find.text('Fix the errors before saving'), findsOneWidget);
+      expect(find.textContaining('“YouTube upload, H.264” has settings that can’t render'), findsOneWidget);
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+      expect(await mine(tester), isEmpty, reason: 'nothing saved');
+      expect(editor(tester).dirty, isTrue, reason: 'the changes stay');
+
+      await save(tester);
+      await tester.tap(find.widgetWithText(VeButton, 'Show setting'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fix the errors before saving'), findsNothing);
+      expect(await mine(tester), isEmpty);
+    });
+
+    testWidgets('errors only for the chosen FFmpeg warn, and Save anyway saves', (tester) async {
+      await pump(tester);
+      await tester.tap(find.text('FFmpeg 8.1 full (default)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('FFmpeg 8.0 LGPL').last);
+      await tester.pumpAndSettle();
+      await type(tester, fieldWith('18'), '20');
+      await save(tester);
+      expect(find.textContaining('can’t render with FFmpeg 8.0 LGPL'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(await mine(tester), isEmpty);
+
+      await save(tester);
+      await tester.tap(find.text('Save anyway'));
+      await tester.pumpAndSettle();
+      expect((await mine(tester)).single.recipe.video.quality, 20);
+    });
+
+    testWidgets('closing with a draft that has errors stays open and says why', (tester) async {
+      await pump(tester);
+      await type(tester, extraField(), '-c:v libx265');
+      final exit = tester.binding.handleRequestAppExit();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fix the errors before saving'), findsOneWidget);
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+      expect(await exit, AppExitResponse.cancel);
+      expect(await mine(tester), isEmpty);
+    });
+  });
   testWidgets('keyframes read out the core\'s frame count for the typed seconds', (tester) async {
     await pump(tester);
     await type(tester, fieldWith('2'), '4');

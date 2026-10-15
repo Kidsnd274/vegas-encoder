@@ -6,6 +6,8 @@ import 'package:vegas_encoder/state/history.dart';
 import 'package:vegas_encoder/state/presets.dart';
 import 'package:vegas_encoder/state/services.dart';
 
+import '../helpers.dart';
+
 /// History's mapping (S5) from the platform's sample job records (B0 fakes).
 void main() {
   late Map<String, JobRecord> jobs;
@@ -44,6 +46,8 @@ void main() {
     expect(realtimeRatio(jobs['j-1042']!.copyWith(elapsedSec: 0)), isNull);
     expect(realtimeRatio(jobs['j-1039']!), isNull, reason: 'a failed render didn’t encode the whole length');
     expect(realtimeRatio(jobs['j-1041']!), isNull, reason: 'nor did a cancelled one');
+    expect(realtimeRatio(jobs['j-1042']!.copyWith(realtime: 0.53)), 0.53, reason: 'the recorded figure wins (B4)');
+    expect(realtimeRatio(jobs['j-1039']!.copyWith(realtime: 0.2)), isNull, reason: 'still only for a finished render');
     expect(ratioLabel(0.5136), '0.51×');
     expect(ratioLabel(12.44), '12.4×');
   });
@@ -95,6 +99,12 @@ void main() {
       expect(line, contains(r' -i \\.\pipe\vegas-encoder-j-1039-video '));
       expect(line, endsWith(r' -f matroska "D:\Renders\Channel trailer v2.ve-partial-j-1039.mkv"'));
     });
+
+    test('the core'
+        's own command line when the record has it (B4)', () {
+      final r = jobs['j-1039']!.copyWith(commandLine: 'ffmpeg -as -the -core -wrote -it');
+      expect(commandLine(r), 'ffmpeg -as -the -core -wrote -it');
+    });
   });
 
   test('labels: status, verification, hashes, times', () {
@@ -112,7 +122,9 @@ void main() {
 
   group('history state', () {
     test('the filter keeps its status; the selection falls back to the first shown', () async {
-      final container = ProviderContainer(overrides: [veCoreProvider.overrideWithValue(FakeVeCore())]);
+      final container = ProviderContainer(
+        overrides: [veCoreProvider.overrideWithValue(FakeVeCore()), servicesOverride()],
+      );
       addTearDown(container.dispose);
       container.listen(historyViewProvider, (_, _) {});
       await container.read(jobsProvider.future);
@@ -133,7 +145,11 @@ void main() {
     test('Open settings as new preset makes a preset in Mine, named after the template', () async {
       final library = FakePresetLibrary(now: () => '2026-10-14T00:00:00Z');
       final container = ProviderContainer(
-        overrides: [veCoreProvider.overrideWithValue(FakeVeCore()), presetLibraryProvider.overrideWithValue(library)],
+        overrides: [
+          veCoreProvider.overrideWithValue(FakeVeCore()),
+          servicesOverride(),
+          presetLibraryProvider.overrideWithValue(library),
+        ],
       );
       addTearDown(container.dispose);
       container.listen(presetsProvider, (_, _) {});
@@ -142,9 +158,9 @@ void main() {
       controller.setQuery('prores');
 
       final r = jobs['j-1042']!;
-      final created = (await controller.createFromRecipe(r.recipe, name: r.templateName))!;
+      final created = (await controller.createFromJob(r))!;
       expect(created.builtin, isFalse);
-      expect(created.origin, isNull);
+      expect(created.origin, 'job/j-1042', reason: 'C3 PresetTransfer.fromJob');
       expect(created.recipe.name, 'YouTube 4K upload (Lakeside)');
       expect(created.recipe.id, 'youtube-4k-upload-lakeside');
       expect(created.recipe.video.toJson(), r.recipe.video.toJson());
@@ -153,7 +169,7 @@ void main() {
       expect(state.query, '', reason: 'the search is cleared so the new preset shows');
 
       await container.read(presetsProvider.future);
-      final again = (await controller.createFromRecipe(r.recipe, name: r.templateName))!;
+      final again = (await controller.createFromJob(r))!;
       expect(again.recipe.name, 'YouTube 4K upload (Lakeside) (copy)');
       expect(again.recipe.id, isNot(created.recipe.id));
     });

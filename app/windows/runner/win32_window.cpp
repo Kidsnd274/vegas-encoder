@@ -313,41 +313,75 @@ RECT Win32Window::RestoredBounds(bool* maximized) {
   return rect;
 }
 
-bool Win32Window::PlaceOnOwner(HWND owner) {
+std::optional<RECT> Win32Window::OwnerBounds(HWND owner) {
   if (window_handle_ == nullptr || owner == nullptr || !IsWindow(owner)) {
-    return false;
+    return std::nullopt;
   }
   owner_ = owner;
   SetWindowLongPtr(window_handle_, GWLP_HWNDPARENT,
                    reinterpret_cast<LONG_PTR>(owner));
 
+  // The size Create gives the window, but for the owner's monitor: the window
+  // was made on the primary monitor, whose DPI can differ.
   RECT owner_rect;
-  RECT self;
   GetWindowRect(owner, &owner_rect);
-  GetWindowRect(window_handle_, &self);
-  const RECT work =
-      WorkAreaOf(MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST));
-  const int width = self.right - self.left;
-  const int height = self.bottom - self.top;
-  int x = (owner_rect.left + owner_rect.right - width) / 2;
-  int y = (owner_rect.top + owner_rect.bottom - height) / 2;
-  x = std::max(static_cast<int>(work.left),
-               std::min(x, static_cast<int>(work.right) - width));
-  y = std::max(static_cast<int>(work.top),
-               std::min(y, static_cast<int>(work.bottom) - height));
-  SetWindowPos(window_handle_, nullptr, x, y, 0, 0,
-               SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+  const HMONITOR monitor = MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST);
+  const RECT work = WorkAreaOf(monitor);
+  const UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+  const double scale_factor = dpi / 96.0;
+  const int border_x = options_.resizable ? ResizeBorderX(dpi) : 0;
+  const int border_y = options_.resizable ? ResizeBorderY(dpi) : 0;
+  const int work_width = work.right - work.left;
+  const int work_height = work.bottom - work.top;
+  const int width = std::min(Scale(options_.width, scale_factor) + 2 * border_x,
+                             work_width + 2 * border_x);
+  const int height = std::min(Scale(options_.height, scale_factor) + border_y,
+                              work_height + border_y);
+  // Centred on the owner; the whole window, title bar included, inside the
+  // work area (the invisible resize borders may hang over its edges).
+  const int x = std::max(
+      static_cast<int>(work.left) - border_x,
+      std::min((static_cast<int>(owner_rect.left + owner_rect.right) - width) / 2,
+               static_cast<int>(work.right) + border_x - width));
+  const int y = std::max(
+      static_cast<int>(work.top),
+      std::min((static_cast<int>(owner_rect.top + owner_rect.bottom) - height) / 2,
+               static_cast<int>(work.bottom) + border_y - height));
   char line[160];
-  RECT placed;
-  GetWindowRect(window_handle_, &placed);
   snprintf(line, sizeof(line),
-           "place_on_owner owner=(%ld,%ld,%ld,%ld) self_before=(%ld,%ld,%ld,%ld) "
-           "placed=(%ld,%ld,%ld,%ld)",
+           "owner_bounds owner=(%ld,%ld,%ld,%ld) dpi=%u target=(%d,%d,%d,%d)",
            owner_rect.left, owner_rect.top, owner_rect.right, owner_rect.bottom,
-           self.left, self.top, self.right, self.bottom, placed.left, placed.top,
-           placed.right, placed.bottom);
+           dpi, x, y, x + width, y + height);
   startup_trace::Mark(line);
-  return true;
+  return RECT{x, y, x + width, y + height};
+}
+
+std::optional<RECT> Win32Window::HostBounds(HWND host) {
+  if (window_handle_ == nullptr ||
+      options_.kind != LaunchKind::kRenderMonitor || host == nullptr ||
+      !IsWindow(host) || GetAncestor(host, GA_ROOT) != host) {
+    return std::nullopt;
+  }
+  // As Create places it, but on the host's monitor and at that monitor's DPI
+  // (the progress window has no resize borders).
+  const HMONITOR monitor = MonitorFromWindow(host, MONITOR_DEFAULTTONEAREST);
+  const RECT work = WorkAreaOf(monitor);
+  const UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
+  const double scale_factor = dpi / 96.0;
+  const int width = std::min(Scale(options_.width, scale_factor),
+                             static_cast<int>(work.right - work.left));
+  const int height = std::min(Scale(options_.height, scale_factor),
+                              static_cast<int>(work.bottom - work.top));
+  const int margin = Scale(kMonitorWindowMargin, scale_factor);
+  const int x = std::max(static_cast<int>(work.left),
+                         static_cast<int>(work.right) - width - margin);
+  const int y = std::max(static_cast<int>(work.top),
+                         static_cast<int>(work.bottom) - height - margin);
+  char line[160];
+  snprintf(line, sizeof(line), "host_bounds dpi=%u target=(%d,%d,%d,%d)", dpi,
+           x, y, x + width, y + height);
+  startup_trace::Mark(line);
+  return RECT{x, y, x + width, y + height};
 }
 
 void Win32Window::SetKeepOnTop(bool keep_on_top) {

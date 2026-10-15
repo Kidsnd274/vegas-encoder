@@ -3,11 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
 
 import '../design/components/signal_path/signal_path_model.dart';
+import 'editor.dart' show RecipeEditor;
 import 'recipe_edit.dart';
 import 'services.dart';
 import 'ui_state.dart';
 
 enum LibraryFilter { all, builtin, mine }
+
+final _presetRecipes = Expando<Recipe>();
+
+/// [preset]'s saved recipe, one object per preset object. `Preset.recipe`
+/// makes a new copy each time; one shared (immutable) object lets the editor
+/// and the library row share a compile, and lookups by ID stay cheap
+/// (TECH_ARCHITECTURE §9.3).
+Recipe presetRecipe(Preset preset) => _presetRecipes[preset] ??= preset.recipe;
+
+/// [preset]'s ID, without copying its recipe.
+String presetId(Preset preset) => presetRecipe(preset).id;
 
 /// Unsaved changes to one preset. [baseRevision] is the revision the edit
 /// started from; a save expects the library to still be at it.
@@ -39,7 +51,6 @@ class PresetsState {
     this.favoritesOnly = false,
     this.installationId,
     this.lengthText,
-    this.builtinFavorites = const {},
     this.commandMultiline = true,
   });
 
@@ -57,10 +68,6 @@ class PresetsState {
   /// (then the remembered text, or 10:00, applies: see ui_state.dart).
   final String? lengthText;
 
-  /// Favorites on built-in presets for this session. The library can't save
-  /// them (built-ins are read-only in C3); see workstreams/app.md, Needs.
-  final Map<String, bool> builtinFavorites;
-
   /// The command's layout: grouped lines, or one line (UI_SPEC §2).
   final bool commandMultiline;
 
@@ -73,7 +80,6 @@ class PresetsState {
     bool? favoritesOnly,
     Object? installationId = _keep,
     Object? lengthText = _keep,
-    Map<String, bool>? builtinFavorites,
     bool? commandMultiline,
   }) => PresetsState(
     selectedId: identical(selectedId, _keep) ? this.selectedId : selectedId as String?,
@@ -84,11 +90,8 @@ class PresetsState {
     favoritesOnly: favoritesOnly ?? this.favoritesOnly,
     installationId: identical(installationId, _keep) ? this.installationId : installationId as String?,
     lengthText: identical(lengthText, _keep) ? this.lengthText : lengthText as String?,
-    builtinFavorites: builtinFavorites ?? this.builtinFavorites,
     commandMultiline: commandMultiline ?? this.commandMultiline,
   );
-
-  bool isFavorite(Preset p) => p.builtin ? (builtinFavorites[p.recipe.id] ?? p.favorite) : p.favorite;
 }
 
 const Object _keep = Object();
@@ -98,13 +101,29 @@ enum SaveOutcome { saved, savedAsNew, conflict, nothingToSave }
 
 final presetsControllerProvider = NotifierProvider<PresetsController, PresetsState>(PresetsController.new);
 
-class PresetsController extends Notifier<PresetsState> {
+class PresetsController extends Notifier<PresetsState> implements RecipeEditor {
   @override
   PresetsState build() => const PresetsState();
 
   PresetLibrary get _library => ref.read(presetLibraryProvider);
   List<Preset> get _presets => ref.read(presetsProvider).value ?? const [];
-  Preset? _find(String id) => _presets.where((p) => p.recipe.id == id).firstOrNull;
+  Preset? _find(String id) => _presets.where((p) => presetId(p) == id).firstOrNull;
+
+  /// Waits for the library's list to include this window's own write. The file
+  /// library polls (C3 `watch`, 250 ms): without this the editor would show the
+  /// old list for a moment, a new preset's selection would fall back to the
+  /// first preset, and a rebased draft would look changed elsewhere.
+  Future<void> _refresh() async {
+    ref.invalidate(presetsProvider);
+    // Listen while waiting: Riverpod pauses a provider nobody listens to
+    // (History is open, not Presets), and a paused watch never delivers.
+    final listening = ref.listen(presetsProvider, (_, _) {});
+    try {
+      await ref.read(presetsProvider.future);
+    } finally {
+      listening.close();
+    }
+  }
 
   void select(String id) => state = state.copyWith(selectedId: id);
   void selectNode(SignalNode node) => state = state.copyWith(node: node);
@@ -125,18 +144,22 @@ class PresetsController extends Notifier<PresetsState> {
   void toggleCommandLayout() => state = state.copyWith(commandMultiline: !state.commandMultiline);
 
   /// The recipe the editor shows for [id]: the draft, else the saved one.
-  Recipe? working(String id) => state.drafts[id]?.recipe ?? _find(id)?.recipe;
+  Recipe? working(String id) {
+    final saved = _find(id);
+    return state.drafts[id]?.recipe ?? (saved == null ? null : presetRecipe(saved));
+  }
 
   /// Applies an edit to the selected preset. Editing back to the saved recipe
   /// drops the draft, so the preset is clean again.
+  @override
   void edit(Recipe Function(Recipe r) change) {
     final id = state.selectedId;
     final saved = id == null ? null : _find(id);
     if (id == null || saved == null) return;
     final current = state.drafts[id];
-    final next = change(current?.recipe ?? saved.recipe);
+    final next = change(current?.recipe ?? presetRecipe(saved));
     final drafts = Map.of(state.drafts);
-    if (sameRecipe(next, saved.recipe)) {
+    if (sameRecipe(next, presetRecipe(saved))) {
       drafts.remove(id);
     } else {
       drafts[id] = current?.copyWith(recipe: next) ?? PresetDraft(next, saved.revision);
@@ -185,6 +208,8 @@ class PresetsController extends Notifier<PresetsState> {
         saved.copyWith(recipe: draft.recipe),
         expectedRevision: overwrite ? saved.revision : draft.baseRevision,
       );
+      await _refresh();
+      if (!ref.mounted) return SaveOutcome.saved;
       state = state.copyWith(drafts: Map.of(state.drafts)..remove(id));
       return SaveOutcome.saved;
     } on ServiceException catch (e) {
@@ -202,6 +227,8 @@ class PresetsController extends Notifier<PresetsState> {
     final recipe = id == null ? null : working(id);
     if (id == null || source == null || recipe == null) return null;
     final created = await _create(source, recipe, name: recipe.name == source.recipe.name ? null : recipe.name);
+    await _refresh();
+    if (!ref.mounted) return created;
     state = state.copyWith(
       selectedId: state.selectedId == id ? created.recipe.id : state.selectedId,
       drafts: Map.of(state.drafts)..remove(id),
@@ -210,12 +237,16 @@ class PresetsController extends Notifier<PresetsState> {
   }
 
   /// Copies [id]'s working recipe into Mine and selects the copy. The source
-  /// keeps any unsaved changes.
+  /// keeps any unsaved changes. The copy starts unstarred (C3's
+  /// `PresetTransfer.duplicate` would copy the star, and only the saved
+  /// recipe).
   Future<Preset?> duplicate(String id) async {
     final source = _find(id);
     final recipe = working(id);
     if (source == null || recipe == null) return null;
     final created = await _create(source, recipe);
+    await _refresh();
+    if (!ref.mounted) return created;
     state = state.copyWith(selectedId: created.recipe.id);
     return created;
   }
@@ -242,38 +273,43 @@ class PresetsController extends Notifier<PresetsState> {
         ),
       ),
     );
-    state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
-    return created;
-  }
-
-  /// A new preset in Mine holding [recipe] (History's "Open settings as new
-  /// preset"), named [name], or "[name] (copy)" when that name is taken.
-  /// Selected, with the library's search and filters cleared so it shows.
-  /// It has no origin: C3 defines none for a render's settings yet.
-  Future<Preset?> createFromRecipe(Recipe recipe, {required String name}) async {
-    final names = _presets.map((p) => p.recipe.name).toSet();
-    final newName = names.contains(name) ? copyName(name, names) : name;
-    final created = await _library.save(
-      Preset(
-        // The library stamps its own time on save.
-        updatedAt: DateTime.now().toUtc().toIso8601String(),
-        requires: PresetRequirements(),
-        recipe: recipe.copyWith(id: uniqueId(newName, _presets.map((p) => p.recipe.id).toSet()), name: newName),
-      ),
-    );
+    await _refresh();
     if (!ref.mounted) return created;
     state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
     return created;
   }
 
+  /// A new preset in Mine holding [job]'s settings (History's "Open settings
+  /// as new preset"), named after its template, or "[name] (copy)" when that
+  /// name is taken. The library records where it came from (C3
+  /// `PresetTransfer.fromJob`, origin `job/<id>`). Selected, with the
+  /// library's search and filters cleared so it shows.
+  Future<Preset?> createFromJob(JobRecord job) async {
+    final names = _presets.map((p) => p.recipe.name).toSet();
+    final name = job.templateName;
+    final newName = names.contains(name) ? copyName(name, names) : name;
+    final created = await ref
+        .read(presetTransferProvider)
+        .fromJob(job, newId: uniqueId(newName, _presets.map((p) => p.recipe.id).toSet()), name: newName);
+    await _refresh();
+    if (!ref.mounted) return created;
+    state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
+    return created;
+  }
+
+  /// Saves [recipe] as a new preset in Mine copied from [source], with the
+  /// origin C3 defines for a copy: `builtin/<id>`, or `preset/<id>@<revision>`
+  /// (the revision the edit started from).
   Future<Preset> _create(Preset source, Recipe recipe, {String? name}) {
     final newName = name ?? copyName(recipe.name, _presets.map((p) => p.recipe.name).toSet());
     final newId = uniqueId(newName, _presets.map((p) => p.recipe.id).toSet());
+    final id = source.recipe.id;
+    final revision = state.drafts[id]?.baseRevision ?? source.revision;
     return _library.save(
       Preset(
         updatedAt: source.updatedAt,
         favorite: false,
-        origin: source.builtin ? 'builtin/${source.recipe.id}' : null,
+        origin: source.builtin ? 'builtin/$id' : 'preset/$id@$revision',
         requires: source.requires,
         recipe: recipe.copyWith(id: newId, name: newName),
       ),
@@ -288,17 +324,20 @@ class PresetsController extends Notifier<PresetsState> {
       saved.copyWith(recipe: saved.recipe.copyWith(name: name.trim())),
       expectedRevision: saved.revision,
     );
+    await _refresh();
+    if (!ref.mounted) return;
     _rebase(id, saved.revision, result.revision, (r) => r.copyWith(name: result.recipe.name));
   }
 
+  /// Stars or unstars [id], built-ins included (C3 `PresetPreferences`; the
+  /// library keeps built-in stars beside them). A preset in Mine moves to its
+  /// next revision; its draft stays current.
   Future<void> toggleFavorite(String id) async {
     final saved = _find(id);
     if (saved == null) return;
-    if (saved.builtin) {
-      state = state.copyWith(builtinFavorites: {...state.builtinFavorites, id: !state.isFavorite(saved)});
-      return;
-    }
-    final result = await _library.save(saved.copyWith(favorite: !saved.favorite), expectedRevision: saved.revision);
+    final result = await ref.read(presetPreferencesProvider).setPreferences(id, favorite: !saved.favorite);
+    await _refresh();
+    if (!ref.mounted || saved.builtin) return;
     _rebase(id, saved.revision, result.revision, (r) => r);
   }
 
@@ -306,6 +345,8 @@ class PresetsController extends Notifier<PresetsState> {
     final saved = _find(id);
     if (saved == null || saved.builtin) return;
     await _library.delete(id, expectedRevision: saved.revision);
+    await _refresh();
+    if (!ref.mounted) return;
     state = state.copyWith(
       drafts: Map.of(state.drafts)..remove(id),
       selectedId: state.selectedId == id ? null : state.selectedId,

@@ -75,7 +75,8 @@ class _SettingsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final version = ref.watch(veCoreProvider).version;
-    final fakeServices = ref.watch(machineSettingsRepositoryProvider) is FakeMachineSettingsRepository;
+    // Null for the platform's fakes, which keep nothing.
+    final paths = ref.watch(servicesProvider).paths;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(22, 24, 22, 40),
       child: Center(
@@ -164,9 +165,10 @@ class _SettingsList extends ConsumerWidget {
                     ('Formats', 'Recipe schema ${version.schemaMax}, contracts ${version.contracts}'),
                     (
                       'Services',
-                      fakeServices
+                      paths == null
                           ? 'Sample data from the platform’s fakes. Settings last until the app closes.'
-                          : 'This PC',
+                          : 'This PC. Settings and presets are in "${paths.roaming}"; FFmpeg checks and render '
+                                'records in "${paths.local}".',
                     ),
                   ]),
                 ],

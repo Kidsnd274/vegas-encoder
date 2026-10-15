@@ -2,9 +2,9 @@ import 'package:flutter/widgets.dart';
 import 'package:ve_services/ve_services.dart';
 
 import '../../../design/components/message.dart';
+import '../../../design/components/signal_path/signal_path_model.dart';
 import '../../../design/tokens.dart';
 import '../../../state/editor.dart';
-import '../../../state/presets.dart';
 import '../../../state/recipe_edit.dart';
 import '../display.dart';
 
@@ -12,10 +12,10 @@ import '../display.dart';
 class PanelScope {
   PanelScope(this.data, this.controller);
   final EditorData data;
-  final PresetsController controller;
+  final RecipeEditor controller;
 
   Recipe get recipe => data.recipe;
-  Recipe get saved => data.preset.recipe;
+  Recipe get saved => data.saved;
   ProfileCatalog get catalog => data.catalog;
   ResolvedSettings? get resolved => data.compiled.value?.resolved;
 
@@ -36,6 +36,41 @@ class PanelScope {
     for (final f in fields)
       for (final i in data.issuesFor(f)) VeMessage(level: levelOf(i.level), text: i.message, fix: i.fix),
   ];
+}
+
+/// `.ip-h`: the node's name and what it does.
+class NodePanelHeader extends StatelessWidget {
+  const NodePanelHeader({super.key, required this.node});
+  final SignalNode node;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = VeTokens.of(context);
+    final c = t.colors;
+    final (title, sub, color) = switch (node) {
+      SignalNode.source => ('From VEGAS', 'What the project delivers', c.faint),
+      SignalNode.video => ('Video encoder', 'Encodes the frames', c.videoWire),
+      SignalNode.audio => ('Audio encoder', 'Encodes the samples', c.audioWire),
+      SignalNode.container => ('Container', 'Joins the streams into one file', c.containerWire),
+      SignalNode.file => ('File', 'Where the render goes, and how big it will be', c.containerWire),
+    };
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
+        ),
+        const SizedBox(width: 8),
+        Semantics(header: true, child: Text(title, style: t.text.panelTitle)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(sub, style: t.text.small.copyWith(color: c.muted)),
+        ),
+      ],
+    );
+  }
 }
 
 /// `.cols`: the panel's two columns.

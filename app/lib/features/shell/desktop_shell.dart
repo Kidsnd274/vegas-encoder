@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ve_services/ve_services.dart' show DesktopWindowBounds;
+import 'package:ve_services/ve_services.dart' show DesktopWindowBounds, ServiceException;
 
 import '../../design/components/button.dart';
 import '../../design/components/dialog.dart';
@@ -18,6 +18,7 @@ import '../ffmpeg/ffmpeg_page.dart';
 import '../gallery/gallery_page.dart';
 import '../history/history_page.dart';
 import '../presets/presets_page.dart';
+import '../presets/save_check.dart';
 import '../settings/settings_page.dart';
 import 'core_unavailable.dart';
 
@@ -116,7 +117,35 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     if (choice != _CloseChoice.save) return AppExitResponse.cancel;
     final controller = ref.read(presetsControllerProvider.notifier);
     for (final id in drafts.keys.toList()) {
-      if (await controller.save(id: id) == SaveOutcome.conflict) {
+      // A draft whose settings have errors isn't saved (owner decision,
+      // 2026-10-15): say why and stay open on it.
+      final recipe = controller.working(id);
+      final errors = recipe == null ? null : saveErrors(ref.read(veCoreProvider), recipe, const []);
+      if (recipe != null && errors!.settings.isNotEmpty) {
+        controller.select(id);
+        if (mounted) {
+          await checkSave(context, name: recipe.name, settings: errors.settings, ffmpeg: const [], installation: '');
+        }
+        return AppExitResponse.cancel;
+      }
+      final SaveOutcome outcome;
+      try {
+        outcome = await controller.save(id: id);
+      } on ServiceException catch (e) {
+        // The library refused it: stay open on that preset and say why.
+        controller.select(id);
+        if (mounted) {
+          final name = presets.where((p) => p.recipe.id == id).firstOrNull?.recipe.name ?? id;
+          await showVeDialog<void>(
+            context,
+            title: 'Couldn’t save “$name”',
+            message: '${e.message} Vegas Encoder stays open so you can fix it or close without saving.',
+            actions: const [VeDialogAction('OK', null, variant: VeButtonVariant.primary)],
+          );
+        }
+        return AppExitResponse.cancel;
+      }
+      if (outcome == SaveOutcome.conflict) {
         // Changed in another window: stay open on that preset so the user decides.
         controller.select(id);
         return AppExitResponse.cancel;

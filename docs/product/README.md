@@ -1,17 +1,19 @@
 # Vegas Encoder product plan
 
-Updated: 2026-10-12 (Asia/Singapore). Status: **direction chosen; ready to build** in two
-parallel workstreams ([WORKSTREAMS.md](WORKSTREAMS.md)).
+Updated: 2026-10-15 (Asia/Singapore). Status: **being built** in two parallel
+workstreams ([WORKSTREAMS.md](WORKSTREAMS.md)).
 This folder covers the product layer built on top of the adapter: the desktop app,
-presets, the shared editor and the VEGAS configuration popup. Nothing here is
-implemented yet, and no real VEGAS test ran for this work. Adapter gate status is
-unchanged; see [STATUS.md](../STATUS.md).
+presets, the shared editor, the VEGAS configuration popup and the progress window. What
+is built is in [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) and the workstream files. The
+app was tested with fakes and a fake host, not in real VEGAS. Adapter gate status is
+in [STATUS.md](../STATUS.md).
 
 ## Reading order
 
 | Document | What it answers |
 | --- | --- |
 | [design/signal-flow.html](design/signal-flow.html) | **Start here.** The chosen direction, Signal Flow round 2, in light and dark |
+| [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) | **How it is built today:** the tech stack, the folders, how the C++ core, the Dart packages and the Flutter app fit together, and what runs where |
 | [WORKSTREAMS.md](WORKSTREAMS.md) | How the build is split between the app and platform agents: ownership, contracts, order |
 | [design/index.html](design/index.html) | The round 1 gallery of eight directions, plus the shared VEGAS native page |
 | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Features and priorities, key user flows, and the adapter limits shown to users |
@@ -102,6 +104,11 @@ the owner objects.
 | 15 | Proof-template migration | **Decided: no migration.** The foundation's test templates were for experiments; product templates start fresh | TECH_ARCHITECTURE §6.2 |
 | 16 | Live encode statistics during a render | **Decided:** a status line in VEGAS's render dialog if a real-host test shows it works, plus a small progress window in the app's design. The window is dropped if it measurably slows renders (rule in TECH_ARCHITECTURE §5.6) | TECH_ARCHITECTURE §5.6, UI_SPEC §12, design S6 |
 | 17 | Project license | Still open. It affects FFmpeg bundling and font and library choices (all chosen fonts are OFL) | ARCHITECTURE §8 |
+| 18 | Status line in VEGAS's render dialog (B5) | **Decided (2026-10-15):** dropped. The progress window is the only place the encode statistics show | workstreams/platform.md (B5) |
+| 19 | Saving a preset with errors | **Decided (2026-10-15):** errors in the settings stop the save; errors only for the chosen FFmpeg warn, with Save anyway | UI_SPEC §3, workstreams/app.md |
+| 20 | Plug-in and app versions | **Decided (2026-10-15), later stage:** the exporter keeps its own static core; plug-in and app stay in step through one installer and version checks (the popup warns; the plug-in checks before launching the app) | workstreams/app.md (Decisions) |
+| 21 | Installer | **Decided (2026-10-15):** the owner builds it with Inno Setup, guided by AI; agents supply inputs. One release installed together; setup records every VEGAS it installed into and updates them all by default. Older VEGAS versions wait on platform research | workstreams/app.md (Decisions) |
+| 22 | Progress window keep on top | **Decided:** off by default; the pin and Settings change the same C7 setting | UI_SPEC §12 |
 
 ## Design review notes
 

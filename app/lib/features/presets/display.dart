@@ -12,6 +12,7 @@ import '../../design/components/signal_path/signal_path_model.dart';
 import '../../design/components/slider.dart';
 import '../../design/components/status.dart';
 import '../../design/format.dart';
+import '../../state/editor.dart' show PreviewMedia;
 
 // ------------------------------------------------------------ vocabulary
 
@@ -232,6 +233,7 @@ CommandDisplay commandDisplay(core.CompileResult result, {required bool audio}) 
       extra: t.role == core.TokenRole.extra,
       error: errors.contains(index),
       field: t.field,
+      replacedField: t.replacedField,
     );
     switch (t.role) {
       case core.TokenRole.exe:
@@ -302,9 +304,17 @@ SignalPathModel signalPathModel({
   core.CompileResult? compiled,
   core.FFmpegInstallation? installation,
   int? lengthSec,
+  PreviewMedia preview = PreviewMedia.sample,
 }) {
   if (recipe.command.mode == 'template') {
-    return _commandSignalPath(recipe: recipe, catalog: catalog, media: media, compiled: compiled, lengthSec: lengthSec);
+    return _commandSignalPath(
+      recipe: recipe,
+      catalog: catalog,
+      media: media,
+      compiled: compiled,
+      lengthSec: lengthSec,
+      preview: preview,
+    );
   }
   final summary = compiled?.summary ?? const <String, Object?>{};
   final facts = compiled?.signalPath;
@@ -366,7 +376,7 @@ SignalPathModel signalPathModel({
 
   final ext = cp?.ext ?? '';
   return SignalPathModel(
-    source: _signalSource(media, inDepth),
+    source: _signalSource(media, inDepth, preview),
     video: video,
     audio: audio,
     container: SignalContainer(
@@ -375,15 +385,44 @@ SignalPathModel signalPathModel({
       spokenLabel: cp?.label,
     ),
     fileName: 'Sample project$ext',
-    contextLabel: 'Preview with: ${mediaSummary(media)}${lengthSec == null ? '' : ', ${lengthPhrase(lengthSec)}'}',
+    contextLabel: _contextLabel(media, lengthSec, preview),
   );
 }
 
-/// The "From VEGAS" node: what the project delivers.
-SignalSource _signalSource(core.MediaDescription media, int depth) {
+/// What the preview is worked out with: the sample, or the project's facts.
+String _contextLabel(core.MediaDescription media, int? lengthSec, PreviewMedia preview) {
+  final length = lengthSec == null ? '' : ', ${lengthPhrase(lengthSec)}';
+  return switch (preview) {
+    PreviewMedia.sample => 'Preview with: ${mediaSummary(media)}$length',
+    PreviewMedia.project => 'The project: ${mediaSummary(media)}$length',
+    PreviewMedia.projectUnknown => 'Set by the project. Preview with the sample: ${mediaSummary(media)}$length',
+  };
+}
+
+/// The "From VEGAS" node: what the project delivers. When VEGAS didn't share
+/// the project's facts they are "Set by the project", and the lines name the
+/// sample the preview uses (UI_SPEC §4).
+SignalSource _signalSource(core.MediaDescription media, int depth, PreviewMedia preview) {
   final mediaAudio = media.audio;
   final audioIn = _deliveredAudio[mediaAudio?.sampleFmt];
   final fps = VeFormat.fps(media.video.fps[0], media.video.fps[1]);
+  if (preview == PreviewMedia.projectUnknown) {
+    const unset = 'Set by the project';
+    return SignalSource(
+      frameSize: unset,
+      // What fits in the strip's node; the panel says it in full.
+      stripTitle: 'Set by project',
+      frameRate: unset,
+      pixelFormat: unset,
+      audio: unset,
+      stripVideo: 'Sample: $fps',
+      stripAudio: mediaAudio == null
+          ? 'Sample: no audio'
+          : 'Sample: ${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt}',
+      depth: depth,
+      spokenSummary: '$unset. The preview uses a sample: ${mediaSummary(media)}',
+    );
+  }
   return SignalSource(
     frameSize: '${media.video.width}×${media.video.height}',
     frameRate: fps,
@@ -430,6 +469,7 @@ SignalPathModel _commandSignalPath({
   required core.MediaDescription media,
   core.CompileResult? compiled,
   int? lengthSec,
+  PreviewMedia preview = PreviewMedia.sample,
 }) {
   String? s(String key) {
     final v = compiled?.summary[key];
@@ -498,7 +538,7 @@ SignalPathModel _commandSignalPath({
   final muxer = s('container');
   final cp = muxer == null ? null : catalog.containers.where((c) => c.label == muxer).firstOrNull;
   return SignalPathModel(
-    source: _signalSource(media, sourceDepth),
+    source: _signalSource(media, sourceDepth, preview),
     video: video,
     audio: audio,
     container: muxer == null
@@ -513,7 +553,7 @@ SignalPathModel _commandSignalPath({
             spokenLabel: muxer,
           ),
     fileName: 'Sample project$ext',
-    contextLabel: 'Preview with: ${mediaSummary(media)}${lengthSec == null ? '' : ', ${lengthPhrase(lengthSec)}'}',
+    contextLabel: _contextLabel(media, lengthSec, preview),
     fromCommand: true,
   );
 }

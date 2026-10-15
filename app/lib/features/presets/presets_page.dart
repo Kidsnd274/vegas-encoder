@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ve_services/ve_services.dart' show Preset;
+import 'package:ve_services/ve_services.dart' show FFmpegInstallation, Issue, Preset, Recipe, ServiceException;
 
 import '../../design/components/button.dart';
 import '../../design/components/command_view.dart';
@@ -17,6 +17,7 @@ import '../../state/presets.dart';
 import '../../state/services.dart';
 import '../../state/ui_state.dart';
 import '../advanced/advanced_workspace.dart';
+import '../advanced/mode_switch.dart';
 import 'command_column.dart';
 import 'display.dart';
 import 'library_model.dart';
@@ -28,6 +29,7 @@ import 'panels/other_panels.dart';
 import 'panels/panel_kit.dart';
 import 'panels/video_panel.dart';
 import 'preset_header.dart';
+import 'save_check.dart';
 
 /// Below this window width the library collapses to a rail (UI_SPEC §1).
 const double libraryRailBreakpoint = 1280;
@@ -83,14 +85,28 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
 
   // ------------------------------------------------------------ actions
 
-  Future<void> _save() async {
+  /// Runs a library write. A refusal (the library's checks found an error,
+  /// the store is busy, the disk is full) is said in the toast, with the
+  /// library's reason, instead of being lost.
+  Future<void> _write(String what, Future<void> Function() action) async {
+    try {
+      await action();
+    } on ServiceException catch (e) {
+      if (mounted) _showToast('Couldn’t $what: ${e.message}');
+    }
+  }
+
+  Future<void> _save() => _write('save the preset', _saveUnguarded);
+
+  Future<void> _saveUnguarded() async {
     final data = ref.read(editorProvider);
     if (data == null || !data.dirty) return;
+    if (!await _checkSave(data.recipe, data.issues, data.installation)) return;
     var overwrite = false;
     if (data.behindLibrary && !data.preset.builtin) {
       final choice = await _askConflict(data.recipe.name);
       if (choice == null) return;
-      if (choice == _Conflict.saveAsNew) return _saveAsNew();
+      if (choice == _Conflict.saveAsNew) return _saveAsNewUnguarded();
       overwrite = true;
     }
     final outcome = await _controller.save(overwrite: overwrite);
@@ -102,7 +118,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
         _showToast('Saved as a new preset in Mine');
       case SaveOutcome.conflict:
         final choice = await _askConflict(data.recipe.name);
-        if (choice == _Conflict.saveAsNew) return _saveAsNew();
+        if (choice == _Conflict.saveAsNew) return _saveAsNewUnguarded();
         if (choice == _Conflict.overwrite) {
           await _controller.save(overwrite: true);
           if (mounted) _showToast('Preset saved');
@@ -112,10 +128,31 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
     }
   }
 
-  Future<void> _saveAsNew() async {
+  /// Save as new from the conflict question (inside [_save]'s guard).
+  Future<void> _saveAsNewUnguarded() async {
     await _controller.saveAsNew();
     if (mounted) _showToast('Saved as a new preset in Mine');
   }
+
+  /// Warns before saving a preset with errors (owner decision, 2026-10-15):
+  /// settings errors stop the save, errors only for the chosen FFmpeg ask.
+  /// [compiled] are the compile's issues for that FFmpeg, when known.
+  Future<bool> _checkSave(Recipe recipe, List<Issue> compiled, FFmpegInstallation? installation) async {
+    final errors = saveErrors(ref.read(veCoreProvider), recipe, compiled);
+    final check = await checkSave(
+      context,
+      name: recipe.name,
+      settings: errors.settings,
+      ffmpeg: errors.ffmpeg,
+      installation: installation?.label ?? 'this FFmpeg',
+    );
+    if (!mounted) return false;
+    if (check == SaveCheck.showSetting) _showField(errors.settings.first.field);
+    return check == SaveCheck.save;
+  }
+
+  Future<void> _toggleFavorite(LibraryEntry entry) =>
+      _write(entry.favorite ? 'unstar it' : 'star it', () => _controller.toggleFavorite(entry.id));
 
   Future<_Conflict?> _askConflict(String name) => showVeDialog<_Conflict>(
     context,
@@ -144,10 +181,19 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
     );
   }
 
-  Future<void> _duplicate(String id) async {
+  Future<void> _duplicate(String id) => _write('duplicate it', () async {
+    final recipe = _controller.working(id);
+    final data = ref.read(editorProvider);
+    // The copy is a save too; the chosen FFmpeg's checks are known only for
+    // the preset on screen.
+    final selected = data != null && presetId(data.preset) == id;
+    if (recipe != null &&
+        !await _checkSave(recipe, selected ? data.issues : const [], selected ? data.installation : null)) {
+      return;
+    }
     await _controller.duplicate(id);
     if (mounted) _showToast('Duplicated into Mine');
-  }
+  });
 
   /// "New preset": a preset in Mine started from the first built-in.
   Future<void> _newPreset() async {
@@ -159,11 +205,13 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
         .entries
         .first;
     if (first == null) return;
-    await _controller.createNew(first.id);
-    if (mounted) {
-      setState(() => _libraryOpen = false);
-      _showToast('Started a new preset in Mine from “${first.name}”');
-    }
+    await _write('start a new preset', () async {
+      await _controller.createNew(first.id);
+      if (mounted) {
+        setState(() => _libraryOpen = false);
+        _showToast('Started a new preset in Mine from “${first.name}”');
+      }
+    });
   }
 
   Future<void> _libraryAction(LibraryAction action, LibraryEntry entry) async {
@@ -178,7 +226,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
           initial: entry.name,
           confirmLabel: 'Rename',
         );
-        if (name != null && name != entry.name) await _controller.rename(entry.id, name);
+        if (name != null && name != entry.name) await _write('rename it', () => _controller.rename(entry.id, name));
       case LibraryAction.delete:
         final ok = await showVeDialog<bool>(
           context,
@@ -190,8 +238,10 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
           ],
         );
         if (ok == true) {
-          await _controller.delete(entry.id);
-          if (mounted) _showToast('Deleted “${entry.name}”');
+          await _write('delete it', () async {
+            await _controller.delete(entry.id);
+            if (mounted) _showToast('Deleted “${entry.name}”');
+          });
         }
     }
   }
@@ -221,31 +271,14 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
       }
       return;
     }
-    final seed = data.compiled.value?.advancedTemplate;
-    String? template;
-    if (data.recipe.command.template.trim().isEmpty) {
-      template = seed;
-    } else {
-      final choice = await showVeDialog<_Seed>(
-        context,
-        title: 'Switch to Advanced',
-        message:
-            'This preset already has a command from Advanced mode. Use it, or start again from the current '
-            'Basic settings? The Basic settings are kept either way.',
-        actions: const [
-          VeDialogAction('Cancel', _Seed.cancel),
-          VeDialogAction('Replace it with the current settings', _Seed.replace),
-          VeDialogAction('Use your saved command', _Seed.keep, variant: VeButtonVariant.primary),
-        ],
-      );
-      if (!mounted || choice == null || choice == _Seed.cancel) return;
-      if (choice == _Seed.keep) {
-        _controller.setMode(advanced: true);
-        _afterFrame(_commandEditor.requestFocus);
-        return;
-      }
-      template = seed;
+    final start = await askAdvancedStart(context, data);
+    if (!mounted || start == AdvancedStart.cancel) return;
+    if (start == AdvancedStart.keepSaved) {
+      _controller.setMode(advanced: true);
+      _afterFrame(_commandEditor.requestFocus);
+      return;
     }
+    final template = data.compiled.value?.advancedTemplate;
     if (template == null) {
       _showToast(
         'Advanced mode starts from the command, which the core couldn’t build: '
@@ -322,7 +355,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
 
   /// Selects the first preset when nothing (or a deleted preset) is selected.
   void _ensureSelection(List<Preset> presets, PresetsState state) {
-    if (presets.isEmpty || presets.any((p) => p.recipe.id == state.selectedId)) return;
+    if (presets.isEmpty || presets.any((p) => presetId(p) == state.selectedId)) return;
     final groups = groupLibrary(ref.read(libraryEntriesProvider));
     final first = groups.isEmpty ? presets.first.recipe.id : groups.first.subgroups.first.entries.first.id;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -345,6 +378,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
         final library = LibraryPane(
           searchFocus: _search,
           onAction: _libraryAction,
+          onFavorite: (e) => unawaited(_toggleFavorite(e)),
           onNewPreset: _newPreset,
           onPicked: narrow ? () => setState(() => _libraryOpen = false) : null,
         );
@@ -444,9 +478,6 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
 }
 
 enum _Conflict { cancel, saveAsNew, overwrite }
-
-/// The question when switching to Advanced with a command already saved.
-enum _Seed { cancel, replace, keep }
 
 class _Centered extends StatelessWidget {
   const _Centered(this.text);
@@ -619,6 +650,7 @@ class _Editor extends ConsumerWidget {
                 onSwitchToBasic: () => onMode(EditorMode.basic),
                 onReplaceWithBasic: onReplaceWithBasic,
                 onCopy: onCopy,
+                onTemplateChanged: controller.setTemplate,
               ),
             ),
           )
@@ -638,7 +670,7 @@ class _Editor extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _PanelHeader(node: node),
+                              NodePanelHeader(node: node),
                               const SizedBox(height: 14),
                               KeyedSubtree(
                                 key: ValueKey('$id/${node.name}'),
@@ -678,41 +710,6 @@ class _Editor extends ConsumerWidget {
               ),
             ),
           ),
-      ],
-    );
-  }
-}
-
-/// `.ip-h`: the node's name and what it does.
-class _PanelHeader extends StatelessWidget {
-  const _PanelHeader({required this.node});
-  final SignalNode node;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = VeTokens.of(context);
-    final c = t.colors;
-    final (title, sub, color) = switch (node) {
-      SignalNode.source => ('From VEGAS', 'What the project delivers', c.faint),
-      SignalNode.video => ('Video encoder', 'Encodes the frames', c.videoWire),
-      SignalNode.audio => ('Audio encoder', 'Encodes the samples', c.audioWire),
-      SignalNode.container => ('Container', 'Joins the streams into one file', c.containerWire),
-      SignalNode.file => ('File', 'Where the render goes, and how big it will be', c.containerWire),
-    };
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
-        ),
-        const SizedBox(width: 8),
-        Semantics(header: true, child: Text(title, style: t.text.panelTitle)),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(sub, style: t.text.small.copyWith(color: c.muted)),
-        ),
       ],
     );
   }

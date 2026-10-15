@@ -4,6 +4,18 @@ import '../tokens.dart';
 import 'button.dart';
 import 'message.dart';
 
+/// Whether the [VeField]s under it show their explanations (`.blurb`). The
+/// VEGAS popup hides them to stay compact (S3: `.pp-main .blurb`).
+class VeBlurbs extends InheritedWidget {
+  const VeBlurbs({super.key, required this.show, required super.child});
+  final bool show;
+
+  static bool visible(BuildContext context) => context.dependOnInheritedWidgetOfExactType<VeBlurbs>()?.show ?? true;
+
+  @override
+  bool updateShouldNotify(VeBlurbs oldWidget) => oldWidget.show != show;
+}
+
 /// `.fld`: a labelled setting. The read-out on the right states the value and
 /// its meaning ("CRF 18, visually lossless"); messages sit under the control.
 class VeField extends StatelessWidget {
@@ -103,7 +115,7 @@ class VeField extends StatelessWidget {
             ),
           ),
           child,
-          if (blurb != null)
+          if (blurb != null && VeBlurbs.visible(context))
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: DefaultTextStyle(

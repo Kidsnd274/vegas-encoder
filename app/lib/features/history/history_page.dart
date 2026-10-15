@@ -53,9 +53,13 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with VeToastHost {
   /// "Open settings as new preset": a preset in Mine with the settings this
   /// render used, opened in Presets.
   Future<void> _openAsPreset(JobRecord record) async {
-    final created = await ref
-        .read(presetsControllerProvider.notifier)
-        .createFromRecipe(record.recipe, name: record.templateName);
+    final Preset? created;
+    try {
+      created = await ref.read(presetsControllerProvider.notifier).createFromJob(record);
+    } on ServiceException catch (e) {
+      if (mounted) showToast('Couldn’t make a preset from this render: ${e.message}');
+      return;
+    }
     if (!mounted || created == null) return;
     ref.read(desktopSectionProvider.notifier).go(DesktopSection.presets);
   }

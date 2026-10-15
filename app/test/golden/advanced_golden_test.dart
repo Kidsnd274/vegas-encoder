@@ -1,9 +1,9 @@
 // Golden images of Advanced mode (F4, UI_SPEC §3) on the native core (B2),
 // light and dark. Fake services, no FFmpeg, no VEGAS. The highlighting, lint,
 // signal facts, macro values and resolved command are the core's; its
-// profile and option data are B0/Linux bootstrap, not Windows-qualified, so
-// regenerate these images when platform's B1 lands (and when the core starts
-// giving Advanced words their stage and macro roles).
+// profile and option data are B1's Windows data (regenerated 2026-10-14);
+// regenerate these images when the core's data or wording changes, and when it
+// starts giving Advanced words their stage and macro roles.
 // Regenerate with: flutter test --update-goldens test/golden/advanced_golden_test.dart
 // Images: test/golden/goldens/advanced_<state>_<light|dark>.png
 

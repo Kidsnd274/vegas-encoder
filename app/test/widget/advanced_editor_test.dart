@@ -22,8 +22,8 @@ import '../helpers.dart';
 /// Advanced mode (F4, UI_SPEC §3) on the native core (B2): the command
 /// editor's highlighting, locked chips, lint, macros and resolved command, the
 /// switch between modes, and Advanced mode elsewhere on the screen. Fake
-/// services, no FFmpeg, no VEGAS. The core's option data is B0/Linux
-/// bootstrap, so these tests check where its results show, not its wording.
+/// services, no FFmpeg, no VEGAS. The core's option data is B1's Windows data;
+/// these tests check where its results show, not its wording.
 void main() {
   late NativeVeCore core;
 

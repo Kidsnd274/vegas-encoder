@@ -7,6 +7,8 @@ import 'package:vegas_encoder/state/presets.dart';
 import 'package:vegas_encoder/state/recipe_edit.dart';
 import 'package:vegas_encoder/state/services.dart';
 
+import '../helpers.dart';
+
 /// The Presets screen's state against the platform fakes (B0). Nothing here
 /// runs FFmpeg or VEGAS.
 void main() {
@@ -25,6 +27,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         veCoreProvider.overrideWithValue(FakeVeCore()),
+        servicesOverride(),
         presetLibraryProvider.overrideWithValue(library),
         machineSettingsRepositoryProvider.overrideWithValue(machine),
       ],
@@ -95,7 +98,7 @@ void main() {
     expect(saved.recipe.video.quality, 20);
   });
 
-  test('favorites: Mine saves to the library, built-ins last the session', () async {
+  test('favorites go through the library\'s preferences, built-ins included', () async {
     await controller().duplicate('yt-h264');
     await settle();
     final id = state().selectedId!;
@@ -107,9 +110,31 @@ void main() {
     expect(container.read(editorProvider)!.changedElsewhere, isFalse);
 
     final builtin = (await library.get('av1-small'))!;
+    expect(builtin.favorite, isFalse);
     await controller().toggleFavorite('av1-small');
-    expect(state().isFavorite(builtin), isTrue);
-    expect((await library.get('av1-small'))!.revision, builtin.revision);
+    await settle();
+    final starred = (await library.get('av1-small'))!;
+    expect(starred.favorite, isTrue, reason: 'C3 PresetPreferences keeps built-in stars');
+    expect(starred.revision, builtin.revision, reason: 'a built-in\'s revision never moves');
+    expect(starred.recipe.toJson(), builtin.recipe.toJson());
+  });
+
+  test('copies carry the origin C3 defines', () async {
+    await controller().duplicate('yt-h264');
+    await settle();
+    final copy = (await library.get(state().selectedId!))!;
+    expect(copy.origin, 'builtin/yt-h264');
+    expect(copy.revision, 1);
+
+    await controller().duplicate(copy.recipe.id);
+    await settle();
+    final second = (await library.get(state().selectedId!))!;
+    expect(second.origin, 'preset/${copy.recipe.id}@1', reason: 'a copy of a preset in Mine names its revision');
+
+    controller().edit((r) => r.withVideo((v) => v.copyWith(quality: 23)));
+    final fromDraft = (await controller().saveAsNew())!;
+    expect(fromDraft.origin, 'preset/${second.recipe.id}@1', reason: 'the revision the edit started from');
+    expect(fromDraft.recipe.video.quality, 23);
   });
 
   test('rename and delete work on Mine only', () async {

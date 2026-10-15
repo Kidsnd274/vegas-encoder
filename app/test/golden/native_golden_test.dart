@@ -1,13 +1,14 @@
 // Golden images of the Presets screen on the native core (B2), light and dark,
 // and of the window when the core didn't load. Fake services, no FFmpeg, no
-// VEGAS. The core's profile data is B0/Linux bootstrap, not Windows-qualified:
-// its figures and wording will move when platform's B1 lands, so regenerate
-// these images then.
+// VEGAS. The core's profile data is B1's Windows data (regenerated
+// 2026-10-14); regenerate these images when the core's figures or wording
+// change.
 // Regenerate with: flutter test --update-goldens test/golden/native_golden_test.dart
 // Images: test/golden/goldens/presets_native_<state>_<light|dark>.png and
 // core_unavailable_<light|dark>.png
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/features/presets/panels/extra_field.dart';
@@ -54,6 +55,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Set in Extra arguments.'), findsNWidgets(2));
       expect(find.text('120 frames at 29.97 fps', findRichText: true), findsOneWidget);
+    },
+    // Save with an error in the settings (owner decision, 2026-10-15): the
+    // warning lists the core's error and nothing is saved.
+    'save_errors': (tester) async {
+      EditableText.debugDeterministicCursor = true;
+      addTearDown(() => EditableText.debugDeterministicCursor = false);
+      final extra = find.descendant(of: find.byType(ExtraArgumentsField), matching: find.byType(TextField));
+      await tester.enterText(extra, '-c:v libx265');
+      await tester.pumpAndSettle();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('Fix the errors before saving'), findsOneWidget);
     },
     // File node at the default 10:00: the core's total and its range for 10:00.
     'file': (tester) async {
