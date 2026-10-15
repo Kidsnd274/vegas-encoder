@@ -40,20 +40,20 @@ void main() {
           ),
         ),
       );
-      expect(find.text('About 537 MB', findRichText: true), findsOneWidget);
-      expect(find.text('About 53.7 MB per minute, typically 32.2 MB to 85.9 MB.'), findsOneWidget);
-      expect(find.text('Video 6.8 Mb/s', findRichText: true), findsOneWidget);
-      expect(find.text('Audio 320 kb/s', findRichText: true), findsOneWidget);
+      expect(find.text('About 537\u00A0MB', findRichText: true), findsOneWidget);
+      expect(find.text('About 53.7\u00A0MB per minute, typically 32.2\u00A0MB to 85.9\u00A0MB.'), findsOneWidget);
+      expect(find.text('Video 6.8\u00A0Mb/s', findRichText: true), findsOneWidget);
+      expect(find.text('Audio 320\u00A0kb/s', findRichText: true), findsOneWidget);
       await tester.enterText(find.byType(TextField), '20:00');
       await tester.pump();
       expect(length, 1200);
-      expect(find.text('About 1.07 GB', findRichText: true), findsOneWidget);
+      expect(find.text('About 1.07\u00A0GB', findRichText: true), findsOneWidget);
       await tester.enterText(find.byType(TextField), 'soon');
       await tester.pump();
       expect(length, isNull);
       expect(find.text('Type a length', findRichText: true), findsOneWidget);
       expect(
-        find.text('About 53.7 MB per minute, typically 32.2 MB to 85.9 MB.'),
+        find.text('About 53.7\u00A0MB per minute, typically 32.2\u00A0MB to 85.9\u00A0MB.'),
         findsOneWidget,
         reason: 'the rate needs no length',
       );
@@ -79,8 +79,8 @@ void main() {
           ),
         ),
       );
-      expect(find.text('120 MB', findRichText: true), findsOneWidget);
-      expect(find.text('60.0 MB per minute, set by the bitrate.'), findsOneWidget);
+      expect(find.text('120\u00A0MB', findRichText: true), findsOneWidget);
+      expect(find.text('60.0\u00A0MB per minute, set by the bitrate.'), findsOneWidget);
       expect(find.text('Audio off', findRichText: true), findsOneWidget);
       expect(find.text('No audio: the file has video only.'), findsOneWidget);
     });
@@ -104,7 +104,7 @@ void main() {
         ),
       );
       expect(find.text('Total not available yet', findRichText: true), findsOneWidget);
-      expect(find.text('About 53.7 MB per minute.'), findsOneWidget);
+      expect(find.text('About 53.7\u00A0MB per minute.'), findsOneWidget);
     });
 
     testWidgets('a typed length gets the core\'s range for that length', (tester) async {
@@ -132,8 +132,11 @@ void main() {
           ),
         ),
       );
-      expect(find.text('About 537 MB', findRichText: true), findsOneWidget);
-      expect(find.text('About 53.7 MB per minute. Typically 322 MB to 859 MB for 10:00.'), findsOneWidget);
+      expect(find.text('About 537\u00A0MB', findRichText: true), findsOneWidget);
+      expect(
+        find.text('About 53.7\u00A0MB per minute. Typically 322\u00A0MB to 859\u00A0MB for 10:00.'),
+        findsOneWidget,
+      );
       expect(find.textContaining('typically'), findsNothing, reason: 'the per-minute range gives way');
 
       await tester.enterText(find.byType(TextField), 'soon');
@@ -141,7 +144,7 @@ void main() {
       expect(length, isNull);
       expect(find.text('Type a length', findRichText: true), findsOneWidget);
       expect(
-        find.text('About 53.7 MB per minute, typically 32.2 MB to 85.9 MB.'),
+        find.text('About 53.7\u00A0MB per minute, typically 32.2\u00A0MB to 85.9\u00A0MB.'),
         findsOneWidget,
         reason: 'without a length, the per-minute range',
       );

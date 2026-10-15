@@ -17,7 +17,9 @@ import '../monitor_doubles.dart';
 void main() {
   const view = Size(380, 340);
 
-  Future<({FakeWindowController window, FakeLiveRenderStatusReader live, FakeJobRepository jobs, FakeFileReveal reveal})>
+  Future<
+    ({FakeWindowController window, FakeLiveRenderStatusReader live, FakeJobRepository jobs, FakeFileReveal reveal})
+  >
   pump(WidgetTester tester, {LiveRenderStatus? status, JobRecord? record, DesktopAppLauncher? launcher}) async {
     final window = FakeWindowController();
     final m = monitorOverrides(status: status, record: record, window: window, launcher: launcher);
@@ -45,7 +47,7 @@ void main() {
     expect(find.text('Rendering, 32%'), findsOneWidget);
     expect(find.text('Frame 7,400 of 22,873'), findsOneWidget);
     expect(rich('61.8 fps'), findsOneWidget);
-    expect(rich('about 2.93 GB'), findsOneWidget);
+    expect(rich('about 2.93\u00A0GB'), findsOneWidget);
     expect(rich('4:10 of 8:14'), findsOneWidget);
     expect(find.bySemanticsLabel('Render progress'), findsOneWidget);
 
@@ -59,7 +61,7 @@ void main() {
     await publish(RenderState.done, 14);
     expect(find.text('Rendered'), findsOneWidget);
     expect(find.text(r'D:\Renders'), findsOneWidget);
-    expect(find.textContaining('Rendered 12:43 in 4:07, 3.09× realtime, 2.93 GB.'), findsOneWidget);
+    expect(find.textContaining('Rendered 12:43 in 4:07, 3.09× realtime, 2.93\u00A0GB.'), findsOneWidget);
     expect(find.text('Cancel the render in VEGAS.'), findsNothing);
     await tester.pump(const Duration(seconds: 11));
   });
@@ -218,9 +220,7 @@ void main() {
 
   group('placement before the first frame', () {
     test('VEGAS\'s window from the live file and the remembered pin', () async {
-      final container = testContainer(
-        overrides: monitorOverrides(status: liveSample(RenderState.starting)).overrides,
-      );
+      final container = testContainer(overrides: monitorOverrides(status: liveSample(RenderState.starting)).overrides);
       addTearDown(container.dispose);
       final settings = container.read(machineSettingsRepositoryProvider);
       final current = await settings.read();

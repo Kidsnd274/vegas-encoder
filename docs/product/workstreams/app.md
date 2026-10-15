@@ -13,7 +13,10 @@ Show changes, Update from library, Save to library, Apply and Cancel, and Advanc
 in a compact layout. **F6, the render progress window, is built** (`--render-monitor`,
 UI_SPEC §12, S6): the C5 live file, placement on VEGAS's monitor from `hostHwnd`, the
 remembered pin, the figures, and the done, failed and cancelled states from the C6
-record. Next: the F3 follow-ups that platform already unblocked (Open items).
+record. **The F2/F3 follow-ups platform unblocked are built** (2026-10-15, uncommitted for
+review): installation health, History from the index with the full log, error tokens and
+Open folder, Test this preset, Export…/share strings/Show in folder, and the small display
+fixes. Next: what Needs and Open items list.
 
 Nothing here ran inside VEGAS. Window behaviour was checked against a fake host (a
 WinForms window standing in for VEGAS); screens and components were checked with
@@ -409,9 +412,70 @@ leaves the decision to the library, whose refusal still shows its reason.
   data root's `machine.json`, and adds a run with VEGAS on another monitor while another
   window is in front, plus a stale handle.
 
+**F2/F3 follow-ups on the B3/B4 services** (2026-10-15; `features/ffmpeg/`, `features/history/`,
+`state/history.dart`, `features/presets/`, `state/preset_test.dart`, `state/services.dart`,
+`design/format.dart`, `design/components/command_view.dart`, `command_editor.dart`,
+`platform/window_channel.dart`, `windows/runner/file_dialog.*`, `flutter_window.cpp`). On the
+platform's fakes; no FFmpeg, no VEGAS:
+
+- **FFmpeg health** (C3 `health`): a card whose files changed says so with Scan again; a
+  missing one quotes its path with Locate… (the Open dialog, then `discovery.add`; a missing
+  default hands its role to the file found); no ffprobe says where to put it, then Scan
+  again. `healthMessage` is the tooltip's second line. `unknown`/`unchanged` show nothing.
+- **History list from the index** (C6 summaries): rows read no record (a test counts the
+  reads); encoder is the engine's `encoderSummary`; length, time taken, size and project
+  from the index; an older line without them shows dashes. **Speed left the list**: the
+  index has no realtime figure and the app doesn't divide (the engine's `realtime` is
+  FFmpeg's speed, not length ÷ time); the detail still shows it (Needs).
+- **History detail**: Open folder reveals the published file, else the kept unfinished
+  one, else is off with "This render left no file to show."; a failed reveal says why.
+  "FFmpeg log": Show log reads `JobLogs.readLog` as it streams, keeps the last 1,000 lines
+  (200K characters, whole lines), opens at the end, says "The last 1,000 of 12,345 lines.";
+  Show in folder reveals `logLocation`; no log says so; a log gone since (`NOT-FOUND`) says
+  so. `errorTokenIndices` underline those argv entries in the command (error colours) with
+  "FFmpeg's error points at “-preset 14”, underlined above."
+- **Test this preset**: `AppServices.presetTests` (`presetTestsProvider`; the fake in
+  `test/helpers.dart`). Header button beside the FFmpeg it uses ("Test", an icon below
+  1080 px), off with the reason without an FFmpeg, without a command, or with errors. The
+  dialog runs `PresetTests.test(recipe, installation)` (`presetTestProvider`, autoDispose:
+  closing stops the run): phase, frame progress, the result with the output check, FFmpeg's
+  output as it streams (last 400 lines), Show log / Show file, Stop test, Test again, and a
+  "Sample result… nothing ran" line for the fake (`isFixture`). Mapping in
+  `features/presets/test_display.dart`.
+- **Library**: context menu Duplicate, Rename… / Export…, Copy share string, Show in folder
+  / Delete…. Export… opens a new runner **Save dialog** (`saveFile`, `IFileSaveDialog`,
+  asks before replacing) and `PresetTransfer.exportTo` writes the saved version; Copy share
+  string puts `shareString` on the clipboard; Show in folder reveals `PresetLocations`
+  (off for built-ins). A `+` beside the search: New preset, Import share string… (field
+  starts with a `vepreset:` clipboard; `importShareString`, new ID `imported-preset`,
+  selected), and Import file… (off: Needs).
+- **Display fixes**: `VeFormat.bytes`/`rate` put a no-break space before the unit (the
+  size card no longer wraps "859 / MB"); `CommandView` breaks lines itself, only between
+  units (an option stays with its value) and indents wrapped parts by four spaces (two in
+  one-line layout); the Advanced chip's lock badge stays inside its line box.
+- Small defaults taken: Locate… on a missing default makes the new file the default;
+  export and share strings carry the saved version (the menu says so for an edited
+  preset); an imported preset keeps its shared name.
+
 ## Tests
 
-`flutter test` in `app/`: **523 tests** (477 before F6, 470 before saving with errors, 416 before F5, 403 before F7, 348 before F4).
+`flutter test` in `app/`: **553 tests** (523 before the follow-ups, 477 before F6, 470 before saving with errors, 416 before F5, 403 before F7, 348 before F4).
+
+Follow-ups added (30, six of them golden images), on the platform fakes, no FFmpeg, no
+VEGAS: History (widget +5:
+the index list and that only the selected record is read, older lines, Open folder for a
+file / a kept partial / none, error marks and the note, the full log, a vanished log; unit
++7: index mapping, `commandParts`/`markedArguments`, log summary, `jobLogProvider`
+chunking and NOT-FOUND); FFmpeg health (widget +5, unit +3); presets
+(`preset_actions_test.dart`, 4: Test this preset passed and stopped/failed, Export… / Copy
+share string / Show in folder / Import share string…, the export file name). Strings with
+units now expect ` `. Goldens: new `ffmpeg_health`, `history_log`, `presets_test`
+(light and dark); regenerated 64 for the header's Test button, the library's `+`, the
+command view's wrapping, the size card and History's columns (`advanced_*`, `popup_*`,
+`presets_*`, `size_and_command`, `window_desktop`, `history_*`). Looked at: all History
+and the three new pairs, plus `advanced_locked`, `presets_native_file`, `presets_narrow`,
+`presets_text150`, `popup_video` and `size_and_command`; the rest were not opened one by
+one (the owner asked to keep this pass lean), so give them a glance in review.
 `flutter analyze`: no issues. Platform fakes for services everywhere except the Windows
 services tests below; the fake core for the F0–F3 tests and the native core (B2, through
 `dart:ffi`, in the `flutter test` VM) for the core tests; a fake window controller; for
@@ -765,6 +829,15 @@ Over the other-DPI owner the popup stays within the 0.7 s warm budget but takes 
 those runs (4 ms otherwise), and the move to the other monitor then resizes the view.
 Why the request read took longer there is not established.
 
+**Follow-up recheck (2026-10-15), the Save dialog.** Release build (31 s, no C++
+warnings), `-Checks start`, fake host, data root on `app\build\spikes\data-root`. Skia warm
+medians: desktop shown 427 ms, popup 401 ms (F6: 433 / 413); Impeller 1,431 / 1,360 ms; popup
+WM_CLOSE left a cancel `result.json` 10 of 10. `%LOCALAPPDATA%\VegasEncoder` stayed absent;
+`%APPDATA%\VegasEncoder` already existed before the run (the harness reports existence only).
+The Save dialog
+(`saveFile`) is compiled in and covered with the fake controller; it was not clicked or
+automated.
+
 **F6 recheck (2026-10-15), the progress window.** Release build (37 s), `-Checks monitor`
 three times, then `-Checks start`, fake host, `VEGAS_ENCODER_DATA_ROOT` on
 `app\build\spikes\data-root`, the same three monitors. Live files written by the probe
@@ -877,13 +950,12 @@ C3 copy origins (`builtin/<id>`, `preset/<id>@<revision>`, `PresetTransfer.fromJ
 C6 `commandLine` and `realtime` in History. This answers the F3 questions on discovery
 vs `machine.json`, probe results on the installation and where hardware results are kept.
 
-Delivered and **not used yet** (app work, Open items): `FFmpegInstallation.health` and
-`healthMessage`; job index summaries (`encoderSummary`, `project`, `durationSec`,
-`elapsedSec`, `sizeBytes`); `JobLogs` for the full log; `errorTokenIndices`;
-`PresetTests` (Test this preset); `PresetTransfer.exportTo`/`shareString`/
-`importShareString`, `PresetLocations` and `FileReveal` (Export…, Copy share string,
-Show in folder, History's Open folder). `PresetTransfer.duplicate` copies the source's
-star; the app keeps its own copy path so a copy starts unstarred and can hold a draft.
+Delivered in B3/B4 and **used since the follow-ups** (2026-10-15): `FFmpegInstallation.health`
+and `healthMessage`; job index summaries (`encoderSummary`, `project`, `durationSec`,
+`elapsedSec`, `sizeBytes`); `JobLogs`; `errorTokenIndices`; `PresetTests`;
+`PresetTransfer.exportTo`/`shareString`/`importShareString`, `PresetLocations` and
+`FileReveal`. `PresetTransfer.duplicate` copies the source's star; the app keeps its own
+copy path so a copy starts unstarred and can hold a draft.
 
 Used in F5 with no change: C4 `EditSessionService` (`readRequest`, `writeResult`, the fake's
 `b0-session`), `EditSessionRequest.ownerHwnd`, `origin`, `baseRecipe` and `context`;
@@ -901,11 +973,15 @@ Open (additive):
 | Popup size (F5) | UI_SPEC §1: the popup remembers its size, not its position. C7 `uiState` has desktop fields only, so the popup opens at its default size every time. Please add an additive `popupWindowSize` (physical width and height, or logical) to `AppUiState`, or the owner decides the popup keeps the default size |
 | Render As path in the popup (F5) | C4 `context` carries the project but not the file Render As will write, so the popup's command and Advanced's resolved command use the sample path (`D:\Renders\Sample project.mp4`; the resolved command says "for the sample project"). If the page can know the path, an additive `context.outputPath` would let the preview show it; otherwise nothing changes |
 | Capability transfer in Advanced mode (F7) | Lint and compile each serialize the full capability map (156–236K characters) through FFI: **25–32 ms per keystroke** in Advanced mode (budget 4 ms). Please let the core keep a capability map it was given (an ID or handle per identity key) so later calls pass the ID, or offer one call that lints and compiles a template together |
-| Advanced token roles (F4) | In Advanced mode every user word comes back as role `extra`, so the editor can't colour options by stage (video, audio, mux, global), draw stage stripes or style macros. Please give Advanced tokens the same stage roles Basic tokens have and role `macro` (already in `TokenRole`) for a word that held a macro, keeping `sourceStart`/`sourceEnd`. An option/value marker per token would replace the app's "starts with -[letter]" bold rule. The app reads these with no change; until then only option names (bold) and the chips stand out |
+| Advanced token roles (F4) | In Advanced mode every user word comes back as role `extra`, so the editor can't colour options by stage (video, audio, mux, global), draw stage stripes or style macros. Please give Advanced tokens the same stage roles Basic tokens have and role `macro` (already in `TokenRole`) for a word that held a macro, keeping `sourceStart`/`sourceEnd`. An option/value marker per token would replace the app's "starts with -[letter]" bold rule. The app reads these with no change; until then only option names (bold) and the chips stand out. **Delivered (master `fa58338`): stage colours, stripes and macro styling now show with no app change; the option/value marker isn't adopted yet** |
 | Macro list (F4) | The macros panel takes names from `VeCore.complete("{")` (generic description "VEGAS media or output macro") and values from a compile of the names alone. A `VeCore.macros(media, paths)` (name, description, required, expanded value) would replace both; the app keeps its own wording only as fallback |
 | Encoder IDs in Advanced (F4) | The Advanced summary names the command's encoders by label ("x265", or the raw name), so nodes can't show availability for the chosen FFmpeg (lint's `L-ENCODER` covers a missing one). A `videoEncoderId`/`audioEncoderId` (summary or signal facts) would let the nodes show Ready / Not in this FFmpeg |
 | Temporary output name (F4) | "Resolved command" shows the sample Render As path for `{output}`; SETTINGS_AND_COMMANDS §4 says the engine writes a temporary name. If the preview should show it, C2 needs the naming rule (or a `CompilePaths` helper) |
-| Partial highlighting (F4) | With an unterminated quote, compile returns no tokens, so the editor loses its chips (and their guard) until the quote is closed; lint reports `L-QUOTE` over the whole text. Spans for the words before the open quote, and the quote's position, would keep them |
+| Realtime in the job index (follow-ups) | History's list reads only `jobs.jsonl` now, which has no realtime figure, so the Speed (× realtime) column is gone from the list (the detail shows the record's). The engine's `realtime` is FFmpeg's speed, not length ÷ time, so the app can't work it out. An additive `realtime` in `JobIndexEntry` brings the column back with no other change |
+| Import a `.vepreset` file (follow-ups) | PRODUCT_SPEC F8: "On the other PC, Import validates the file." `PresetLibrary.importPreset` takes JSON text and `PresetTransfer` has no import from a path, and the app reads no files itself. Please add `PresetTransfer.importFrom(path, {newId})` (bounded read, same validation as the share string). The `+` menu's Import file… is shown disabled until then; the Open dialog (`pickFile`) is ready |
+| Plain failure text from PresetTests (follow-ups) | A failed test's `message` is the exception's `toString()` ("ServiceException(PROBE-REQUIRED): Probe this installation…"). The app strips that wrapper for display (`serviceMessage`), which depends on Dart's `toString`. Please put the plain message in `message` (and the code in its own field if useful) |
+| Test frames at the project's size (follow-ups) | UI_SPEC §2 says Test this preset encodes at the sample or project context's size, rate and pixel format; `PresetTests` always uses 320×180 P010 at 30 fps. The app shows the service's result and claims no size. If the owner wants the spec's behaviour, the service would take a `MediaDescription`; otherwise UI_SPEC keeps the as-built note |
+| Partial highlighting (F4) | With an unterminated quote, compile returns no tokens, so the editor loses its chips (and their guard) until the quote is closed; lint reports `L-QUOTE` over the whole text. Spans for the words before the open quote, and the quote's position, would keep them. **Delivered (master `fa58338`): the editor now underlines `L-QUOTE` from the quote to the end; keeping chips before the quote isn't checked yet** |
 
 ## Open items
 
@@ -916,14 +992,23 @@ the popup size, the desktop launch and `context.outputPath`. The library watch's
 missing from the table after F5's rewrite; it is back at the top of Needs as the owner's
 priority (2026-10-15).
 
-App side, unblocked by B3/B4 (F3 follow-up): installation health on the FFmpeg cards
-(Changed on disk, Missing, No ffprobe); History's list from the index summaries instead
-of one record per visible row; the full log (JobLogs) and FFmpeg's error tokens in a
-job; Test this preset (PresetTests); Export…, Copy share string, Show in folder and
-History's Open folder (PresetTransfer, PresetLocations, FileReveal). Real discovery
-and probes were not run from the app: no FFmpeg ran for F7. F6 already wired
-`jobLogsProvider` and `fileRevealProvider` into `AppServices`, so History's full log and
-Open folder can use them directly.
+Follow-ups (2026-10-15), points to check in use (everything ran on fakes only):
+
+- **Test this preset** is on the desktop header only. UI_SPEC §2 says desktop and popup;
+  the popup has no button yet (its header is full: Load preset, Save to library, Basic |
+  Advanced). Owner: where should it go in the popup, or desktop only?
+- The real `PresetTests` needs the installation's cached capabilities (`PROBE-REQUIRED`
+  otherwise), refuses general extra inputs/maps/filters (`PRESET-TEST-SCOPE`) and leaves
+  its output and log in `%LOCALAPPDATA%\VegasEncoder\tests`. None of this ran with a real
+  FFmpeg; the failure wording is the service's.
+- History's list has no Speed column (Needs: realtime in the index).
+- Export… and Copy share string carry the saved version; the menu says so for an edited
+  preset. An imported preset keeps its shared name, so a library can hold two presets with
+  one name. Import file… waits on platform (Needs).
+- The Save dialog and Explorer reveals were not clicked in the running app.
+- The command view now chooses its own line breaks from measured widths (a 2 px margin).
+  If a font or text-scale change ever made the paragraph wrap a line the view kept, that
+  line would wrap without the hanging indent; nothing else breaks.
 
 Waiting on platform for F6: starting the desktop app on a job (Show in History), the
 output bit depth in C5 (the header glyph). Gated: the window has only read hand-written
@@ -984,18 +1069,12 @@ F4 points to check in use:
 - A word typed directly against a chip (`{inputs}x`) joins it, so the core no longer sees
   `{inputs}` and the lint says so; the chip comes back when the space is restored.
 - Long Advanced library rows truncate the summary after the tag ("x264, your co…").
-- A chip's lock badge straddles its top-right corner (the mockup's `.t-lock::after`).
-  Since B1 the seed puts `{inputs}` after the colour tags, usually on a wrapped row, so
-  the badge overlaps the descenders of the row above (as `{output}`'s already did under
-  `-movflags`). Keeping the badge inside the line box would fix it.
+- A chip's lock badge sits at its top-right corner but inside the chip's line box (fixed
+  in the follow-ups; it used to overlap the row above).
 The Open dialog (`pickFile`) is built and covered with a fake controller; it was not
-clicked through in the running app. Small display points seen on the native core:
+clicked through in the running app. Small display points seen on the native core (the
+size card's "859 / MB" wrap and the command view's wrapping were fixed in the follow-ups):
 
-- The size card can wrap between a figure and its unit ("…to 859 / MB for 10:00.");
-  a non-breaking space in `VeFormat.bytes` would fix it (tests match its strings).
-- The command view's wrapped lines have no hanging indent, and an option can wrap away
-  from its value (`-profile:v` | `high`). F1 component behaviour, more visible now that
-  the core's lines are longer.
 - A control replaced by Extra arguments keeps showing its own value with the note
   (UI_SPEC §2 as written). If that reads as contradictory in use, dimming the control is
   a later design choice.
@@ -1011,21 +1090,28 @@ Window start (runner), unverified or not fixed:
   established.
 - **Restoring maximized** shows a stretched first frame for ~20–40 ms (the restored-size
   frame scaled up). Present before the fix too. Sizing the hidden window to the maximized
-  client size before the first frame may avoid it (untested).
+  client size before the first frame may avoid it (untested; not attempted in the
+  follow-ups, since the spike harness can't show a one-frame stretch).
 - The remaining ~150 ms desktop-only first-frame delay (Spike results); cold start.
 
 ## Handoff for the next app agent
 
 Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md, this file and the
-UI_SPEC section for what you change. F6 is done; the app runs on the native core (B2) and
-the Windows services (B3), with fakes in tests. Next, app-only work that platform has
-already unblocked (Open items, "App side, unblocked by B3/B4"):
+UI_SPEC section for what you change. F6 and the B3/B4 follow-ups are done (the follow-ups
+are uncommitted on `ws/app` for the owner's review); the app runs on the native core (B2)
+and the Windows services (B3), with fakes in tests. What's left is waiting on platform
+(Needs) or the owner (Test this preset in the popup; Open items).
 
-- FFmpeg cards: installation health (`FFmpegInstallation.health`, `healthMessage`).
-- History: the list from the index summaries; the full log (`jobLogsProvider`) and
-  FFmpeg's error tokens (`errorTokenIndices`) in a job; Open folder (`fileRevealProvider`).
-- Presets: Test this preset (`PresetTests`); Export…, Copy share string, Show in folder
-  (`PresetTransfer`, `PresetLocations`, `FileReveal`).
+- Follow-ups live in: `features/ffmpeg/display.dart` (`installationHealth`),
+  `features/history/` (index mapping, `commandParts`, the log section) with
+  `state/history.dart` (`jobLogProvider`, `jobLogLocationProvider`),
+  `features/presets/preset_test_dialog.dart` + `test_display.dart` + `state/preset_test.dart`,
+  and the library's actions in `presets_page.dart`. Test doubles: `test/history_doubles.dart`
+  (records with summaries, error tokens and logs), `unhealthyInstallations()` in
+  `test/ffmpeg_doubles.dart`. History's goldens use those doubles, not the bare B0 index.
+- `CommandView` lays out its own line breaks (`_build` takes the width); unit strings
+  from `VeFormat` contain ` `, so tests match `'9.84 GB'`, while core and service
+  text (node summaries, `encoderSummary`) keeps plain spaces.
 - Runner or window changes need a release build and `tool/spikes/run_window_spikes.ps1`
   (`-Checks monitor`, `owner` or `start`; never `all` or `theme`); it sets
   `VEGAS_ENCODER_DATA_ROOT` to a scratch folder. If a run's monitor coordinates disagree

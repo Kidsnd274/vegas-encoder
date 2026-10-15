@@ -2,8 +2,10 @@
 
 Updated: 2026-10-15 (Asia/Singapore). Status: proposal, updated for the chosen
 direction; §1, §9, §10 and §11 record what the app workstream built in F0 and F1, §2
-what F2 built, §3 F4, §4 the popup (F5), and §5, §6 and §6a what F3 built (open items
-are in workstreams/app.md). Since 2026-10-14 the editor runs on the native core (B2)
+what F2 built, §3 F4, §4 the popup (F5), and §5, §6 and §6a what F3 built, refined by the
+B3/B4 follow-ups of 2026-10-15 (installation health, History from the index with the full
+log and error tokens, Test this preset, export and share strings; open items are in
+workstreams/app.md). Since 2026-10-14 the editor runs on the native core (B2)
 and the app on the platform's Windows services (B3, F7). The popup has met only the
 platform's fake session; nothing here ran inside VEGAS.
 
@@ -51,7 +53,16 @@ bottom as a collapsible "Library and command" strip, collapsed, with a one-line 
   8-bit output, and **availability** (an
   error-coloured mark plus a tooltip such as "Needs x264: not in FFmpeg 8.0 LGPL").
 - **Context menu:** Duplicate, Rename, Export…, Copy share string, Delete (user
-  presets only), Show in folder.
+  presets only), Show in folder. As built: Duplicate, Rename… / Export…, Copy share string,
+  Show in folder / Delete… (destructive last). Export… opens the Windows Save dialog
+  (`name.vepreset`, asks before replacing) and the library writes the saved version
+  (C3 `exportTo`); Copy share string copies `vepreset:1:…`; Show in folder shows the file
+  in Explorer (off for built-ins: "Built-in presets are part of the app."). For an edited
+  preset the menu says these carry the saved version.
+- **Add menu (`+` beside the search):** New preset; Import share string… (the field starts
+  with the clipboard when it holds a `vepreset:` string; the preset lands in Mine, keeps
+  its name and is selected); Import file… (disabled until the library can import a file
+  by path; workstreams/app.md, Needs).
 - **Empty search:** "No presets match 'xyz'." plus a **New preset** action (a preset in
   Mine started from the first built-in, named "New preset") and **Show all presets**.
 - **Error mark:** a preset the core finds errors in, for the chosen FFmpeg, shows an
@@ -196,13 +207,29 @@ into a panel.
 This catches failing hardware encoders and bad extra arguments early. Voukoder Pro's
 "Scene Test" is the precedent.
 
+As built (desktop, on C3 `PresetTests`): a **Test** button beside the header's FFmpeg
+picker (an icon below 1080 px) tests the editor's current settings, unsaved changes
+included, with that FFmpeg. It is off, with the reason, without an FFmpeg, without a
+command from the core, or with errors. A dialog shows the phase ("Encoding: frame 30 of
+60"), a video-wire bar, the result ("Passed": "FFmpeg encoded the test frames and the file
+checked out: h264 and aac."; "Failed" with the service's reason), the output check
+(Expected / Found), and FFmpeg's output as it streams (last 400 lines, opening at the
+end), with Show log, Show file, Stop test and Test again. Closing stops a running test.
+The service decides the synthetic input (320×180 P010, 30 fps, two seconds of tone), not
+the project's size; the dialog claims no size. **Not in the popup yet** (workstreams/app.md,
+Open items).
+
 ### Command preview
 
 - Always reachable; visible by default on the desktop.
 - `{inputs}` is collapsed into a "VEGAS video + audio" chip; it expands on click.
 - Supports copy (Ctrl+Shift+C) and a toggle between single-line and grouped multi-line
   layouts ("One line" / "Grouped" beside Copy). In the multi-line layout each `^`
-  continuation stays at the end of its line.
+  continuation stays at the end of its line. A long line wraps only between arguments,
+  never between an option and its value (`-profile:v high`), and its wrapped part is
+  indented four spaces (two in the one-line layout) so it reads as a continuation.
+- Figures carry a no-break space before their unit ("859 MB", "320 kb/s"), so no line
+  wraps between them.
 - The group for the selected node is highlighted. Clicking a token focuses the control
   that produced it; hovering or focusing a control highlights its tokens (StaxRip's
   click-to-jump). Both use the core's `CommandToken.field`; tokens an error issue points
@@ -236,7 +263,8 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
   Advanced words only `extra`, so today only the chips and the `{inputs}`/`{output}` lines
   are coloured (workstreams/app.md, Needs).
 - **Locked chips:** `{inputs}` and `{output}` (the core's `input`/`output` token spans)
-  are drawn as chips with a lock badge. The caret never rests inside one (a click goes to
+  are drawn as chips with a lock badge at the top-right corner, kept inside the chip's
+  line so it never covers the line above. The caret never rests inside one (a click goes to
   the nearer edge, an arrow step carries on). Typing inside or deleting part of a chip is
   refused with "{inputs} is locked. Vegas Encoder puts the VEGAS video and audio pipes
   here. Cut and paste moves it." and selects the chip, so a second Backspace deletes it
@@ -246,7 +274,8 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
   underlined red (wavy), warnings amber (wavy), hints dotted. Each line's number takes its
   most severe level's colour and its message is written after the line's end. Pointing at
   an underline shows a bubble; the caret's message shows in the bar. A finding whose range
-  is the whole command (an unterminated quote, extra outputs) is listed, not underlined.
+  is the whole command (extra outputs) is listed, not underlined. An unterminated quote is
+  underlined from the quote to the end.
 - **Diagnostics** under the editor: counts ("1 error, 2 warnings, 1 hint, 1 note") and the
   FFmpeg checked; each finding with its icon, "Line N" and **Go to** (selects the range and
   focuses the editor); then whole-command findings; then the compile's recipe notes ("Not
@@ -465,8 +494,12 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
   the test failure class and 10-bit result, the test-encode diagram (testsrc2 → encoder
   → null, dashed past an encoder that can't run), FFmpeg's stderr line, the presets that
   use it (click opens the preset in Presets), and Test again for hardware encoders.
-- **Not shown yet** (no fact in C3): Changed on disk, Missing, No ffprobe. See
-  workstreams/app.md, Needs.
+- **Health** (C3 `health`, follow-ups 2026-10-15): Changed on disk, Missing and No ffprobe
+  show on the card as the table above says, with an amber or red icon, the service's
+  `healthMessage` in the tooltip, and the fix as the card's first action: Scan again
+  (changed, no ffprobe) or Locate… (missing: the Open dialog, then discovery adds the file
+  chosen; a missing default hands its role to it). A missing default says "Renders fail
+  until you locate it or choose another default." `unknown` and `unchanged` show nothing.
 
 ## 6. History screen (S5)
 
@@ -484,24 +517,28 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
 mock; History uses S4's layout: the list on surface at the left, a 450 px detail on
 panel at the right (380 px below 1280 px).
 
-- **List:** status with icon and word; start time (local); template over project;
-  encoder ("Advanced command" for template recipes, never the inactive Basic one);
-  length; time taken; speed (× realtime, finished renders only); size ("No file" when
-  nothing was published). Filter: All / Succeeded / Failed / Cancelled, with a count.
-  Below 860 px the length and time-taken columns drop. The index has no summary fields,
-  so each row reads its record.
+- **List** (from the index only since the follow-ups, 2026-10-15; no record per row):
+  status with icon and word; start time (local); template over project; encoder (the
+  engine's summary, "x264 CRF 18, slow / AAC 320 kb/s", full text in a tooltip); length;
+  time taken; size ("No file" when nothing was published). A summary an older index line
+  lacks shows a dash. **No speed column**: the index has no realtime figure (the detail's
+  sentence has it; workstreams/app.md, Needs). Filter: All / Succeeded / Failed /
+  Cancelled, with a count. Below 860 px the length and time-taken columns drop.
 - **Detail order:** result sentence; actions; FFmpeg said (stderr tail); how it stopped
   (exit code, HRESULT); output path; FFmpeg identity (shortened hash, full value in a
-  tooltip); output check; the command.
-- **Actions:** Copy command (also Ctrl+Shift+C) copies ffmpeg's path and argv with
-  standard Windows quoting until the record carries the core's command line; Open
-  settings as new preset makes a Mine preset and switches to Presets; Open folder is
-  disabled until the platform has a reveal service.
+  tooltip); output check; the command, with the arguments FFmpeg's error points at
+  (C6 `errorTokenIndices`) underlined in the error colours and "FFmpeg's error points at
+  “-preset 14”, underlined above."; then **FFmpeg log**: Show log reads the whole log
+  (C3 `JobLogs`) as it streams and shows its last 1,000 lines in a box that opens at the
+  end ("The last 1,000 of 12,345 lines."), Show in folder for the file; "FFmpeg left no
+  log for this render." when there is none.
+- **Actions:** Copy command (also Ctrl+Shift+C) copies the core's recorded command line;
+  Open settings as new preset makes a Mine preset and switches to Presets; Open folder
+  shows the published file in Explorer (else a kept unfinished file; off with "This render
+  left no file to show." otherwise).
 - **Keyboard:** Up and Down move the selection and focus. An empty history and a filter
   with no matches each have their own message; a missing or unreadable record says so
   in its row and in the detail.
-- **Not shown yet:** the full log, and FFmpeg's named option highlighted in the command
-  (both need C6 additions; see workstreams/app.md).
 
 ## 6a. Settings screen
 
@@ -651,7 +688,7 @@ Undo), and in `features/presets/`: the Ctrl+K palette, `BitrateField`, and
 | `OriginBanner` | Popup origin states and actions |
 | `DiffList` | Field label, from → to |
 | `InstallationCard`, `CapabilityTable` | F3 (`features/ffmpeg/`), with `EncoderDetail` and its test-encode diagram |
-| `JobList`, `JobDetail`, `LogView` | F3 (`features/history/`); the stderr tail shows in the detail, the full log waits on C6 |
+| `JobList`, `JobDetail`, `LogView` | F3 (`features/history/`); the stderr tail and, since the follow-ups, the full log's last lines (`_FullLog`) show in the detail |
 | `VePageHeader`, `VeToastHost` | F3 (`design/components/page_header.dart`): a section's heading and actions; one toast per screen |
 | `RenderMonitor` | F6 (`features/monitor/`, `state/monitor.dart`): the progress window (§12). `VeWireProgress` (`design/components/wire_progress.dart`) is its bar |
 

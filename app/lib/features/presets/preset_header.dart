@@ -23,6 +23,8 @@ class PresetHeader extends StatelessWidget {
     required this.onDuplicate,
     required this.onRevert,
     required this.onSave,
+    required this.onTest,
+    this.testBlocked,
   });
 
   final EditorData data;
@@ -31,6 +33,12 @@ class PresetHeader extends StatelessWidget {
   final VoidCallback onDuplicate;
   final VoidCallback onRevert;
   final VoidCallback onSave;
+
+  /// "Test this preset" with the FFmpeg chosen beside it.
+  final VoidCallback onTest;
+
+  /// Why the test can't run now; null when it can.
+  final String? testBlocked;
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +138,23 @@ class PresetHeader extends StatelessWidget {
                 ],
                 onChanged: onInstallation,
               ),
+              const SizedBox(width: 6),
+              // Beside the FFmpeg it tests with.
+              if (roomy)
+                VeButton(
+                  label: 'Test',
+                  icon: VeIcons.flask,
+                  tooltip: testBlocked ?? 'Test this preset: this FFmpeg encodes test frames, then the file is checked',
+                  semanticLabel: 'Test this preset',
+                  onPressed: testBlocked == null ? onTest : null,
+                )
+              else
+                VeIconButton(
+                  icon: VeIcons.flask,
+                  label: testBlocked ?? 'Test this preset with this FFmpeg',
+                  bordered: true,
+                  onPressed: testBlocked == null ? onTest : null,
+                ),
               const SizedBox(width: 10),
               VeButton(
                 label: 'Duplicate',

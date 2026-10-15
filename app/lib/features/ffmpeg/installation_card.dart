@@ -17,6 +17,7 @@ class InstallationCard extends StatelessWidget {
     required this.onSetDefault,
     required this.onCopyPath,
     required this.onRemove,
+    required this.onHealthAction,
   });
 
   final InstallationCardModel model;
@@ -25,6 +26,9 @@ class InstallationCard extends StatelessWidget {
   final VoidCallback onSetDefault;
   final VoidCallback onCopyPath;
   final VoidCallback onRemove;
+
+  /// Scan again or Locate… for an installation that isn't as checked.
+  final ValueChanged<HealthAction> onHealthAction;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +43,7 @@ class InstallationCard extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: '${m.title}${m.isDefault ? ', default' : ''}',
+      label: [m.title, if (m.isDefault) 'default', if (m.health case final h?) h.text].join(', '),
       child: VeInteractive(
         onTap: onSelect,
         excludeChildSemantics: false,
@@ -103,6 +107,18 @@ class InstallationCard extends StatelessWidget {
                     ]),
                   ],
                 ],
+                if (m.health case final h?) ...[
+                  const SizedBox(height: 7),
+                  VeTooltip(
+                    message: h.detail == null ? h.text : '${h.text}\n${h.detail}',
+                    child: _Note(
+                      icon: h.error ? VeIcons.error : VeIcons.warning,
+                      color: h.error ? c.error : c.warning,
+                      text: h.text,
+                      maxLines: 3,
+                    ),
+                  ),
+                ],
                 if (m.failure case final f?) ...[
                   const SizedBox(height: 7),
                   _Note(icon: VeIcons.error, color: c.error, text: f),
@@ -128,6 +144,12 @@ class InstallationCard extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
+                    if (m.health case final h?)
+                      VeButton(
+                        label: h.action.label,
+                        size: VeButtonSize.small,
+                        onPressed: () => onHealthAction(h.action),
+                      ),
                     if (!m.isDefault)
                       VeButton(label: 'Set as default', size: VeButtonSize.small, onPressed: onSetDefault),
                     VeButton(
@@ -217,10 +239,11 @@ class _Progress extends StatelessWidget {
 }
 
 class _Note extends StatelessWidget {
-  const _Note({required this.icon, required this.color, required this.text});
+  const _Note({required this.icon, required this.color, required this.text, this.maxLines = 2});
   final VeIconData icon;
   final Color color;
   final String text;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -234,7 +257,12 @@ class _Note extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Expanded(
-          child: Text(text, style: t.text.small.copyWith(color: t.colors.text2), maxLines: 2),
+          child: Text(
+            text,
+            style: t.text.small.copyWith(color: t.colors.text2),
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

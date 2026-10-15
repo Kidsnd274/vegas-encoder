@@ -39,6 +39,21 @@ class ComPtr {
   T* ptr_ = nullptr;
 };
 
+// The file-system path of a dialog's result, in UTF-8.
+std::optional<std::string> PathOf(ComPtr<IShellItem>& item) {
+  PWSTR path = nullptr;
+  if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) ||
+      path == nullptr) {
+    return std::nullopt;
+  }
+  std::string utf8 = Utf8FromUtf16(path);
+  CoTaskMemFree(path);
+  if (utf8.empty()) {
+    return std::nullopt;
+  }
+  return utf8;
+}
+
 }  // namespace
 
 std::optional<std::string> ShowOpenFileDialog(HWND owner,
@@ -79,15 +94,51 @@ std::optional<std::string> ShowOpenFileDialog(HWND owner,
   if (FAILED(dialog->GetResult(item.put()))) {
     return std::nullopt;
   }
-  PWSTR path = nullptr;
-  if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &path)) ||
-      path == nullptr) {
+  return PathOf(item);
+}
+
+std::optional<std::string> ShowSaveFileDialog(HWND owner,
+                                              const SaveFileRequest& request) {
+  ComPtr<IFileSaveDialog> dialog;
+  if (FAILED(CoCreateInstance(CLSID_FileSaveDialog, nullptr,
+                              CLSCTX_INPROC_SERVER,
+                              IID_PPV_ARGS(dialog.put())))) {
     return std::nullopt;
   }
-  std::string utf8 = Utf8FromUtf16(path);
-  CoTaskMemFree(path);
-  if (utf8.empty()) {
+  FILEOPENDIALOGOPTIONS options = 0;
+  dialog->GetOptions(&options);
+  dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_OVERWRITEPROMPT |
+                     FOS_PATHMUSTEXIST | FOS_NOREADONLYRETURN);
+
+  const std::wstring title = Utf16FromUtf8(request.title);
+  if (!title.empty()) {
+    dialog->SetTitle(title.c_str());
+  }
+  const std::wstring filter_name = Utf16FromUtf8(request.filter_name);
+  const std::wstring filter_pattern = Utf16FromUtf8(request.filter_pattern);
+  if (!filter_pattern.empty()) {
+    const COMDLG_FILTERSPEC filters[] = {
+        {filter_name.empty() ? filter_pattern.c_str() : filter_name.c_str(),
+         filter_pattern.c_str()},
+    };
+    dialog->SetFileTypes(1, filters);
+    dialog->SetFileTypeIndex(1);
+  }
+  const std::wstring extension = Utf16FromUtf8(request.default_extension);
+  if (!extension.empty()) {
+    dialog->SetDefaultExtension(extension.c_str());
+  }
+  const std::wstring file_name = Utf16FromUtf8(request.file_name);
+  if (!file_name.empty()) {
+    dialog->SetFileName(file_name.c_str());
+  }
+
+  if (FAILED(dialog->Show(owner))) {
     return std::nullopt;
   }
-  return utf8;
+  ComPtr<IShellItem> item;
+  if (FAILED(dialog->GetResult(item.put()))) {
+    return std::nullopt;
+  }
+  return PathOf(item);
 }

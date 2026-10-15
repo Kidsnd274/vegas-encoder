@@ -71,6 +71,17 @@ abstract interface class WindowController {
   /// path on to ve_services; it reads no file itself.
   Future<String?> pickFile({required String title, required String filterName, required String filterPattern});
 
+  /// The Windows Save dialog, modal to this window, starting at [fileName];
+  /// it asks before replacing a file. Returns the chosen path, or null if
+  /// cancelled. The app passes the path to ve_services, which writes it.
+  Future<String?> saveFile({
+    required String title,
+    required String fileName,
+    required String filterName,
+    required String filterPattern,
+    required String defaultExtension,
+  });
+
   /// Adds a line to the startup trace (VEGAS_ENCODER_STARTUP_TRACE).
   Future<void> trace(String label);
 }
@@ -107,7 +118,13 @@ class MethodChannelWindowController implements WindowController {
   }
 
   @override
-  Future<bool> configure({int? ownerHwnd, int? hostHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized}) async {
+  Future<bool> configure({
+    int? ownerHwnd,
+    int? hostHwnd,
+    bool? keepOnTop,
+    WindowBounds? bounds,
+    bool? maximized,
+  }) async {
     final result = await _invoke<Map<Object?, Object?>>('configure', {
       'ownerHwnd': ?ownerHwnd,
       'hostHwnd': ?hostHwnd,
@@ -167,6 +184,21 @@ class MethodChannelWindowController implements WindowController {
       _invoke<String>('pickFile', {'title': title, 'filterName': filterName, 'filterPattern': filterPattern});
 
   @override
+  Future<String?> saveFile({
+    required String title,
+    required String fileName,
+    required String filterName,
+    required String filterPattern,
+    required String defaultExtension,
+  }) => _invoke<String>('saveFile', {
+    'title': title,
+    'fileName': fileName,
+    'filterName': filterName,
+    'filterPattern': filterPattern,
+    'defaultExtension': defaultExtension,
+  });
+
+  @override
   Future<void> trace(String label) => _invoke<void>('trace', {'label': label});
 }
 
@@ -182,6 +214,9 @@ class FakeWindowController implements WindowController {
 
   /// What [pickFile] returns: the path "chosen" in the Open dialog.
   String? pickedFile;
+
+  /// What [saveFile] returns: the path "chosen" in the Save dialog.
+  String? savedFile;
   final StreamController<WindowState> _changes = StreamController<WindowState>.broadcast();
 
   void emit(WindowState state) {
@@ -190,7 +225,13 @@ class FakeWindowController implements WindowController {
   }
 
   @override
-  Future<bool> configure({int? ownerHwnd, int? hostHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized}) async {
+  Future<bool> configure({
+    int? ownerHwnd,
+    int? hostHwnd,
+    bool? keepOnTop,
+    WindowBounds? bounds,
+    bool? maximized,
+  }) async {
     calls.add(
       'configure(owner: $ownerHwnd${hostHwnd == null ? '' : ', host: $hostHwnd'}, keepOnTop: $keepOnTop'
       '${bounds == null ? '' : ', bounds: $bounds, maximized: $maximized'})',
@@ -232,6 +273,18 @@ class FakeWindowController implements WindowController {
   Future<String?> pickFile({required String title, required String filterName, required String filterPattern}) async {
     calls.add('pickFile($filterPattern)');
     return pickedFile;
+  }
+
+  @override
+  Future<String?> saveFile({
+    required String title,
+    required String fileName,
+    required String filterName,
+    required String filterPattern,
+    required String defaultExtension,
+  }) async {
+    calls.add('saveFile($fileName, $filterPattern)');
+    return savedFile;
   }
 
   @override

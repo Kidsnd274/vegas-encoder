@@ -41,6 +41,8 @@ class FakeAppServices implements AppServices {
   @override
   final FakeCapabilityCache capabilityCache = FakeCapabilityCache();
   @override
+  final FakePresetTests presetTests = FakePresetTests();
+  @override
   final FakeJobRepository jobs = FakeJobRepository();
   @override
   FakeJobRepository get jobLogs => jobs;

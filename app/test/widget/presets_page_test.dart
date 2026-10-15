@@ -88,7 +88,7 @@ void main() {
     await tester.tap(find.text('Sample project.mp4'));
     await tester.pumpAndSettle();
     expect(find.byType(SizeQualityCard), findsOneWidget);
-    expect(find.text('About 53.7 MB per minute, typically 32.2 MB to 85.9 MB.'), findsOneWidget);
+    expect(find.text('About 53.7\u00A0MB per minute, typically 32.2\u00A0MB to 85.9\u00A0MB.'), findsOneWidget);
     expect(
       find.text('Total not available yet', findRichText: true),
       findsOneWidget,
@@ -353,18 +353,18 @@ void main() {
     await tester.tap(find.text('Bitrate'));
     await tester.pumpAndSettle();
     expect(find.text('Average bitrate'), findsOneWidget);
-    expect(find.text('12 Mb/s average, no peak cap'), findsOneWidget);
+    expect(find.text('12\u00A0Mb/s average, no peak cap'), findsOneWidget);
     await tester.tap(find.text('Common').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('8 Mb/s').last);
+    await tester.tap(find.text('8\u00A0Mb/s').last);
     await tester.pumpAndSettle();
-    expect(find.text('8 Mb/s average, no peak cap'), findsOneWidget);
+    expect(find.text('8\u00A0Mb/s average, no peak cap'), findsOneWidget);
     await tester.enterText(
       find.descendant(of: find.widgetWithText(VeField, 'Peak bitrate'), matching: find.byType(TextField)),
       '12',
     );
     await tester.pumpAndSettle();
-    expect(find.text('8 Mb/s average, 12 Mb/s peak'), findsOneWidget);
+    expect(find.text('8\u00A0Mb/s average, 12\u00A0Mb/s peak'), findsOneWidget);
   });
 
   testWidgets('an empty search offers a new preset', (tester) async {
