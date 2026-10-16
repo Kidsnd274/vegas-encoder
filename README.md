@@ -4,19 +4,26 @@ Native VEGAS Pro Render As exporter with an external FFmpeg encoding engine.
 The product includes its internal VEGAS adapter; a separate SDK is deferred.
 Research provenance is in [ORIGIN.md](ORIGIN.md).
 
-**Current implementation:** independent Windows x64 development build. Internal
+**Development:** one agent handles app and platform in the original
+`L:\repos\vegas-encoder` checkout (currently `master`). Read
+[AGENTS.md](AGENTS.md), [workflow](docs/product/WORKSTREAMS.md),
+[status](docs/STATUS.md) and [next work](docs/NEXT_AGENT.md). The former worktree
+split is retired; retained candidate/rollback folders must stay in place.
+
+**Current implementation:** Windows x64 development build. Internal
 ABI declarations, checked template/frame-lifetime helpers, render adapter, encoder,
 diagnostics, fake host, synthetic fixtures and output checkers are implemented.
-The first profile is P010 → lossless FFV1, with optional float32 stereo → PCM float,
-in MKV. The raw diagnostic mode is a developer comparison tool.
+The Flutter app supplies presets, Basic/Advanced editing, FFmpeg setup, History,
+the VEGAS popup and progress monitor. Recipes use the shared native core; the
+current adapter trial writes MKV. The raw mode remains a diagnostic tool.
 
 **Qualification:** builds and generated fake-host/FFmpeg checks are tracked in
-[STATUS.md](docs/STATUS.md). The installed candidate passes its first real VEGAS
-1080p/fractional renders and the temporary native page's on/off setting reaches
-Render. The current candidate also passes real cancellation and same-session
-recovery; controlled error recovery remains fake-host tested. The user deferred
-the real two-template/restart persistence test. The app design is on a separate
-branch; preset management, the desktop editor and rich popup UI follow its review.
+[STATUS.md](docs/STATUS.md). The installed 0.1.7 template-name-fix trial on VEGAS
+2026.0.3.189 has owner-confirmed basic renders, normal restart persistence,
+cancellation/recovery, failure presentation and immediate large-preset reopen.
+Extra encoder-failure recovery and the prepared faster-progress trial/performance
+comparison are owner-deferred. Exact large-template restart sequence is unconfirmed.
+Offline tests and source consolidation do not close real-host qualification gates.
 
 ## Build and validate
 

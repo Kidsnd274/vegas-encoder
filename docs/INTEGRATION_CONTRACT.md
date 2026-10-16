@@ -1,5 +1,10 @@
 # Native integration evidence and implementation limits
 
+Current continuation is single-agent app/platform work in the original checkout;
+see [NEXT_AGENT](NEXT_AGENT.md) and [STATUS](STATUS.md) for present implementation,
+installed candidate and qualification. The imported evidence and older unresolved
+sections below are historical scope, not a separate workstream or current queue.
+
 This is a practical imported evidence summary. It is not the original Sony/MAGIX
 SDK and does not claim new Vegas Encoder runtime compatibility. The header
 `src/vegas/abi/sfio_abi.h` retains per-method/field finding annotations. Source origin

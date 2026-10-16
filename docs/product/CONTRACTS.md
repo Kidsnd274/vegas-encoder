@@ -1,8 +1,9 @@
 # App/platform contracts v1 — B1/B2/B3
 
-Updated: 2026-10-15 (Asia/Singapore). **B3 Windows services delivered.** These
-shapes are the shared contract. Breaking changes require the owner and both
-workstreams; additive fields stay in v1. Native core implementation/build hook is
+Updated: 2026-10-16 (Asia/Singapore). **B3 Windows services delivered.** These
+shapes remain the shared contract under single-agent ownership. Breaking changes
+require owner agreement and coordinated producer/consumer updates; additive
+fields stay in v1. Native core implementation/build hook is
 delivered in B2; B3 discovery, probe, hardware tests, preset tests and repositories
 are delivered below. No native payload persistence, popup, progress-window or
 VEGAS compatibility gate is passed by this handoff.
@@ -621,7 +622,7 @@ holds only short-lived file handles.
 Reads reject invalid UTF-8, duplicate keys, >64 nesting levels, nonfinite numbers,
 overflowing signed integers, unsafe Windows IDs and invalid known field types.
 Unknown fields and arbitrary JSON inside extensions survive. A newer major fails
-and leaves bytes intact. Watches poll at 250 ms, emit a current value per listener,
+and leaves bytes intact. Watches poll at 250 ms (C5 live status: 100 ms), emit a current value per listener,
 pause reads when paused and close their in-flight read on cancellation. C5 retains
 its last valid snapshot on malformed/stale/missing replacement. Large-library/app
 scroll/search timing budgets remain app-side F7 measurements.
@@ -862,7 +863,8 @@ nonnull precision flag; malformed replacements preserve the last valid snapshot.
 The fake transports supplied facts without calculating them. Samples show unknown
 at startup and illustrative P010-to-8-bit reduction in subsequent phases.
 
-Worker writes at most twice a second plus phase/terminal changes, atomically.
+Worker writes at most five times a second plus phase/terminal changes, atomically.
+FFmpeg reports progress every 200 ms; the live status reader polls every 100 ms.
 A pending metric wakes an idle writer as soon as this rate budget is free; there
 is no extra periodic half-second wait after an idle gap. Phase changes bypass
 ordinary metric coalescing.

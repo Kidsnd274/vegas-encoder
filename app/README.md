@@ -1,8 +1,11 @@
 # Vegas Encoder app
 
 The Flutter app: the desktop library app, the VEGAS popup editor and the render
-progress window, all from one `VegasEncoder.exe`. Windows x64 only. Status, needs and
-spike results: [docs/product/workstreams/app.md](../docs/product/workstreams/app.md).
+progress window, all from one `VegasEncoder.exe`. Windows x64 only. Work from
+`L:\repos\vegas-encoder\app` with one agent owning app and platform together.
+Current [status](../docs/STATUS.md), [queue](../docs/NEXT_AGENT.md) and
+[workflow](../docs/product/WORKSTREAMS.md) supersede the old split-agent handoff.
+Historical spike results: [app history](../docs/product/workstreams/app.md).
 Behaviour: [UI_SPEC.md](../docs/product/UI_SPEC.md). Look:
 [signal-flow.html](../docs/product/design/signal-flow.html).
 
@@ -40,9 +43,9 @@ Support switches (environment): `VEGAS_ENCODER_RENDERER=impeller` (default Skia)
 flutter analyze
 flutter test                                  # all tests
 flutter test --update-goldens test/golden     # after an intended visual change
-powershell -File tool\spikes\run_window_spikes.ps1 -Checks all   # needs a release build
+powershell -File tool\spikes\run_window_spikes.ps1 -Checks monitor # use the focused check for the changed runner behavior
 ```
 
 The app reaches the core and the system only through `packages/ve_core` and
-`packages/ve_services` (platform workstream). Until they land, only the gallery and the
-tests use local sample data.
+`packages/ve_services`. These implementations exist; tests use explicit fakes.
+Single-agent ownership does not move domain or file/process logic into widgets.

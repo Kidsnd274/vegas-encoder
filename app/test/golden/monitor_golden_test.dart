@@ -28,7 +28,11 @@ void main() {
     Future<void> pump(WidgetTester tester, {LiveRenderStatus? status, JobRecord? record}) async {
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       tester.platformDispatcher.platformBrightnessTestValue = b;
-      await pumpApp(tester, view: monitorView, overrides: monitorOverrides(status: status, record: record).overrides);
+      await pumpApp(
+        tester,
+        view: monitorView,
+        overrides: monitorOverrides(status: status, record: record).overrides,
+      );
     }
 
     testWidgets('$theme monitor_waiting', (tester) async {
@@ -54,6 +58,13 @@ void main() {
     testWidgets('$theme monitor_failed', (tester) async {
       await pump(tester, status: liveSample(RenderState.failed), record: records[RenderState.failed]);
       await expectGolden('monitor_failed_$theme');
+    });
+
+    testWidgets('$theme monitor_failed_long', (tester) async {
+      final cause = 'FFmpeg could not open the output file: ${List.filled(20, 'long folder name').join(' / ')}';
+      await pump(tester, status: liveSample(RenderState.failed).copyWith(message: cause));
+      await expectGolden('monitor_failed_long_$theme');
+      await tester.pump(const Duration(seconds: 3));
     });
 
     testWidgets('$theme monitor_cancelled', (tester) async {

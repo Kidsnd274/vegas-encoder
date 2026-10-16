@@ -1,5 +1,10 @@
 # Internal VEGAS adapter implementation plan
 
+**Current workflow (2026-10-16):** one agent owns app/platform integration in the
+original checkout. Use AGENTS.md, STATUS and NEXT_AGENT for current work. The
+foundation-only design boundary in this original blueprint is superseded;
+technical gate definitions remain useful and require their own evidence.
+
 Updated: 2026-10-10 (Asia/Singapore). Status: implementation blueprint. This user-created repository is named
 Vegas Encoder. Gate completion and pending real-host checks are tracked in
 [STATUS.md](STATUS.md); the original research plan is preserved in provenance.

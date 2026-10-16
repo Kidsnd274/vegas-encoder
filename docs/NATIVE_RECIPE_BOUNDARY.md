@@ -1,5 +1,21 @@
 # B6 recipe bytes, editor bridge and opt-in native candidate
 
+Current workflow (2026-10-16): one agent continues app/platform integration in
+`L:\repos\vegas-encoder`; see NEXT_AGENT and STATUS for the current queue/evidence.
+Installed/staged candidates remain at their original paths. Immediate reopen with
+the template-name fix is owner-confirmed, and reopened notes match the seeded
+preset. Exact large-template restart sequence and host capacity remain unqualified.
+Faster-progress trial/performance and extra encoder-failure recovery are deferred.
+
+Prior problem/fix record (2026-10-16): the installed 0.1.7 error-ui trial passes the
+owner's focus/error-presentation checks. Loading the 16000-byte capacity preset,
+Apply and reopening before restart exposed an empty native display-name gate
+(`S-REQUEST, templateName`). The separate template-name-fix candidate uses the
+captured page name, then the validated recipe name, when the holder's name is
+absent. It changes C4 display metadata only, preserving native bytes and strict
+payload validation. The reason native display text is absent and real capacity
+remain unqualified; no host maximum follows from the offline checks below.
+
 The owner resumed B6 preparation and real-host testing on 2026-10-15. The opt-in
 **0.1.6-recipe-proof** candidate connects fresh native recipe templates to the
 existing frontend popup and recipe engine/C5 monitor. Default and historical proof
@@ -56,11 +72,18 @@ their existing limits.
 ## C4 transaction boundary
 
 `RecipeTemplateDraft` keeps committed and pending snapshots on its creator UI
-thread. BeginEdit fills the actual template name, recipe and origin from that
+thread. BeginEdit fills the native template name, recipe and origin from that
 draft; the caller supplies a fresh session ID, owner HWND, native/core versions,
 optional origin baseline, context and an immutable C3 capability view. Unknown
 project facts remain null. The core validates C4 request/result shapes and recipe
 semantics; the adapter enforces session identity and one terminal result.
+
+If native display text is absent, the page's Slot14 source label is used, then
+the validated recipe's name. C4 still requires a nonempty label; arbitrary
+caller text does not override an existing native name. This fallback does not
+rewrite native text, repair corrupt payloads or weaken CRC/version/size checks.
+The native page logs only source choice, declared byte/text counts and recipe
+notes byte count when this fallback is needed, without dumping template contents.
 
 - Only one editor transaction can be active. Host Apply is refused while it is
   open. Requests/results stay within C4's 1 MiB JSON bound.

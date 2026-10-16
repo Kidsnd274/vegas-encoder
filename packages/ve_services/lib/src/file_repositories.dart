@@ -544,7 +544,7 @@ class FileCapabilityCache implements CapabilityCache {
 
 class FileLiveRenderStatusReader implements LiveRenderStatusReader {
   FileLiveRenderStatusReader({
-    this.interval = const Duration(milliseconds: 250),
+    this.interval = const Duration(milliseconds: 100),
   });
   final Duration interval;
   @override

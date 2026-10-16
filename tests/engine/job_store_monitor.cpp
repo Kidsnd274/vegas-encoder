@@ -62,18 +62,23 @@ int wmain(int argc, wchar_t** argv) {
     auto end = GetTickCount64() + 2000;
     while (GetTickCount64() < end && !Sequence(timingFile,0)) Sleep(5);
     Check(Sequence(timingFile,0),"initial timing snapshot published");
-    Sleep(550); // Idle beyond the 2 Hz deadline; a new sample should wake immediately.
+    Sleep(250); // Idle beyond the 5 Hz deadline; a new sample should wake immediately.
     const auto sample = GetTickCount64(); timing->Status({{"sequence",1}},false);
     end = sample + 350;
     while (GetTickCount64() < end && !Sequence(timingFile,1)) Sleep(5);
-    Check(Sequence(timingFile,1),"idle progress update has no extra half-second timer wait");
-    timing->Status({{"sequence",2}},false); Sleep(100);
-    Check(Sequence(timingFile,1),"ordinary samples remain coalesced within the 2 Hz budget");
-    timing->Status({{"sequence",3}},true);
-    end = GetTickCount64() + 350;
+    Check(Sequence(timingFile,1),"idle progress update has no extra timer wait");
+    const auto queued = GetTickCount64();
+    timing->Status({{"sequence",2}},false); Sleep(50);
+    Check(Sequence(timingFile,1),"ordinary samples remain coalesced within the 5 Hz budget");
+    timing->Status({{"sequence",3}},false);
+    end = queued + 350;
     while (GetTickCount64() < end && !Sequence(timingFile,3)) Sleep(5);
-    Check(Sequence(timingFile,3),"phase changes bypass sample coalescing");
-    printf("B6 MONITOR LAUNCH/CADENCE PASSED: initial publication, argv/cwd, stalled child independence, nonfatal refusal and 2 Hz wake/coalescing; fake child only\n");
+    Check(Sequence(timingFile,3),"latest coalesced progress publishes before the former 500 ms interval");
+    timing->Status({{"sequence",4}},true);
+    end = GetTickCount64() + 350;
+    while (GetTickCount64() < end && !Sequence(timingFile,4)) Sleep(5);
+    Check(Sequence(timingFile,4),"phase changes bypass sample coalescing");
+    printf("B6 MONITOR LAUNCH/CADENCE PASSED: initial publication, argv/cwd, stalled child independence, nonfatal refusal and 5 Hz wake/coalescing; fake child only\n");
     return 0;
   } catch (const std::exception& error) { printf("B6 MONITOR LAUNCH FAILED: %s\n",error.what()); return 1; }
 }

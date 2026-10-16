@@ -73,8 +73,9 @@ host::Tpl ReplaceRecipeSnapshot(const host::Tpl& value, const GUID& owner, const
   return Place(value, ve::EncodePayload(snapshot));
 }
 
-RecipeTemplateDraft::RecipeTemplateDraft(const host::Tpl& value, const GUID& owner, std::string writer)
-    : caller_(GetCurrentThreadId()), owner_(owner), writer_(std::move(writer)),
+RecipeTemplateDraft::RecipeTemplateDraft(const host::Tpl& value, const GUID& owner, std::string writer,
+                                       std::string pageTemplateName)
+    : caller_(GetCurrentThreadId()), owner_(owner), writer_(std::move(writer)), pageTemplateName_(std::move(pageTemplateName)),
       base_(value), committed_(ReadRecipeSnapshot(base_, owner_)), pending_(committed_) {
   if (writer_.empty()) throw std::invalid_argument("Snapshot writer identity is required.");
 }
@@ -91,7 +92,14 @@ ve::Json RecipeTemplateDraft::BeginEdit(ve::Json request, ve::Json capabilities)
   if (!request.is_object()) throw std::invalid_argument("Expected an edit-session request.");
   request["recipe"] = pending_.at("recipe");
   request["origin"] = pending_.value("origin", ve::Json(nullptr));
-  request["templateName"] = Utf8(base_.Name().c_str());
+  auto name = Utf8(base_.Name().c_str());
+  const bool nativeNameMissing = name.empty();
+  // Holder snapshots can lack display text even though their recipe envelope
+  // is valid. C4 requires a label, not proof that native text exists. Prefer the
+  // captured page name, then the validated recipe's name; preserve all native
+  // bytes and keep core payload/request validation strict.
+  if (nativeNameMissing) name = pageTemplateName_.empty() ? ve::Str(pending_.at("recipe"),"name") : pageTemplateName_;
+  request["templateName"] = std::move(name);
   const auto validated = ve::SessionRequest(request);
   for (const auto& issue : validated.at("issues")) {
     if (ve::Str(issue, "level") != "error") continue;

@@ -25,14 +25,16 @@ struct EditOutcome {
 // validation. The native page owns file/process/modality transport separately.
 class RecipeTemplateDraft final {
  public:
-  RecipeTemplateDraft(const host::Tpl& value, const GUID& owner, std::string writer);
+  RecipeTemplateDraft(const host::Tpl& value, const GUID& owner, std::string writer,
+                      std::string pageTemplateName = {});
   RecipeTemplateDraft(const RecipeTemplateDraft&) = delete;
   RecipeTemplateDraft& operator=(const RecipeTemplateDraft&) = delete;
   ve::Json Snapshot() const;
   bool Dirty() const;
   bool Editing() const;
   // Caller supplies unique session ID/owner/version/context; draft supplies the
-  // actual template name, recipe and origin. Null context facts stay null.
+  // native template name (page/recipe display fallback when absent), recipe and
+  // origin. Display fallback never changes native text. Null facts stay null.
   ve::Json BeginEdit(ve::Json request, ve::Json capabilities = nullptr);
   // Consume at most one terminal result. A missing/malformed/crashed editor is
   // cancellation; a structurally valid but invalid recipe is rejected unchanged.
@@ -47,7 +49,7 @@ class RecipeTemplateDraft final {
   void RequireCaller() const;
   DWORD caller_;
   GUID owner_;
-  std::string writer_;
+  std::string writer_, pageTemplateName_;
   host::Tpl base_;
   ve::Json committed_, pending_, request_, capabilities_;
   bool editing_ = false;

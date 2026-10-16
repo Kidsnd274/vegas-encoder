@@ -2,6 +2,7 @@
 #include "../support/diagnostics.h"
 #include <algorithm>
 #include <cmath>
+#include <cctype>
 #include <filesystem>
 
 namespace vegas_encoder {
@@ -92,6 +93,41 @@ ve::Json Verification(const std::string& state, const std::string& message) {
   return {{"state",state},{"message",message},{"expectedCodecs",ve::Json::array()},{"actualCodecs",ve::Json::array()},{"ffprobeVersion",nullptr}};
 }
 } // namespace
+std::string EncoderFailureMessage(const std::string& fallback, const std::string& stderrTail) {
+  std::string specific, general;
+  // FFmpeg may finish with secondary queue warnings and "Conversion failed!".
+  // Prefer an earlier concrete diagnostic; retain the full stderr in C6/logs.
+  for (size_t begin = 0; begin < stderrTail.size();) {
+    const auto end = stderrTail.find('\n', begin);
+    auto line = stderrTail.substr(begin, end == std::string::npos ? end : end - begin);
+    begin = end == std::string::npos ? stderrTail.size() : end + 1;
+    const auto first = line.find_first_not_of(" \t\r");
+    if (first == std::string::npos) continue;
+    line.erase(0, first); line.erase(line.find_last_not_of(" \t\r") + 1);
+    if (line.front() == '[') {
+      const auto prefix = line.find("] ");
+      if (prefix != std::string::npos) line.erase(0, prefix + 2);
+    }
+    auto lower = line;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    for (const char* marker : {"no such filter", "unknown encoder", "unrecognized option", "option not found",
+                              "error opening", "error initializing", "unable to ", "cannot ", "could not ", "invalid argument"}) {
+      if (lower.find(marker) != std::string::npos) { specific = line; break; }
+    }
+    if (!specific.empty()) break;
+    if (general.empty() && (lower.rfind("error ", 0) == 0 || lower.rfind("failed ", 0) == 0 || lower == "conversion failed!")) general = line;
+  }
+  auto line = specific.empty() ? general : specific;
+  if (line.empty()) return fallback;
+  for (auto& c : line) if (static_cast<unsigned char>(c) < 32) c = ' ';
+  constexpr size_t limit = 384;
+  if (line.size() > limit) {
+    auto end = limit;
+    while (end && (static_cast<unsigned char>(line[end]) & 0xc0) == 0x80) --end;
+    line.resize(end); line += "...";
+  }
+  return "FFmpeg: " + line;
+}
 ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expected) {
   auto result = Verification("failed","FFprobe returned invalid or unreadable streams.");
   if (!probe.is_object() || !probe.contains("streams") || !probe.at("streams").is_array() || probe.at("streams").empty()) return result;
@@ -217,7 +253,7 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
         const auto& inputs = compiled_.at("inputStreams"); plan.audioInput = std::find(inputs.begin(),inputs.end(),ve::Json("audio")) != inputs.end();
         return plan;
       },[this](const char* bytes, size_t count) { parser_.Feed(bytes,count); },[&] { return Check(poll); });
-    if (!ok) { Stop(encoder_.Error(),encoder_.Reason()); return false; }
+    if (!ok) { encoderFailure_ = !FAILED(error_); Stop(encoder_.Error(),encoder_.Reason()); return false; }
     Phase("encoding","Encoding."); return true;
   } catch (const std::exception& e) {
     Stop(FAILED(error_) ? error_ : E_FAIL,FAILED(error_) ? message_ : e.what(),cancelled_); return false;
@@ -234,6 +270,7 @@ bool RecipeJob::Check(const Poll& poll) {
 bool RecipeJob::Submit(bool audio, std::vector<BYTE> bytes, const Poll& poll) {
   if (terminal_ || !startedOnce_) return false;
   if (encoder_.Submit(audio,std::move(bytes),[&] { return Check(poll); })) return true;
+  encoderFailure_ = !FAILED(error_);
   Stop(FAILED(error_) ? error_ : encoder_.Error(),message_.empty() ? encoder_.Reason() : message_,cancelled_); return false;
 }
 void RecipeJob::Progress(const ve::Json& metrics) {
@@ -284,6 +321,7 @@ bool RecipeJob::Finish(const Poll& poll) {
   if (terminal_ || !startedOnce_) return false;
   Phase("finishing","Waiting for encoder completion.");
   if (!encoder_.Finish([&] { return Check(poll); },false)) {
+    encoderFailure_ = !FAILED(error_);
     Stop(FAILED(error_) ? error_ : encoder_.Error(),message_.empty() ? encoder_.Reason() : message_,cancelled_); return false;
   }
   if (!Verify(poll)) {
@@ -304,9 +342,10 @@ void RecipeJob::Stop(HRESULT hresult, const std::string& message, bool cancelled
 void RecipeJob::Complete(bool success) {
   if (terminal_) return; terminal_ = true;
   const auto stats = encoder_.Stats(); const auto state = success ? "done" : cancelled_ ? "cancelled" : "failed";
+  const auto stderrTail = Tail(stats.stderrPath);
+  if (!success && !cancelled_ && encoderFailure_) message_ = EncoderFailureMessage(message_, stderrTail);
   Phase(state,message_);
   const double elapsed = (GetTickCount64()-started_)/1000.0;
-  const auto stderrTail = Tail(stats.stderrPath);
   ve::Json indices = ve::ErrorTokenIndices(compiled_,stderrTail);
   if (compiled_.contains("issues")) for (const auto& issue : compiled_.at("issues")) {
     if (ve::Str(issue,"level") != "error") continue;

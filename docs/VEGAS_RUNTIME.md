@@ -1,4 +1,10 @@
-# Vegas Encoder foundation runtime check
+# Historical Vegas Encoder foundation runtime check
+
+For current product trials, installed candidate/rollback and owner-deferred checks,
+use [STATUS](STATUS.md) and [B6_TRIAL](B6_TRIAL.md). One agent now develops app and
+platform from the original `L:\repos\vegas-encoder` folder; see NEXT_AGENT.
+The foundation candidates/procedures below are historical, not the current install
+or a request to repeat completed/deferred qualification.
 
 Target: Boris FX VEGAS Pro 2026.0.3.189 x64, identity in [TARGET.md](TARGET.md).
 Current progress and exact candidate identities are in [STATUS.md](STATUS.md).

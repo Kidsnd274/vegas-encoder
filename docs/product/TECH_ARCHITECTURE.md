@@ -1,10 +1,12 @@
 # Vegas Encoder product architecture
 
-Updated: 2026-10-12 (Asia/Singapore). Status: proposal; T7 and the platform are
-decided (Flutter, Windows x64 only; [README.md](README.md#decisions)). It extends
+Updated: 2026-10-16 (Asia/Singapore). Architecture plan with later decisions;
+as-built implementation is in SYSTEM_OVERVIEW and qualification in STATUS.
+One agent owns app/platform in the original checkout (WORKSTREAMS.md), preserving
+layer/process contracts. Flutter and Windows x64 are decided. It extends
 [ARCHITECTURE.md](../ARCHITECTURE.md) §3–§6 with the product layer: shared core,
-Flutter app, VEGAS popup, presets and FFmpeg management. Nothing here is implemented
-or run in VEGAS. Native configuration exchange (A5), one-setting persistence (A6) and
+Flutter app, VEGAS popup, presets and FFmpeg management. Those components are built;
+recorded real-host checks do not qualify every planned feature. Native exchange (A5), persistence (A6) and
 versioned payloads (A7) remain the gates in [ADAPTER_PLAN.md](../ADAPTER_PLAN.md);
 designs that depend on them are marked **gated**.
 
@@ -249,7 +251,10 @@ on VEGAS's progress interface). Two additions show the encode statistics FFmpeg
 reports through `-progress pipe:1`: encode fps, speed, bitrate, size so far, and an
 extrapolated final size and time left.
 
-**1. A status line in VEGAS's render dialog (needs a real-host test).** VEGAS's progress
+**1. A status line in VEGAS's render dialog (historical).**
+**Dropped by the owner on 2026-10-15.** Do not resume this
+experiment. The original investigation outline below is retained for context.
+VEGAS's progress
 interface (`ISfProgress`, `src/vegas/abi/sfio_abi.h`) has two unmapped methods that
 take text: slot 3 `(LPCWSTR, LONGLONG)` and slot 4 `(LPCWSTR)`. Their signatures come
 from the proxy-stub descriptors; their meaning is unknown, and neither Voukoder capture
@@ -267,7 +272,7 @@ used them.
 [design/signal-flow.html](design/signal-flow.html).
 
 - **Data path.** The engine's FFmpeg progress reader (not Render's thread) writes
-  `%LOCALAPPDATA%\VegasEncoder\jobs\<job>.live.json` by atomic replace, at most twice a
+  `%LOCALAPPDATA%\VegasEncoder\jobs\<job>.live.json` by atomic replace, at most five times a
   second. The fields are state (starting, encoding, finishing, verifying, done,
   failed, cancelled), frames done and total, encode fps, speed, bitrate, bytes written,
   elapsed, output path, template name, encoder summary, VEGAS's main HWND for
@@ -280,10 +285,13 @@ used them.
   toggle. It repaints only when the file changes. It exits a few seconds after a
   successful end; after a failure it stays open.
 - **The encode never passes through the app.** Frames still go VEGAS → DLL → pipes →
-  FFmpeg. The window only reads a few hundred bytes twice a second.
+  FFmpeg. FFmpeg reports every 200 ms; the independent writer coalesces ordinary
+  updates to five per second. The window polls every 100 ms and repaints only
+  when the snapshot changes. Phase/terminal updates bypass writer coalescing.
 - **Performance rule (owner).** Measure the same real render three times with the
   window and three times without. If the window costs more than about 2% of render
-  time, or visibly disturbs VEGAS, drop it and keep only the status line. Memory
+  time, or visibly disturbs VEGAS, drop it. B5's custom status line is already
+  dropped; VEGAS's own progress bar remains. Memory
   budget: under 120 MB. Results go in the support notes with the host identity.
 
 ## 6. Recipes, presets and templates
@@ -414,8 +422,9 @@ packages/ve_services/ library, machine settings, cache, jobs, live status, sessi
                      FFmpeg discovery, process runner, parsers, hardware test scheduler
 ```
 
-The packages are pure Dart, so they test without Flutter and give the two workstreams a
-clean seam ([WORKSTREAMS.md](WORKSTREAMS.md)). The app depends on them by path.
+The packages' Dart interfaces test without Flutter and retain a clean app/domain/
+system seam under single-agent ownership ([WORKSTREAMS.md](WORKSTREAMS.md)). The app
+depends on them by path; native implementations use the documented build hooks.
 
 - **Editor state.** One `EditorController` holds the draft recipe, the mode
   (Basic/Advanced), the selected signal-path node and the dirty state. Derived values

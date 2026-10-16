@@ -1,4 +1,34 @@
-# App workstream
+# App implementation history
+
+**Superseded workflow, 2026-10-16:** the owner consolidated app and platform into
+one agent in `L:\repos\vegas-encoder` on `master`. This file
+retains app implementation/spike history and decisions, not an active workstream
+queue. Follow [workflow](../WORKSTREAMS.md), [STATUS](../../STATUS.md) and the one
+current [NEXT_AGENT](../../NEXT_AGENT.md) queue. Old ownership boundaries and
+instructions to continue on `ws/app` no longer apply.
+
+**Owner-directed monitor follow-up, 2026-10-16 (in `ws/platform`):** the owner
+explicitly requested clearer error display and no automatic close on failure.
+The bottom-right monitor now gives the authoritative C5/C6 cause a prominent
+error panel, with long-message scrolling from the beginning, a visible stay-open
+label and explicit Close. Trailing stderr warnings no longer replace the cause;
+Show log retains access to the full log. Failure display no longer waits for C6,
+and a failure cancels a previously started close countdown. This narrow frontend
+change follows the owner's request; it does not change general workstream
+ownership. Focused widget/unit/light+dark golden checks pass (50); updated normal
+and long-error images in both themes were visually inspected. Release staging and
+full app checks are recorded in the platform handoff. Real-host screenshot now
+confirms the prior native fix reaches VEGAS's error dialog; same-session
+post-error recovery and the new frontend's real-host retest remain open.
+
+Owner subsequently installed the error-ui variant and approved its appearance
+("looks good"); the real VEGAS screenshot shows the cause panel, stay-open label
+and Close action. Platform verified the installed trial and new failed C6 record.
+Presentation is accepted; timed/manual-dismissal behavior and successful
+same-session post-error recovery are not inferred from that screenshot.
+The owner subsequently chose to skip the extra same-session recovery render
+and proceed on the working assumption; that check is owner-deferred/unverified,
+not a pass or an active request. Payload and monitor checks are next.
 
 Updated: 2026-10-15 (Asia/Singapore). Branch `ws/app`. Status: **F0, F1, F4, F5 and F6
 done; F2 and F3 done except the parts waiting on platform** (listed under Needs). **The
@@ -1094,9 +1124,11 @@ Window start (runner), unverified or not fixed:
   follow-ups, since the spike harness can't show a one-frame stretch).
 - The remaining ~150 ms desktop-only first-frame delay (Spike results); cold start.
 
-## Handoff for the next app agent
+## Historical app handoff (superseded by NEXT_AGENT.md)
 
-Start from `ws/app`. Read AGENTS.md, WORKSTREAMS.md, CONTRACTS.md, this file and the
+The old handoff started from `ws/app`; current work uses the original checkout.
+The technical notes below are retained for reference. Read current AGENTS.md,
+WORKSTREAMS.md, CONTRACTS.md, NEXT_AGENT.md and the
 UI_SPEC section for what you change. F6 and the B3/B4 follow-ups are done (the follow-ups
 are uncommitted on `ws/app` for the owner's review); the app runs on the native core (B2)
 and the Windows services (B3), with fakes in tests. What's left is waiting on platform

@@ -1,14 +1,16 @@
 # Product roadmap
 
-Updated: 2026-10-12 (Asia/Singapore). Status: proposal; P0 decisions recorded.
+Updated: 2026-10-16 (Asia/Singapore). Phase plan; actual completion/qualification
+is in STATUS. One agent now owns implementation in the original checkout; the
+current queue is [NEXT_AGENT.md](../NEXT_AGENT.md).
 
 The product phases run alongside the adapter gates in [ADAPTER_PLAN.md](../ADAPTER_PLAN.md);
 gate state is tracked in [STATUS.md](../STATUS.md). No calendar estimates are given,
 for the same reason as ADAPTER_PLAN §7: real-host access and native-exchange recovery
 set the pace.
 
-Each phase is a reviewable change. It gets its own experiment note and evidence,
-and STATUS is updated at the end.
+Each phase is reviewable. Use focused checks and update STATUS; preserve historical
+evidence without requiring a new experiment ledger for routine work.
 
 ```mermaid
 flowchart LR
@@ -31,9 +33,9 @@ flowchart LR
   that follows Windows, Riverpod, user-supplied FFmpeg, no proof-template migration,
   and render progress through a VEGAS status line plus a small progress window.
 - Still open: the project license. T1 and T2 stand as plan defaults.
-- From here the work runs in two parallel workstreams, app and platform, described in
-  [WORKSTREAMS.md](WORKSTREAMS.md). The phases below say what is built; that file says
-  who builds it and in what order.
+- The initial parallel app/platform split was consolidated on 2026-10-16.
+  [WORKSTREAMS.md](WORKSTREAMS.md) now describes one agent in the original checkout.
+  The phases below describe scope, not separate agents or current completion.
 
 ## P1: Product core and schema (no VEGAS, no Flutter)
 

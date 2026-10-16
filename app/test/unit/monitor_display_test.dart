@@ -142,7 +142,7 @@ void main() {
     test('failed: the reason, with or without the record', () {
       expect(
         endSentence(liveSample(RenderState.failed), failed),
-        'Failed after 4:08. FFmpeg exited with code 1. Partial file removed.',
+        "Failed after 4:08. FFmpeg: No such filter: 'vegas_encoder_deliberate_failure'.",
       );
       expect(
         endSentence(liveSample(RenderState.failed), null),
@@ -155,11 +155,13 @@ void main() {
       expect(endSentence(liveSample(RenderState.cancelled), cancelled), 'Cancelled in VEGAS after 1:12.');
     });
 
-    test('FFmpeg\'s last lines, without blank ones', () {
-      expect(ffmpegLastLines(failed, lines: 2), '[vost#0:0/libsvtav1] Error while opening encoder\nConversion failed!');
-      expect(ffmpegLastLines(failed).split('\n'), hasLength(3));
-      expect(ffmpegLastLines(null), '');
-      expect(ffmpegLastLines(done), '', reason: 'nothing on stderr');
+    test('the prominent cause uses only matching job messages with a live fallback', () {
+      final status = liveSample(RenderState.failed);
+      expect(failureReason(status, failed), "FFmpeg: No such filter: 'vegas_encoder_deliberate_failure'");
+      expect(failureReason(status, null), status.message);
+      expect(failureReason(status, failed.copyWith(id: 'another-job')), status.message);
+      expect(failureReason(status, failed.copyWith(message: '  ')), status.message);
+      expect(failureReason(status.copyWith(message: ''), null), contains('Show the log'));
     });
   });
 

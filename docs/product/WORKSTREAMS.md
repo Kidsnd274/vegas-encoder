@@ -1,121 +1,93 @@
-# Workstreams: building in parallel
+# Development workflow: one agent, one checkout
 
-Updated: 2026-10-12 (Asia/Singapore). Status: agreed split for the first build.
+Updated: 2026-10-16 (Asia/Singapore). The owner consolidated app and platform work.
+The filename remains stable for existing links.
 
-Two agents build the product at the same time. Each owns a set of paths and a branch;
-they meet at written contracts. The owner relays between them and merges.
+## Working location and ownership
 
-| Workstream | Agent | Owns |
-| --- | --- | --- |
-| **App** | Claude Code, Opus | The Flutter app: design system, every screen and window, state, app tests |
-| **Platform** | ChatGPT agent | Everything under the app: C++ core, engine, adapter, schema, Dart packages for the core and services, FFmpeg facts, installer, real-host work |
+- Work in **`L:\repos\vegas-encoder`**, the original repository folder. The current
+  local branch is **`master`**; no new worktree is needed.
+- One agent can edit the app, packages, native code, tests, scripts and product
+  documentation together. The former app/platform path ownership split is retired.
+- Do not delegate or restart parallel agents unless the owner requests it.
+- Commit only with owner authorization. Do not push, merge into master, publish,
+  install or replace the installed exporter without owner authorization.
+- Current facts/qualification: [STATUS.md](../STATUS.md). Current implementation
+  queue and continuation: [NEXT_AGENT.md](../NEXT_AGENT.md).
+- [workstreams/app.md](workstreams/app.md) and
+  [workstreams/platform.md](workstreams/platform.md) retain history. Their old
+  ownership rules, queues and working locations are superseded by this workflow.
 
-## 1. Branches and worktrees
+## Consolidation and retained artifacts
 
-Each agent works in its own git worktree on its own branch, created from master after
-the design commit:
+Original master `86aefaf` already included both committed workstream tips
+(`ws/app` at `493f146`, `ws/platform` at `7a8493a`). App had no outstanding edits.
+The platform's 32 modified files and two new monitor goldens were brought into the
+original folder and byte-verified before workflow documentation edits. The owner
+then authorized staging/committing both snapshots and merging into master.
+Platform checkpoint `fd4edb3` preserves its original changes; the unified version
+includes the workflow updates and reviewed Advanced goldens. Both histories are
+merged locally, and the retained platform branch is advanced to the same result.
+No history was rewritten or pushed.
 
-| Workstream | Branch | Worktree (suggested) |
-| --- | --- | --- |
-| App | `ws/app` | `L:\repos\vegas-encoder-app` |
-| Platform | `ws/platform` | `L:\repos\vegas-encoder-platform` |
+The original checkout passes analysis, all 558 app tests, the native build and
+3,055 core checks. STATUS records the reviewed command-text golden refresh and
+link/source-transfer checks. No real-host or installed-binary change was made.
 
-- Agents commit to their own branch at milestones, and only when the owner's prompt
-  allows it. They never push, merge into master, rebase master, or touch the other
-  branch.
-- The owner merges a milestone into master, and the other agent merges master into
-  its own branch when it needs that milestone.
-- Builds write to each worktree's ignored `build/`, so the two never share outputs.
+`build/consolidation-backup/` preserves the original binary patch and new goldens.
+Do not overwrite it, unrelated `.claude/`, historical evidence or build outputs.
+Old worktrees remain for reference and operational rollback, not development.
+The installed trial still references files under
+`L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.7-template-name-fix`.
+The separate faster-progress candidate is prepared there and its owner trial is
+deferred. Moving source work does not move installed paths or qualify a new build.
+Keep those candidates, manifests, isolated profiles and exact rollback files in
+place. Do not delete their folders or silently rewrite the installed INI.
 
-## 2. Path ownership
+Build source and run checks from the original folder. Do not transplant
+`.dart_tool`, Flutter/CMake outputs or native build caches from a sibling.
+Legacy trial launchers still accept an explicit absolute CandidateRoot.
 
-| Path | Owner | Notes |
-| --- | --- | --- |
-| `app/` (including `windows/runner/`, tests and goldens) | App | |
-| `docs/product/design/` (mockups, screenshots) | App | `design/shared/model.js` and `avoptions.js` are reference prototypes; neither agent changes them |
-| `docs/product/UI_SPEC.md` | App | |
-| `docs/product/workstreams/app.md` | App | Status, needs, decisions |
-| `src/` (core, engine, vegas, support), `tests/`, `scripts/`, `config/` | Platform | |
-| `schema/` | Platform | Recipe schema, encoder profiles, fixtures |
-| `packages/ve_core/`, `packages/ve_services/` | Platform | Pure Dart; the app's only way into the core and the system |
-| `docs/product/CONTRACTS.md` | Platform | The seams below, in exact shapes |
-| `docs/product/SETTINGS_AND_COMMANDS.md`, `FFMPEG_INTEGRATION.md`, `research/` | Platform | |
-| `docs/STATUS.md`, adapter docs (`ADAPTER_PLAN.md`, `INTEGRATION_CONTRACT.md`, `NATIVE_CONFIGURATION.md`…) | Platform | |
-| `docs/product/workstreams/platform.md` | Platform | Status, needs, delivered |
-| `AGENTS.md`, `docs/product/README.md`, `PRODUCT_SPEC.md`, `TECH_ARCHITECTURE.md`, `ROADMAP.md`, this file | Owner | Agents propose changes in their workstream file; the owner applies them |
+## Architecture boundaries remain
 
-If you need a change in a path you don't own, write it under "Needs" in your
-workstream file and carry on with a stub. Don't edit the other side's files.
+| Layer | Responsibility |
+| --- | --- |
+| `src/core/` | Sole normalize/validate/compile/lint/completion/payload implementation; portable C++17, no Windows/VEGAS headers |
+| `packages/ve_core/` | Typed Dart models and FFI to the same core |
+| `packages/ve_services/`, `src/services/` | Files, settings, FFmpeg discovery/probes/processes, library, jobs, edit sessions and system access |
+| `src/engine/`, `src/vegas/`, `src/support/` | Encoding, host integration, lifetime, transport and diagnostics |
+| `app/` | Presentation, state, navigation and Windows runner; consume domain/system facts through the packages |
+| `schema/`, `tests/`, `scripts/`, `docs/` | Shared schemas, checks, build/install tools and product documentation |
 
-## 3. Contracts (the seams)
+Host calls stay on Render's caller thread; release host frames before waits.
+Render never waits on Flutter, the monitor or a status writer. Single ownership
+preserves these process, lifetime and package boundaries.
 
-Platform writes these first, in `docs/product/CONTRACTS.md` and as code. App reviews
-them before building on them.
+## Contracts and validation
 
-| ID | Contract | Lives in | Used by |
-| --- | --- | --- | --- |
-| C1 | Recipe schema v1 and encoder/container profiles | `schema/` | Core, app (through C2) |
-| C2 | `VeCore` Dart API: normalize, validate, compile, lint, complete, profiles, payload, version; typed models for recipe, issue, compile result, diagnostic and suggestion; `FakeVeCore` | `packages/ve_core/` | App |
-| C3 | `ve_services` Dart API: FFmpeg installations, probe progress stream, capabilities, hardware tests; preset library (list, watch, save with revisions, import/export); machine settings; job records; live render status; edit-session request/result. A fake for each | `packages/ve_services/` | App |
-| C4 | Edit session files (`--edit-session <dir>`): `request.json`, `result.json` | CONTRACTS.md, TECH_ARCHITECTURE §5.2 | DLL, app |
-| C5 | Live render status file and the `--render-monitor <file>` launch | CONTRACTS.md, TECH_ARCHITECTURE §5.6 | DLL, app |
-| C6 | Job record and `jobs.jsonl` | CONTRACTS.md | DLL, app (History) |
-| C7 | Settings the DLL reads from the app (default FFmpeg, progress window on/off, keep on top) | CONTRACTS.md (`machine.json`) | App writes, DLL reads |
+Keep [CONTRACTS.md](CONTRACTS.md) in step with implementations and fakes:
+C1 recipe/profiles, C2 core API, C3 services, C4 edit sessions, C5 live status,
+C6 job records/index and C7 settings. Implement producer, consumer and focused
+checks together; preserve backwards-compatible unknown fields and facts.
 
-Rules:
+Windows x64 only, using existing MSVC and `L:\flutter`. Read relevant specs and
+native integration docs before changes. Follow AGENTS.md for current library
+documentation and Context7.
 
-- **The C++ core is the only implementation** of compile, validate, lint and
-  completion (TECH_ARCHITECTURE T1). The app never reimplements them in Dart. Until the
-  real core lands, `FakeVeCore` returns fixture results for the built-in presets.
-- **Fakes ship with the contract.** Every C2/C3 service has a fake the app can use in
-  widget and golden tests, and to run screens before the real code exists.
-- **Contract changes are versioned.** Additive changes are fine; breaking ones go
-  through the owner and both workstream files.
+Use focused native/service tests for affected ownership, bounds, timing,
+cancellation, persistence and scripts. App changes need widget tests and light/dark
+goldens; inspect intended visual changes. Run relevant window probes for runner
+changes. Distinguish fakes, a fake host and real VEGAS. Do not repeat passing
+checks without a new change, failure or unresolved concern.
 
-## 4. Order
+Real-host gates remain at their actual evidence level. The owner deferred extra
+encoder-failure recovery, faster-progress trial and monitor measurements. Installer
+implementation remains the owner's Inno Setup work with agent guidance/inputs.
+Consolidation selects no new license/tool version or compatibility claim.
 
-The early milestones are chosen so neither side waits.
+## Milestone history
 
-**Platform**
-
-| # | Milestone | Unblocks |
-| --- | --- | --- |
-| B0 | `CONTRACTS.md`; draft `schema/recipe.v1.schema.json`; draft `ve_core.h`; `packages/ve_core` and `packages/ve_services` with the Dart API, models and fakes; a sample live status file | App screens on fakes |
-| B1 | Windows FFmpeg recapture (help text, encoders, muxers, container matrix, probe timings) with gyan.dev and BtbN builds; `encoder-profiles.v1.json`; golden recipe fixtures | Real option data for lint and Extra arguments |
-| B2 | C++ core (normalize, validate, compile, lint, complete, payload, session) with tests; FFI through the `ve_core` build hook; `FakeVeCore` kept for tests | Live command, checks and estimates in the app |
-| B3 | `ve_services`: discovery, probe, parser, hardware tests, cache, library repository, machine settings, jobs, live status reader, sessions | Real FFmpeg page, library and History |
-| B4 | Engine: argv input, `-progress` parsing, live status writer, ffprobe verification, job records; fake-host suite with recipes | Progress window on real data (fake host) |
-| B5 | VEGAS status line track: static analysis of `ISfProgress` slots 3/4, then an opt-in real-host test with the owner | Keep or drop the status line |
-| B6 | Adapter (gated A5–A7): template payload, native page launching the editor, render from recipe, progress window launch; real-host checklist and the progress-window performance check with the owner | Popup and progress window in VEGAS |
-| B7 | Installer inputs for the owner's Inno Setup installer (owner, 2026-10-15): the file set per target, install locations, version stamps, what must be closed, VEGAS detection, and the current reversible installer's rules (manifest, backups). The owner builds the installer | Release |
-
-**App**
-
-| # | Milestone | Needs |
-| --- | --- | --- |
-| F0 | Flutter project in `app/`; Windows runner; mode dispatch (desktop, `--edit-session`, `--render-monitor`); Riverpod; theme following Windows; bundled fonts; the P2 spikes that are app-side (start time, owner HWND, renderer, live theme, no-activate window) | Nothing |
-| F1 | Design system from `design/signal-flow.html`: tokens light and dark, buttons, inputs, segmented controls, pickers, slider, messages; signal path (full and strip) with `CustomPainter` wires; size and quality card; command view; goldens in both themes | Nothing |
-| F2 | Presets screen and Basic editor | B0 fakes |
-| F3 | FFmpeg, History and Settings screens | B0 fakes |
-| F4 | Advanced editor: highlighting, lint display, locked chips, macros, resolved command; autocomplete last | B0 fakes (B2 for real data) |
-| F5 | Popup mode: template header, strip, origin and update-from-library flows, Apply/Cancel through C4 | B0 fakes; B6 for VEGAS |
-| F6 | Render progress window from C5 | B0 sample file; B4 for real data |
-| F7 | Switch from fakes to the real core and services as B2–B4 land; measure the §9.3 budgets | B2–B4 |
-
-## 5. Shared rules
-
-- Windows x64 only. Flutter at `L:\flutter` (3.47.7 / Dart 3.13.5); upgrading
-  the SDK is the owner's call.
-- The visual reference is `design/signal-flow.html` (light and dark); behaviour is
-  `UI_SPEC.md`; settings rules are `SETTINGS_AND_COMMANDS.md`.
-- Say what was verified where: fake host, fake services, or real VEGAS with the build
-  and host identity. Gated features stay gated until real-host evidence exists.
-- Real-host steps (installing a DLL, running VEGAS) are done with the owner, using the
-  reversible installer. Never replace the installed exporter without asking.
-- Keep each workstream file short: what's done, what's next, what you need from the
-  other side, and any decision the owner must make.
-- Either side may add `.gitignore` rules for its own paths (for example `app/build/`,
-  `.dart_tool/`); leave the other rules alone.
-- The main checkout `L:\repos\vegas-encoder` keeps the ignored `build/` folder with the
-  installed candidate and rollback backups, and `evidence/`. Worktrees don't have
-  them; don't delete or rebuild over them.
+B0–B7 (core/platform/installer inputs) and F0–F7 (app) remain useful historical
+labels for components, not separate agents. B5 status text was dropped. B6 basic
+integration works with qualification limits. B7 inputs exist, not a completed
+installer. App integration follow-ups are in NEXT_AGENT.md.

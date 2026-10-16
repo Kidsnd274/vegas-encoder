@@ -1,6 +1,7 @@
 /build/
 /evidence/
 /.vs/
+/.claude/worktrees/
 __pycache__/
 *.pyc
 *.dll

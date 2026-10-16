@@ -1,13 +1,15 @@
 # UI behaviour specification
 
-Updated: 2026-10-15 (Asia/Singapore). Status: proposal, updated for the chosen
+Updated: 2026-10-16 (Asia/Singapore). One agent now owns app/platform integration
+in the original checkout; use [NEXT_AGENT](../NEXT_AGENT.md) for current work.
+Status: behaviour reference, updated for the chosen
 direction; §1, §9, §10 and §11 record what the app workstream built in F0 and F1, §2
 what F2 built, §3 F4, §4 the popup (F5), and §5, §6 and §6a what F3 built, refined by the
 B3/B4 follow-ups of 2026-10-15 (installation health, History from the index with the full
-log and error tokens, Test this preset, export and share strings; open items are in
-workstreams/app.md). Since 2026-10-14 the editor runs on the native core (B2)
-and the app on the platform's Windows services (B3, F7). The popup has met only the
-platform's fake session; nothing here ran inside VEGAS.
+log and error tokens, Test this preset, export and share strings). Since 2026-10-14
+the editor runs on the native core (B2) and Windows services (B3, F7). Actual
+real-VEGAS evidence and limits are in [STATUS](../STATUS.md); old workstream
+handoffs are historical, not current prerequisites or ownership boundaries.
 
 This document covers the behaviour Flutter will implement: states, flows, the signal
 path, the size card, theme, keyboard, copy and the token structure. The chosen
@@ -19,7 +21,7 @@ The vocabulary is fixed in the brief §2.
 | Window | Default | Minimum | Notes |
 | --- | --- | --- | --- |
 | Desktop app | 1440×900 | 1100×700 | Remembers size, position and maximized (C7 `uiState`; clamped to a current monitor on restore); single instance |
-| Popup editor | 1120×740 | 960×640 | Owned by the VEGAS dialog its session names and centred on it, on that monitor's DPI; resizable. Should remember its size, not position: not stored yet (C7 has desktop fields only; workstreams/app.md, Needs) |
+| Popup editor | 1120×740 | 960×640 | Owned by the VEGAS dialog its session names and centred on it, on that monitor's DPI; resizable. Should remember size, not position: C7 `popupWindowSize` exists; app/runner adoption remains |
 | Native page | Host-defined | — | Win32 inside VEGAS; see the mock |
 
 Below 1280 px width the desktop app collapses the library to an icon rail (library and
@@ -61,8 +63,8 @@ bottom as a collapsible "Library and command" strip, collapsed, with a one-line 
   preset the menu says these carry the saved version.
 - **Add menu (`+` beside the search):** New preset; Import share string… (the field starts
   with the clipboard when it holds a `vepreset:` string; the preset lands in Mine, keeps
-  its name and is selected); Import file… (disabled until the library can import a file
-  by path; workstreams/app.md, Needs).
+  its name and is selected); Import file… (still disabled in the app; C3
+  `PresetTransfer.importFrom` is delivered and awaits UI wiring).
 - **Empty search:** "No presets match 'xyz'." plus a **New preset** action (a preset in
   Mine started from the first built-in, named "New preset") and **Show all presets**.
 - **Error mark:** a preset the core finds errors in, for the chosen FFmpeg, shows an
@@ -702,12 +704,12 @@ performance rule: TECH_ARCHITECTURE §5.6. Built in F6; as built:
 | Size | 380×340 (the mockup's content; the earlier "about 380×250" didn't fit it); not resizable; 16 px in from the bottom-right corner of the work area of the monitor VEGAS's main window is on (C5 `hostHwnd`), at that monitor's DPI. Without a usable handle: the foreground window's monitor |
 | Showing | Appears when a render starts **without taking focus**, and a click on it doesn't take it either. Keep on top is a pin in the title bar, remembered in C7 `keepOnTop` (the same setting as in Settings) and applied before the first frame; **off by default** (owner, 2026-10-12). Mockup S6 shows it pinned |
 | Title | "Rendering, 42%"; "Starting the render", "Finishing the file", "Checking the output"; "Rendered", "Render failed", "Render cancelled"; "Waiting for the render" until the file appears |
-| Header | Output file name, then the encoder summary as the engine writes it; the folder once done. **No wire glyph yet:** C5 doesn't carry the output's bit depth (workstreams/app.md, Needs) |
+| Header | Output file name, then the encoder summary as the engine writes it; the folder once done. **No wire glyph yet:** C5 carries nullable output depth/reduction facts; frontend adoption remains |
 | Progress | A video-wire bar with a round head; percentage (rounded down, so 100% means every frame went to FFmpeg) and "Frame 9,607 of 22,873". With no total: no fill, "Rendering", "Frame 9,607" |
 | Figures | Encoding fps, speed (× realtime), bitrate, size so far, final size ("about"; the engine's estimate, `estimatedFinalBytes`) and time left with the total. A figure the engine hasn't written shows a dash; the app computes none of them |
 | Finishing | "Finishing" then "Checking", with the frame count. The engine doesn't say whether a fast-start index is being written, so the window doesn't either |
 | Done | The result sentence as in History, plus the output check: "Rendered 12:43 in 4:07, 3.09× realtime, 2.93 GB. Output checked: h264 and aac, as set." (from the job record, C6). Without the record, "Rendered in 4:07, 2.06× realtime." **Open folder** (Explorer, file selected) and **Close**. "Closes in 10 s", counting; while the pointer is over the window, "Stays open while the pointer is here", and the count resumes when it leaves |
-| Failed | The reason ("Failed after 4:08. FFmpeg exited with code 1. Partial file removed.") and FFmpeg's last lines from the record, in a three-line box scrolled to the end (the wheel scrolls back). **Show in History** (disabled with the reason until a service can start the desktop app) and **Show log** (FFmpeg's log in Explorer; disabled when there is none). Stays open |
+| Failed | A prominent error-coloured **Why it failed** panel with the engine's causal message (for example, "FFmpeg: No such filter: '…'"). Shows C5 immediately, then the matching C6 message when available; never infers a cause from stderr or replaces it with trailing warnings. Long messages scroll from the beginning without truncation. **Show in History** (disabled until a service can start the desktop app), **Show log** (full FFmpeg log in Explorer; disabled when unavailable), and **Close**. Explicitly says **Stays open until you close it**; a failure cancels any existing auto-close countdown (owner, 2026-10-16) |
 | Cancelled | "Cancelled in VEGAS after 1:12."; closes after 5 s, with the same pointer rule |
 | No news | While starting or encoding, 30 s without a new status: the footer says "No news from the render for 30 s. If VEGAS stopped, close this." It never ends the render or closes the window; a new status clears it. Not shown while checking the output (ffprobe can take minutes) |
 | Cancel | Not offered: rendering is cancelled in VEGAS's own dialog, and the footer says so |

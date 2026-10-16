@@ -52,11 +52,14 @@ class RecipeJob {
   std::string id_, startedAt_, message_;
   ULONGLONG started_ = 0, phaseStarted_ = 0;
   HRESULT error_ = S_OK;
-  bool cancelled_ = false, terminal_ = false, startedOnce_ = false;
+  bool cancelled_ = false, terminal_ = false, startedOnce_ = false, encoderFailure_ = false;
 };
 // Pure fact comparison, independently exercised with malformed/mismatched probes.
 ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expectedStreams);
 // C5's nullable video facts come only from a successfully compiled, scoped
 // native-core result. No FFmpeg command or human-readable summary is parsed.
 ve::Json LiveVideoFacts(const ve::Json& compiled);
+// Bounded diagnostic text for an encoder failure, not a replacement HRESULT or
+// an inference about host/verification/cancellation failures.
+std::string EncoderFailureMessage(const std::string& fallback, const std::string& stderrTail);
 } // namespace vegas_encoder

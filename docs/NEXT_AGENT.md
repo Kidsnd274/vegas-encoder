@@ -1,83 +1,79 @@
-# Next agent: native configuration foundation
+# Continue the unified Vegas Encoder implementation
 
-Use the updated [AGENTS.md](../AGENTS.md): focused checks and concise progress
-summaries, without a per-task research ledger or mandatory experiment archives.
+Updated: 2026-10-16 (Asia/Singapore).
 
-The user authorized continuing the **xhigh** agent through the integration
-foundation. The user now reports the app design is complete on another branch;
-`origin/product-ui-design` is present but has not been merged here. They deferred
-real two-template/restart testing. Current closeout stops at the requested Git
-checkpoint; review the design only in a later app implementation stage. Do not select a UI framework or
-build presets/rich editor/product workflows in this foundation task. See
-[design gate](DESIGN_GATE.md).
+Work in **`L:\repos\vegas-encoder`**, currently on **`master`**.
+The owner requested one agent for app and platform, using this original folder
+without a separate development worktree. Read [AGENTS.md](../AGENTS.md),
+[workflow](product/WORKSTREAMS.md), [product decisions](product/README.md),
+[status](STATUS.md) and relevant contracts/specs. Former workstream handoffs are
+history; their old locations, ownership splits and queues do not apply.
 
-The installed 0.1.0-dev candidate completed its first real VEGAS render:
-`C:/Users/Samuel Tee/Desktop/test_video/vegas_encoder_test.mkv`. Decoded checks pass:
-182 frames at 1920x1080 / 30000/1001, FFV1 10-bit, and 291,491 float32 stereo sample
-frames at 48 kHz. S_OK, encoder exit zero, publication and zero outstanding locks;
-duration difference about 0.004 ms. This is real footage, not the counter/click
-fixture, so frame identity/perceptual sync and a same-run byte oracle are untested.
+## What is here
 
-The manifest identifies DLL `9FE5587A49F7A65AE3DC62DBB54D6B4AB392B67447D1D21C9DDC307325EEF5B2`
-on VEGAS 2026.0.3.189. The initially empty process log is now complete; there is
-no established logging regression.
+Master `86aefaf` already contained the earlier app/platform milestones. The latest
+changes were copied from platform and verified before updating docs:
+actionable FFmpeg failure propagation, clear persistent failure UI, large-preset
+editor name fallback and faster progress (FFmpeg/writer 200 ms, live reader 100 ms),
+with tests/goldens/status. The owner subsequently authorized committing both
+snapshots and merging into master. Platform checkpoint `fd4edb3` preserves its
+original work; the main checkout holds the unified result. No push, installation
+or new real-host qualification was performed. STATUS records validation.
 
-Legacy FFmpeg Bridge was removed. Its research/source remain available, and its
-installation is backed up under `build/retired-ffbridge-2026-10-11/`. Vegas Encoder,
-external FFmpeg, host and other discovery configs are unchanged. A live legacy
-installation is unnecessary unless a specific comparison later calls for it.
+Original-folder validation passes: clean analysis, all 558 app tests, native build,
+3,055 core checks and argv goldens. Ten stale Advanced screenshots were refreshed
+for the already-intended `stats_period 0.2` text after reviewing their isolated
+digit changes in both themes. Dependency locks and preserved trial builds did not
+change. Current work starts with the integration queue below, not more migration.
 
-The **xhigh** subagent resolved native ownership on the known copies and wired a
-minimal page into a separate `0.1.0-config-proof` DLL. Its sole effect is an optional
-configuration-proof section in the existing sidecar. Both build modes pass; 60
-configuration, 24 helper and 9 boundary checks pass, plus decoded fake-host on/off,
-save/reload/Create-without-conform, repeat, cancel and encoder-failure cases.
-The default build has zero pages; the proof build is now installed. The tested
-baseline is preserved, with its old installation backed up for rollback.
+## Implementation queue
 
-The first real proof UI displayed a blank body because Activate left its dialog
-hidden and VEGAS did not separately call Show. The `0.1.1-config-proof` fix now
-shows the initialized page during activation. Its 67 configuration checks include
-three visibility regressions reproduced before the fix; the fake-host suite
-passes again. That corrected candidate was installed and verified at
-`build/candidate-0.1.1-config-proof/`. Previous proof files are backed up in
-`build/rollback-before-page-visibility-fix/`, and the original working build is
-still in `build/rollback-before-configuration-proof/`.
+1. **Selected-file import:** connect the picker and disabled Import file action to
+   `PresetTransfer.importFrom`; handle errors, refresh/select the new preset. The
+   bounded validated service and fake exist.
+2. **Desktop navigation:** implement a service-backed launcher, preset/job launch
+   routing and handoff to an already-running desktop instance. Connect the null
+   `desktopAppLauncherProvider` for Open in Vegas Encoder and Show in History.
+   This needs platform/runner work, not just provider wiring. Preserve isolated
+   profiles and keep Render independent of the app.
+3. **Popup size:** consume `AppUiState.popupWindowSize`; remember physical outer
+   dimensions, centre/clamp on the owner monitor and retry revision conflicts.
+   Do not persist popup position or break desktop window settings.
+4. **Advanced editor:** adopt core option/stage/macro metadata and `VeCore.macros`
+   using actual recipe/media/path context; show availability from nullable summary
+   encoder IDs. Existing stage colours work; replace remaining option heuristics
+   and synthetic macro probes.
+5. **Monitor precision:** use C5 output depth/reduction facts for the header glyph/
+   pip. Unknown stays unknown. Preserve failure UI/stay-open behavior and no core/
+   library reads while rendering.
+6. Review combined changes and focused app/native/service checks, then prepare
+   release/installer guidance. Owner builds/tests Inno Setup; do not silently
+   take over installation or choose runtime/license policy.
 
-Real corrected-build renders `diagnostic_on.mkv` / `diagnostic_off.mkv` now show
-the expected presence/absence of the JSON configuration-proof section. Both
-report S_OK, encoder exit zero, publication and zero outstanding locks in the
-same host session. File counts are intentionally identical. Media was not decoded
-in this check; restart persistence and Cancel semantics have not been established.
-The latest installed candidate is `build/candidate-0.1.2-config-proof/`, DLL
-`CA876E05CA4ED6D8A2A84529A573577716CEA650B74384D7B9ED19F4D578EA45`.
-It corrects generic progress errors being reported as cancellation and preserves
-their HRESULT through video/audio Submit and Finish. All 11 configuration/fake-host
-cases (20 attempts) pass, including seven same-loaded-DLL stop/recovery pairs;
-successful recovery outputs decode correctly. The default `0.1.1-dev` build passes
-the existing baseline suite. The user approved installation; the current payloads
-match this tested candidate. The prior `0.1.1-config-proof` is preserved in
-`build/rollback-before-foundation-closeout/`; host/sharedk/FFmpeg/other configs
-are unchanged.
-The user's real cancel/recovery check now passes on this candidate in one host
-session: no cancelled MKV/partial/child or locks remain, and the following render
-decodes to 299 1080p frames and 478,878 stereo sample frames. Controlled real
-failure/recovery remains unverified; see [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).
-The user's deferred persistence check is a qualification limit, not a renewed
-request for them to run it. The user now requested the foundation changes be
-committed and expressly deferred reviewing the app-design branch to next time.
-Stop at that checkpoint; do not review or merge the branch in this task.
-Use existing native captures read-only; generic COM docs alone do not establish
-FileIO ownership. Unknown contracts need a precise small capture procedure and
-useful offline scaffolding, not guessed production wiring. Keep the installed-tested
-`build/candidate-0.1.0-dev/` unchanged; no automatic install or commit.
+These are next implementation items, not changes already made by consolidation.
+No separate app/platform request or relay is needed now.
 
-The product still needs controlled real failure/recovery qualification; normal
-renders and cancellation/recovery now pass. Use [adapter plan](ADAPTER_PLAN.md)
-and [runtime procedure](VEGAS_RUNTIME.md); rich desktop UI and preset catalog stay later.
+Optional enhancements need backend work or product decisions: Speed in History's
+index, actual Render As path if exposed by the host, popup Test button placement
+and tests at project dimensions. Do not guess host facts. Library-watch and
+capability-transfer optimizations are delivered; do not redo them.
 
-To restore the legacy exporter for a deliberate comparison, close VEGAS and copy
-the saved flat DLL/PDB/INI/manifest to
-`C:/Program Files/BorisFX/Vegas Pro 2026/FileIO Plug-Ins/ffbridge/`, and its saved
-`FfBridge-x64.fio2007-config` to the host root, with administrator rights and verified
-backup bytes. Keep Vegas Encoder intact.
+## Owner scope and operational continuity
+
+- Installed trial: template-name-fix 0.1.7 on VEGAS 2026.0.3.189. Its INI still
+  points into the platform folder's matching candidate.
+- Faster-progress is prepared, **not installation-confirmed**. Owner deferred its
+  trial and monitor time/memory measurements until next time. Do not resume them
+  automatically or treat preparation as qualification.
+- Extra normal render after encoder failure is owner-deferred. Normal renders,
+  normal restart persistence, cancellation/recovery, failure presentation and
+  immediate large-preset reopen have owner evidence at STATUS's recorded scope.
+- Reopened large-preset notes were checked directly and match, including `END 容量`;
+  the popup does not display notes. Exact large-template save/restart sequence is
+  unconfirmed; no absolute host capacity limit is established.
+- Preserve old worktrees, candidate app/log/data files and exact rollback backups.
+  Do not relocate installed paths or delete worktrees. Build new work here;
+  preserve unrelated ignored outputs and `.claude/`.
+- The owner authorized this consolidation's commits and local master merge.
+  Future commits/merges still follow owner authorization. No push, installation,
+  machine-tool upgrade, AV exclusion, sanitizer or old process/thread investigation.

@@ -23,8 +23,9 @@ and Windows SDK. The hook uses the source under `../../src/core/`, also built by
 `scripts/build-core.cmd` as DLL and static library. No research checkout, FFmpeg
 download, SDK upgrade or exporter installation is needed to build the core.
 Standalone AOT consumers use [`dart build cli`](https://dart.dev/tools/dart-build) so native assets are bundled;
-`dart compile exe` does not run build hooks. Flutter's native-asset build is the app
-workstream's integration path.
+`dart compile exe` does not run build hooks. Flutter's native-asset build is the
+app integration path. One agent maintains app/core/services together from the
+original checkout; architectural/package boundaries remain (see WORKSTREAMS.md).
 
 See [C1/C2 contracts](../../docs/product/CONTRACTS.md). Results include token field
 provenance and issue display indexes, `overriddenFields`, structured stream/source

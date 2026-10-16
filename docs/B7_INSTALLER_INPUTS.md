@@ -1,5 +1,10 @@
 # B7 inputs for the owner's Inno Setup installer
 
+Source/build location after consolidation: **`L:\repos\vegas-encoder`**. One agent
+owns app/platform integration; the owner still builds/tests Inno Setup. Retained
+trial candidates in the old platform folder must stay in place for rollback and
+installed path continuity; rebuild new inputs from this original checkout.
+
 Matched trial: **0.1.7-recipe-proof / frontend 0.1.7+1**, Windows x64.
 Both now have numeric PE file version **0.1.7.1**. Native preflight requires that
 exact frontend version. The native core remains statically linked into the
@@ -12,17 +17,17 @@ a release or an implemented Inno Setup installer.
 Use the existing MSVC and Flutter SDKs without upgrading them:
 
 ```powershell
-Set-Location L:\repos\vegas-encoder-platform
+Set-Location L:\repos\vegas-encoder
 cmd /d /c 'scripts\build.cmd "" recipe-proof'
 Push-Location app
 L:\flutter\bin\flutter.bat build windows --release --build-name 0.1.7 --build-number 1
 Pop-Location
-.\scripts\Prepare-B7.ps1 -OutputDir "$PWD\build\b6-candidate-0.1.7"
-.\scripts\Test-B7.ps1 -BundleDir "$PWD\build\b6-candidate-0.1.7"
+.\scripts\Prepare-B7.ps1 -OutputDir "$PWD\build\release-inputs-0.1.7"
+.\scripts\Test-B7.ps1 -BundleDir "$PWD\build\release-inputs-0.1.7"
 ```
 
-The prepared candidate already exists in this worktree. Choose a **fresh** output
-name on a repeat; the script refuses replacement. It checks x64 PE headers, both
+Earlier candidates remain in the retired platform checkout. Choose a **fresh**
+output name on each repeat; the script refuses replacement. It checks x64 PE headers, both
 product/numeric versions, required runtime files and reparse paths. It copies the
 whole release runtime, writes deployment-specific INI inputs, and hashes every
 packaged file in `installer-inputs.json`. It does not execute a payload, install,
@@ -108,6 +113,7 @@ manages **one target's plug-in**, not the shared app or a multi-target transacti
    Changed/unrecorded files cause refusal/preservation, not recursive deletion.
 
 The manual trial install/rollback remains in [B6_TRIAL.md](B6_TRIAL.md). Release
-signoff still needs real focus, cancellation/failure recovery, payload capacity
-and monitor time/memory evidence. The owner builds and tests the Inno installer;
+signoff retains the exact outstanding/deferred qualification in STATUS; do not
+repeat its already confirmed focus, cancellation or normal persistence checks.
+The owner builds and tests the Inno installer;
 no installer, installation or compatibility claim for another host is produced here.

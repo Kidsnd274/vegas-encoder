@@ -17,21 +17,33 @@ on 2026-10-12 and recorded the decisions in docs/product/README.md (Decisions):
   theme follows Windows.
 - Windows x64 only, for the product, development, tests and CI.
 - User-supplied FFmpeg. No proof-template migration.
-- Render progress: a status line in VEGAS's render dialog if a real-host test shows it
-  works, plus a small progress window that is dropped if it measurably slows renders
-  (docs/product/TECH_ARCHITECTURE.md §5.6).
+- Render progress: the owner dropped the VEGAS status-line experiment. Keep the
+  small progress window; its real-host overhead remains unqualified
+  (docs/product/TECH_ARCHITECTURE.md §5.6 and docs/STATUS.md).
 
-Work runs in two parallel workstreams, **app** and **platform**. Before product work,
-read docs/product/README.md, docs/product/WORKSTREAMS.md and the documents your
-workstream uses. Stay inside the paths your workstream owns. Ask for changes elsewhere
-through your file in docs/product/workstreams/, and keep using a stub meanwhile. The
-C++ core is the only implementation of compile, validate, lint and completion; the app
-reaches it and the system only through packages/ve_core and packages/ve_services.
+The owner consolidated app and platform work on 2026-10-16. One agent owns product
+work across app, packages, native code, tests, scripts and documentation in the
+original checkout, `L:\repos\vegas-encoder`, currently on
+`master`. Do not create or resume a separate worktree or split
+the work between agents unless the owner asks. A branch in this original folder
+is fine; it does not require another checkout. Do not spawn subagents by default.
 
-Outstanding qualification limits stay explicit: the real two-template/restart
-persistence test and controlled real failure recovery are unverified (see
-docs/STATUS.md). Features gated on A5–A7 stay gated until real-host evidence exists.
-Do not claim a gate passed from offline mocks, fakes or design decisions.
+Before product work, read docs/product/README.md, docs/product/WORKSTREAMS.md,
+docs/STATUS.md and docs/NEXT_AGENT.md, plus the contracts/specifications relevant
+to the change. The old docs/product/workstreams/ files are historical component
+handoffs, not active ownership boundaries or instructions to work elsewhere.
+Implement both sides of an integration together rather than leaving an ownership
+stub. Preserve architectural boundaries: the C++ core is the only implementation
+of compile, validate, lint and completion; the app reaches it and the system only
+through packages/ve_core and packages/ve_services.
+
+Outstanding qualification limits stay explicit in docs/STATUS.md. Basic renders,
+normal template restart persistence, cancellation/recovery, failure presentation
+and immediate large-preset reopen are owner-confirmed at their recorded scope.
+Extra same-session encoder-failure recovery and the faster-progress real-host trial/
+performance comparison are owner-deferred; do not request or resume them without
+new owner direction. The exact large-template save/restart sequence remains
+unconfirmed. Do not claim a gate passed from mocks, fakes or design decisions.
 
 ## Development rules
 
@@ -57,8 +69,9 @@ check licences before adding a dependency or bundling a font or asset.
 
 Run focused checks for ownership, bounds, timing, cancellation and changed scripts.
 App work needs widget tests and golden tests in light and dark for what it changes.
-Update docs/STATUS.md (platform) or your workstream file when a milestone, limitation
-or next task changes. Summarize what changed and the focused checks actually performed
+Update docs/STATUS.md when a milestone or limitation changes, and docs/NEXT_AGENT.md
+when the next task changes. Keep one current queue; do not maintain parallel app
+and platform queues. Summarize what changed and the focused checks actually performed
 in the task response or appropriate product documentation. State whether validation
 used fakes, a fake host or real VEGAS when that distinction matters.
 
@@ -72,10 +85,17 @@ Keep installation changes reversible with an appropriate backup/manifest and cle
 restoration instructions. This is operational rollback information, not a research
 workflow. Test output can go under ignored build/test-results/; existing runners'
 -EvidenceDir argument simply names their output folder.
-Commit only to your own workstream branch, and only when the owner's task prompt
-allows it. Never push, merge into master, rewrite shared history, publish, install or
+Commit only when the owner's task prompt allows it, using the current local branch
+in the original checkout. Never push, merge into master, rewrite shared history, publish, install or
 replace an installed exporter without asking. Upgrading the Flutter SDK or other
 machine-wide tools is the owner's call.
+
+Existing sibling worktrees and `.claude/` are preserved, not active development
+locations. The installed trial's INI still points to candidate app/log files under
+`L:\repos\vegas-encoder-platform\build`; keep those candidates, isolated trial
+data and exact rollback files intact. Do not rewrite installed paths, relocate a
+live candidate, delete old worktrees or copy their build caches as part of routine
+development. New builds/tests belong in this checkout's ignored build folders.
 
 For external API/library-specific questions use current primary documentation and
 Context7, resolving the library before requesting docs (maximum three commands per

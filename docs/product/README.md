@@ -1,12 +1,13 @@
 # Vegas Encoder product plan
 
-Updated: 2026-10-15 (Asia/Singapore). Status: **being built** in two parallel
-workstreams ([WORKSTREAMS.md](WORKSTREAMS.md)).
+Updated: 2026-10-16 (Asia/Singapore). Status: **being built by one agent** in the
+original `L:\repos\vegas-encoder` checkout ([workflow](WORKSTREAMS.md)). The owner
+retired the app/platform worktree split. Current queue: [NEXT_AGENT.md](../NEXT_AGENT.md).
 This folder covers the product layer built on top of the adapter: the desktop app,
 presets, the shared editor, the VEGAS configuration popup and the progress window. What
-is built is in [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) and the workstream files. The
-app was tested with fakes and a fake host, not in real VEGAS. Adapter gate status is
-in [STATUS.md](../STATUS.md).
+is built is in [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md). Earlier workstream files
+are historical; current implementation and real-VEGAS evidence/limits are in
+[STATUS.md](../STATUS.md). Consolidation adds no new compatibility claim.
 
 ## Reading order
 
@@ -14,7 +15,7 @@ in [STATUS.md](../STATUS.md).
 | --- | --- |
 | [design/signal-flow.html](design/signal-flow.html) | **Start here.** The chosen direction, Signal Flow round 2, in light and dark |
 | [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) | **How it is built today:** the tech stack, the folders, how the C++ core, the Dart packages and the Flutter app fit together, and what runs where |
-| [WORKSTREAMS.md](WORKSTREAMS.md) | How the build is split between the app and platform agents: ownership, contracts, order |
+| [WORKSTREAMS.md](WORKSTREAMS.md) | One-agent workflow, original checkout, contracts and retained trial artifacts |
 | [design/index.html](design/index.html) | The round 1 gallery of eight directions, plus the shared VEGAS native page |
 | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Features and priorities, key user flows, and the adapter limits shown to users |
 | [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) | Processes, shared C++ core, Flutter app, popup session protocol, payload, testing |
@@ -108,6 +109,7 @@ the owner objects.
 | 19 | Saving a preset with errors | **Decided (2026-10-15):** errors in the settings stop the save; errors only for the chosen FFmpeg warn, with Save anyway | UI_SPEC §3, workstreams/app.md |
 | 20 | Plug-in and app versions | **Decided (2026-10-15), later stage:** the exporter keeps its own static core; plug-in and app stay in step through one installer and version checks (the popup warns; the plug-in checks before launching the app) | workstreams/app.md (Decisions) |
 | 21 | Installer | **Decided (2026-10-15):** the owner builds it with Inno Setup, guided by AI; agents supply inputs. One release installed together; setup records every VEGAS it installed into and updates them all by default. Older VEGAS versions wait on platform research | workstreams/app.md (Decisions) |
+| 22 | Development ownership | **Decided (2026-10-16):** one agent handles app and platform in the original `L:\repos\vegas-encoder` folder; no separate development worktree. Existing trials/rollback stay in place | WORKSTREAMS.md, ../NEXT_AGENT.md |
 | 22 | Progress window keep on top | **Decided:** off by default; the pin and Settings change the same C7 setting | UI_SPEC §12 |
 
 ## Design review notes

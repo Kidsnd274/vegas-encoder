@@ -1,6 +1,9 @@
 # System overview: what is built, in what, and how it fits
 
-Updated: 2026-10-15 (Asia/Singapore), as of master `32d0926`. This describes the system
+Updated: 2026-10-16 (Asia/Singapore). App and platform now have one agent in the
+original `L:\repos\vegas-encoder` checkout, on `master`.
+See [workflow](WORKSTREAMS.md) and the current [queue](../NEXT_AGENT.md).
+This describes the system
 **as built**: the languages, the folders, how each part becomes a binary and how the
 parts talk at run time. The design reasons and the original plan are in
 [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md); exact data shapes are in
@@ -36,23 +39,23 @@ Dart packages are Riverpod and the Dart team's build-hook and FFI packages.
 
 ## Repository map
 
-| Folder | What it is | Language | Becomes | Workstream |
+| Folder | What it is | Language | Becomes | Maintainer |
 | --- | --- | --- | --- | --- |
-| `src/core/` | Recipe rules: normalize, validate, compile to FFmpeg arguments, lint and completion for Advanced mode, size estimates, diff, template payload. `capi/ve_core.h` is its C ABI; `profiles/data.h` is the generated encoder and container catalog. No Windows or VEGAS headers | C++17 | `ve_core.dll`, `ve_core_static.lib` | Platform |
-| `src/vegas/` | The VEGAS side: recovered host interface declarations (`abi/`), template and frame helpers (`host/`), the exporter's entry points and render path (`adapter/`), the template page and editor-session transport (`configuration/`) | C++17 | `vegas-encoder.dll` | Platform |
-| `src/engine/` | Runs FFmpeg for a render: pipes for VEGAS's frames and audio, progress parsing, the live status file, output checks with ffprobe, job records | C++17 | `vegas-encoder.dll` | Platform |
-| `src/services/` | `windows_gpu.cpp`: reads the GPU and driver identity for hardware-test caching | C++17 | `ve_windows_services.dll` | Platform |
-| `src/support/`, `src/settings/` | Diagnostics, exception boundaries, developer settings | C++17 | `vegas-encoder.dll` | Platform |
-| `packages/ve_core/` | The app's door to the core: typed models (`Recipe`, `CompileResult`, `Issue`…), `NativeVeCore` (FFI calls), `FakeVeCore` (fixed answers for tests) and the build hook that compiles `src/core` | Dart | Linked into the app; builds `ve_core.dll` | Platform |
-| `packages/ve_services/` | The app's door to the system: FFmpeg discovery, probing, help-text parsing, hardware test encodes, capability cache, preset library files, machine settings, job records, live render status, edit sessions; a fake for each | Dart | Linked into the app; builds `ve_windows_services.dll` | Platform |
-| `app/lib/` | Screens (`features/`), state (`state/`, Riverpod), design system (`design/`), window channel (`platform/`) | Dart (Flutter) | `VegasEncoder.exe` (AOT) | App |
-| `app/windows/runner/` | The Windows host for Flutter: caption-less window, popup ownership and placement, no-activate progress window, single instance, file dialog | C++ | Part of `VegasEncoder.exe` | App |
-| `app/test/`, `app/tool/` | Widget, unit and golden tests; window spike harness; budget measurements | Dart, C# (spike probe) | — | App |
-| `schema/` | Recipe schema, encoder profiles, measured FFmpeg data per Windows build, fixtures shared by C++ and Dart tests | JSON | Input to `profiles/data.h` and tests | Platform |
-| `tests/` | Core tests, VEGAS helper tests, engine tests with recipes, `fiohost` (a fake VEGAS host that drives the real exporter DLL) | C++ | Test executables | Platform |
-| `scripts/` | `build.cmd` (exporter), `build-core.cmd`, generators, test runners, the reversible installer | Batch, PowerShell, Python | — | Platform |
-| `config/` | Development INI copied beside the exporter DLL | INI | — | Platform |
-| `docs/` | Adapter and qualification documents; `docs/product/` holds the product plan, contracts, UI spec and workstream files | Markdown | — | Owner and both workstreams |
+| `src/core/` | Recipe rules: normalize, validate, compile to FFmpeg arguments, lint and completion for Advanced mode, size estimates, diff, template payload. `capi/ve_core.h` is its C ABI; `profiles/data.h` is the generated encoder and container catalog. No Windows or VEGAS headers | C++17 | `ve_core.dll`, `ve_core_static.lib` | Unified agent |
+| `src/vegas/` | The VEGAS side: recovered host interface declarations (`abi/`), template and frame helpers (`host/`), the exporter's entry points and render path (`adapter/`), the template page and editor-session transport (`configuration/`) | C++17 | `vegas-encoder.dll` | Unified agent |
+| `src/engine/` | Runs FFmpeg for a render: pipes for VEGAS's frames and audio, progress parsing, the live status file, output checks with ffprobe, job records | C++17 | `vegas-encoder.dll` | Unified agent |
+| `src/services/` | `windows_gpu.cpp`: reads the GPU and driver identity for hardware-test caching | C++17 | `ve_windows_services.dll` | Unified agent |
+| `src/support/`, `src/settings/` | Diagnostics, exception boundaries, developer settings | C++17 | `vegas-encoder.dll` | Unified agent |
+| `packages/ve_core/` | The app's door to the core: typed models (`Recipe`, `CompileResult`, `Issue`…), `NativeVeCore` (FFI calls), `FakeVeCore` (fixed answers for tests) and the build hook that compiles `src/core` | Dart | Linked into the app; builds `ve_core.dll` | Unified agent |
+| `packages/ve_services/` | The app's door to the system: FFmpeg discovery, probing, help-text parsing, hardware test encodes, capability cache, preset library files, machine settings, job records, live render status, edit sessions; a fake for each | Dart | Linked into the app; builds `ve_windows_services.dll` | Unified agent |
+| `app/lib/` | Screens (`features/`), state (`state/`, Riverpod), design system (`design/`), window channel (`platform/`) | Dart (Flutter) | `VegasEncoder.exe` (AOT) | Unified agent |
+| `app/windows/runner/` | The Windows host for Flutter: caption-less window, popup ownership and placement, no-activate progress window, single instance, file dialog | C++ | Part of `VegasEncoder.exe` | Unified agent |
+| `app/test/`, `app/tool/` | Widget, unit and golden tests; window spike harness; budget measurements | Dart, C# (spike probe) | — | Unified agent |
+| `schema/` | Recipe schema, encoder profiles, measured FFmpeg data per Windows build, fixtures shared by C++ and Dart tests | JSON | Input to `profiles/data.h` and tests | Unified agent |
+| `tests/` | Core tests, VEGAS helper tests, engine tests with recipes, `fiohost` (a fake VEGAS host that drives the real exporter DLL) | C++ | Test executables | Unified agent |
+| `scripts/` | `build.cmd` (exporter), `build-core.cmd`, generators, test runners, the reversible installer | Batch, PowerShell, Python | — | Unified agent |
+| `config/` | Development INI copied beside the exporter DLL | INI | — | Unified agent |
+| `docs/` | Adapter and qualification documents; `docs/product/` holds the product plan, contracts, UI spec and workstream files | Markdown | — | Unified agent; owner decisions |
 
 ## How each part is built
 
@@ -219,8 +222,8 @@ the core gives no fact, the app shows less and asks platform for it (app.md, Nee
   section is the plan; this file is what was built). Since that plan, the app dropped
   freezed, package:win32 and window_manager: window work is in the C++ runner behind a
   method channel, and the FFI bindings are hand-written rather than generated.
-- Who owns which folder and how the two workstreams meet: [WORKSTREAMS.md](WORKSTREAMS.md).
+- Unified ownership, working location and retained trial artifacts: [WORKSTREAMS.md](WORKSTREAMS.md).
 - The settings model and command rules: [SETTINGS_AND_COMMANDS.md](SETTINGS_AND_COMMANDS.md).
 - The exporter's side: [ARCHITECTURE.md](../ARCHITECTURE.md), [ADAPTER_PLAN.md](../ADAPTER_PLAN.md).
-- Progress of each side: [workstreams/app.md](workstreams/app.md),
-  [workstreams/platform.md](workstreams/platform.md).
+- Current progress/queue: [STATUS.md](../STATUS.md), [NEXT_AGENT.md](../NEXT_AGENT.md).
+  Historical component records: [app](workstreams/app.md), [platform](workstreams/platform.md).

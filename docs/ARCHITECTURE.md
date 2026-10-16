@@ -1,6 +1,10 @@
 # Vegas Encoder architecture
 
-Updated: 2026-10-10 (Asia/Singapore). Direction: user-requested product with an
+Current continuation (2026-10-16): one agent owns app and platform integration in
+`L:\repos\vegas-encoder`. Follow AGENTS.md, STATUS and NEXT_AGENT. The original
+foundation-only scope below is historical and does not prohibit current app work.
+
+Original plan: 2026-10-10 (Asia/Singapore). Direction: user-requested product with an
 internal VEGAS adapter. Implementation details below are a draft for review.
 
 Read the [adapter implementation plan](ADAPTER_PLAN.md)

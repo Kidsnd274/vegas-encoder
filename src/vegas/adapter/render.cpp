@@ -786,14 +786,17 @@ class RenderFile final : public ISfRenderFile {
 #endif
     BestEffortDiagnostic([&] { Log("FFmpeg render: %s hr=%s frames=%lld samples=%lld exit=%lu published=%d", r.status.c_str(),
         Hr(r.returned).c_str(), r.framesWritten, r.samplesWritten, r.encoder.exitCode, r.encoder.published); });
+    // Recipe renders report the failure through C5/C6 and the returned HRESULT.
+    // A modal box here would hold Render before VEGAS receives that HRESULT;
+    // an unowned box can also hide behind the host/monitor windows.
+#if !defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
     if (!ok && r.status != "cancelled" && cfg.showEncoderErrors) {
       std::wstring message = L"FFmpeg render failed: " + Widen(r.stopReason) + L"\n" + Widen(Hr(r.stopHr)) +
         L"\nEncoder log: " + r.encoder.stderrPath;
-#if !defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
       message += L"\nManifest: " + r.manifestPath;
-#endif
       MessageBoxW(nullptr, message.c_str(), L"Vegas Encoder", MB_OK | MB_ICONERROR);
     }
+#endif
     return r.returned;
   }
 

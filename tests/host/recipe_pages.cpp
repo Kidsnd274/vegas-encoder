@@ -32,6 +32,7 @@ std::wstring Exe() {
 int FakeEditor(const fs::path& root, const std::wstring& mode) {
   const auto request = Read(root / L"request.json");
   if (ve::HasErrors(ve::SessionRequest(request).at("issues"))) return 80;
+  if (mode == L"unnamed" && request.at("templateName") != "Actual template name") return 83;
   HWND owner = reinterpret_cast<HWND>(static_cast<uintptr_t>(std::stoull(request.at("ownerHwnd").get<std::string>())));
   if (!IsWindow(owner) || IsWindowEnabled(owner)) return 81;
   Json result{{"protocol", 1}, {"sessionId", request.at("sessionId")}, {"action", "apply"},
@@ -122,6 +123,14 @@ void Run(const fs::path& root, const Json& recipe, const std::wstring& mode) {
   Check(CreateNativeRecipePage(nullptr, options, &page) == E_POINTER &&
         CreateNativeRecipePage(&allocator, options, nullptr) == E_POINTER, "page factory rejects missing allocator/output");
   Check(CreateNativeRecipePage(&allocator, options, &page) == S_OK && page, "candidate native recipe page created");
+  if (mode == L"unnamed") {
+    const auto captured = holder.saved;
+    holder.saved.SetU32(sfio::tpl::cchAllocText,0);
+    BYTE info[56]{};
+    auto* nativePage = static_cast<sfio::ISfFileIOPropertyPage*>(page);
+    Check(nativePage->Slot14(captured.Ptr(),info) == S_OK && holder.saved.Name().empty(),
+          "page captures display name separately from an unnamed intact holder snapshot");
+  }
   IUnknown* object = &holder;
   Check(page->SetPageSite(&site) == S_OK && page->SetObjects(1, &object) == S_OK &&
         page->IsPageDirty() == S_FALSE, "native holder loads an owned clean draft");
@@ -152,7 +161,7 @@ void Run(const fs::path& root, const Json& recipe, const std::wstring& mode) {
       }
     }
     Check(holder.saved.b == original && holder.commits == 0, "editor never directly mutates native template store");
-    if (mode == L"apply") {
+    if (mode == L"apply" || mode == L"unnamed") {
       Check(page->IsPageDirty() == S_OK && site.dirty == 1, "valid editor Apply marks only pending page draft dirty");
       holder.commitResult = E_FAIL;
       Check(page->Apply() == E_FAIL && holder.saved.b == original && page->IsPageDirty() == S_OK,
@@ -185,7 +194,7 @@ int wmain(int argc, wchar_t** argv) {
     recipe["container"]["format"] = "mkv";
     const auto root = fs::absolute(fs::path(argv[2])) / vegas_encoder::Widen("page-" + NewEditSessionId());
     fs::create_directory(root);
-    for (const auto mode : {L"apply", L"cancel", L"crash", L"invalid", L"unsupported", L"hang", L"preflight", L"queued-close"})
+    for (const auto mode : {L"apply", L"unnamed", L"cancel", L"crash", L"invalid", L"unsupported", L"hang", L"preflight", L"queued-close"})
       Run(root, recipe, mode);
     WNDCLASSW returnClass{}; returnClass.lpfnWndProc=DefWindowProcW; returnClass.hInstance=GetModuleHandleW(nullptr);
     returnClass.lpszClassName=L"B6_RETURN_TEST";

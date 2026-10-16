@@ -1,9 +1,14 @@
-# Stop point before app design
+# Historical stop point before app design
+
+**Current workflow (2026-10-16):** this foundation stop point is superseded.
+One agent continues app/platform integration in the original checkout. Follow
+[AGENTS.md](../AGENTS.md), [STATUS](STATUS.md), [NEXT_AGENT](NEXT_AGENT.md) and
+[workflow](product/WORKSTREAMS.md); do not stop at old instructions below.
 
 **Update 2026-10-12:** the design branch is merged and the owner has reviewed it.
 Decisions, including Signal Flow, Flutter and Windows only, are in
 [docs/product/README.md](product/README.md#decisions). Product implementation starts
-in two workstreams ([WORKSTREAMS.md](product/WORKSTREAMS.md)); the "stop before
+under the current [workflow](product/WORKSTREAMS.md); the "stop before
 building" instructions below are superseded. The real-host qualification limits below
 still apply, and this gate is not passed by design decisions or offline mocks.
 
