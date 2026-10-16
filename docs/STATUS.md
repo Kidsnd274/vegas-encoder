@@ -8,9 +8,9 @@ Updated: 2026-10-16 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proo
 **Owner-authorized commit/merge (2026-10-16):** committed the platform snapshot
 as `fd4edb3`, preserving its 34 changed/new files. Verified that all of its runtime,
 package and test source changes already match the unified original checkout;
-its patch also matches the earlier consolidation backup exactly. Commit the
-unified workflow/documentation/Advanced-golden version and join that platform
-history without replacing the already consolidated tree. Final development is
+its patch also matches the earlier consolidation backup exactly. Unified commit
+`bec50ef` records the workflow/documentation/Advanced-golden version; merge
+`01c4756` joins the platform history with an identical consolidated tree. Development is
 on local `master` in `L:\repos\vegas-encoder`; the retained platform branch is
 advanced to the same merged result so both folders are clean. No remote push,
 installed replacement, worktree deletion or new qualification. Existing 558 app
