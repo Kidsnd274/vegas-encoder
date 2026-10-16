@@ -241,6 +241,56 @@ void HostTextRoundtrips(const Json& recipe) {
         "host text roundtrip returns every owned buffer/reference");
 }
 
+void LargePayloadRoundtrips(const Json& recipe) {
+  for (const size_t budget : {4096u,8192u,12288u,16000u,16383u,16384u}) {
+    const auto initial = CreateRecipeTemplate(Empty(),owner,Snapshot(recipe));
+    RecipeTemplateDraft draft(initial,owner,"capacity-test");
+    auto expected = Snapshot(recipe);
+    expected["recipe"]["name"] = "B6 large snapshot";
+    expected["recipe"]["notes"] = "";
+    expected["origin"] = Apply(recipe).at("origin");
+    expected["writtenBy"] = "capacity-test";
+    const std::string marker = " END \xe5\xae\xb9\xe9\x87\x8f";
+    const auto overhead = ve::EncodePayload(expected).size();
+    expected["recipe"]["notes"] = std::string(budget-overhead-marker.size(),'N') + marker;
+    Check(ve::EncodePayload(expected).size() == budget, "large fixture has exact core envelope size");
+    draft.BeginEdit(Request());
+    Check(draft.FinishEdit(Apply(expected.at("recipe")),0).disposition == EditDisposition::applied,
+          "large editor Apply accepts a bounded complete snapshot");
+    auto saved = initial;
+    Check(draft.Commit([&](const Tpl& value) { saved = value; return S_OK; }) == S_OK &&
+          Same(ReadRecipeSnapshot(saved,owner),expected) && saved.Name() == initial.Name() &&
+          saved.Notes() == initial.Notes(), "large Apply preserves exact payload/end marker and native text");
+    RecipeTemplateDraft reopened(saved,owner,"reopened");
+    const auto request = reopened.BeginEdit(Request());
+    Check(Same(request.at("recipe"),expected.at("recipe")) &&
+          request.at("templateName") == vegas_encoder::Utf8(initial.Name().c_str()), "large snapshot reopens before any restart");
+    // Empty native display metadata is legal at the template boundary. It must
+    // not prevent opening a validated recipe or mutate the private payload.
+    auto unnamed = saved;
+    WordRename(unnamed,L"",L"Native label absent");
+    const auto unchanged = unnamed.b;
+    RecipeTemplateDraft unnamedDraft(unnamed,owner,"unnamed-large");
+    const auto fallback = unnamedDraft.BeginEdit(Request());
+    Check(fallback.at("templateName") == expected.at("recipe").at("name") &&
+          Same(fallback.at("recipe"),expected.at("recipe")) && unnamed.b == unchanged,
+          "missing native label uses recipe display name without touching large payload bytes");
+    unnamed.SetU32(sfio::tpl::cchAllocText,0);
+    RecipeTemplateDraft noTextDraft(unnamed,owner,"no-native-text");
+    Check(noTextDraft.BeginEdit(Request()).at("templateName") == expected.at("recipe").at("name"),
+          "zero declared native text also permits reopening an intact large snapshot");
+    RecipeTemplateDraft pageNamed(unnamed,owner,"page-fallback","Captured VEGAS template");
+    Check(pageNamed.BeginEdit(Request()).at("templateName") == "Captured VEGAS template",
+          "captured page name takes precedence over recipe display fallback");
+    RecipeTemplateDraft nativeNamed(saved,owner,"native-preferred","Stale page label");
+    Check(nativeNamed.BeginEdit(Request()).at("templateName") == vegas_encoder::Utf8(saved.Name().c_str()),
+          "existing native template name still takes precedence over page fallback");
+    unnamed.b[sfio::tpl::abExtra+32] ^= 1;
+    Check(Rejects([&] { RecipeTemplateDraft rejected(unnamed,owner,"corrupt"); }),
+          "display fallback cannot bypass a corrupt large-payload checksum");
+  }
+}
+
 void Sessions(const Json& recipe) {
   const auto snapshot = Snapshot(recipe);
   auto value = CreateRecipeTemplate(Empty(),owner,snapshot);
@@ -316,10 +366,8 @@ void Sessions(const Json& recipe) {
         "request failure reports precise core issue and field without logging template contents");
   auto unnamed = Tpl::Make(L"",L"Empty name",0); unnamed.SetGuid(sfio::tpl::iidOwner,owner);
   RecipeTemplateDraft unnamedDraft(CreateRecipeTemplate(unnamed,owner,snapshot),owner,"unnamed");
-  contextError.clear();
-  try { unnamedDraft.BeginEdit(Request()); } catch (const std::invalid_argument& error) { contextError = error.what(); }
-  Check(contextError.find("S-REQUEST, templateName") != std::string::npos && !unnamedDraft.Editing(),
-        "empty host template name identifies the failed field instead of an ambiguous context error");
+  Check(unnamedDraft.BeginEdit(Request()).at("templateName") == recipe.at("name") && unnamedDraft.Editing(),
+        "empty native name uses the validated recipe label for editor display");
   auto hugeRequest = Request(); hugeRequest["extensions"]["huge"] = std::string(VE_CORE_JSON_LIMIT,'x');
   Check(Rejects([&] { draft.BeginEdit(hugeRequest); }) && !draft.Editing(), "oversize C4 request never opens transaction");
   draft.BeginEdit(Request("oversize-result"));
@@ -379,6 +427,7 @@ int main(int argc, char** argv) {
     const auto bundle = ve::Parse(reinterpret_cast<const uint8_t*>(bytes.data()),bytes.size());
     Placement(bundle);
     HostTextRoundtrips(bundle.at("fixtures")[0].at("recipe"));
+    LargePayloadRoundtrips(bundle.at("fixtures")[0].at("recipe"));
     Sessions(bundle.at("fixtures")[0].at("recipe"));
     printf("B6 OFFLINE SNAPSHOT/SESSION PASSED: %d checks; owned bytes/fake holder, no VEGAS/process/UI\n", checks);
     return 0;

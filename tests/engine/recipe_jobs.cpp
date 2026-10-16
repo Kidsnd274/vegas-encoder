@@ -99,6 +99,20 @@ void PureChecks() {
   const Json compiled{{"argv",Json::array({"-i","input","-wrong","3","out"})}};
   Require(ve::ErrorTokenIndices(compiled,"Unrecognized option 'wrong'.") == Json::array({2}),"runtime argv indexes exclude executable");
   Require(ve::ErrorTokenIndices(compiled,"generic encoder failure").empty(),"unknown error provenance stays empty");
+  const auto causal = EncoderFailureMessage("named pipe I/O failed",
+    "[AVFilterGraph @ 1234] No such filter: 'vegas_encoder_deliberate_failure'\r\n"
+    "Error reinitializing filters!\r\nFailed to inject frame into filter network: Invalid argument\r\n"
+    "[f32le @ 4321] Thread message queue blocking; consider raising thread_queue_size\r\nConversion failed!\r\n");
+  Require(causal == "FFmpeg: No such filter: 'vegas_encoder_deliberate_failure'", "causal error wins over transport error and later warnings");
+  Require(EncoderFailureMessage("pipe failure", "Unrecognized option 'bad'.\nConversion failed!\n") == "FFmpeg: Unrecognized option 'bad'.", "invalid option diagnostic retained");
+  Require(EncoderFailureMessage("encoder failed", "Unknown encoder 'bad'.\n") == "FFmpeg: Unknown encoder 'bad'.", "missing encoder diagnostic retained");
+  Require(EncoderFailureMessage("pipe failure", "warning only\n") == "pipe failure", "unclassified diagnostic keeps precise original failure");
+  Require(EncoderFailureMessage("cannot start encoder", "") == "cannot start encoder", "empty stderr preserves startup failure");
+  const auto bounded = EncoderFailureMessage("pipe failure", "No such filter: " + std::string(5000, 'x'));
+  Require(bounded.size() <= 395 && bounded.substr(bounded.size()-3) == "...", "failure summary bounded independently of full stderr");
+  std::string unicode = "No such filter: "; for (int i=0;i<200;++i) unicode += "\xe7\x95\x8c";
+  const auto unicodeSummary = EncoderFailureMessage("pipe failure", unicode);
+  Require(Utf8(Widen(unicodeSummary).c_str()) == unicodeSummary, "bounded summary preserves complete UTF-8 codepoints");
 }
 void LiveFactChecks(const Json& fixtures) {
   const auto& fixture = fixtures.at("fixtures")[0];

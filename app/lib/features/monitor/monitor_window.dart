@@ -69,6 +69,11 @@ class _MonitorWindowState extends ConsumerState<MonitorWindow> {
         if (mounted) setState(() => _stale = true);
       });
     }
+    if (phase != MonitorPhase.done && phase != MonitorPhase.cancelled) {
+      _closeTimer?.cancel();
+      _closeTimer = null;
+      _closeIn = null;
+    }
     if (_closeTimer == null && (phase == MonitorPhase.done || phase == MonitorPhase.cancelled)) {
       _closeIn = phase == MonitorPhase.done ? doneCloseDelay : cancelledCloseDelay;
       _closeTimer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
@@ -170,6 +175,7 @@ class _MonitorWindowState extends ConsumerState<MonitorWindow> {
                   const Spacer(),
                   _ShowInHistory(jobId: status!.jobId),
                   _ShowLog(jobId: status.jobId, enabled: record?.value != null),
+                  VeButton(label: 'Close', size: VeButtonSize.small, onPressed: window.close),
                 ],
                 _ => [
                   Expanded(
@@ -246,18 +252,8 @@ class _Body extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          fileNameOf(status.outputPath),
-          style: t.text.panelTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        Text(
-          headerDetail(status),
-          style: muted,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        Text(fileNameOf(status.outputPath), style: t.text.panelTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text(headerDetail(status), style: muted, maxLines: 1, overflow: TextOverflow.ellipsis),
         const SizedBox(height: 14),
         VeWireProgress(fraction: bar.fraction, tone: bar.tone, semanticLabel: 'Render progress'),
         const SizedBox(height: 6),
@@ -265,7 +261,10 @@ class _Body extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Semantics(liveRegion: phase != MonitorPhase.encoding, child: Text(headline(status), style: t.text.figure)),
+            Semantics(
+              liveRegion: phase != MonitorPhase.encoding,
+              child: Text(headline(status), style: t.text.figure),
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -280,7 +279,12 @@ class _Body extends StatelessWidget {
         ),
         if (!phase.ended)
           _Figures(figures: figuresOf(status))
-        else if (!recordLoading) ...[
+        else if (phase == MonitorPhase.failed) ...[
+          const SizedBox(height: 12),
+          Expanded(
+            child: _Failure(status: status, record: record),
+          ),
+        ] else if (!recordLoading) ...[
           const SizedBox(height: 12),
           _Result(status: status, record: record),
         ],
@@ -311,7 +315,10 @@ class _Figures extends StatelessWidget {
             TextSpan(
               children: [
                 if (f.prefix != null) TextSpan(text: '${f.prefix} ', style: small),
-                TextSpan(text: f.value ?? '–', style: f.value == null ? value.copyWith(color: c.faintText) : value),
+                TextSpan(
+                  text: f.value ?? '–',
+                  style: f.value == null ? value.copyWith(color: c.faintText) : value,
+                ),
                 if (f.suffix != null) TextSpan(text: ' ${f.suffix}', style: small),
               ],
             ),
@@ -325,10 +332,7 @@ class _Figures extends StatelessWidget {
     Widget row(Iterable<MonitorFigure> items) => Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final (i, f) in items.indexed) ...[
-          if (i > 0) const SizedBox(width: 12),
-          Expanded(child: cell(f)),
-        ],
+        for (final (i, f) in items.indexed) ...[if (i > 0) const SizedBox(width: 12), Expanded(child: cell(f))],
       ],
     );
     return Container(
@@ -337,14 +341,12 @@ class _Figures extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: c.line)),
       ),
-      child: Column(
-        children: [row(figures.take(3)), const SizedBox(height: 10), row(figures.skip(3))],
-      ),
+      child: Column(children: [row(figures.take(3)), const SizedBox(height: 10), row(figures.skip(3))]),
     );
   }
 }
 
-/// How the render ended: the sentence, and for a failure FFmpeg's last lines.
+/// How a successful or cancelled render ended.
 class _Result extends StatelessWidget {
   const _Result({required this.status, required this.record});
   final LiveRenderStatus status;
@@ -374,48 +376,57 @@ class _Result extends StatelessWidget {
         ],
       );
     }
-    final lines = phase == MonitorPhase.failed ? ffmpegLastLines(record) : '';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        sentence,
-        if (lines.isNotEmpty) _FFmpegLines(lines),
-      ],
-    );
+    return sentence;
   }
 }
 
-/// FFmpeg's last lines (`.mlog`), three lines high and scrolled to the end:
-/// the error is usually last. The wheel scrolls back through the rest.
-class _FFmpegLines extends StatelessWidget {
-  const _FFmpegLines(this.lines);
-  final String lines;
-
-  static const _visibleLines = 3;
-  static const _lineHeight = 1.4;
+/// The engine's causal error, visible immediately from C5 and refined by C6.
+/// Trailing stderr warnings belong in the full log, not in the primary panel.
+class _Failure extends StatelessWidget {
+  const _Failure({required this.status, required this.record});
+  final LiveRenderStatus status;
+  final JobRecord? record;
 
   @override
   Widget build(BuildContext context) {
     final t = VeTokens.of(context);
     final c = t.colors;
-    final style = t.text.monoSmall.copyWith(color: c.errorText, height: _lineHeight);
-    // The padding stays outside the scroll view, so the view is a whole
-    // number of lines and an earlier line is never cut in half.
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: c.errorBackground,
-        border: Border.all(color: c.errorLine),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: style.fontSize! * _lineHeight * _visibleLines),
-        child: SingleChildScrollView(
-          reverse: true,
-          child: Text(lines, style: style),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Container(
+            key: const ValueKey('monitor-failure-cause'),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: c.errorBackground,
+              border: Border.all(color: c.errorLine),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: SingleChildScrollView(
+              child: Semantics(
+                liveRegion: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        VeIcon(VeIcons.error, color: c.errorText),
+                        const SizedBox(width: 7),
+                        Text('Why it failed', style: t.text.panelTitle.copyWith(color: c.errorText)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(failureReason(status, record), style: t.text.body.copyWith(color: c.errorText, height: 1.4)),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 7),
+        Text('Stays open until you close it.', style: t.text.caption.copyWith(color: c.muted)),
+      ],
     );
   }
 }
@@ -450,7 +461,12 @@ class _FooterText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = VeTokens.of(context);
-    return Text(text, style: t.text.caption.copyWith(color: t.colors.muted), maxLines: 2, overflow: TextOverflow.ellipsis);
+    return Text(
+      text,
+      style: t.text.caption.copyWith(color: t.colors.muted),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 }
 

@@ -1,11 +1,175 @@
 # Vegas Encoder status
 
-Updated: 2026-10-15 (Asia/Singapore). Owner-installed version: 0.1.6-recipe-proof
-(parallel editor startup retested on VEGAS 2026.0.3.189).
+Updated: 2026-10-16 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proof
+(frontend 0.1.7+1; template-name-fix variant installed on VEGAS 2026.0.3.189).
 
 ## Current progress
 
-**0.1.7 focus fix / B7 inputs (prepared, not installed):** the owner-authorized
+**Owner defers progress trial (2026-10-16):** leave faster-progress installation/
+real-host review and the monitor performance comparison for next time. The candidate
+remains prepared; no new installation or qualification pass is inferred. Other
+useful work is app adoption of delivered file import, popup-size storage, Advanced
+metadata/macro catalogue/encoder IDs and monitor bit-depth facts. Desktop-launch
+actions additionally need a platform launcher and running-instance coordination;
+the prior blanket claim that all three services were ready was too broad. These
+follow-ups precede review/consolidation and the owner's installer.
+
+**Faster progress candidate (2026-10-16, prepared, not installed):** owner wants
+the monitor to update faster before measuring overhead. Core-owned FFmpeg
+`-stats_period` changes from 0.5 to 0.2 seconds in Basic and Advanced; the independent
+C5 writer coalesces ordinary samples every 200 ms (formerly 500 ms), and the C3
+live reader polls every 100 ms (formerly 250 ms). Phase/terminal updates still
+bypass coalescing, and Render never waits on the monitor/writer. No schema change.
+Official FFmpeg docs retrieved with Context7 confirm `-stats_period` controls
+`-progress` reporting. An actual two-second FFmpeg run produced 10 intermediate
+reports with a 202.7 ms median gap; this is not a real-VEGAS UI latency measurement.
+
+Checks passed: 3,055 native core checks and reviewed argv goldens, 5 Hz writer
+wake/coalescing/phase checks with a fake child, 150 real-file C3 repository checks,
+24,477 engine checks / 23 fake-host real-FFmpeg and controlled-child cases,
+138 adapter checks / 11 fake-host real-FFmpeg cases, 216 snapshot/session,
+95 transport, 124 page checks, clean app/service analysis, 50 monitor unit/widget/
+light-dark golden tests, and 65 packaging checks. Native optimized /W4 /WX build
+passes. Flutter release compilation finished but its final copy was blocked by an
+open development app's DLL. The same generated Release install script was directed
+to a fresh build folder; assembly succeeded and compiled DLL/AOT inputs were
+hash-verified, leaving the running app untouched.
+
+Staged `build/b6-candidate-0.1.7-faster-progress`, same 0.1.7 / 0.1.7+1 stamps,
+native SHA-256 `918C22A4F961D4E41883210B37FAF27A4326AE8AEADB26ED0B8C1C1FAA916B0D`.
+Trial settings/library/history are copied (active edit sessions excluded), with
+five verified exact installed-template-name-fix rollback files. No commit or
+installation. Next: owner installs, checks one normal render's responsiveness,
+then the existing monitor time/memory comparison. Overhead and real UI cadence
+remain unqualified; the earlier deferred/unconfirmed checks keep their scope.
+
+**Large-preset immediate reopen fix (2026-10-16, installed, owner-confirmed):**
+owner hit `S-REQUEST, templateName` after Load/Apply/reopen of capacity 16000,
+before restart. The draft's native display name is empty; an otherwise accepted
+recipe cannot form C4. This does not establish payload corruption or a host size
+limit. The native fix uses native name → captured page name → validated recipe
+name for C4 display, preserving native text and strict CRC/version/size checks.
+The old code reproduces the same error with an intact large unnamed snapshot.
+Fixed **216** snapshot/session checks cover exact 4096/8192/12288/16000/16383/16384
+envelopes, immediate reopen, missing names, precedence and corrupt CRC refusal.
+**124** native-page, **95** transport, **138 / 11** actual-adapter fake-host
+real-FFmpeg cases, writer checks, optimized build and **65** packaging checks pass.
+These do not establish real-host capacity. Page diagnostics record only label
+source and declared byte/text counts; why native text is absent remains open.
+
+Separate `build/b6-candidate-0.1.7-template-name-fix` preserves the byte-identical
+error-ui frontend, copied trial data and five exact installed-error-ui rollback
+files. Native SHA-256:
+`BBB01B74CB88F3CF4A33D0E86B72A9AFC595C1D86DC66E42C8369B3892C606EA`.
+Same version labels, hash-distinct variant; installed DLL hash matches. The owner
+confirms Load → Apply → reopen now works in real VEGAS. No commit was made.
+The latest reopened request (`EAFB2258-877B-4274-9FBB-D13AA08D8821`) has all
+15,088 UTF-8 notes bytes, ending `END 容量`, exactly matching the seeded preset,
+and FFV1/PCM-float/MKV settings. Notes are not shown in the popup; inspect session
+data instead of asking the owner to find them. Confirmation that this reopen
+followed saving and restarting is still pending; immediate reopen alone does
+not establish the complete persistence sequence.
+Encoder-failure recovery remains owner-deferred; other qualification limits stand.
+
+The owner subsequently confirms the preset is visible and appears to work
+correctly. Accept this functional check and move to monitor performance without
+repeating the notes request. The exact large-template save/restart sequence was
+not explicitly confirmed; keep that qualification limit separate from the observed
+intact reopened request and owner acceptance.
+
+**Owner qualification scope (2026-10-16):** the owner explicitly skips the
+additional same-session good render after encoder failure as excessive for this
+stage and proceeds on the working assumption. Record that check as owner-deferred,
+not passed; do not request it again without a new relevant failure. Real failure
+return/presentation and earlier cancellation/recovery evidence stand. Next is a
+lean large-payload persistence check using the prepared 16000-byte input, followed
+by monitor overhead/memory and installer work. One intact large sample establishes
+a tested lower bound, not an absolute host capacity limit.
+
+**Error UI accepted in real VEGAS (2026-10-16):** the owner installed the
+error-ui variant and says it "looks good." The screenshot shows the prominent
+missing-filter cause, stay-open label and Close action beside VEGAS's error
+dialog. New C6 job `9A1785F2-5243-440D-8C7F-B942F8C807CD` is failed with no
+publication; installed manifest/INI and staged frontend hashes match this trial.
+Record real-host failure presentation as owner-approved. This feedback does not
+establish timed retention/manual dismissal or a successful post-error render;
+same-session encoder-failure recovery is still next, followed by capacity and
+monitor time/memory. No implementation change or test rerun was needed.
+
+**Error monitor UI follow-up (2026-10-16, prepared, not installed):** the owner
+retested the native error fix. Screenshot and C6 job
+`16005680-443B-4979-9BBA-DD374003F054` show real FFmpeg failure/no publication,
+the concrete missing-filter cause and VEGAS's own error dialog (0x8007006d).
+This confirms failure reaches VEGAS; same-session recovery is not yet reported.
+At the owner's request the monitor now highlights the authoritative C5/C6 cause
+in a prominent error panel instead of trailing stderr warnings. It shows errors
+immediately, scrolls long messages, says it stays open until closed, and has an
+explicit Close action. Failure cancels any prior auto-close countdown.
+
+Clean app analysis, **558** full app tests (**50** focused monitor checks),
+light/dark normal+long-error visual inspection, release build and **65** package
+checks pass. UI validation uses fakes/goldens, not real VEGAS. Fresh
+`build/b6-candidate-0.1.7-error-ui` keeps the tested native fix and updated
+0.1.7+1 frontend, copied trial data and exact installed-error-fix rollback.
+Manifests identify this hash-distinct development variant. Installed files and
+prior candidates are unchanged; new UI still needs the owner's real-host retest.
+
+**0.1.7 encoder-failure reporting fix (2026-10-16, prepared, not installed):**
+the real invalid-filter job `76568149-62D3-43A8-B566-5C62B756BE3C` is failed,
+FFmpeg exit 1, no publication. Its stderr identifies the deliberately nonexistent
+filter, but the monitor summarized a secondary broken-pipe error and the owner
+reports VEGAS remained waiting. Recipe Render opened an unowned modal error box
+before returning the failing HRESULT. The source fix removes that blocking box
+for recipe renders and selects a bounded causal FFmpeg diagnostic for C5/C6,
+preserving the original HRESULT, full stderr, cancellation and host/probe errors.
+No frontend source changed. Optimized build and engine checks pass (24,487 /
+23 cases); actual adapter checks pass (138 / 11 fake-host real-FFmpeg cases),
+including the bad filter, no publication, error return with ShowEncoderErrors=1,
+matching C5/C6 messages and subsequent recovery. Snapshot/transport/page/monitor
+and 65 packaging checks pass. These fixes still need real VEGAS retesting.
+
+Separate `build/b6-candidate-0.1.7-error-fix` has copied trial data and exact
+installed-0.1.7 rollback. It retains the existing 0.1.7 version stamps/frontend;
+DLL SHA-256 **CE46036DC5A7ACC3A296BF91B610A7B04DF6367F3BC6BD7989AA0982FB75D017**
+distinguishes it from installed **0A5D6F74…**. Manifest marks dirty source and
+records a source patch hash; it is not release-qualified. Nothing installed or
+committed by this continuation. See [retest/rollback](B6_TRIAL.md). Actual real
+encoder-failure recovery, capacity and monitor overhead remain open.
+
+**0.1.7 real cancellation/recovery (2026-10-16):** the owner reports the requested
+cancel-and-render-again sequence worked. C6 job `17E0A52A-F34A-4B9B-A887-9868150ABD49`
+is cancelled by the host after 605/1470 frames; no final output was published,
+no partial was retained, and `017_test_cancel.mkv` is absent. The following job
+`BD533179-4D29-47B7-B4A1-93C30C4D1FD4` uses the identical recipe hash, succeeds
+with 1470 frames, publishes `unchaed_render.mkv` (19,312,208 bytes) and passes
+sampled H.264/AAC FFprobe readback. Owner feedback supports the requested
+same-session recovery sequence; records establish cancellation then success,
+but do not independently identify the VEGAS PID/session or measure cancel-click
+latency. Installed 0.1.7 DLL identity is unchanged. This is real VEGAS trial data,
+not a fake-host result. Next: actual encoder-failure recovery, then bounded
+capacity and monitor time/memory; broader qualification remains open.
+
+**0.1.7 real-host focus retest (2026-10-16):** after the requested focus trial,
+the owner reports the issue "seems like it has been fixed." The installed DLL
+matches the staged 0.1.7 candidate; the real-host log identifies VEGAS
+2026.0.3.189 and native 0.1.7-recipe-proof. Record the reported focus repro as
+owner-confirmed fixed, without claiming every Apply/Cancel/switch-order or passive
+background variant was individually observed. Two frontend traces show the window
+at **698.2 / 536.4 ms** after process creation; native CreateProcess took
+**168.7 / 36.2 ms**. These are observations, not click-to-visible guarantees.
+The 65-check packaging rerun and exact installed-0.1.6 rollback verification pass.
+Next: controlled real cancellation and encoder-failure recovery, then bounded
+payload capacity and monitor time/memory. No 0.1.7 render/recovery or full A5–A7
+qualification follows from this focus feedback.
+
+The first cancellation attempt was blocked before encoding by missing default
+FFmpeg selection (zero frames/samples, no published output). The trial profile
+already selects the existing `C:\ffmpeg\bin\ffmpeg.exe`; the normal user profile
+has no installations/default. This is consistent with a non-trial VEGAS launch.
+The subsequent trial retry above succeeded. Ordinary launches need their own
+desktop-app default selection; the two profiles remain separate.
+
+**0.1.7 focus fix / B7 inputs (preparation checkpoint):** the owner-authorized
 narrow frontend change captures foreground before re-enabling the valid owner,
 then explicitly activates it before destruction for foreground closes only.
 Same existing fake-window probe: old frontend **3/7**, new **7/7** close cases,
@@ -497,9 +661,9 @@ and ignored evidence. The source/research import is documented in [ORIGIN.md](..
 | A2 internal host helpers | Template/lease separation and targeted checks implemented; further stream/allocator extraction and real-host qualification remain |
 | A3 adapter/engine boundary | Internal dependencies and owned-buffer transport retained; broader job/settings and cancellation hardening remain |
 | A4 Vegas Encoder real-host parity | Normal 1080p/fractional, same-session on/off and current-build cancel/recovery pass; controlled failure/recovery and counter fixture qualification remain open |
-| A5/A6 native page and saved-setting proof | Real popup Apply and distinct template renders work; owner confirms saved templates persist across restart. Foreground return remains faulty; full qualification is open |
+| A5/A6 native page and saved-setting proof | Real popup Apply and distinct template renders work; owner confirms saved templates persist across restart and reports the 0.1.7 foreground-return fix works. Detailed focus variants and full qualification remain open |
 | A7 versioned recipe snapshots | Implemented in the opt-in B6 candidate; tested recipes render independently and persist per owner. Maximum native payload capacity and broader qualification remain open |
-| A8 foundation qualification | Foundation normal/cancel/recovery evidence retained; B6 normal recipe rendering/startup and owner-confirmed persistence added. Focus, controlled failure, capacity, monitor overhead and broader support matrix remain qualification limits |
+| A8 foundation qualification | Foundation normal/cancel/recovery evidence retained; B6 normal recipe rendering/startup, owner-confirmed persistence and reported 0.1.7 focus fix added. Detailed focus variants, controlled failure, capacity, monitor overhead and broader support matrix remain qualification limits |
 
 ## Limits
 
@@ -555,9 +719,17 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 ## Next task
 
-The owner installs/tests the separately prepared 0.1.7 candidate for foreground
-Apply/Cancel, controlled cancellation/encoder-failure recovery, bounded payload
-capacity and measured monitor time/memory. Basic recipe renders and normal
+The owner has installed the template-name-fix 0.1.7 variant, confirmed immediate
+large-preset reopen, approved focus/error presentation and completed cancellation/recovery. The extra same-session
+post-encoder-error render is owner-deferred, not a passed qualification. The owner
+also defers faster-progress installation/review and monitor measurements until
+next time. Available work: app adoption of file import, popup size, Advanced core
+metadata/macros/encoder IDs and monitor bit-depth facts; desktop-launch actions
+also need a launcher service/instance coordination. Then review/consolidation and
+the owner's installer. The large preset is owner-accepted and reopened
+notes integrity is verified; the exact large-template save/restart sequence
+remains unconfirmed and should not be claimed as a completed gate.
+Basic recipe renders and normal
 restart persistence are already owner-confirmed. B7's matched inputs and rules
 are ready for the owner's Inno Setup work; installer implementation/testing and
 release signoff remain. Do not redo library-watch, precision facts or B6 wiring.

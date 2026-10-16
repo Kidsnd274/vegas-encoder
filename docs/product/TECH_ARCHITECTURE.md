@@ -267,7 +267,7 @@ used them.
 [design/signal-flow.html](design/signal-flow.html).
 
 - **Data path.** The engine's FFmpeg progress reader (not Render's thread) writes
-  `%LOCALAPPDATA%\VegasEncoder\jobs\<job>.live.json` by atomic replace, at most twice a
+  `%LOCALAPPDATA%\VegasEncoder\jobs\<job>.live.json` by atomic replace, at most five times a
   second. The fields are state (starting, encoding, finishing, verifying, done,
   failed, cancelled), frames done and total, encode fps, speed, bitrate, bytes written,
   elapsed, output path, template name, encoder summary, VEGAS's main HWND for
@@ -280,7 +280,9 @@ used them.
   toggle. It repaints only when the file changes. It exits a few seconds after a
   successful end; after a failure it stays open.
 - **The encode never passes through the app.** Frames still go VEGAS → DLL → pipes →
-  FFmpeg. The window only reads a few hundred bytes twice a second.
+  FFmpeg. FFmpeg reports every 200 ms; the independent writer coalesces ordinary
+  updates to five per second. The window polls every 100 ms and repaints only
+  when the snapshot changes. Phase/terminal updates bypass writer coalescing.
 - **Performance rule (owner).** Measure the same real render three times with the
   window and three times without. If the window costs more than about 2% of render
   time, or visibly disturbs VEGAS, drop it and keep only the status line. Memory

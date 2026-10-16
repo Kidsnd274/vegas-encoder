@@ -40,14 +40,15 @@ Future<JobRecord> recordFor(RenderState state) async {
       ...await fixture('j-1039'),
       'id': 'b0-render',
       'elapsedSec': 248,
-      'message': 'FFmpeg exited with code 1. Partial file removed.',
+      'message': "FFmpeg: No such filter: 'vegas_encoder_deliberate_failure'",
+      'stderrTail':
+          "[AVFilterGraph] No such filter: 'vegas_encoder_deliberate_failure'\n"
+          'Error reinitializing filters!\n'
+          'Thread message queue blocking; consider raising thread_queue_size\n'
+          'Conversion failed!\n',
       'logFile': 'b0-render.ffmpeg.log',
     }),
-    RenderState.cancelled => JobRecord.fromJson({
-      ...await fixture('j-1041'),
-      'id': 'b0-render',
-      'elapsedSec': 72,
-    }),
+    RenderState.cancelled => JobRecord.fromJson({...await fixture('j-1041'), 'id': 'b0-render', 'elapsedSec': 72}),
     _ => throw ArgumentError('No record while rendering: $state'),
   };
 }

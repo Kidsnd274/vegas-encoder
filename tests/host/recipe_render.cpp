@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <atomic>
+#include <thread>
 
 using namespace vegas_encoder;
 using namespace sfio;
@@ -15,6 +17,26 @@ namespace {
 RecipeRuntime selected;
 int checks = 0;
 void Check(bool ok, const char* message) { ++checks; if (!ok) throw std::runtime_error(message); }
+// Bound each tiny fake-host render even if a modal dialog blocks its return.
+// On regression only this isolated test process exits; its kill-on-close job
+// cleans up the owned encoder. Host calls stay on the original caller thread.
+struct RenderDeadline {
+  std::atomic<bool> done{false};
+  std::thread worker;
+  RenderDeadline() {
+    worker = std::thread([this] {
+      const auto until = GetTickCount64() + 15000;
+      while (!done && GetTickCount64() < until) Sleep(10);
+      if (!done) {
+        fputs("B6 adapter FAIL: Render did not return to the host within 15 s with ShowEncoderErrors enabled.\n", stderr);
+        fflush(stderr);
+        TerminateProcess(GetCurrentProcess(), 1);
+      }
+    });
+  }
+  void Join() { done = true; if (worker.joinable()) worker.join(); }
+  ~RenderDeadline() { Join(); }
+};
 Json Read(const std::filesystem::path& path) {
   std::ifstream file(path, std::ios::binary);
   if (!file) throw std::runtime_error("Cannot open test JSON: " + path.string());
@@ -63,7 +85,8 @@ Json Record(const std::wstring& root) {
   throw std::runtime_error("native asynchronous record was not published within 7 s");
 }
 Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT expected,
-         LONGLONG cancelAt = -1, int failureSlot = 0, bool mutateAfterCreate = false, bool existing = false) {
+         LONGLONG cancelAt = -1, int failureSlot = 0, bool mutateAfterCreate = false, bool existing = false,
+         bool encoderFailure = false) {
   const auto folder = root + L"\\" + name;
   std::filesystem::create_directories(folder);
   selected.jobsRoot = folder + L"\\jobs";
@@ -83,6 +106,8 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
   RenderTestOptions options; options.width = 320; options.height = 180; options.frames = 24;
   options.fps = 30000.0 / 1001; options.cancelAt = cancelAt; options.progressFailureSlot = failureSlot;
   options.progressFailureAt = 8; options.shortRead = 257;
+  RenderDeadline deadline;
+  const auto began = GetTickCount64();
   const auto host = ExerciseRecipeHost(options, [&](ISfReadVideoRenderStream* video, ISfReadAudioStream* audio, ISfProgress* progress) {
     Check(render->SetStreamReader(video, 0) == S_OK && render->SetStreamReader(audio, 1) == S_OK, "adapter retains readers");
     Check(render->SetFile(output.c_str()) == S_OK, "adapter accepts output path");
@@ -92,10 +117,15 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
           "adapter releases reader references before host audit");
     return result;
   });
-  Check(host.returned == expected, "adapter preserves success/cancellation/host error HRESULT");
+  deadline.Join();
+  Check(GetTickCount64() - began < 15000, "Render returns to the host promptly with ShowEncoderErrors enabled");
+  Check(encoderFailure ? FAILED(host.returned) && host.returned != SF_E_RENDER_STOPPED : host.returned == expected,
+        "adapter preserves success/cancellation/host error HRESULT and returns encoder failures as failures");
   Check(host.served == host.released && !host.outstanding && !host.lockErrors && !host.callerThreadErrors && !host.tokenErrors,
         "adapter copies/releases frames and keeps all host calls on caller thread");
   const auto record = Record(selected.jobsRoot);
+  Check(ve::Str(record,"hresult") == Hr(expected == SF_E_RENDER_STOPPED ? SF_E_PROGRESS_CANCELLED : host.returned),
+        "C6 preserves the original failure while the host receives its established cancellation mapping");
   Check(record.at("recipe").at("name") == recipe.at("name"), "record uses immutable Create snapshot");
   Check(record.at("status") == (success ? "succeeded" : expected == SF_E_RENDER_STOPPED ? "cancelled" : "failed"), "native C6 terminal classification");
   if (success) Check(std::filesystem::file_size(output) > 20, "real FFmpeg output published");
@@ -117,7 +147,7 @@ int wmain(int argc, wchar_t** argv) {
     std::filesystem::create_directories(root);
     wchar_t self[32768]{}; GetModuleFileNameW(nullptr, self, 32768);
     const auto ini = (std::filesystem::path(self).parent_path() / L"vegas-encoder.ini").wstring();
-    WritePrivateProfileStringW(L"vegas-encoder", L"ShowEncoderErrors", L"0", ini.c_str());
+    WritePrivateProfileStringW(L"vegas-encoder", L"ShowEncoderErrors", L"1", ini.c_str());
     WritePrivateProfileStringW(L"vegas-encoder", L"LogDir", root.c_str(), ini.c_str());
     selected.installation = Installation(std::filesystem::absolute(argv[3]).wstring());
     selected.capabilities = nullptr; selected.verifyOutput = true;
@@ -139,11 +169,19 @@ int wmain(int argc, wchar_t** argv) {
     advanced["command"]["template"] = "{inputs} -c:v ffv1 -c:a pcm_f32le {output}";
     Run(root, L"unknown-container", advanced, E_FAIL);
     Run(root, L"recovery", recipe, S_OK);
+    auto badFilter = recipe; badFilter["video"]["extra"] = "-vf vegas_encoder_deliberate_failure";
+    const auto filterFailure = Run(root, L"bad-filter", badFilter, E_FAIL, -1, 0, false, false, true);
+    Check(ve::Str(filterFailure,"message").find("No such filter: 'vegas_encoder_deliberate_failure'") != std::string::npos,
+          "failure message preserves causal FFmpeg diagnostic instead of the secondary pipe failure");
+    const auto failedId = Widen(ve::Str(filterFailure,"id"));
+    const auto failedLive = Read(std::filesystem::path(root) / L"bad-filter" / L"jobs" / (failedId + L".live.json"));
+    Check(failedLive.at("message") == filterFailure.at("message"), "C5 and C6 share the actionable failure message");
+    Run(root, L"after-filter-failure", recipe, S_OK);
     Run(root, L"existing-destination", recipe, HRESULT_FROM_WIN32(ERROR_FILE_EXISTS), -1, 0, false, true);
     auto empty = Tpl::Make(L"Not a recipe", L"", 0); empty.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
     ISfRenderFile* rejected = nullptr;
     Check(CreateRenderFile(empty.Ptr(), &rejected) == E_INVALIDARG && !rejected, "Create rejects absent recipe instead of using proof settings");
-    printf("B6 actual adapter PASS: %d checks / 9 fake-host real-FFmpeg cases.\n", checks);
+    printf("B6 actual adapter PASS: %d checks / 11 fake-host real-FFmpeg cases.\n", checks);
     return 0;
   } catch (const std::exception& error) {
     fprintf(stderr, "B6 adapter FAIL after %d checks: %s\n", checks, error.what()); return 1;

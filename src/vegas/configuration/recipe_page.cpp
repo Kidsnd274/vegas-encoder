@@ -85,7 +85,14 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
       host::Tpl owned;
       const auto loaded = next->Load(&owned);
       if (loaded != S_OK) return loaded;
-      auto draft = std::make_unique<RecipeTemplateDraft>(owned, options_.owner, options_.dllVersion);
+      auto draft = std::make_unique<RecipeTemplateDraft>(owned, options_.owner, options_.dllVersion,
+                                                       Utf8(source_.Name().c_str()));
+      if (owned.Name().empty()) BestEffortDiagnostic([&] {
+        Log("B6 editor display-name fallback: source=%s cbStruct=%lu cbExtra=%lu cchAllocText=%lu notesUtf8Bytes=%zu",
+            source_.Name().empty() ? "recipe" : "page", owned.U32(sfio::tpl::cbStruct),
+            owned.U32(sfio::tpl::cbExtra), owned.U32(sfio::tpl::cchAllocText),
+            ve::Str(draft->Snapshot().at("recipe"),"notes").size());
+      });
       next->AddRef();
       if (store_) store_->Release();
       store_ = next; draft_ = std::move(draft);

@@ -152,11 +152,7 @@ List<MonitorFigure> figuresOf(LiveRenderStatus s) {
   final finalBytes = s.estimatedFinalBytes;
   return [
     MonitorFigure('Encoding', s.encodeFps == null ? null : fpsLabel(s.encodeFps!)),
-    MonitorFigure(
-      'Speed',
-      s.speed == null ? null : ratioLabel(s.speed!),
-      suffix: s.speed == null ? null : 'realtime',
-    ),
+    MonitorFigure('Speed', s.speed == null ? null : ratioLabel(s.speed!), suffix: s.speed == null ? null : 'realtime'),
     MonitorFigure('Bitrate', s.bitrateKbps == null ? null : VeFormat.rate(s.bitrateKbps!)),
     MonitorFigure('Size so far', VeFormat.bytes(s.bytesWritten)),
     MonitorFigure(
@@ -200,18 +196,19 @@ String endSentence(LiveRenderStatus s, JobRecord? record) {
   }
   final took = VeFormat.duration(s.elapsedSec);
   return switch (phase) {
-    MonitorPhase.done => '${['Rendered in $took', if (s.speed != null) '${ratioLabel(s.speed!)} realtime'].join(', ')}.',
+    MonitorPhase.done =>
+      '${['Rendered in $took', if (s.speed != null) '${ratioLabel(s.speed!)} realtime'].join(', ')}.',
     _ => s.message.trim().isEmpty ? 'Failed after $took.' : 'Failed after $took. ${_sentence(s.message)}',
   };
 }
 
-/// The last lines FFmpeg wrote before it stopped (C6 `stderrTail`), at most
-/// [lines] of them, for a failed render. Empty when there is no record or
-/// FFmpeg wrote nothing.
-String ffmpegLastLines(JobRecord? record, {int lines = 12}) {
-  if (record == null) return '';
-  final all = record.stderrTail.split(RegExp(r'\r?\n')).map((l) => l.trimRight()).where((l) => l.isNotEmpty).toList();
-  return all.skip(all.length > lines ? all.length - lines : 0).join('\n');
+/// Use the engine's message, never infer a cause from raw log lines. C5 is
+/// available even when the terminal job record has not arrived or cannot load.
+String failureReason(LiveRenderStatus status, JobRecord? record) {
+  final saved = record?.id == status.jobId ? record!.message.trim() : '';
+  if (saved.isNotEmpty) return saved;
+  final live = status.message.trim();
+  return live.isNotEmpty ? live : 'The render could not be completed. Show the log for details.';
 }
 
 String _and(List<String> items) =>

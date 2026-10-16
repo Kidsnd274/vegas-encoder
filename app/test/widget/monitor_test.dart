@@ -138,12 +138,56 @@ void main() {
   });
 
   group('failed', () {
-    testWidgets('stays open with the reason and FFmpeg\'s last lines', (tester) async {
+    testWidgets('highlights the cause, hides trailing warnings and stays open until dismissed', (tester) async {
       final m = await pump(tester, status: liveSample(RenderState.failed), record: await recordFor(RenderState.failed));
       expect(find.text('Render failed'), findsOneWidget);
-      expect(find.text('Failed after 4:08. FFmpeg exited with code 1. Partial file removed.'), findsOneWidget);
-      expect(find.textContaining('Conversion failed!'), findsOneWidget);
-      await tester.pump(const Duration(minutes: 2));
+      expect(find.text('Why it failed'), findsOneWidget);
+      expect(find.text("FFmpeg: No such filter: 'vegas_encoder_deliberate_failure'"), findsOneWidget);
+      expect(find.textContaining('Conversion failed!'), findsNothing);
+      expect(find.textContaining('thread_queue_size'), findsNothing);
+      expect(find.text('Stays open until you close it.'), findsOneWidget);
+      await tester.pump(const Duration(minutes: 10));
+      expect(closed(m.window), isFalse);
+      await tester.tap(find.widgetWithText(VeButton, 'Close'));
+      await tester.pump();
+      expect(closed(m.window), isTrue);
+    });
+
+    testWidgets('shows the live cause immediately without waiting for the job record', (tester) async {
+      const cause = "FFmpeg: No such filter: 'vegas_encoder_deliberate_failure'";
+      final m = await pump(tester, status: liveSample(RenderState.failed).copyWith(message: cause));
+      expect(find.text(cause), findsOneWidget);
+      await tester.pump(monitorRecordInterval * (monitorRecordAttempts + 1));
+      expect(find.text(cause), findsOneWidget);
+      await tester.pump(const Duration(minutes: 10));
+      expect(closed(m.window), isFalse);
+    });
+
+    testWidgets('a failure cancels a pending automatic-close countdown', (tester) async {
+      final m = await pump(tester, status: liveAt(RenderState.done, 10), record: await recordFor(RenderState.done));
+      await tester.pump(const Duration(seconds: 3));
+      m.live.publish(liveFile, liveAt(RenderState.failed, 11));
+      await tester.pumpAndSettle();
+      expect(find.text('Stays open until you close it.'), findsOneWidget);
+      await tester.pump(const Duration(minutes: 10));
+      expect(closed(m.window), isFalse);
+    });
+
+    testWidgets('long errors can be scrolled without truncating the cause or hiding Close', (tester) async {
+      final cause = 'FFmpeg: No such filter: ${List.filled(40, 'long filter name').join(' ')} END';
+      final m = await pump(tester, status: liveSample(RenderState.failed).copyWith(message: cause));
+      expect(find.text(cause), findsOneWidget);
+      final text = tester.widget<Text>(find.text(cause));
+      expect(text.maxLines, isNull);
+      final panel = find.byKey(const ValueKey('monitor-failure-cause'));
+      await tester.drag(
+        find.descendant(of: panel, matching: find.byType(SingleChildScrollView)),
+        const Offset(0, -600),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.widgetWithText(VeButton, 'Close').hitTestable(), findsOneWidget);
+      await tester.pump(const Duration(seconds: 3));
       expect(closed(m.window), isFalse);
     });
 

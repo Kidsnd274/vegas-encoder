@@ -1,5 +1,28 @@
 # App workstream
 
+**Owner-directed monitor follow-up, 2026-10-16 (in `ws/platform`):** the owner
+explicitly requested clearer error display and no automatic close on failure.
+The bottom-right monitor now gives the authoritative C5/C6 cause a prominent
+error panel, with long-message scrolling from the beginning, a visible stay-open
+label and explicit Close. Trailing stderr warnings no longer replace the cause;
+Show log retains access to the full log. Failure display no longer waits for C6,
+and a failure cancels a previously started close countdown. This narrow frontend
+change follows the owner's request; it does not change general workstream
+ownership. Focused widget/unit/light+dark golden checks pass (50); updated normal
+and long-error images in both themes were visually inspected. Release staging and
+full app checks are recorded in the platform handoff. Real-host screenshot now
+confirms the prior native fix reaches VEGAS's error dialog; same-session
+post-error recovery and the new frontend's real-host retest remain open.
+
+Owner subsequently installed the error-ui variant and approved its appearance
+("looks good"); the real VEGAS screenshot shows the cause panel, stay-open label
+and Close action. Platform verified the installed trial and new failed C6 record.
+Presentation is accepted; timed/manual-dismissal behavior and successful
+same-session post-error recovery are not inferred from that screenshot.
+The owner subsequently chose to skip the extra same-session recovery render
+and proceed on the working assumption; that check is owner-deferred/unverified,
+not a pass or an active request. Payload and monitor checks are next.
+
 Updated: 2026-10-15 (Asia/Singapore). Branch `ws/app`. Status: **F0, F1, F4, F5 and F6
 done; F2 and F3 done except the parts waiting on platform** (listed under Needs). **The
 app runs on the native core (B2) and the platform's Windows services (B3)** (F7's

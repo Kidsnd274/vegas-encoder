@@ -296,7 +296,7 @@ Json Compile(const Json& request, const Json* capabilities) {
     if (audioInput && Str(paths,"audioPipe").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Enabled audio needs a pipe path.");
     bool partialCommand = false;
     Json tokens = Json::array(); Push(tokens,"exe",nullptr,{exe});
-    Push(tokens,"global",nullptr,{"-hide_banner","-nostdin","-loglevel","info","-stats_period","0.5","-progress","pipe:1"});
+    Push(tokens,"global",nullptr,{"-hide_banner","-nostdin","-loglevel","info","-stats_period","0.2","-progress","pipe:1"});
     if (Bool(paths,"overwriteOutput")) Push(tokens,"global",nullptr,{"-y"});
     const auto input = InputTokens(r,media,paths); Json res = Resolve(r); res["gopFrames"] = nullptr;
     const bool advanced = Str(r.at("command"),"mode") == "template";
