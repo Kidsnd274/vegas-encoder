@@ -321,6 +321,7 @@ SignalPathModel signalPathModel({
       catalog: catalog,
       media: media,
       compiled: compiled,
+      installation: installation,
       lengthSec: lengthSec,
       preview: preview,
     );
@@ -470,13 +471,14 @@ SignalConversion _videoConversion(core.StreamSignalFacts vf, int inDepth, int ou
 /// in Advanced mode it supplies what it can establish and leaves the rest
 /// null). The inactive Basic settings never appear. An unknown format claims
 /// no conversion either way and no wire label; the wire keeps VEGAS's depth.
-/// Encoder availability isn't shown: the core names the command's encoders by
-/// label only, and lint reports one missing from the chosen FFmpeg.
+/// Availability is shown only for the core's established encoder IDs; neither
+/// display labels nor inactive Basic settings supply one.
 SignalPathModel _commandSignalPath({
   required core.Recipe recipe,
   required core.ProfileCatalog catalog,
   required core.MediaDescription media,
   core.CompileResult? compiled,
+  core.FFmpegInstallation? installation,
   int? lengthSec,
   PreviewMedia preview = PreviewMedia.sample,
 }) {
@@ -486,6 +488,8 @@ SignalPathModel _commandSignalPath({
   }
 
   const fromCommand = 'From command';
+  final videoEncoderId = s('videoEncoderId');
+  final audioEncoderId = s('audioEncoderId');
   final facts = compiled?.signalPath;
   final issues = compiled?.issues ?? const <core.Issue>[];
   final sourceDepth = facts?.source?.video.bits ?? deliveredDepth(media.video.pixfmt) ?? 8;
@@ -507,7 +511,7 @@ SignalPathModel _commandSignalPath({
       codec: s('video') ?? fromCommand,
       inputBits: inDepth,
       outputBits: outDepth,
-      availability: null,
+      availability: videoEncoderId == null ? null : availabilityOf(installation, videoEncoderId),
       conversion: vf != null && vf.conversion == true ? _videoConversion(vf, inDepth, outDepth, issues) : null,
       formatLabel: outBits == null ? null : ['$outBits-bit', ?vf?.outputChroma].join(' '),
       inputLabel: vf?.inputBits == null ? null : '$inDepth-bit',
@@ -528,7 +532,7 @@ SignalPathModel _commandSignalPath({
       codec: s('audio') ?? fromCommand,
       inputBits: inBits,
       outputBits: outBits ?? inBits,
-      availability: null,
+      availability: audioEncoderId == null ? null : availabilityOf(installation, audioEncoderId),
       conversion: af != null && af.conversion == true
           ? SignalConversion(
               label: '${af.inputFormat ?? 'VEGAS samples'} to ${af.outputFormat ?? 'encoder format'}',

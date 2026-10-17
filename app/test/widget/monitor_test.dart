@@ -3,8 +3,10 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart';
+import 'package:vegas_encoder/app/app.dart';
 import 'package:vegas_encoder/design/components/button.dart';
 import 'package:vegas_encoder/features/monitor/monitor_window.dart';
+import 'package:vegas_encoder/features/monitor/monitor_precision.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/monitor.dart';
 import 'package:vegas_encoder/state/services.dart';
@@ -29,6 +31,60 @@ void main() {
 
   Finder rich(String text) => find.text(text, findRichText: true);
   bool closed(FakeWindowController w) => w.calls.contains('close');
+
+  testWidgets('header precision follows C5 facts, preserving unknowns without loading core or library', (tester) async {
+    final initial = liveAt(
+      RenderState.encoding,
+      10,
+    ).copyWith(outputBitDepth: null, pixelFormatConversionReducesPrecision: null);
+    final m = monitorOverrides(status: initial);
+    tester.view.physicalSize = view;
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          servicesOverride(),
+          ...m.overrides,
+          veCoreProvider.overrideWith((ref) => throw StateError('Monitor must not load core during a render')),
+          presetLibraryProvider.overrideWith(
+            (ref) => throw StateError('Monitor must not read library during a render'),
+          ),
+        ],
+        child: const VeApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(MonitorPrecision), findsNothing, reason: 'encoder text cannot supply missing depth');
+
+    Future<void> publish(int sequence, int? depth, bool? reduces) async {
+      m.live.publish(
+        liveFile,
+        initial.copyWith(sequence: sequence, outputBitDepth: depth, pixelFormatConversionReducesPrecision: reduces),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await publish(11, 8, true);
+    var glyph = tester.widget<MonitorPrecision>(find.byType(MonitorPrecision));
+    expect(glyph.outputBitDepth, 8);
+    expect(glyph.conversionReducesPrecision, isTrue);
+    expect(find.bySemanticsLabel('8-bit at encoder input. Pixel-format conversion reduces precision.'), findsOneWidget);
+
+    await publish(12, 10, false);
+    glyph = tester.widget<MonitorPrecision>(find.byType(MonitorPrecision));
+    expect(glyph.outputBitDepth, 10);
+    expect(glyph.conversionReducesPrecision, isFalse);
+
+    await publish(13, 10, null);
+    glyph = tester.widget<MonitorPrecision>(find.byType(MonitorPrecision));
+    expect(glyph.conversionReducesPrecision, isNull);
+    expect(find.bySemanticsLabel('10-bit at encoder input. Pixel-format precision change is unknown.'), findsOneWidget);
+
+    await publish(14, null, null);
+    expect(find.byType(MonitorPrecision), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('follows the live file from start to finish', (tester) async {
     final m = await pump(tester);
@@ -226,6 +282,24 @@ void main() {
       await tester.pump();
       expect(launcher.jobs, ['b0-render']);
     });
+
+    testWidgets('Show in History reports launch failure separately and keeps the render cause open', (tester) async {
+      final launcher = _Launcher()..fail = true;
+      final m = await pump(
+        tester,
+        status: liveSample(RenderState.failed),
+        record: await recordFor(RenderState.failed),
+        launcher: launcher,
+      );
+      await tester.tap(find.widgetWithText(VeButton, 'Show in History'));
+      await tester.pumpAndSettle();
+      expect(find.text('Couldn’t open Vegas Encoder: The desktop app could not be started.'), findsOneWidget);
+      expect(find.text("FFmpeg: No such filter: 'vegas_encoder_deliberate_failure'").hitTestable(), findsOneWidget);
+      expect(find.text('Stays open until you close it.'), findsOneWidget);
+      await tester.pump(const Duration(minutes: 1));
+      expect(closed(m.window), isFalse);
+      expect(tester.takeException(), isNull);
+    });
   });
 
   testWidgets('the pin keeps the window on top and is remembered (C7)', (tester) async {
@@ -282,8 +356,12 @@ void main() {
 
 class _Launcher implements DesktopAppLauncher {
   final List<String> jobs = [];
+  bool fail = false;
   @override
   Future<void> openPreset(String presetId) async {}
   @override
-  Future<void> openJob(String jobId) async => jobs.add(jobId);
+  Future<void> openJob(String jobId) async {
+    if (fail) throw const ServiceException('APP-LAUNCH', 'The desktop app could not be started.');
+    jobs.add(jobId);
+  }
 }

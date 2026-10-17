@@ -44,6 +44,9 @@ static class Native
     [StructLayout(LayoutKind.Sequential)]
     public struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct COPYDATASTRUCT { public UIntPtr dwData; public uint cbData; public IntPtr lpData; }
+
     [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
     [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc proc, IntPtr lparam);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
@@ -60,6 +63,7 @@ static class Native
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hwnd, int cmd);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    [DllImport("user32.dll")] public static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint message, IntPtr wparam, ref COPYDATASTRUCT data, uint flags, uint timeout, out UIntPtr result);
     [DllImport("user32.dll")] public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
     [DllImport("user32.dll")] public static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
     [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
@@ -170,7 +174,7 @@ static class Probe
         }
         var runs = args.Length > 3 ? int.Parse(args[3]) : 10;
         _request = Environment.GetEnvironmentVariable("VE_SPIKE_REQUEST");
-        if ((what == "start" || what == "owner" || what == "close" || what == "all") && (_request == null || !File.Exists(_request)))
+        if ((what == "start" || what == "owner" || what == "close" || what == "integration" || what == "all") && (_request == null || !File.Exists(_request)))
         {
             Console.WriteLine("Set VE_SPIKE_REQUEST to the C4 request fixture (run_window_spikes.ps1 does).");
             return 2;
@@ -187,6 +191,7 @@ static class Probe
             if (what == "close") CloseFocus();
             if (what == "monitor" || what == "all") Monitor();
             if (what == "theme" || what == "all") Theme();
+            if (what == "integration") DesktopIntegration();
         }
         finally
         {
@@ -263,6 +268,115 @@ static class Probe
     }
 
     static string Yes(bool b) => b ? "yes" : "NO";
+
+    static void Require(bool condition, string message)
+    {
+        Log(message + ": " + Yes(condition));
+        if (!condition) throw new InvalidOperationException(message);
+    }
+
+    static bool WaitForStage(string trace, string stage)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < 6000)
+        {
+            try { if (File.ReadAllLines(trace).Any(l => l.EndsWith(" " + stage))) return true; }
+            catch (IOException) { }
+            Thread.Sleep(20);
+        }
+        return false;
+    }
+
+    static bool WaitForRoute(string trace, string kind, string id) => WaitForStage(trace, "desktop_route_applied " + kind + " " + id);
+
+    static void HandoffExited(Process process, string message)
+    {
+        var exited = process.WaitForExit(9000);
+        if (!exited) { process.Kill(); process.WaitForExit(); }
+        Require(exited && process.ExitCode == 0, message);
+    }
+
+    static bool SendRouteData(IntPtr window, string payload, uint tag = 0x56454E31)
+    {
+        var bytes = Encoding.ASCII.GetBytes(payload);
+        var buffer = Marshal.AllocHGlobal(bytes.Length);
+        try
+        {
+            Marshal.Copy(bytes, 0, buffer, bytes.Length);
+            var data = new Native.COPYDATASTRUCT { dwData = new UIntPtr(tag), cbData = (uint)bytes.Length, lpData = buffer };
+            return Native.SendMessageTimeout(window, 0x004A, IntPtr.Zero, ref data, 0x23, 2000, out var result) != IntPtr.Zero && result.ToUInt64() == 1;
+        }
+        finally { Marshal.FreeHGlobal(buffer); }
+    }
+
+    // Only selected by `integration`: real runner, fake owner, isolated data.
+    // No theme changes, installed exporter, FFmpeg process or VEGAS process.
+    static void DesktopIntegration()
+    {
+        var root = Environment.GetEnvironmentVariable("VEGAS_ENCODER_DATA_ROOT");
+        if (root == null) throw new InvalidOperationException("An isolated data root is required.");
+        Log("== desktop routes / profile isolation / popup physical size ==");
+        var trace = Path.Combine(_out, "desktop-routes.txt");
+        using (var first = Launch("--open-preset yt-h264", new Dictionary<string, string> { { "VEGAS_ENCODER_STARTUP_TRACE", trace } }))
+        {
+            IntPtr desktop = IntPtr.Zero;
+            try
+            {
+                Require(WaitForStage(trace, "desktop_instance_acquired"), "first process acquires profile before startup race");
+                // A second launch while the first engine is starting must be
+                // queued/drained rather than discarded or create a new window.
+                using (var early = Launch("--open-preset av1-small"))
+                    HandoffExited(early, "startup handoff acknowledged");
+                desktop = FindAppWindow(first.Id);
+                Require(desktop != IntPtr.Zero && WaitForRoute(trace, "preset", "yt-h264") && WaitForRoute(trace, "preset", "av1-small"), "cold and queued preset routes applied");
+                Native.ShowWindow(desktop, Native.SW_MINIMIZE);
+                using (var warm = Launch("--open-preset ffv1-master", new Dictionary<string, string> { { "VEGAS_ENCODER_DATA_ROOT", root.ToUpperInvariant() + "\\" } }))
+                    HandoffExited(warm, "equivalent profile forwards to existing process");
+                Require(WaitForRoute(trace, "preset", "ffv1-master") && !Native.IsIconic(desktop), "warm route applied and desktop restored");
+                Require(!SendRouteData(desktop, "preset\nyt-h264", 0) && !SendRouteData(desktop, "preset\n../escape") && !SendRouteData(desktop, "preset\n" + new string('a', 129)) && !SendRouteData(desktop, "preset\nCON"), "foreign, path, oversized and reserved destinations refused");
+                var otherTrace = Path.Combine(_out, "desktop-other-profile.txt");
+                using (var other = Launch("--open-preset av1-small", new Dictionary<string, string> {
+                    { "VEGAS_ENCODER_DATA_ROOT", Path.Combine(root, "different-profile") },
+                    { "VEGAS_ENCODER_STARTUP_TRACE", otherTrace } }))
+                {
+                    var otherWindow = FindAppWindow(other.Id);
+                    Require(otherWindow != IntPtr.Zero && WaitForRoute(otherTrace, "preset", "av1-small"), "different profile owns an independent desktop");
+                    Require(CloseAndWait(other, otherWindow), "other profile closes cleanly");
+                }
+            }
+            finally { CloseAndWait(first, desktop); }
+        }
+        using (var host = new FakeHost("Fake VEGAS popup-size owner", new Rectangle(250, 150, 1100, 800)))
+        {
+            var roaming = Path.Combine(root, "Roaming");
+            Directory.CreateDirectory(roaming);
+            var ownerScale = Native.GetDpiForWindow(host.Handle) / 96.0;
+            var physicalSize = new Size((int)Math.Ceiling(1020 * ownerScale), (int)Math.Ceiling(700 * ownerScale));
+            foreach (var size in new[] { physicalSize, new Size(32768, 32768) })
+            {
+                var settings = Path.Combine(roaming, "machine.json");
+                File.WriteAllText(settings, "{\"machine\":1,\"revision\":0,\"installations\":[],\"defaultFFmpegId\":null,\"progressWindow\":true,\"keepOnTop\":false,\"verifyOutput\":true,\"theme\":\"system\",\"uiState\":{\"desktopWindowBounds\":{\"x\":25,\"y\":30,\"width\":1200,\"height\":800},\"desktopMaximized\":false,\"lastSizeLengthText\":\"3:00\",\"popupWindowSize\":{\"width\":" + size.Width + ",\"height\":" + size.Height + "}}}");
+                var dir = NewSession(host.Handle);
+                using (var popup = Launch("--edit-session \"" + dir + "\""))
+                {
+                    var hwnd = FindAppWindow(popup.Id);
+                    Thread.Sleep(200);
+                    Native.GetWindowRect(hwnd, out var rect);
+                    var work = WorkArea(host.Handle);
+                    // Invisible resize borders may extend beyond the work area.
+                    var dpi = Native.GetDpiForWindow(hwnd);
+                    var border = (int)Math.Ceiling(16 * dpi / 96.0);
+                    Require(hwnd != IntPtr.Zero && Native.GetWindow(hwnd, Native.GW_OWNER) == host.Handle, "remembered popup remains owned");
+                    Require(rect.Top >= work.Top && rect.Bottom <= work.Bottom + border && rect.Left >= work.Left - border && rect.Right <= work.Right + border, "popup clamped to owner monitor work area");
+                    if (size.Width < work.Width && size.Height < work.Height)
+                        Require(rect.Width == size.Width && rect.Height == size.Height, "remembered outer physical size restored without rescaling");
+                    Require(CloseAndWait(popup, hwnd), "remembered popup closes cleanly");
+                }
+                var saved = File.ReadAllText(settings);
+                Require(saved.Contains("\"lastSizeLengthText\":\"3:00\"") && saved.Contains("\"desktopWindowBounds\""), "popup size save preserves desktop UI state");
+            }
+        }
+    }
 
     /// A fresh session directory holding the fixture request (C4), owned by
     /// [owner] when given (the fake host), as the exporter's page writes it.

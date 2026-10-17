@@ -91,6 +91,26 @@ bool FlutterWindow::OnCreate() {
   channel_->SetMethodCallHandler([this](const auto& call, auto result) {
     HandleMethodCall(call, std::move(result));
   });
+  if (options().kind == LaunchKind::kDesktop) {
+    desktop_channel_ = std::make_unique<flutter::MethodChannel<EncodableValue>>(
+        flutter_controller_->engine()->messenger(), "vegas_encoder/desktop",
+        &flutter::StandardMethodCodec::GetInstance());
+    desktop_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
+      if (call.method_name() != "ready") {
+        result->NotImplemented();
+        return;
+      }
+      flutter::EncodableList queued;
+      for (const auto& route : pending_desktop_routes_) {
+        queued.emplace_back(EncodableMap{
+            {EncodableValue("kind"), EncodableValue(route.kind)},
+            {EncodableValue("id"), EncodableValue(route.id)}});
+      }
+      pending_desktop_routes_.clear();
+      desktop_ready_ = true;
+      result->Success(EncodableValue(queued));
+    });
+  }
 
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
@@ -121,6 +141,7 @@ void FlutterWindow::OnDestroy() {
     SingleInstance::UnmarkWindow(GetHandle());
   }
   channel_ = nullptr;
+  desktop_channel_ = nullptr;
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -140,9 +161,22 @@ void FlutterWindow::HandleMethodCall(
     // The popup over its owner, the progress window on VEGAS's monitor, or
     // the desktop at its remembered bounds.
     std::optional<RECT> on_owner;
+    std::optional<SIZE> popup_size;
+    if (options().kind == LaunchKind::kEditSession) {
+      if (const auto* value = Find(args, "popupSize")) {
+        if (const auto* size = std::get_if<EncodableMap>(value)) {
+          const auto width = AsInt(Find(*size, "width"));
+          const auto height = AsInt(Find(*size, "height"));
+          if (width && height && *width > 0 && *width <= 32768 &&
+              *height > 0 && *height <= 32768) {
+            popup_size = SIZE{static_cast<LONG>(*width), static_cast<LONG>(*height)};
+          }
+        }
+      }
+    }
     if (auto owner = AsInt(Find(args, "ownerHwnd"))) {
       on_owner =
-          OwnerBounds(reinterpret_cast<HWND>(static_cast<intptr_t>(*owner)));
+          OwnerBounds(reinterpret_cast<HWND>(static_cast<intptr_t>(*owner)), popup_size);
     }
     std::optional<RECT> on_host;
     if (auto host = AsInt(Find(args, "hostHwnd"))) {
@@ -299,6 +333,19 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  if (message == WM_COPYDATA) {
+    if (options().kind != LaunchKind::kDesktop || !desktop_channel_) return FALSE;
+    const auto route = SingleInstance::ReadRoute(reinterpret_cast<const COPYDATASTRUCT*>(lparam));
+    if (!route || (!desktop_ready_ && pending_desktop_routes_.size() >= 16)) return FALSE;
+    // Only copy/enqueue or dispatch a tiny route here: no filesystem/core work
+    // and no Dart acknowledgment is required by the sending process.
+    if (!desktop_ready_) pending_desktop_routes_.push_back(*route);
+    else desktop_channel_->InvokeMethod("route", std::make_unique<EncodableValue>(EncodableMap{
+        {EncodableValue("kind"), EncodableValue(route->kind)},
+        {EncodableValue("id"), EncodableValue(route->id)}}));
+    startup_trace::Mark("desktop_route_received " + route->kind + " " + route->id);
+    return TRUE;
+  }
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

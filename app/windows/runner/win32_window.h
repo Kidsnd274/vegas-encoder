@@ -43,12 +43,13 @@ class Win32Window {
   RECT GetClientArea();
 
   // Makes |owner| this window's owner (GWLP_HWNDPARENT) and returns where the
-  // window goes: centred on the owner at the window's default size for the
-  // owner's monitor and its DPI, inside that monitor's work area. Nullopt if
+  // window goes: centred on the owner at the remembered physical outer size,
+  // or default logical size at the owner's DPI, clamped to its work area and
+  // DPI-dependent minimum. Nullopt if
   // |owner| is not a window. Put it there with RestoreBounds before Show, so
   // it never jumps; on a monitor with another DPI that resizes the Flutter
   // view, so do it after replying to Dart (FlutterWindow::HandleMethodCall).
-  std::optional<RECT> OwnerBounds(HWND owner);
+  std::optional<RECT> OwnerBounds(HWND owner, std::optional<SIZE> popup_size = std::nullopt);
   HWND owner() const { return owner_; }
 
   // Progress window only: where it goes for VEGAS's main window |host| (C5

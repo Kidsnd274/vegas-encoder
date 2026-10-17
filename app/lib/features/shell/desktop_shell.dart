@@ -1,16 +1,20 @@
+import 'dart:async';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ve_services/ve_services.dart' show DesktopWindowBounds, ServiceException;
+import 'package:ve_services/ve_services.dart' show DesktopRoute, DesktopWindowBounds, ServiceException;
 
+import '../../app/launch.dart';
 import '../../design/components/button.dart';
 import '../../design/components/dialog.dart';
 import '../../design/components/title_bar.dart';
 import '../../design/tokens.dart';
 import '../../state/app_state.dart';
+import '../../state/desktop_interaction.dart';
+import '../../state/desktop_routes.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
 import '../../state/ui_state.dart';
@@ -51,17 +55,72 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
   /// last window. Unsaved presets ask first (UI_SPEC §2).
   late final AppLifecycleListener _lifecycle = AppLifecycleListener(onExitRequested: _onExitRequested);
   bool _asking = false;
+  StreamSubscription<DesktopRoute>? _routes;
+  Future<void> _routeWork = Future.value();
+  final Completer<void> _routeStop = Completer<void>();
 
   @override
   void initState() {
     super.initState();
     _lifecycle;
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_startRoutes()));
   }
 
   @override
   void dispose() {
+    _routeStop.complete();
+    unawaited(_routes?.cancel());
     _lifecycle.dispose();
     super.dispose();
+  }
+
+  Future<void> _startRoutes() async {
+    if (!mounted) return;
+    final source = ref.read(desktopRouteSourceProvider);
+    _routes = source.changes.listen(_queueRoute);
+    final mode = ref.read(launchModeProvider);
+    if (mode is DesktopLaunch) {
+      if (mode.route case final route?) _queueRoute(route);
+      if (mode.error case final error?) unawaited(_routeError(error));
+    }
+    for (final route in await source.start()) {
+      if (!mounted) return;
+      _queueRoute(route);
+    }
+  }
+
+  void _queueRoute(DesktopRoute route) {
+    _routeWork = _routeWork.then((_) async {
+      if (!mounted) return;
+      final gate = ref.read(desktopInteractionProvider);
+      Future<bool> idle() => gate.waitUntilIdle(cancelled: _routeStop.future);
+      if (!await idle() || !mounted) return;
+      final container = ProviderScope.containerOf(context, listen: false);
+      String? error;
+      try {
+        error = await openDesktopRoute(container, route, isMounted: () => mounted, beforeApply: idle);
+      } on Object {
+        error = 'Vegas Encoder couldn’t read the requested item. Try opening it from the library or History.';
+      }
+      if (!mounted) return;
+      if (error != null) {
+        await _routeError(error);
+      } else {
+        setState(() => _gallery = false);
+        unawaited(ref.read(windowControllerProvider).trace('desktop_route_applied ${route.kind} ${route.id}'));
+      }
+    });
+  }
+
+  Future<void> _routeError(String message) async {
+    if (!mounted) return;
+    if (!await ref.read(desktopInteractionProvider).waitUntilIdle(cancelled: _routeStop.future) || !mounted) return;
+    await showVeDialog<void>(
+      context,
+      title: 'Couldn’t open the requested item',
+      message: message,
+      actions: const [VeDialogAction('OK', null, variant: VeButtonVariant.primary)],
+    );
   }
 
   /// Remembers where the window is (C7 `uiState`) for the next start. A
@@ -86,7 +145,9 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     return AppExitResponse.exit;
   }
 
-  Future<AppExitResponse> _onExitRequested() async {
+  Future<AppExitResponse> _onExitRequested() => ref.read(desktopInteractionProvider).run(_onExitGuarded);
+
+  Future<AppExitResponse> _onExitGuarded() async {
     final drafts = ref.read(presetsControllerProvider).drafts;
     if (drafts.isEmpty) return _exit();
     if (_asking || !mounted) return AppExitResponse.cancel;

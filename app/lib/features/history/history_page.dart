@@ -8,6 +8,7 @@ import 'package:ve_services/ve_services.dart';
 import '../../design/components/page_header.dart';
 import '../../design/tokens.dart';
 import '../../state/app_state.dart';
+import '../../state/desktop_interaction.dart';
 import '../../state/history.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
@@ -52,7 +53,10 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with VeToastHost {
 
   /// "Open settings as new preset": a preset in Mine with the settings this
   /// render used, opened in Presets.
-  Future<void> _openAsPreset(JobRecord record) async {
+  Future<void> _openAsPreset(JobRecord record) =>
+      ref.read(desktopInteractionProvider).run(() => _openAsPresetGuarded(record));
+
+  Future<void> _openAsPresetGuarded(JobRecord record) async {
     final Preset? created;
     try {
       created = await ref.read(presetsControllerProvider.notifier).createFromJob(record);

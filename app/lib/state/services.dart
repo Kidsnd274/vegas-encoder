@@ -7,6 +7,8 @@ import 'package:ve_services/ve_services.dart';
 import '../app/launch.dart';
 import 'app_state.dart';
 
+export 'package:ve_services/ve_services.dart' show DesktopAppLauncher;
+
 // The app's only ways into the core (C2) and the system (C3). The core is the
 // real C++ core (B2); the services are the platform's Windows services (B3),
 // composed once in [servicesProvider]. Tests override that with the platform's
@@ -227,14 +229,11 @@ final editSessionServiceProvider = Provider<EditSessionService>((ref) => ref.wat
 
 /// Starts the desktop app on a preset ("Open in Vegas Encoder", UI_SPEC §4)
 /// or on a job in History (the progress window's "Show in History", §12).
-abstract interface class DesktopAppLauncher {
-  Future<void> openPreset(String presetId);
-  Future<void> openJob(String jobId);
-}
-
-/// No C3 service starts the desktop app yet (workstreams/app.md, Needs), so
-/// this is null and the popup and the progress window say why. Tests supply one to check the action.
-final desktopAppLauncherProvider = Provider<DesktopAppLauncher?>((ref) => null);
+/// Kept separate from WindowsServices so a monitor can launch the desktop
+/// without loading the core or library. Widget tests explicitly inject a fake.
+final desktopAppLauncherProvider = Provider<DesktopAppLauncher?>(
+  (ref) => Platform.environment.containsKey('FLUTTER_TEST') ? null : WindowsDesktopAppLauncher(),
+);
 
 /// The installations discovery knows about, kept current.
 final discoveredInstallationsProvider = StreamProvider<List<FFmpegInstallation>>(

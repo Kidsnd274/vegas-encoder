@@ -17,3 +17,4 @@ export 'src/process_runner.dart';
 export 'src/windows_gpu.dart';
 export 'src/windows_services.dart';
 export 'src/capabilities.dart';
+export 'src/desktop_app.dart';

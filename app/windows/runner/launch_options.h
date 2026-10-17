@@ -2,6 +2,7 @@
 #define RUNNER_LAUNCH_OPTIONS_H_
 
 #include <string>
+#include <optional>
 #include <vector>
 
 // The three ways VegasEncoder.exe runs (TECH_ARCHITECTURE §9.2). The runner only
@@ -11,6 +12,12 @@ enum class LaunchKind {
   kDesktop,        // user-started library app; single instance
   kEditSession,    // --edit-session <dir>: popup owned by VEGAS's dialog
   kRenderMonitor,  // --render-monitor <file>: progress window, never activates
+};
+
+struct DesktopRoute {
+  std::string kind;
+  std::string id;
+  bool valid() const;
 };
 
 struct LaunchOptions {
@@ -24,6 +31,8 @@ struct LaunchOptions {
   bool resizable = true;
   // Shown with SW_SHOWNOACTIVATE and WS_EX_NOACTIVATE; clicks never activate it.
   bool no_activate = false;
+  std::optional<DesktopRoute> desktop_route;
+  bool invalid_desktop_route = false;
 
   // The first of --edit-session or --render-monitor decides the kind, the same
   // rule as the Dart parser. Anything else is the desktop app.

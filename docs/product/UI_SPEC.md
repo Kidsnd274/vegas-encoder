@@ -1,6 +1,6 @@
 # UI behaviour specification
 
-Updated: 2026-10-16 (Asia/Singapore). One agent now owns app/platform integration
+Updated: 2026-10-17 (Asia/Singapore). App/platform integration follows one queue
 in the original checkout; use [NEXT_AGENT](../NEXT_AGENT.md) for current work.
 Status: behaviour reference, updated for the chosen
 direction; §1, §9, §10 and §11 record what the app workstream built in F0 and F1, §2
@@ -20,8 +20,8 @@ The vocabulary is fixed in the brief §2.
 
 | Window | Default | Minimum | Notes |
 | --- | --- | --- | --- |
-| Desktop app | 1440×900 | 1100×700 | Remembers size, position and maximized (C7 `uiState`; clamped to a current monitor on restore); single instance |
-| Popup editor | 1120×740 | 960×640 | Owned by the VEGAS dialog its session names and centred on it, on that monitor's DPI; resizable. Should remember size, not position: C7 `popupWindowSize` exists; app/runner adoption remains |
+| Desktop app | 1440×900 | 1100×700 | Remembers size, position and maximized (C7 `uiState`; clamped to a current monitor on restore); single instance per data profile, including preset/job navigation handoff |
+| Popup editor | 1120×740 | 960×640 | Owned by the VEGAS dialog its session names and centred on it, on that monitor's DPI; resizable. Remembers physical outer size through C7 `popupWindowSize`, never position; clamps to the current monitor and minimum size |
 | Native page | Host-defined | — | Win32 inside VEGAS; see the mock |
 
 Below 1280 px width the desktop app collapses the library to an icon rail (library and
@@ -63,8 +63,10 @@ bottom as a collapsible "Library and command" strip, collapsed, with a one-line 
   preset the menu says these carry the saved version.
 - **Add menu (`+` beside the search):** New preset; Import share string… (the field starts
   with the clipboard when it holds a `vepreset:` string; the preset lands in Mine, keeps
-  its name and is selected); Import file… (still disabled in the app; C3
-  `PresetTransfer.importFrom` is delivered and awaits UI wiring).
+  its name and is selected); Import file… opens the Windows `.vepreset` picker and
+  delegates bounded validation to C3 `PresetTransfer.importFrom`. A successful import
+  creates a new preset in Mine, selects it and clears filters/search. Cancelling the
+  picker or refusing invalid input leaves the current selection unchanged.
 - **Empty search:** "No presets match 'xyz'." plus a **New preset** action (a preset in
   Mine started from the first built-in, named "New preset") and **Show all presets**.
 - **Error mark:** a preset the core finds errors in, for the chosen FFmpeg, shows an
@@ -260,10 +262,9 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
 - **Editor bar:** "FFmpeg command", then the message at the caret (or "{inputs} and
   {output} are locked."), "Line 3, column 12", and the Ctrl Space hint.
 - **Highlighting** comes from the compile's token spans (`sourceStart`/`sourceEnd`).
-  Option names are bold (the command view's display rule); a word's stage colour, the
-  line stripes for stages and macro styling follow the core's token roles. B2 gives
-  Advanced words only `extra`, so today only the chips and the `{inputs}`/`{output}` lines
-  are coloured (workstreams/app.md, Needs).
+  Option names are bold from C2 `isOption`; stage colours/stripes and embedded or
+  quoted macro styling follow the core's `stage`/`macros` metadata. Missing metadata
+  does not turn a leading dash into an option or invent a command stage.
 - **Locked chips:** `{inputs}` and `{output}` (the core's `input`/`output` token spans)
   are drawn as chips with a lock badge at the top-right corner, kept inside the chip's
   line so it never covers the line above. The caret never rests inside one (a click goes to
@@ -290,8 +291,9 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
   description, type and default; encoders after `-c:v`/`-c:a` show Ready, Not in this
   FFmpeg or Failed test from the core. Header: "Options" or "Values for -tune" and where
   they come from; footer "Tab or Enter inserts".
-- **Macros panel:** the macros the core offers, each with what it is for and the value the
-  core expands it to for the sample ("1920", "30000/1001", `{gop:2s}` "60"). Click to
+- **Macros panel:** `VeCore.macros` supplies the catalogue, descriptions and values
+  using the active recipe, media and paths (the desktop preview uses its labelled
+  sample: "1920", "30000/1001", `{gop:2s}` "60"). Click to
   insert at the caret, with a space either side where needed. `{inputs}` and `{output}`
   say "Required, locked"; when the command has lost one it says "Required, missing:
   insert" and inserts.
@@ -303,7 +305,8 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
 - **Signal path** (§2): dashed nodes from the core's facts for the active command only:
   the encoder and codec it names ("From command" when none), "From command, slow", the
   muxer `-f` names or "From file name" without one. Unknown formats claim no conversion,
-  no wire label and no availability; the wire keeps VEGAS's depth. Nodes open no settings;
+  no wire label; availability uses only established summary encoder IDs, and unknown
+  IDs show no availability. The wire keeps VEGAS's depth. Nodes open no settings;
   selecting one puts the caret in the editor.
 - **No size estimate** in Advanced mode. The library row's **Advanced** tag leads its
   summary line ("[Advanced] x265, your command") and follows the draft.
@@ -331,7 +334,9 @@ commits the result on VEGAS's own Apply/OK is B6 work behind A5–A7.
 
 - The app reads the session's `request.json` (C4) before the window shows, and the VEGAS
   dialog the request names (`ownerHwnd`) owns the window. It is centred on that dialog at
-  the default size for that monitor's DPI, inside its work area.
+  the remembered physical outer size (or that monitor's DPI-scaled default), clamped
+  to its work area and current minimum. Apply, Cancel and window close save only size
+  through revision-checked settings writes; a settings failure never prevents closing.
 - A request that is missing or can't be read: "Vegas Encoder couldn’t open this template:
   <reason>. Closing this window leaves the template as it was." Apply is off; closing
   writes nothing, which VEGAS treats as Cancel.
@@ -376,8 +381,8 @@ Switching mode or editing the command counts as a change.
   revision 5." and **Update from library**; "Not in the library" with **Save as new
   preset…**; "Made in VEGAS. Save it to the library to use it in other templates.";
   otherwise "Up to date with the library preset." **Open in Vegas Encoder** opens the
-  desktop app on the origin preset, for library work. It waits for a platform service
-  and is disabled with that reason.
+  desktop app on the origin preset, for library work. It starts or hands off to the
+  desktop in the same data profile; a removed preset or failed launch is explained.
 - **Command** and **Checks**, as on the desktop (Basic). In Advanced mode: "N diagnostics.
   Edit it below the diagram."
 - Below 1040 px the side column is the collapsible "Library and command" strip (§1).
@@ -704,16 +709,16 @@ performance rule: TECH_ARCHITECTURE §5.6. Built in F6; as built:
 | Size | 380×340 (the mockup's content; the earlier "about 380×250" didn't fit it); not resizable; 16 px in from the bottom-right corner of the work area of the monitor VEGAS's main window is on (C5 `hostHwnd`), at that monitor's DPI. Without a usable handle: the foreground window's monitor |
 | Showing | Appears when a render starts **without taking focus**, and a click on it doesn't take it either. Keep on top is a pin in the title bar, remembered in C7 `keepOnTop` (the same setting as in Settings) and applied before the first frame; **off by default** (owner, 2026-10-12). Mockup S6 shows it pinned |
 | Title | "Rendering, 42%"; "Starting the render", "Finishing the file", "Checking the output"; "Rendered", "Render failed", "Render cancelled"; "Waiting for the render" until the file appears |
-| Header | Output file name, then the encoder summary as the engine writes it; the folder once done. **No wire glyph yet:** C5 carries nullable output depth/reduction facts; frontend adoption remains |
+| Header | Output file name, then the encoder summary as the engine writes it; the folder once done. A wire glyph shows known C5 encoder-input depth, with an amber pip only for explicit precision reduction. Unknown conversion has a gap and explanatory tooltip/semantics; unknown depth omits the glyph. These are compiled input facts before codec compression, not measured file precision |
 | Progress | A video-wire bar with a round head; percentage (rounded down, so 100% means every frame went to FFmpeg) and "Frame 9,607 of 22,873". With no total: no fill, "Rendering", "Frame 9,607" |
 | Figures | Encoding fps, speed (× realtime), bitrate, size so far, final size ("about"; the engine's estimate, `estimatedFinalBytes`) and time left with the total. A figure the engine hasn't written shows a dash; the app computes none of them |
 | Finishing | "Finishing" then "Checking", with the frame count. The engine doesn't say whether a fast-start index is being written, so the window doesn't either |
 | Done | The result sentence as in History, plus the output check: "Rendered 12:43 in 4:07, 3.09× realtime, 2.93 GB. Output checked: h264 and aac, as set." (from the job record, C6). Without the record, "Rendered in 4:07, 2.06× realtime." **Open folder** (Explorer, file selected) and **Close**. "Closes in 10 s", counting; while the pointer is over the window, "Stays open while the pointer is here", and the count resumes when it leaves |
-| Failed | A prominent error-coloured **Why it failed** panel with the engine's causal message (for example, "FFmpeg: No such filter: '…'"). Shows C5 immediately, then the matching C6 message when available; never infers a cause from stderr or replaces it with trailing warnings. Long messages scroll from the beginning without truncation. **Show in History** (disabled until a service can start the desktop app), **Show log** (full FFmpeg log in Explorer; disabled when unavailable), and **Close**. Explicitly says **Stays open until you close it**; a failure cancels any existing auto-close countdown (owner, 2026-10-16) |
+| Failed | A prominent error-coloured **Why it failed** panel with the engine's causal message (for example, "FFmpeg: No such filter: '…'"). Shows C5 immediately, then the matching C6 message when available; never infers a cause from stderr or replaces it with trailing warnings. Long messages scroll from the beginning without truncation. **Show in History** opens the desktop app on that job; launch errors appear separately from the render cause. **Show log** reveals the full FFmpeg log in Explorer (disabled when unavailable). **Close** dismisses the window. Explicitly says **Stays open until you close it**; a failure cancels any existing auto-close countdown (owner, 2026-10-16) |
 | Cancelled | "Cancelled in VEGAS after 1:12."; closes after 5 s, with the same pointer rule |
 | No news | While starting or encoding, 30 s without a new status: the footer says "No news from the render for 30 s. If VEGAS stopped, close this." It never ends the render or closes the window; a new status clears it. Not shown while checking the output (ffprobe can take minutes) |
 | Cancel | Not offered: rendering is cancelled in VEGAS's own dialog, and the footer says so |
-| Updates | Redraws only when the status changes (at most twice a second); no animation beyond the bar moving. Reduced motion changes nothing else |
+| Updates | Redraws only when the status changes (ordinary samples at most five times a second, phase changes immediate); no animation beyond the bar moving. Reduced motion changes nothing else. Real-host cadence/overhead remain unqualified |
 | Reading | While VEGAS renders it reads the live file and machine settings only: no core, no library. After the end it reads the job record, which loads the core |
 
 B5's outcome: the owner dropped custom text in VEGAS's render dialog, so this window

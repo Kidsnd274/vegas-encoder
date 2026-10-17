@@ -313,7 +313,7 @@ RECT Win32Window::RestoredBounds(bool* maximized) {
   return rect;
 }
 
-std::optional<RECT> Win32Window::OwnerBounds(HWND owner) {
+std::optional<RECT> Win32Window::OwnerBounds(HWND owner, std::optional<SIZE> popup_size) {
   if (window_handle_ == nullptr || owner == nullptr || !IsWindow(owner)) {
     return std::nullopt;
   }
@@ -333,10 +333,17 @@ std::optional<RECT> Win32Window::OwnerBounds(HWND owner) {
   const int border_y = options_.resizable ? ResizeBorderY(dpi) : 0;
   const int work_width = work.right - work.left;
   const int work_height = work.bottom - work.top;
-  const int width = std::min(Scale(options_.width, scale_factor) + 2 * border_x,
-                             work_width + 2 * border_x);
-  const int height = std::min(Scale(options_.height, scale_factor) + border_y,
-                              work_height + border_y);
+  const bool remembered = options_.kind == LaunchKind::kEditSession && popup_size.has_value();
+  // C7 is physical outer dimensions: never scale a remembered size again.
+  // Minimum controls still follow the current owner's monitor DPI.
+  const int requested_width = remembered ? popup_size->cx : Scale(options_.width, scale_factor) + 2 * border_x;
+  const int requested_height = remembered ? popup_size->cy : Scale(options_.height, scale_factor) + border_y;
+  const int width = std::min(
+      std::max(requested_width, Scale(options_.min_width, scale_factor) + 2 * border_x),
+      work_width + 2 * border_x);
+  const int height = std::min(
+      std::max(requested_height, Scale(options_.min_height, scale_factor) + border_y),
+      work_height + border_y);
   // Centred on the owner; the whole window, title bar included, inside the
   // work area (the invisible resize borders may hang over its edges).
   const int x = std::max(

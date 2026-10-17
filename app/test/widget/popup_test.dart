@@ -184,6 +184,27 @@ void main() {
       expect(window.calls, contains('close'));
     });
 
+    testWidgets('Apply remembers the restored physical size before closing', (tester) async {
+      await pump(tester);
+      window.restored = (bounds: (x: -1100, y: 70, width: 1280, height: 800), maximized: false);
+      await keys(tester, LogicalKeyboardKey.enter, control: true);
+      final saved = await container(tester).read(machineSettingsRepositoryProvider).read();
+      expect(saved.uiState!.popupWindowSize!.width, 1280);
+      expect(saved.uiState!.popupWindowSize!.height, 800);
+      expect(window.calls, contains('close'));
+    });
+
+    testWidgets('Cancel remembers size without saving the template changes', (tester) async {
+      await pump(tester);
+      window.restored = (bounds: (x: 70, y: 80, width: 1180, height: 760), maximized: false);
+      await tap(tester, find.widgetWithText(VeButton, 'Cancel'));
+      final saved = await container(tester).read(machineSettingsRepositoryProvider).read();
+      expect(saved.uiState!.popupWindowSize!.width, 1180);
+      expect(saved.uiState!.popupWindowSize!.height, 760);
+      expect(result()!.action, 'cancel');
+      expect(window.calls, contains('close'));
+    });
+
     testWidgets('Esc with changes asks first; Keep editing keeps the popup open', (tester) async {
       await pump(tester);
       await tester.enterText(fieldWith('17'), '20');

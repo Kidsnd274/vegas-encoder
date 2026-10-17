@@ -314,6 +314,19 @@ class PresetsController extends Notifier<PresetsState> implements RecipeEditor {
     return created;
   }
 
+  /// Imports the caller-selected file through the service's bounded read and
+  /// validation. Like a share import, this creates a new preset without
+  /// replacing an existing one, then refreshes and selects it.
+  Future<Preset> importFile(String selectedPath) async {
+    final created = await ref
+        .read(presetTransferProvider)
+        .importFrom(selectedPath, newId: uniqueId('imported preset', _presets.map((p) => p.recipe.id).toSet()));
+    await _refresh();
+    if (!ref.mounted) return created;
+    state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
+    return created;
+  }
+
   /// Saves [recipe] as a new preset in Mine copied from [source], with the
   /// origin C3 defines for a copy: `builtin/<id>`, or `preset/<id>@<revision>`
   /// (the revision the edit started from).

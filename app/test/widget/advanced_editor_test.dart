@@ -321,9 +321,14 @@ void main() {
       await ctrlM(tester);
       final command = template(tester);
       final values = {for (final m in container(tester).read(macroEntriesProvider)!.value!) m.name: m.value};
+      final data = editor(tester);
+      final catalogue = core.macros(media: data.media, paths: data.paths, recipe: data.recipe);
+      expect(values, {for (final macro in catalogue) macro.name: macro.value});
+      expect(values['{inputs}'], contains(data.paths.videoPipe));
+      expect(values['{output}'], data.paths.output);
+      values.remove('{inputs}');
+      values.remove('{output}');
       expect(values, {
-        '{inputs}': null,
-        '{output}': null,
         '{v}': '0:v:0',
         '{a}': '1:a:0',
         '{width}': '1920',
@@ -389,7 +394,7 @@ void main() {
       expect(d.fromCommand, isTrue);
       expect(d.video!.encoder, 'x265');
       expect(d.video!.outputBits, 10);
-      expect(d.video!.availability, isNull, reason: 'the core names no encoder ID');
+      expect(d.video!.availability, isNotNull, reason: 'the core establishes the scoped command encoder ID');
       expect(d.container.label, 'MKV');
       expect(tester.widget<SignalPath>(find.byType(SignalPath)).selected, isNull);
 
@@ -399,6 +404,10 @@ void main() {
       expect(d.video!.conversion, isNull);
       expect(d.video!.formatLabel, isNull);
       expect(d.container.label, 'From file name');
+
+      await setCommand(tester, '{inputs} -c:v copy {output}');
+      expect(diagram(tester).video!.availability, isNull, reason: 'stream copy has no encoder ID');
+      await setCommand(tester, '{inputs} -c:v libx264 {output}');
 
       // Nodes open no settings; selecting one puts the caret in the editor.
       commandEditor(tester).focusNode.unfocus();

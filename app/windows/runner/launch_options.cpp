@@ -1,5 +1,27 @@
 #include "launch_options.h"
 
+#include <algorithm>
+#include <cctype>
+
+bool DesktopRoute::valid() const {
+  if ((kind != "preset" && kind != "job") || id.empty() || id.size() > 128 ||
+      id.back() == '.') return false;
+  const auto alnum = [](unsigned char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9');
+  };
+  if (!alnum(static_cast<unsigned char>(id.front()))) return false;
+  for (const unsigned char c : id) {
+    if (!alnum(c) && c != '.' && c != '_' && c != '-') return false;
+  }
+  std::string base = id.substr(0, id.find('.'));
+  std::transform(base.begin(), base.end(), base.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+  return base != "CON" && base != "PRN" && base != "AUX" && base != "NUL" &&
+         !(base.size() == 4 && (base.substr(0, 3) == "COM" || base.substr(0, 3) == "LPT") &&
+           base[3] >= '1' && base[3] <= '9');
+}
+
 LaunchOptions LaunchOptions::FromArguments(
     const std::vector<std::string>& arguments) {
   LaunchOptions options;
@@ -10,6 +32,17 @@ LaunchOptions LaunchOptions::FromArguments(
     }
     if (argument == "--render-monitor") {
       options.kind = LaunchKind::kRenderMonitor;
+      break;
+    }
+  }
+
+  if (options.kind == LaunchKind::kDesktop) {
+    for (size_t i = 0; i < arguments.size(); ++i) {
+      if (arguments[i] != "--open-preset" && arguments[i] != "--open-job") continue;
+      DesktopRoute route{arguments[i] == "--open-preset" ? "preset" : "job",
+                         i + 1 < arguments.size() ? arguments[i + 1] : ""};
+      if (route.valid()) options.desktop_route = std::move(route);
+      else options.invalid_desktop_route = true;
       break;
     }
   }

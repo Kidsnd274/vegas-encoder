@@ -1,6 +1,6 @@
 # App/platform contracts v1 — B1/B2/B3
 
-Updated: 2026-10-16 (Asia/Singapore). **B3 Windows services delivered.** These
+Updated: 2026-10-17 (Asia/Singapore). **B3 Windows services delivered.** These
 shapes remain the shared contract under single-agent ownership. Breaking changes
 require owner agreement and coordinated producer/consumer updates; additive
 fields stay in v1. Native core implementation/build hook is
@@ -579,6 +579,7 @@ the parser-version-2 cache and GPU-aware view composed by WindowsServices below.
 | PresetTransfer(library) | duplicate(id,{newId,name?}); fromJob(record,{newId,name?}); exportTo(id,selectedPath); importFrom(selectedPath,{required newId}); shareString(id); importShareString(text,{newId}) | FakePresetTransfer (selected-file fixtures and captured exports in memory) |
 | JobLogs | readLog(id) -> Stream<String> UTF-8 chunks; logLocation(id) -> path or null | FakeJobRepository(logs:{id:text}) |
 | FileReveal | reveal(absolutePath) | FakeFileReveal |
+| DesktopAppLauncher | openPreset(presetId); openJob(jobId) | Injected launcher/captured process starts in focused tests |
 
 Built-in stars/pins live in `library\preferences.json` as
 `{preferences:1,presets:{lowercaseId:{favorite:bool,pinned:bool}}}`. The overlay
@@ -608,6 +609,27 @@ the returned preset. No extension-based trust or automatic scan is introduced.
 `FakePresetTransfer(library, files: {selectedPath: jsonText})` supports this operation
 without file I/O and can re-import its captured exports. Its file envelope checks
 are bounded; semantic behavior remains that of the injected library.
+
+`WindowsDesktopAppLauncher` starts the matching `Platform.resolvedExecutable` with
+`--open-preset <id>` or `--open-job <id>` as separate arguments, detached and without
+a shell, inheriting the caller's data-profile environment. It loads neither core
+nor library. IDs are bounded to 128 file-safe ASCII characters; invalid IDs fail
+before launch, and process-start failures use `DESKTOP-LAUNCH`. The Windows runner
+scopes its desktop instance mutex/window marker to the normalized
+`VEGAS_ENCODER_DATA_ROOT` (or the ordinary profile), so isolated trial profiles do
+not focus or navigate the user's desktop instance.
+
+Same-profile navigation is a bounded, copied `WM_COPYDATA` kind/ID message. The
+runner queues up to 16 requests before the desktop channel is ready, then drains
+them; it never waits for a core/library operation or Dart acknowledgement. A
+short-lived second desktop process waits only for window creation/handoff and
+reports failure rather than dropping a route. The shell processes requests in
+order (including native startup drain before early live events), refreshes the
+target list, clears relevant filters and selects the preset or History job without
+replacing unsaved drafts. Navigation waits for modal dismissal and complete preset
+writes, History-to-preset actions and desktop close/save flows, including async
+continuations; unmount/disposal releases waits. Missing targets have an actionable
+message. No launch service or instance wait runs in Render.
 
 Adjacent temp files are flushed then atomically renamed; the old destination is
 never deleted before replacement. Separate persistent lock files serialize Windows
@@ -996,8 +1018,9 @@ real settings storage and its fake reject dimensions outside 1..32768 or non-int
 preserving the previous settings. The app owns restoring/clamping it to current DPI,
 monitor work area and its minimum size, centring on its current owner, and saving it
 through revision-checked UI writes. Desktop fields and unknown nested keys survive;
-older files require no migration. No frontend adoption or real VEGAS persistence
-qualification follows from the service field.
+older files require no migration. The popup and runner now consume this field:
+restore it before first show, and save on Apply/Cancel/window close. This frontend
+adoption does not qualify real VEGAS size persistence.
 
 UI-state writes use MachineSettingsRepository.save(expectedRevision) like other
 preferences: copy the latest settings, change uiState, retry a revision conflict by

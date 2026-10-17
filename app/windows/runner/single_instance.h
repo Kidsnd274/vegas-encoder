@@ -3,9 +3,12 @@
 
 #include <windows.h>
 
+#include "launch_options.h"
+
 // The desktop app is single instance (TECH_ARCHITECTURE §9.2): a second launch
-// brings the first window forward and exits. Popup and progress windows are
-// not counted.
+// brings the first window forward and forwards a preset/job route. The lock
+// and window marker are scoped to the inherited data-root profile. Popup and
+// progress windows are not counted.
 class SingleInstance {
  public:
   SingleInstance() = default;
@@ -14,8 +17,13 @@ class SingleInstance {
   // Returns false if another desktop instance already holds the lock.
   bool Acquire();
 
-  // Restores and activates the running instance's window, if found.
-  static void ActivateExisting();
+  // Waits at most 5 s for startup, sends a route with a 2 s timeout, then
+  // restores/activates the window. False means absent, hung or refused.
+  static bool ActivateExisting(const std::optional<DesktopRoute>& route);
+
+  // Bounded WM_COPYDATA route protocol; receiver copies before returning.
+  static constexpr ULONG_PTR kRouteMessage = 0x56454E31;
+  static std::optional<DesktopRoute> ReadRoute(const COPYDATASTRUCT* data);
 
   // Marks |window| as the desktop window so a later launch can find it.
   static void MarkWindow(HWND window);

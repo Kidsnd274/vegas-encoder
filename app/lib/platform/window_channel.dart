@@ -39,6 +39,9 @@ class WindowState {
 /// `DesktopWindowBounds`).
 typedef WindowBounds = ({int x, int y, int width, int height});
 
+/// A popup's outer size in physical pixels, without a remembered position.
+typedef WindowSize = ({int width, int height});
+
 /// The app's own window: chrome actions, ownership and state. The Windows
 /// runner implements it (windows/runner/flutter_window.cpp); tests use
 /// [FakeWindowController].
@@ -49,8 +52,17 @@ abstract interface class WindowController {
   /// on, without owning it (C5); a handle that is no longer a window keeps
   /// the runner's placement. [bounds] and [maximized] restore the desktop
   /// window where it was (clamped to a current monitor; ignored if that
-  /// monitor is gone). Returns whether the owner was set.
-  Future<bool> configure({int? ownerHwnd, int? hostHwnd, bool? keepOnTop, WindowBounds? bounds, bool? maximized});
+  /// monitor is gone). [popupSize] restores only an edit popup's physical
+  /// outer dimensions, centred/clamped on the owner. Returns whether the
+  /// owner was set.
+  Future<bool> configure({
+    int? ownerHwnd,
+    int? hostHwnd,
+    bool? keepOnTop,
+    WindowBounds? bounds,
+    bool? maximized,
+    WindowSize? popupSize,
+  });
 
   /// Where the window is when restored, and whether it is maximized; null
   /// outside the Windows runner.
@@ -124,6 +136,7 @@ class MethodChannelWindowController implements WindowController {
     bool? keepOnTop,
     WindowBounds? bounds,
     bool? maximized,
+    WindowSize? popupSize,
   }) async {
     final result = await _invoke<Map<Object?, Object?>>('configure', {
       'ownerHwnd': ?ownerHwnd,
@@ -131,6 +144,7 @@ class MethodChannelWindowController implements WindowController {
       'keepOnTop': ?keepOnTop,
       if (bounds != null) 'bounds': {'x': bounds.x, 'y': bounds.y, 'width': bounds.width, 'height': bounds.height},
       'maximized': ?maximized,
+      if (popupSize != null) 'popupSize': {'width': popupSize.width, 'height': popupSize.height},
     });
     return result?['ownerSet'] == true;
   }
@@ -231,11 +245,13 @@ class FakeWindowController implements WindowController {
     bool? keepOnTop,
     WindowBounds? bounds,
     bool? maximized,
+    WindowSize? popupSize,
   }) async {
     calls.add(
       'configure(owner: $ownerHwnd${hostHwnd == null ? '' : ', host: $hostHwnd'}, keepOnTop: $keepOnTop'
       '${bounds == null ? '' : ', bounds: $bounds, maximized: $maximized'})',
     );
+    if (popupSize != null) calls.add('popupSize($popupSize)');
     return ownerHwnd != null;
   }
 

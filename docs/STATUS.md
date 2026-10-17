@@ -1,9 +1,59 @@
 # Vegas Encoder status
 
-Updated: 2026-10-16 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proof
+Updated: 2026-10-17 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proof
 (frontend 0.1.7+1; template-name-fix variant installed on VEGAS 2026.0.3.189).
 
 ## Current progress
+
+**Integration completion pass (2026-10-17):** at the owner's explicit request,
+three agents planned bounded tasks before implementation in this original
+checkout, with parent integration/review and one current queue. No worktree,
+dependency/tool upgrade, installation or real-VEGAS test was performed. The owner
+subsequently authorized a local commit of this implementation/fix checkpoint;
+push and installation remain outside that authorization.
+
+- File import now opens the `.vepreset` picker, delegates bounded validation to
+  `PresetTransfer.importFrom`, creates/selects a new ID and clears filters. Cancel
+  and rejected files retain the current selection.
+- A package-backed launcher opens the matching desktop executable on a preset or
+  job. Native instance handoff is bounded and scoped to the normalized data
+  profile; startup/live routes keep their order. Missing targets/launch failures
+  are explained. Navigation waits for modal dismissal and complete async preset
+  writes, pickers, History-to-preset actions and exit/save flows, preserving drafts.
+  Review caught and fixed selection changes beneath an open Save warning.
+- The popup restores physical outer size before first show and centres/clamps it
+  on its current owner monitor. Apply/Cancel/window close save only size through
+  revision-conflict retries, preserving desktop state and unknown fields. Settings
+  failures do not prevent close.
+- Advanced option/stage/macro styling uses core metadata; the macro panel uses
+  `VeCore.macros` with actual recipe/media/paths. Availability uses established
+  summary encoder IDs. Unknown metadata remains unknown.
+- Monitor depth/reduction comes only from C5; no source/file precision is inferred.
+  Desktop-launch failure stays separate from the readable render cause and does
+  not change failure retention. Review corrected a cramped launch-error layout.
+
+Focused Windows x64 validation: affected unit/widget files (import, Advanced,
+popup placement, monitor, shell/History and cold/warm routing) pass; light/dark
+goldens were run and changed images visually reviewed. Final targeted follow-up
+passes **94** widget/golden checks, then **12** route/import checks after the
+native-picker lifetime guard. The launcher passes **15** captured-process checks;
+app analysis is clean. The Windows release runner builds with existing tools.
+Tests include a real Save warning with a delayed fake write, queued/native-channel
+startup ordering, cancellation of idle waits, settings revision conflicts and
+no-core/no-library monitor reads. A single selected Windows `integration` probe
+passes **17 assertions** with the real Release app runner and a fake WinForms
+owner: startup/warm handoff, equivalent/separate profiles, invalid message refusal,
+popup ownership, exact physical size at 120 DPI, oversized work-area clamp and
+preserved desktop settings. It uses fresh isolated data and does not run theme,
+FFmpeg or VEGAS checks. Reproduce with `run_window_spikes.ps1 -Checks integration
+-Runs 1` against the current Release build. This is offline/fake-service/fake-owner
+validation; full performance budgets and real VEGAS behavior of these new paths
+remain unqualified. Installed trial and all owner-deferred checks below stand.
+
+The current native recipe candidate still refuses non-MKV output and general or
+ambiguous Advanced output; desktop/core support for more formats is not a VEGAS
+compatibility claim. The next queue audits v1 scope and addresses this gap before
+release/installer work. See [NEXT_AGENT.md](NEXT_AGENT.md).
 
 **Owner-authorized commit/merge (2026-10-16):** committed the platform snapshot
 as `fd4edb3`, preserving its 34 changed/new files. Verified that all of its runtime,

@@ -7,6 +7,7 @@ import '../features/monitor/monitor_window.dart';
 import '../features/popup/popup_window.dart';
 import '../features/shell/desktop_shell.dart';
 import '../state/app_state.dart';
+import '../state/desktop_interaction.dart';
 import 'launch.dart';
 
 /// The root: theme (light and dark, following Windows unless Settings forces
@@ -23,6 +24,7 @@ class VeApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Vegas Encoder',
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [ref.watch(desktopInteractionProvider)],
       theme: buildVeTheme(VeTokens.light),
       darkTheme: buildVeTheme(VeTokens.dark),
       themeMode: themeMode,

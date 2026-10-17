@@ -21,7 +21,7 @@
 #>
 param(
   [ValidateSet('Release', 'Profile', 'Debug')][string]$Configuration = 'Release',
-  [ValidateSet('all', 'start', 'owner', 'close', 'monitor', 'theme')][string]$Checks = 'all',
+  [ValidateSet('all', 'start', 'owner', 'close', 'monitor', 'theme', 'integration')][string]$Checks = 'all',
   [int]$Runs = 10,
   [string]$ApplicationPath
 )

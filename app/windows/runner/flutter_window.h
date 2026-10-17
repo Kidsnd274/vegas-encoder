@@ -7,6 +7,7 @@
 #include <flutter/method_channel.h>
 
 #include <memory>
+#include <vector>
 
 #include "win32_window.h"
 
@@ -15,7 +16,8 @@
 //
 // Dart -> runner:
 //   configure {ownerHwnd?: int, hostHwnd?: int, keepOnTop?: bool,
-//              bounds?: {x, y, width, height}, maximized?: bool}
+//              bounds?: {x, y, width, height}, maximized?: bool,
+//              popupSize?: {width, height}} (physical outer size; popup only)
 //     -> {ownerSet: bool, boundsSet: bool, hostSet: bool}
 //     (ownerHwnd: popup; hostHwnd: progress window, VEGAS's main window;
 //      bounds: desktop; all before show)
@@ -27,6 +29,8 @@
 //   trace {label: String}   (startup trace, see startup_trace.h)
 // Runner -> Dart:
 //   windowEvent {type: maximized|active|reducedMotion, value: bool}
+// Separate vegas_encoder/desktop: Dart "ready" drains queued {kind,id} routes;
+// runner "route" delivers later WM_COPYDATA requests to the desktop only.
 class FlutterWindow : public Win32Window {
  public:
   FlutterWindow(const flutter::DartProject& project,
@@ -56,6 +60,9 @@ class FlutterWindow : public Win32Window {
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
 
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> desktop_channel_;
+  std::vector<DesktopRoute> pending_desktop_routes_;
+  bool desktop_ready_ = false;
 
   bool active_ = false;
 

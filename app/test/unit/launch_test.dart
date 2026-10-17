@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ve_services/ve_services.dart' show DesktopRoute;
 import 'package:vegas_encoder/app/launch.dart';
 
 void main() {
@@ -6,6 +7,23 @@ void main() {
     test('no mode flag runs the desktop app', () {
       expect(LaunchMode.fromArguments([]), const DesktopLaunch());
       expect(LaunchMode.fromArguments(['--unknown', 'x']), const DesktopLaunch());
+    });
+
+    test('desktop destinations are bounded IDs; popup modes still win', () {
+      expect(
+        LaunchMode.fromArguments(['--open-preset', 'yt-h264']),
+        const DesktopLaunch(route: DesktopRoute.preset('yt-h264')),
+      );
+      expect(
+        LaunchMode.fromArguments(['--open-job', 'j-1042']),
+        const DesktopLaunch(route: DesktopRoute.job('j-1042')),
+      );
+      expect((LaunchMode.fromArguments(['--open-preset', '../bad']) as DesktopLaunch).error, isNotNull);
+      expect((LaunchMode.fromArguments(['--open-job']) as DesktopLaunch).error, isNotNull);
+      expect(
+        LaunchMode.fromArguments(['--open-job', 'j-1042', '--edit-session', 'dir']),
+        const EditSessionLaunch('dir'),
+      );
     });
 
     test('--edit-session takes the session directory', () {

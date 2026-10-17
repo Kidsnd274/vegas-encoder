@@ -14,6 +14,7 @@ import '../../state/monitor.dart';
 import '../../state/services.dart';
 import '../../state/settings.dart';
 import 'display.dart';
+import 'monitor_precision.dart';
 
 /// How long the window stays after a finished or cancelled render (UI_SPEC
 /// §12), unless the pointer is over it.
@@ -46,6 +47,7 @@ class _MonitorWindowState extends ConsumerState<MonitorWindow> {
   Timer? _closeTimer;
   int? _closeIn;
   bool _hovered = false;
+  String? _historyError;
 
   @override
   void initState() {
@@ -141,7 +143,12 @@ class _MonitorWindowState extends ConsumerState<MonitorWindow> {
                   child: switch (status) {
                     _ when widget.launchError != null => _Waiting(message: widget.launchError!),
                     null => _Waiting(message: 'Waiting for the render to start.', file: ref.watch(monitorFileProvider)),
-                    final s => _Body(status: s, record: record?.value, recordLoading: record?.isLoading ?? false),
+                    final s => _Body(
+                      status: s,
+                      record: record?.value,
+                      recordLoading: record?.isLoading ?? false,
+                      historyError: _historyError,
+                    ),
                   },
                 ),
               ),
@@ -173,7 +180,12 @@ class _MonitorWindowState extends ConsumerState<MonitorWindow> {
                 ],
                 MonitorPhase.failed => [
                   const Spacer(),
-                  _ShowInHistory(jobId: status!.jobId),
+                  _ShowInHistory(
+                    jobId: status!.jobId,
+                    onError: (error) {
+                      if (mounted) setState(() => _historyError = error);
+                    },
+                  ),
                   _ShowLog(jobId: status.jobId, enabled: record?.value != null),
                   VeButton(label: 'Close', size: VeButtonSize.small, onPressed: window.close),
                 ],
@@ -234,13 +246,14 @@ class _Waiting extends StatelessWidget {
 }
 
 class _Body extends StatelessWidget {
-  const _Body({required this.status, required this.record, required this.recordLoading});
+  const _Body({required this.status, required this.record, required this.recordLoading, this.historyError});
   final LiveRenderStatus status;
   final JobRecord? record;
 
   /// The record is still being looked for: the end sentence waits a moment
   /// rather than changing under the reader.
   final bool recordLoading;
+  final String? historyError;
 
   @override
   Widget build(BuildContext context) {
@@ -253,12 +266,25 @@ class _Body extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(fileNameOf(status.outputPath), style: t.text.panelTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-        Text(headerDetail(status), style: muted, maxLines: 1, overflow: TextOverflow.ellipsis),
+        Row(
+          children: [
+            if (status.outputBitDepth case final depth?) ...[
+              MonitorPrecision(
+                outputBitDepth: depth,
+                conversionReducesPrecision: status.pixelFormatConversionReducesPrecision,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(headerDetail(status), style: muted, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+        ),
         const SizedBox(height: 14),
         VeWireProgress(fraction: bar.fraction, tone: bar.tone, semanticLabel: 'Render progress'),
         const SizedBox(height: 6),
         Row(
-          crossAxisAlignment: CrossAxisAlignment.baseline,
+          crossAxisAlignment: historyError == null ? CrossAxisAlignment.baseline : CrossAxisAlignment.center,
           textBaseline: TextBaseline.alphabetic,
           children: [
             Semantics(
@@ -267,13 +293,23 @@ class _Body extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                framesLabel(status),
-                style: muted,
-                textAlign: TextAlign.right,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: historyError == null
+                  ? Text(
+                      framesLabel(status),
+                      style: muted,
+                      textAlign: TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    )
+                  : SizedBox(
+                      height: 34,
+                      child: SingleChildScrollView(
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(historyError!, style: t.text.caption.copyWith(color: c.errorText)),
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -470,11 +506,12 @@ class _FooterText extends StatelessWidget {
   }
 }
 
-/// Opens the desktop app on this job in History. No C3 service starts the
-/// desktop app yet, so it says why it can't (workstreams/app.md, Needs).
+/// Opens the desktop app on this job in History and reports launch failures
+/// separately from the render's authoritative cause.
 class _ShowInHistory extends ConsumerWidget {
-  const _ShowInHistory({required this.jobId});
+  const _ShowInHistory({required this.jobId, required this.onError});
   final String jobId;
+  final ValueChanged<String?> onError;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -483,7 +520,16 @@ class _ShowInHistory extends ConsumerWidget {
       label: 'Show in History',
       size: VeButtonSize.small,
       tooltip: launcher == null ? 'Open Vegas Encoder and look in History: this window can’t open it yet.' : null,
-      onPressed: launcher == null ? null : () => unawaited(launcher.openJob(jobId)),
+      onPressed: launcher == null
+          ? null
+          : () async {
+              try {
+                await launcher.openJob(jobId);
+                onError(null);
+              } on ServiceException catch (e) {
+                onError('Couldn’t open Vegas Encoder: ${e.message}');
+              }
+            },
     );
   }
 }

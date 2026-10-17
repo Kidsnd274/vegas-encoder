@@ -10,6 +10,7 @@ import 'platform/window_channel.dart';
 import 'state/app_state.dart';
 import 'state/monitor.dart';
 import 'state/popup.dart';
+import 'state/popup_placement.dart';
 import 'state/services.dart';
 
 /// Mode dispatch: desktop, `--edit-session <dir>` or `--render-monitor <file>`.
@@ -35,8 +36,9 @@ Future<void> main(List<String> args) async {
 
   // The runner shows the window on the first frame, so placement (owner,
   // keep on top, the desktop window's remembered bounds) happens before runApp
-  // and the window never jumps. Only the desktop window restores bounds.
+  // and the window never jumps. Popups restore only size, never position.
   final remembered = mode is DesktopLaunch ? await _rememberedBounds(container) : null;
+  final popupSize = mode is EditSessionLaunch ? await popupPlacement(container) : null;
   // The popup is owned by the VEGAS dialog its request names (C4).
   final owner = mode is EditSessionLaunch ? await _owner(container) : null;
   // The progress window goes on VEGAS's monitor (C5 `hostHwnd`) with the
@@ -48,6 +50,7 @@ Future<void> main(List<String> args) async {
     keepOnTop: monitor?.keepOnTop,
     bounds: remembered?.bounds,
     maximized: remembered?.maximized,
+    popupSize: popupSize,
   );
   initial = await window.state();
   binding.addPostFrameCallback((_) => unawaited(window.trace('dart_first_frame')));

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/features/presets/display.dart' show presetFileName;
@@ -11,12 +12,13 @@ import 'package:vegas_encoder/features/presets/preset_header.dart';
 import 'package:vegas_encoder/features/presets/preset_test_dialog.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
+import 'package:vegas_encoder/state/presets.dart';
 import 'package:vegas_encoder/state/services.dart';
 
 import '../helpers.dart';
 
 /// Test this preset, Export…, Copy share string, Show in folder and Import
-/// share string… on the platform fakes (`FakePresetTests`, `FakePresetTransfer`,
+/// share string… / file… on the platform fakes (`FakePresetTests`, `FakePresetTransfer`,
 /// `FakeFileReveal`): no FFmpeg runs and no file is written.
 void main() {
   late FakePresetLibrary library;
@@ -50,6 +52,15 @@ void main() {
   }
 
   Finder inLibrary(Finder f) => find.descendant(of: find.byType(LibraryPane), matching: f);
+  ProviderContainer container(WidgetTester tester) =>
+      ProviderScope.containerOf(tester.element(find.byType(LibraryPane)));
+  Future<void> addMenu(WidgetTester tester, String action) async {
+    await tester.tap(find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Add a preset'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(action));
+    await tester.pumpAndSettle();
+  }
+
   Future<void> menu(WidgetTester tester, String preset, String action) async {
     await tester.tap(inLibrary(find.text(preset)).last, buttons: kSecondaryButton);
     await tester.pumpAndSettle();
@@ -110,7 +121,7 @@ void main() {
     // Import puts it in Mine and selects it; the field starts with the clipboard.
     await tester.tap(find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Add a preset'));
     await tester.pumpAndSettle();
-    expect(find.text('Not available yet: the library can’t read a .vepreset file you choose.'), findsOneWidget);
+    expect(find.text('Choose a .vepreset file to add to Mine.'), findsOneWidget);
     await tester.tap(find.text('Import share string…'));
     await tester.pumpAndSettle();
     expect(find.text(clipboard!), findsOneWidget);
@@ -124,6 +135,62 @@ void main() {
     // A preset in Mine has a file to show.
     await menu(tester, 'Small web file, AV1', 'Show in folder');
     expect(reveal.revealed, ['fixture-library/imported-preset.vepreset']);
+  });
+
+  testWidgets('Import file creates and selects a new preset, clears filters and never replaces the source', (
+    tester,
+  ) async {
+    await pump(tester);
+    const path = r'D:\Shared\AV1.vepreset';
+    transfer.files[path] = await library.exportPreset('av1-small');
+    final source = transfer.files[path];
+    window.pickedFile = path;
+    final c = container(tester);
+    final controller = c.read(presetsControllerProvider.notifier);
+    controller.setQuery('does not match');
+    controller.setFilter(LibraryFilter.builtin);
+    controller.toggleFavoritesOnly();
+    await tester.pumpAndSettle();
+
+    await addMenu(tester, 'Import file…');
+    expect(window.calls, contains('pickFile(*.vepreset)'));
+    expect(find.text('Imported “Small web file, AV1” into Mine'), findsOneWidget);
+    final first = (await library.get('imported-preset'))!;
+    expect(first.builtin, isFalse);
+    expect(first.recipe.name, 'Small web file, AV1');
+    expect(first.origin, 'builtin/av1-small');
+    expect(first.revision, 1);
+    final state = c.read(presetsControllerProvider);
+    expect(state.selectedId, 'imported-preset');
+    expect(state.query, isEmpty);
+    expect(state.filter, LibraryFilter.all);
+    expect(state.favoritesOnly, isFalse);
+
+    await addMenu(tester, 'Import file…');
+    expect(c.read(presetsControllerProvider).selectedId, 'imported-preset-2');
+    expect((await library.get('imported-preset'))!.recipe.toJson(), first.recipe.toJson());
+    expect(transfer.files[path], source, reason: 'the selected source is never changed');
+  });
+
+  testWidgets('Import file cancellation and rejected files keep the current selection and library', (tester) async {
+    await pump(tester);
+    final c = container(tester);
+    final selected = c.read(presetsControllerProvider).selectedId;
+    final before = (await library.list()).length;
+
+    await addMenu(tester, 'Import file…');
+    expect(c.read(presetsControllerProvider).selectedId, selected);
+    expect(find.textContaining('Couldn’t import'), findsNothing);
+
+    window.pickedFile = r'D:\Shared\missing.vepreset';
+    await addMenu(tester, 'Import file…');
+    expect(find.text('Couldn’t import the preset: Preset file is missing.'), findsOneWidget);
+    window.pickedFile = r'D:\Shared\broken.vepreset';
+    transfer.files[window.pickedFile!] = '{invalid JSON';
+    await addMenu(tester, 'Import file…');
+    expect(find.textContaining('Couldn’t import the preset:'), findsOneWidget);
+    expect(c.read(presetsControllerProvider).selectedId, selected);
+    expect((await library.list()).length, before);
   });
 
   test('the Save dialog suggests the preset’s name without characters Windows refuses', () {

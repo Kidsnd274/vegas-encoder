@@ -29,6 +29,7 @@ class LibraryPane extends ConsumerWidget {
     required this.onFavorite,
     required this.onNewPreset,
     required this.onImportShareString,
+    required this.onImportFile,
     this.onPicked,
   });
 
@@ -43,6 +44,9 @@ class LibraryPane extends ConsumerWidget {
 
   /// "Import share string…" from the add menu.
   final VoidCallback onImportShareString;
+
+  /// "Import file…" from the add menu.
+  final VoidCallback onImportFile;
 
   /// After a preset is chosen, for the narrow layout's library overlay.
   final VoidCallback? onPicked;
@@ -110,7 +114,7 @@ class LibraryPane extends ConsumerWidget {
                       onPick: (a) => switch (a) {
                         LibraryAdd.newPreset => onNewPreset(),
                         LibraryAdd.importShareString => onImportShareString(),
-                        LibraryAdd.importFile => null,
+                        LibraryAdd.importFile => onImportFile(),
                       },
                     ),
                   ],
@@ -437,9 +441,7 @@ class _LibraryRow extends StatelessWidget {
   }
 }
 
-/// `+` beside the filters: New preset, Import share string…, and Import
-/// file… (disabled: the library can't read a `.vepreset` the user picks yet;
-/// workstreams/app.md, Needs).
+/// `+` beside the filters: New preset, Import share string…, and Import file….
 class _AddMenu extends StatelessWidget {
   const _AddMenu({required this.onPick});
   final ValueChanged<LibraryAdd> onPick;
@@ -459,12 +461,7 @@ class _AddMenu extends StatelessWidget {
           VeOptionGroup([
             VeOption(LibraryAdd.newPreset, 'New preset', detail: 'Start one in Mine from the first built-in.'),
             VeOption(LibraryAdd.importShareString, 'Import share string…', detail: 'Paste a preset someone shared.'),
-            VeOption(
-              LibraryAdd.importFile,
-              'Import file…',
-              enabled: false,
-              detail: 'Not available yet: the library can’t read a .vepreset file you choose.',
-            ),
+            VeOption(LibraryAdd.importFile, 'Import file…', detail: 'Choose a .vepreset file to add to Mine.'),
           ]),
         ],
       ),

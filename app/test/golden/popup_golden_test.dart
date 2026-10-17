@@ -46,6 +46,7 @@ void main() {
         launchModeProvider.overrideWithValue(const EditSessionLaunch('session')),
         windowControllerProvider.overrideWithValue(FakeWindowController()),
         editSessionServiceProvider.overrideWithValue(FakeEditSessionService(requests: {'session': request ?? b0})),
+        desktopAppLauncherProvider.overrideWithValue(WindowsDesktopAppLauncher(launch: (_, _) async {})),
         ...overrides,
       ],
     );

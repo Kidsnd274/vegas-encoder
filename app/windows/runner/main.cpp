@@ -41,12 +41,21 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
       GetCommandLineArguments();
   const LaunchOptions options =
       LaunchOptions::FromArguments(command_line_arguments);
+  if (options.invalid_desktop_route) {
+    MessageBoxW(nullptr, L"The requested preset or History destination is invalid.",
+                L"Vegas Encoder", MB_OK | MB_ICONERROR);
+    return EXIT_FAILURE;
+  }
 
   SingleInstance single_instance;
   if (options.kind == LaunchKind::kDesktop && !single_instance.Acquire()) {
-    SingleInstance::ActivateExisting();
-    return EXIT_SUCCESS;
+    if (SingleInstance::ActivateExisting(options.desktop_route)) return EXIT_SUCCESS;
+    MessageBoxW(nullptr,
+                L"Couldn't reach the running Vegas Encoder window. Close it and try again.",
+                L"Vegas Encoder", MB_OK | MB_ICONERROR);
+    return EXIT_FAILURE;
   }
+  if (options.kind == LaunchKind::kDesktop) startup_trace::Mark("desktop_instance_acquired");
 
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.

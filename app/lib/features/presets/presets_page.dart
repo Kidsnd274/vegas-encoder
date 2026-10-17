@@ -13,6 +13,7 @@ import '../../design/components/toast.dart';
 import '../../design/icons.dart';
 import '../../design/tokens.dart';
 import '../../state/app_state.dart';
+import '../../state/desktop_interaction.dart';
 import '../../state/editor.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
@@ -90,7 +91,10 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
   /// Runs a library write. A refusal (the library's checks found an error,
   /// the store is busy, the disk is full) is said in the toast, with the
   /// library's reason, instead of being lost.
-  Future<void> _write(String what, Future<void> Function() action) async {
+  Future<void> _write(String what, Future<void> Function() action) =>
+      ref.read(desktopInteractionProvider).run(() => _writeGuarded(what, action));
+
+  Future<void> _writeGuarded(String what, Future<void> Function() action) async {
     try {
       await action();
     } on ServiceException catch (e) {
@@ -267,7 +271,9 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
 
   /// Export…: the Save dialog, then the library writes the saved preset
   /// there (C3 `PresetTransfer.exportTo`). Unsaved changes aren't included.
-  Future<void> _export(LibraryEntry entry) async {
+  Future<void> _export(LibraryEntry entry) => ref.read(desktopInteractionProvider).run(() => _exportGuarded(entry));
+
+  Future<void> _exportGuarded(LibraryEntry entry) async {
     final path = await ref
         .read(windowControllerProvider)
         .saveFile(
@@ -305,6 +311,27 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
         _showToast('Imported “${created.recipe.name}” into Mine');
       }
     });
+  }
+
+  /// The Open dialog supplies the path; ve_services reads and validates it.
+  Future<void> _importFile() => ref.read(desktopInteractionProvider).run(_importFileGuarded);
+
+  Future<void> _importFileGuarded() async {
+    try {
+      final path = await ref
+          .read(windowControllerProvider)
+          .pickFile(title: 'Import preset', filterName: 'Vegas Encoder preset', filterPattern: '*.vepreset');
+      if (path == null || !mounted) return;
+      await _write('import the preset', () async {
+        final created = await _controller.importFile(path);
+        if (mounted) {
+          setState(() => _libraryOpen = false);
+          _showToast('Imported “${created.recipe.name}” into Mine');
+        }
+      });
+    } on PlatformException catch (e) {
+      if (mounted) _showToast('Couldn’t choose a preset file: ${e.message ?? e.code}');
+    }
   }
 
   void _copyCommand() {
@@ -442,6 +469,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
           onFavorite: (e) => unawaited(_toggleFavorite(e)),
           onNewPreset: _newPreset,
           onImportShareString: () => unawaited(_importShareString()),
+          onImportFile: () => unawaited(_importFile()),
           onPicked: narrow ? () => setState(() => _libraryOpen = false) : null,
         );
         return CallbackShortcuts(

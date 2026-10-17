@@ -7,6 +7,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart';
+import 'package:vegas_encoder/design/components/button.dart';
 
 import '../helpers.dart';
 import '../monitor_doubles.dart';
@@ -25,13 +26,18 @@ void main() {
   for (final b in themes) {
     final theme = themeName(b);
 
-    Future<void> pump(WidgetTester tester, {LiveRenderStatus? status, JobRecord? record}) async {
+    Future<void> pump(
+      WidgetTester tester, {
+      LiveRenderStatus? status,
+      JobRecord? record,
+      DesktopAppLauncher? launcher,
+    }) async {
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       tester.platformDispatcher.platformBrightnessTestValue = b;
       await pumpApp(
         tester,
         view: monitorView,
-        overrides: monitorOverrides(status: status, record: record).overrides,
+        overrides: monitorOverrides(status: status, record: record, launcher: launcher ?? _Launcher()).overrides,
       );
     }
 
@@ -43,6 +49,15 @@ void main() {
     testWidgets('$theme monitor_encoding', (tester) async {
       await pump(tester, status: liveSample(RenderState.encoding));
       await expectGolden('monitor_encoding_$theme');
+    });
+
+    testWidgets('$theme monitor_precision_unknown_conversion', (tester) async {
+      await pump(
+        tester,
+        status: liveSample(RenderState.encoding)
+            .copyWith(outputBitDepth: 10, pixelFormatConversionReducesPrecision: null),
+      );
+      await expectGolden('monitor_precision_unknown_conversion_$theme');
     });
 
     testWidgets('$theme monitor_verifying', (tester) async {
@@ -67,9 +82,35 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
     });
 
+    testWidgets('$theme monitor_history_launch_failed', (tester) async {
+      await pump(
+        tester,
+        status: liveSample(RenderState.failed),
+        record: records[RenderState.failed],
+        launcher: _FailedLauncher(),
+      );
+      await tester.tap(find.widgetWithText(VeButton, 'Show in History'));
+      await tester.pumpAndSettle();
+      await expectGolden('monitor_history_launch_failed_$theme');
+    });
+
     testWidgets('$theme monitor_cancelled', (tester) async {
       await pump(tester, status: liveSample(RenderState.cancelled), record: records[RenderState.cancelled]);
       await expectGolden('monitor_cancelled_$theme');
     });
   }
+}
+
+class _Launcher implements DesktopAppLauncher {
+  @override
+  Future<void> openPreset(String presetId) async {}
+
+  @override
+  Future<void> openJob(String jobId) async {}
+}
+
+class _FailedLauncher extends _Launcher {
+  @override
+  Future<void> openJob(String jobId) async =>
+      throw const ServiceException('APP-LAUNCH', 'The desktop app could not be started.');
 }

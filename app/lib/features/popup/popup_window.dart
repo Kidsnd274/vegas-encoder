@@ -16,7 +16,9 @@ import '../../design/icons.dart';
 import '../../design/tokens.dart';
 import '../../state/app_state.dart';
 import '../../state/popup.dart';
+import '../../state/popup_placement.dart';
 import '../../state/services.dart';
+import '../../state/ui_state.dart';
 import '../advanced/mode_switch.dart';
 import '../presets/display.dart' show nodeForField;
 import '../presets/panels/field_anchor.dart';
@@ -108,7 +110,7 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
     final s = _state;
     if (s == null) {
       // No session to answer: closing is a Cancel (C4: no result means cancel).
-      _close();
+      await _close();
       return true;
     }
     if (s.finished != null) return true;
@@ -136,14 +138,18 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
     } on ServiceException {
       // A cancel that can't be written is still a cancel (C4).
     }
-    _close();
+    await _close();
     return true;
   }
 
   /// The title bar's close, Alt+F4 and the taskbar: the same as Cancel.
   Future<AppExitResponse> _onExitRequested() async {
     final s = _state;
-    if (_closing || s == null || s.finished != null) return AppExitResponse.exit;
+    if (_closing) return AppExitResponse.exit;
+    if (s == null || s.finished != null) {
+      await _rememberSize();
+      return AppExitResponse.exit;
+    }
     if (!mounted) return AppExitResponse.exit;
     // _cancel closes the window itself once the result is written.
     await _cancel();
@@ -165,12 +171,23 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
       if (mounted) _showToast('Couldn’t apply to the template: ${e.message}');
       return;
     }
-    _close();
+    await _close();
   }
 
-  void _close() {
+  Future<void> _close() async {
+    if (_closing) return;
     _closing = true;
-    if (mounted) unawaited(ref.read(windowControllerProvider).close());
+    final window = ref.read(windowControllerProvider);
+    await _rememberSize();
+    if (mounted) await window.close();
+  }
+
+  Future<void> _rememberSize() async {
+    try {
+      await rememberPopupSize(ref.read(windowControllerProvider), ref.read(uiStateWriterProvider));
+    } on Object {
+      // Unavailable settings/services must not keep the editor open.
+    }
   }
 
   // ------------------------------------------------------------ actions

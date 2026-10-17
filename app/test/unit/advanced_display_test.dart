@@ -57,16 +57,16 @@ void main() {
   const command = '{inputs}\n-c:v libx264 -g {gop:2s}\n{output}';
 
   group('templateEditorModel', () {
-    test('chips from the core\'s input and output spans; option names bold; no stage claimed', () {
+    test('chips and option markers come from the core; missing markers stay unknown', () {
       final result = compiled(
         display: [
           token('ffmpeg', 'exe'),
           token('-hide_banner', 'global'),
           token('-f', 'input', 0, 8),
           token('rawvideo', 'input', 0, 8),
-          token('-c:v', 'extra', 9, 13),
+          {...token('-c:v', 'extra', 9, 13), 'isOption': true},
           token('libx264', 'extra', 14, 21),
-          token('-g', 'extra', 22, 24),
+          {...token('-g', 'extra', 22, 24), 'isOption': true},
           token('60', 'extra', 25, 33),
           token(r'D:\out.mp4', 'output', 34, 42),
         ],
@@ -82,15 +82,49 @@ void main() {
       ]);
     });
 
-    test('stage and macro roles show when the core gives them', () {
+    test('stage and macro metadata show when the core gives them', () {
       final result = compiled(
-        display: [token('-c:v', 'video', 9, 13), token('-c:a', 'audio', 14, 18), token('60', 'macro', 25, 33)],
+        display: [
+          {...token('-c:v', 'video', 9, 13), 'stage': 'video', 'isOption': true},
+          {...token('-c:a', 'extra', 14, 18), 'stage': 'audio', 'isOption': true},
+          {
+            ...token('60', 'macro', 25, 33),
+            'stage': 'video',
+            'macros': ['{gop:2s}'],
+          },
+        ],
       );
       final m = templateEditorModel(command, compiled: result);
       expect(m.words.map((w) => (w.role, w.macro)), [
         (CommandRole.video, false),
         (CommandRole.audio, false),
-        (null, true),
+        (CommandRole.video, true),
+      ]);
+    });
+
+    test('negative and quoted values are not options; embedded macros keep their stage', () {
+      const text = '-crf -1 -metadata "-x{project}" -unknown';
+      final result = compiled(
+        display: [
+          {...token('-crf', 'video', 0, 4), 'stage': 'video', 'isOption': true},
+          {...token('-1', 'video', 5, 7), 'stage': 'video', 'isOption': false},
+          {...token('-metadata', 'extra', 8, 17), 'isOption': true},
+          {
+            ...token('-xSample project', 'macro', 18, 31),
+            'stage': 'mux',
+            'isOption': false,
+            'macros': ['{project}'],
+          },
+          token('-unknown', 'extra', 32, 40),
+        ],
+      );
+      final m = templateEditorModel(text, compiled: result);
+      expect(m.words.map((w) => (w.flag, w.macro, w.role)), [
+        (true, false, CommandRole.video),
+        (false, false, CommandRole.video),
+        (true, false, null),
+        (false, true, CommandRole.mux),
+        (false, false, null),
       ]);
     });
 
@@ -189,41 +223,23 @@ void main() {
     expect(lines[2].map((t) => t.error), [false, false, false, true]);
   });
 
-  test('macros: the core\'s list with its values; the locked ones say so', () {
-    final offered = core.CompletionResult.fromJson({
-      'kind': 'value',
-      'start': 0,
-      'end': 1,
-      'items': [
-        for (final m in ['{inputs}', '{v}', '{gop:2s}', '{output}', '{new}'])
-          {'value': m, 'description': 'VEGAS media or output macro', 'source': 'Macro'},
-      ],
-    });
-    final probe = macroProbeText(offered);
-    expect(probe, '{inputs} {v} {gop:2s} {output} {new}');
-    final result = compiled(
-      display: [
-        token('-i', 'input', 0, 8),
-        token('0:v:0', 'extra', 9, 12),
-        token('60', 'extra', 13, 21),
-        token(r'D:\x.mp4', 'output', 22, 30),
-        token('{new}', 'extra', 31, 36),
-      ],
-    );
-    final entries = macroEntries(offered, probe, result);
+  test('macros retain catalogue values and required markers, including unknown names', () {
+    final entries = macroEntries([
+      core.MacroDefinition(name: '{inputs}', description: 'Inputs', value: '-i video', required: true),
+      core.MacroDefinition(name: '{v}', description: 'Video', value: '0:v:0'),
+      core.MacroDefinition(name: '{gop:2s}', description: 'GOP', value: '60'),
+      core.MacroDefinition(name: '{output}', description: 'Output', value: r'D:\x.mp4', required: true),
+      core.MacroDefinition(name: '{new}', description: 'A future macro', required: true),
+    ]);
     expect(entries.map((e) => (e.name, e.value, e.required)), [
-      ('{inputs}', null, true),
+      ('{inputs}', '-i video', true),
       ('{v}', '0:v:0', false),
       ('{gop:2s}', '60', false),
-      ('{output}', null, true),
-      ('{new}', null, false),
+      ('{output}', r'D:\x.mp4', true),
+      ('{new}', null, true),
     ]);
     expect(entries[1].description, macroDescriptions['{v}']);
-    expect(
-      entries.last.description,
-      'VEGAS media or output macro',
-      reason: 'the core\'s text for a macro the app has no copy for',
-    );
+    expect(entries.last.description, 'A future macro', reason: 'the core\'s text for a macro the app has no copy for');
   });
 
   group('autocomplete', () {
@@ -423,6 +439,39 @@ void main() {
       expect(m.video!.conversionKnown, isFalse);
       expect(m.audio, isNotNull);
       expect(m.audio!.formatLabel, isNull);
+    });
+
+    test('availability uses only nullable summary encoder IDs, not labels or Basic encoders', () {
+      final installation = core.FFmpegInstallation.fromJson({
+        'label': 'Selected FFmpeg',
+        'availability': {
+          basic.video.encoder: {'state': 'ok'},
+          'hevc_nvenc': {'state': 'failed'},
+          'libopus': {'state': 'missing'},
+        },
+      });
+      final withIds = compiled(
+        summary: {'videoEncoder': 'x264', 'videoEncoderId': 'hevc_nvenc', 'audioEncoderId': 'libopus'},
+      );
+      final known = signalPathModel(
+        recipe: recipe,
+        catalog: catalog,
+        media: SamplePreview.media,
+        compiled: withIds,
+        installation: installation,
+      );
+      expect(known.video!.availability, VeAvailability.failed);
+      expect(known.audio!.availability, VeAvailability.missing);
+
+      final unknown = signalPathModel(
+        recipe: recipe,
+        catalog: catalog,
+        media: SamplePreview.media,
+        compiled: compiled(summary: {'videoEncoder': 'x264', 'videoEncoderId': null, 'audioEncoderId': null}),
+        installation: installation,
+      );
+      expect(unknown.video!.availability, isNull);
+      expect(unknown.audio!.availability, isNull);
     });
   });
 

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:ve_services/ve_services.dart' show DesktopRoute;
 
 /// How VegasEncoder.exe was started (TECH_ARCHITECTURE §9.2). The Windows
 /// runner applies the same rule to choose the window (launch_options.cpp).
@@ -19,6 +20,15 @@ sealed class LaunchMode {
         return arg == '--edit-session' ? EditSessionLaunch(value) : RenderMonitorLaunch(value);
       }
     }
+    for (var i = 0; i < args.length; i++) {
+      final flag = args[i];
+      if (flag != '--open-preset' && flag != '--open-job') continue;
+      final id = i + 1 < args.length ? args[i + 1] : '';
+      if (!DesktopRoute.validId(id)) {
+        return const DesktopLaunch(error: 'The requested preset or History destination is invalid.');
+      }
+      return DesktopLaunch(route: flag == '--open-preset' ? DesktopRoute.preset(id) : DesktopRoute.job(id));
+    }
     return const DesktopLaunch();
   }
 
@@ -29,13 +39,15 @@ sealed class LaunchMode {
 enum LaunchWindow { desktop, editSession, renderMonitor }
 
 final class DesktopLaunch extends LaunchMode {
-  const DesktopLaunch();
+  const DesktopLaunch({this.route, this.error});
+  final DesktopRoute? route;
+  final String? error;
   @override
   LaunchWindow get window => LaunchWindow.desktop;
   @override
-  bool operator ==(Object other) => other is DesktopLaunch;
+  bool operator ==(Object other) => other is DesktopLaunch && other.route == route && other.error == error;
   @override
-  int get hashCode => 0;
+  int get hashCode => Object.hash(route, error);
 }
 
 /// `--edit-session <dir>`: the VEGAS popup for one session directory. The

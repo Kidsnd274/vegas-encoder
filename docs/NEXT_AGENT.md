@@ -1,15 +1,17 @@
 # Continue the unified Vegas Encoder implementation
 
-Updated: 2026-10-16 (Asia/Singapore).
+Updated: 2026-10-17 (Asia/Singapore).
 
 Work in **`L:\repos\vegas-encoder`**, currently on **`master`**.
-The owner requested one agent for app and platform, using this original folder
-without a separate development worktree. Read [AGENTS.md](../AGENTS.md),
+The original folder remains the only development checkout. The owner explicitly
+requested bounded parallel agents for this integration pass; their changes share
+this checkout and one queue. No separate worktree or permanent ownership split was
+introduced. Read [AGENTS.md](../AGENTS.md),
 [workflow](product/WORKSTREAMS.md), [product decisions](product/README.md),
 [status](STATUS.md) and relevant contracts/specs. Former workstream handoffs are
 history; their old locations, ownership splits and queues do not apply.
 
-## What is here
+## Consolidation baseline (2026-10-16)
 
 Master `86aefaf` already contained the earlier app/platform milestones. The latest
 changes were copied from platform and verified before updating docs:
@@ -20,38 +22,45 @@ snapshots and merging into master. Platform checkpoint `fd4edb3` preserves its
 original work; the main checkout holds the unified result. No push, installation
 or new real-host qualification was performed. STATUS records validation.
 
-Original-folder validation passes: clean analysis, all 558 app tests, native build,
+That consolidation passed original-folder validation: clean analysis, all 558 app tests, native build,
 3,055 core checks and argv goldens. Ten stale Advanced screenshots were refreshed
 for the already-intended `stats_period 0.2` text after reviewing their isolated
 digit changes in both themes. Dependency locks and preserved trial builds did not
-change. Current work starts with the integration queue below, not more migration.
+change. These are prior baseline results; current integration validation is in STATUS.
+
+## Integration pass implemented
+
+All five former integration items now have producer/consumer implementation:
+selected-file import with validation/error/selection handling; package-backed
+desktop preset/job launch and profile-scoped instance handoff; popup physical
+outer-size persistence; Advanced token/macro/availability metadata adoption; and
+C5 monitor precision display. External navigation waits for modal actions and
+complete asynchronous writes/pickers, preserving drafts and destination order.
+STATUS records the focused checks and remaining qualification limits. The owner
+authorized a local commit of this integration checkpoint afterward. No installed
+candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
 
-1. **Selected-file import:** connect the picker and disabled Import file action to
-   `PresetTransfer.importFrom`; handle errors, refresh/select the new preset. The
-   bounded validated service and fake exist.
-2. **Desktop navigation:** implement a service-backed launcher, preset/job launch
-   routing and handoff to an already-running desktop instance. Connect the null
-   `desktopAppLauncherProvider` for Open in Vegas Encoder and Show in History.
-   This needs platform/runner work, not just provider wiring. Preserve isolated
-   profiles and keep Render independent of the app.
-3. **Popup size:** consume `AppUiState.popupWindowSize`; remember physical outer
-   dimensions, centre/clamp on the owner monitor and retry revision conflicts.
-   Do not persist popup position or break desktop window settings.
-4. **Advanced editor:** adopt core option/stage/macro metadata and `VeCore.macros`
-   using actual recipe/media/path context; show availability from nullable summary
-   encoder IDs. Existing stage colours work; replace remaining option heuristics
-   and synthetic macro probes.
-5. **Monitor precision:** use C5 output depth/reduction facts for the header glyph/
-   pip. Unknown stays unknown. Preserve failure UI/stay-open behavior and no core/
-   library reads while rendering.
-6. Review combined changes and focused app/native/service checks, then prepare
-   release/installer guidance. Owner builds/tests Inno Setup; do not silently
-   take over installation or choose runtime/license policy.
+1. **Audit v1 scope against the actual product.** Follow PRODUCT_SPEC's user flows,
+   classify implementation gaps separately from qualification, and keep this one
+   queue current. Do not revive superseded workstream Needs tables.
+2. **Resolve native output-format scope early.** The current recipe candidate
+   explicitly refuses non-MKV output and general/ambiguous Advanced output. The
+   product's v1 container scope is broader. Investigate host filename/extension
+   behavior and the safe adapter/core changes before implementation; do not claim
+   MP4/MOV/WebM/MXF support from desktop previews or fake-host tests. Audio-only and
+   older-host support retain their existing gates.
+3. **Finish release validation and inputs.** Review remaining user-flow gaps and
+   affected app performance budgets, then prepare a clean matched release bundle
+   and installer guidance. This integration pass did not rerun full performance
+   budgets or establish real-host behavior for the new UI/window paths.
+4. **Owner release decisions and installer.** The owner builds/tests Inno Setup;
+   runtime deployment policy and project licensing remain owner decisions. Keep
+   install/update/rollback/uninstall validation and final release signoff explicit.
 
-These are next implementation items, not changes already made by consolidation.
-No separate app/platform request or relay is needed now.
+Deferred real-host checks below stay deferred. New integration implementation does
+not close A5–A8 or authorize installation, commits, publishing or support claims.
 
 Optional enhancements need backend work or product decisions: Speed in History's
 index, actual Render As path if exposed by the host, popup Test button placement

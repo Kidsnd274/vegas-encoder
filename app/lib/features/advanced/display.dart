@@ -7,7 +7,7 @@
 import 'package:ve_services/ve_services.dart' as core;
 
 import '../../design/components/command_editor.dart';
-import '../../design/components/command_view.dart' show CommandRole, CommandToken;
+import '../../design/components/command_view.dart' show CommandRole;
 import '../../design/components/message.dart' show VeLevel;
 import '../../design/components/status.dart' show VeAvailability;
 import '../presets/display.dart' show levelOf, quoteArgument;
@@ -25,23 +25,21 @@ const outputLockedMessage = '{output} is locked. Vegas Encoder writes the Render
   return (s, e);
 }
 
-CommandRole? _stage(core.TokenRole role) => switch (role) {
-  core.TokenRole.global || core.TokenRole.input || core.TokenRole.map => CommandRole.inputs,
-  core.TokenRole.video => CommandRole.video,
-  core.TokenRole.audio => CommandRole.audio,
-  core.TokenRole.mux => CommandRole.mux,
-  core.TokenRole.output => CommandRole.output,
-  // Advanced words come back as `extra` today: no stage is claimed.
-  core.TokenRole.extra || core.TokenRole.macro || core.TokenRole.exe => null,
+CommandRole? _stage(core.CommandToken token) => switch (token.stage ?? token.role.name) {
+  'global' || 'input' || 'map' => CommandRole.inputs,
+  'video' => CommandRole.video,
+  'audio' => CommandRole.audio,
+  'mux' => CommandRole.mux,
+  'output' => CommandRole.output,
+  _ => null,
 };
 
 /// The editor's model for [text]: words and chips from the core's compile of
 /// this text, marks from its lint plus compile issues lint doesn't repeat
 /// (such as an out-of-range `{gop:Ns}`).
 ///
-/// The core gives a word's stage and macro role only where it knows them; in
-/// B2 Advanced words are all `extra`, so only option names (the command
-/// view's display rule) and the locked chips stand out until it does.
+/// Unknown option/stage metadata stays unknown. Macro identities include
+/// embedded and quoted expansions; their source span is the whole word.
 CommandEditorModel templateEditorModel(
   String text, {
   core.CompileResult? compiled,
@@ -59,10 +57,16 @@ CommandEditorModel templateEditorModel(
         chips.add(EditorChip(start, end, role: CommandRole.inputs, message: inputsLockedMessage));
       case core.TokenRole.output:
         chips.add(EditorChip(start, end, role: CommandRole.output, message: outputLockedMessage));
-      case core.TokenRole.macro:
-        words.add(EditorWord(start, end, macro: true));
       default:
-        words.add(EditorWord(start, end, flag: CommandToken(t.text).isFlag, role: _stage(t.role)));
+        words.add(
+          EditorWord(
+            start,
+            end,
+            flag: t.isOption == true,
+            macro: t.macros.isNotEmpty || t.role == core.TokenRole.macro,
+            role: _stage(t),
+          ),
+        );
     }
   }
   return CommandEditorModel(text: text, words: words, chips: chips, marks: advancedMarks(text, lint, compiled));
@@ -229,37 +233,17 @@ const macroDescriptions = <String, String>{
   '{project}': 'VEGAS project file name without extension.',
 };
 
-const requiredMacros = {'{inputs}', '{output}'};
-
-/// The macros the core offers (`VeCore.complete` after "{"), with the values
-/// the core expanded them to in [probe]: a compile of [probeText], the names
-/// joined by spaces, so the word starting at each name's offset is its value.
-List<MacroEntry> macroEntries(core.CompletionResult offered, String probeText, core.CompileResult? probe) {
-  final values = <int, String>{};
-  for (final t in probe?.display ?? const <core.CommandToken>[]) {
-    final span = sourceSpan(t, probeText.length);
-    if (span != null && t.role != core.TokenRole.input) values.putIfAbsent(span.$1, () => t.text);
-  }
-  final out = <MacroEntry>[];
-  var offset = 0;
-  for (final s in offered.items) {
-    final name = s.value;
-    final value = values[offset];
-    out.add(
-      MacroEntry(
-        name: name,
-        description: macroDescriptions[name] ?? s.description,
-        value: requiredMacros.contains(name) || value == name ? null : value,
-        required: requiredMacros.contains(name),
-      ),
-    );
-    offset += name.length + 1;
-  }
-  return out;
-}
-
-/// The probe command for [macroEntries]: the offered names, space-separated.
-String macroProbeText(core.CompletionResult offered) => offered.items.map((s) => s.value).join(' ');
+/// The core's macro catalogue, with UI copy for known names. Values and
+/// required markers are retained exactly, including unknown values.
+List<MacroEntry> macroEntries(List<core.MacroDefinition> offered) => [
+  for (final macro in offered)
+    MacroEntry(
+      name: macro.name,
+      description: macroDescriptions[macro.name] ?? macro.description,
+      value: macro.value,
+      required: macro.required,
+    ),
+];
 
 // ------------------------------------------------------------ autocomplete
 
