@@ -17,8 +17,7 @@ struct RecipePageOptions {
   ve::Json context = {{"hostVersion", nullptr}, {"project", nullptr}, {"media", nullptr}};
   ve::Json capabilities = nullptr;
   std::function<void()> beforeLaunch;
-  // Candidate adapter constraints beyond portable core validation (for example
-  // the currently evidenced native MKV file type). Throw to preserve the draft.
+  // Shared native-target preflight. Throw to preserve the previous draft.
   std::function<void(const ve::Json&)> validateRecipe;
 };
 

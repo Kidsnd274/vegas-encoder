@@ -76,6 +76,7 @@ void main() {
       'x264 CRF 18, slow / AAC 320 kb/s',
       '12:43',
       '24:46',
+      '0.51×',
       '9.84\u00A0GB',
     ]) {
       expect(
@@ -84,8 +85,6 @@ void main() {
         reason: text,
       );
     }
-    // Speed needs the record's realtime figure: the detail has it, the list doesn't.
-    expect(find.descendant(of: first, matching: find.text('0.51×')), findsNothing);
     expect(find.descendant(of: row('j-1039'), matching: find.text('No file')), findsOneWidget);
     expect(find.text('5 renders'), findsOneWidget);
     // The newest render is selected to start with.
@@ -101,8 +100,8 @@ void main() {
     expect(find.descendant(of: first, matching: find.text('Lakeside wedding final.veg')), findsOneWidget);
     expect(
       find.descendant(of: first, matching: find.text('–')),
-      findsOneWidget,
-      reason: 'the encoder',
+      findsNWidgets(2),
+      reason: 'the encoder and recorded speed',
     );
     expect(find.descendant(of: first, matching: find.text('x264')), findsNothing);
     final bare = JobIndexEntry(
@@ -117,6 +116,7 @@ void main() {
     expect(indexProject(bare), isNull);
     expect(indexSize(bare), isNull);
     expect(indexDuration(bare.durationSec), isNull);
+    expect(indexSpeed(bare), isNull);
   });
 
   testWidgets('the status filter keeps one kind of render', (tester) async {
@@ -141,7 +141,7 @@ void main() {
     await tester.tap(find.descendant(of: row('j-1038'), matching: find.text('ProRes 422 HQ for editing')));
     await tester.pumpAndSettle();
     expect(inDetail(find.text('ProRes 422 HQ for editing')), findsOneWidget);
-    expect(inDetail(find.text('Rendered 3:02 in 2:40, 1.14× realtime, 5.02\u00A0GB.')), findsOneWidget);
+    expect(inDetail(find.text('Rendered 3:02 in 2:40, 5.02\u00A0GB.')), findsOneWidget);
     expect(inDetail(find.text('FFmpeg said')), findsNothing, reason: 'no stderr for a clean render');
 
     await keys(tester, LogicalKeyboardKey.arrowUp);

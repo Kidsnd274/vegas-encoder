@@ -1,6 +1,6 @@
 # Native integration evidence and implementation limits
 
-Current continuation is single-agent app/platform work in the original checkout;
+Current continuation uses the original checkout and one app/platform queue;
 see [NEXT_AGENT](NEXT_AGENT.md) and [STATUS](STATUS.md) for present implementation,
 installed candidate and qualification. The imported evidence and older unresolved
 sections below are historical scope, not a separate workstream or current queue.
@@ -41,6 +41,15 @@ treat declarations of unused methods as support, unknown flags as semantic names
 or a third-party capture as qualification of our current binary.
 
 ## New implementation versus native evidence
+
+The owner-authorized 2026-10-17 container implementation adds shared C2 native
+target preflight, C4 target propagation, exact suffix/path enforcement, retained
+temporary suffixes and C6 demuxer-family readback. Core/engine/fake-host checks
+establish implementation behavior only. The class still advertises `*.mkv`;
+multi-extension writer syntax, defaults/filtering and new-container real-VEGAS
+renders remain unqualified. No new host method, selector meaning or per-template
+filename mechanism was inferred. See [container plan](product/NATIVE_CONTAINER_PLAN.md)
+and current STATUS for results. Existing imported observations retain their scope.
 
 B5 establishes the exact `CSfRenderProgress` text effects on the unchanged
 2026.0.3.189 executable: slot 3 borrows a description pointer, sets the total and

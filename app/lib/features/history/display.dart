@@ -1,8 +1,7 @@
 // Maps job records (C6) to what History shows. Display work only: labels,
 // sentences and formatting. Every figure comes from the record the engine
 // wrote. Records from before B4 lack the realtime figure and the core's
-// command line; for those the ratio divides two recorded figures and the
-// command is quoted here.
+// command line; their speed stays unknown and the command is quoted here.
 
 import 'package:ve_services/ve_services.dart' as core;
 
@@ -40,16 +39,9 @@ String jobTime(String utc, {bool year = false}) {
 }
 
 /// The recorded realtime figure (C6 `realtime`): "0.51×". Only for a
-/// finished render (a stopped one didn't encode the whole length). An older
-/// record without it divides the project length by the time taken, when both
-/// are known and the render took some time.
-double? realtimeRatio(core.JobRecord r) {
-  if (r.status != 'succeeded') return null;
-  if (r.realtime case final recorded?) return recorded;
-  final length = r.media.durationSec;
-  if (length == null || length <= 0 || r.elapsedSec <= 0) return null;
-  return length / r.elapsedSec;
-}
+/// finished render. Older records leave it unknown; length/time is not
+/// FFmpeg's recorded encoding speed.
+double? realtimeRatio(core.JobRecord r) => r.status == 'succeeded' ? r.realtime : null;
 
 /// "0.51×", "2.31×", "12.4×".
 String ratioLabel(double ratio) => '${ratio.toStringAsFixed(ratio < 10 ? 2 : 1)}×';
@@ -100,6 +92,10 @@ String? indexSize(core.JobIndexEntry e) => switch (e.sizeBytes) {
 
 /// A recorded length in seconds as "12:43"; null stays unknown.
 String? indexDuration(double? seconds) => seconds == null ? null : VeFormat.duration(seconds);
+
+/// FFmpeg's recorded realtime multiplier, including a partial render's last
+/// known speed. An older index without this fact stays unknown.
+String? indexSpeed(core.JobIndexEntry e) => e.realtime == null ? null : ratioLabel(e.realtime!);
 
 // ------------------------------------------------------------ the detail
 

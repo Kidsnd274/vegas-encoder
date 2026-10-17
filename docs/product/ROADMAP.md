@@ -4,6 +4,13 @@ Updated: 2026-10-16 (Asia/Singapore). Phase plan; actual completion/qualificatio
 is in STATUS. One agent now owns implementation in the original checkout; the
 current queue is [NEXT_AGENT.md](../NEXT_AGENT.md).
 
+**Owner scope override (2026-10-17):** retain working features and finish only
+native MP4/MOV/WebM/MXF support alongside MKV, and a read-only VEGAS installation/
+status dashboard. The owner builds the installer. Other unfinished enhancements
+in this historical phase plan are skipped for this release, not follow-up tasks.
+See [current scope](PRODUCT_SPEC.md#current-release-scope-owner-2026-10-17).
+Historical phase exits do not authorize repeating passed or owner-deferred trials.
+
 The product phases run alongside the adapter gates in [ADAPTER_PLAN.md](../ADAPTER_PLAN.md);
 gate state is tracked in [STATUS.md](../STATUS.md). No calendar estimates are given,
 for the same reason as ADAPTER_PLAN §7: real-host access and native-exchange recovery
@@ -160,16 +167,20 @@ pass. Autocomplete is either done or explicitly deferred.
 - Popup checklist passes.
 - Exact identities and hashes recorded.
 
-## P5: Release foundations
+## P5: Retained release foundations
 
 1. Signed installer with reversible plug-in placement, upgrade policy that preserves
    config, and uninstall. The owner builds it with Inno Setup from platform's inputs
    (owner, 2026-10-15): one release installed together, every recorded VEGAS target
    updated by default, plus version checks between plug-in and app. Choosing older
    VEGAS versions waits on per-version platform research.
-2. Research gate: pinned presets as exporter presets (Render As list caching, F-044).
-3. Optional "Get FFmpeg" helper, once licensing is decided.
-4. Update checks and crash/diagnostic bundle export, opt-in.
+2. Read-only VEGAS installation/status dashboard in Settings, backed by services:
+   detected hosts, checked paths/versions, installed-manifest integrity where
+   verifiable, refresh and unknown/error states. No installer mutations.
+3. Finish native multi-container naming/filter integration and qualify retained
+   behavior; the core/engine pipeline is already implemented and offline-tested.
+4. Pinned presets in Render As, FFmpeg helpers, update checks and diagnostic bundle
+   export are owner-skipped. Existing internal fields/data need no removal.
 
 ## Risks
 
@@ -177,7 +188,7 @@ pass. Autocomplete is either done or explicitly deferred.
 | --- | --- | --- |
 | A5 can't recover the template exchange | No in-VEGAS editing | Pinned presets in Render As (§5.5 fallback); edit in the desktop app |
 | `abExtra` size limit is small | Snapshot doesn't fit | Compact encoding or compression; drop optional fields such as notes; measure first |
-| VEGAS names output files by class extension (`*.mkv`) | Wrong extension for MP4/MOV | Investigate per-template extensions; engine renames on publish if needed (to verify) |
+| VEGAS names output files by class extension (`*.mkv`) | Filename/filter workflow incomplete for other retained containers | Establish writer naming syntax/behavior; preserve exact destination and reject suffix mismatch. Never silently rename the host-selected final path. |
 | Cross-process owner window misbehaves in VEGAS | Editor hides behind VEGAS or steals focus | P2 spike; fall back to an unowned topmost window with a native page reminder |
 | Flutter cold start too slow for the popup | Sluggish feel | Measure; pre-warm on page creation (spawn hidden, then show) as a v2 option |
 | Encoder behaviour differs across FFmpeg builds | Lint or compile mismatches | Capability cache per build; fixtures from Windows builds; FFmpeg stderr is authoritative |

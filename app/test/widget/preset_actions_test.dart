@@ -214,7 +214,8 @@ class _StalledTests implements PresetTests {
         PresetTestProgress(
           testId: 't',
           phase: 'failed',
-          message: 'ServiceException(PROBE-REQUIRED): Probe this installation before testing a preset.',
+          message: 'Probe this installation before testing a preset.',
+          code: 'PROBE-REQUIRED',
         ),
       );
       c.close();

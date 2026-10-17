@@ -3,10 +3,10 @@
 Updated: 2026-10-17 (Asia/Singapore).
 
 Work in **`L:\repos\vegas-encoder`**, currently on **`master`**.
-The original folder remains the only development checkout. The owner explicitly
-requested bounded parallel agents for this integration pass; their changes share
-this checkout and one queue. No separate worktree or permanent ownership split was
-introduced. Read [AGENTS.md](../AGENTS.md),
+The original folder remains the only development checkout. The earlier explicitly
+requested parallel pass is complete; default to one agent here unless the owner
+requests delegation again. Preserve its uncommitted changes and this single queue.
+No separate worktree or permanent ownership split was introduced. Read [AGENTS.md](../AGENTS.md),
 [workflow](product/WORKSTREAMS.md), [product decisions](product/README.md),
 [status](STATUS.md) and relevant contracts/specs. Former workstream handoffs are
 history; their old locations, ownership splits and queues do not apply.
@@ -42,30 +42,107 @@ candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
 
-1. **Audit v1 scope against the actual product.** Follow PRODUCT_SPEC's user flows,
-   classify implementation gaps separately from qualification, and keep this one
-   queue current. Do not revive superseded workstream Needs tables.
-2. **Resolve native output-format scope early.** The current recipe candidate
-   explicitly refuses non-MKV output and general/ambiguous Advanced output. The
-   product's v1 container scope is broader. Investigate host filename/extension
-   behavior and the safe adapter/core changes before implementation; do not claim
-   MP4/MOV/WebM/MXF support from desktop previews or fake-host tests. Audio-only and
-   older-host support retain their existing gates.
-3. **Finish release validation and inputs.** Review remaining user-flow gaps and
-   affected app performance budgets, then prepare a clean matched release bundle
-   and installer guidance. This integration pass did not rerun full performance
-   budgets or establish real-host behavior for the new UI/window paths.
-4. **Owner release decisions and installer.** The owner builds/tests Inno Setup;
-   runtime deployment policy and project licensing remain owner decisions. Keep
-   install/update/rollback/uninstall validation and final release signoff explicit.
+The current container/integration implementation pass is complete at its offline
+scope, including final optimized native and app builds. STATUS records focused
+checks and the remaining qualification limits. These new changes are uncommitted;
+the previously authorized integration commit is `df1ff9a`. All three current
+agents completed after resuming interrupted verification; no installed trial or
+rollback files were changed.
+
+The owner reduced the remaining feature scope on 2026-10-17: **keep native
+multi-container support and a VEGAS installation/status dashboard; skip the other
+unfinished enhancements. The owner makes the finished installer.** This supersedes
+the former revision-history and Advanced-extra-input implementation tasks. Preserve
+existing working features and internal plumbing; this is not a code-removal task.
+
+1. **Finish MP4/MOV/WebM/MXF in VEGAS alongside MKV.** Shared target preflight, adapter/
+   engine adoption, exact suffix enforcement and Advanced preview guidance are
+   implemented. The class still advertises `*.mkv`; establish exact writer ID-4
+   extension-list syntax before changing it. Built-in wildcard strings alone are
+   insufficient evidence. Per-template default/filter behavior and new-container
+   real VEGAS renders remain unqualified. The owner retained these formats; an
+   MKV-only release is not the selected final scope. Follow
+   [NATIVE_CONTAINER_PLAN.md](product/NATIVE_CONTAINER_PLAN.md); do not repeat the
+   broad investigation, guess a delimiter or claim qualification from fakes.
+2. **Implement the read-only VEGAS installation/status dashboard in Settings.**
+   First inspect `scripts/Get-VegasTargets.ps1`, the recorded
+   `vegas-encoder-install/1` manifest in `scripts/Install-VegasEncoder.ps1`, and
+   [B7 installer inputs](B7_INSTALLER_INPUTS.md). Plan the package-backed producer
+   and app consumer together; the app reaches the filesystem/registry only through
+   ve_services. Report detected host name/version/path, expected exporter and
+   discovery paths, actual DLL version, manifest path and verification result.
+   Distinguish not installed, verified, unverified/no supported manifest,
+   missing/changed files and unreadable status. A matching version alone does not
+   prove integrity; a detected older host is not a supported host. Include refresh,
+   useful empty/error states and path/error details. Existing development manifests
+   are a starting point; do not invent the owner's future installer format or make
+   the dashboard depend on a finished installer. No install/repair/uninstall writes
+   or automatic file replacement. UI behavior is in UI_SPEC §6a.
+3. **Prepare the retained scope for owner handoff.** Use focused checks for changed
+   producer/consumer paths and light/dark goldens for changed app UI. Reuse passed
+   container/core/service checks unless new changes justify repeating them. Finish
+   matched build inputs and keep installer guidance current; the owner builds/tests
+   Inno Setup. Runtime deployment policy and project licensing remain owner choices.
+   Installation, new real-host trials and release signoff remain separate steps;
+   do not resume existing owner-deferred trials. This pass established no new
+   full performance-budget or real-VEGAS qualification.
 
 Deferred real-host checks below stay deferred. New integration implementation does
 not close A5–A8 or authorize installation, commits, publishing or support claims.
 
-Optional enhancements need backend work or product decisions: Speed in History's
-index, actual Render As path if exposed by the host, popup Test button placement
-and tests at project dimensions. Do not guess host facts. Library-watch and
-capability-transfer optimizations are delivered; do not redo them.
+Everything else unfinished in the feature audit is **skipped for this release**,
+not an implicit next queue: revision browser/restore; native extra inputs/general
+maps/complex graphs; new popup project/path extraction; richer native page/direct
+Load; pinned Render As presets; per-preset FFmpeg override; log retention/richer
+headers; command-to-Basic import; learned estimates; structured filter/input
+controls; FFmpeg downloads; update/diagnostic bundles; additional host/media
+support; live-edit/prewarm features. Existing counters/history, base snapshots,
+diff/update, logs, portable fields and sample/unknown fallbacks stay intact.
+Owner decisions also close popup Test/project-size/recommended-band questions.
+Library-watch and capability-transfer optimizations are delivered; do not redo them.
+
+## Next-agent execution brief
+
+Read the current scope above, PRODUCT_SPEC's current release scope, UI_SPEC §6a,
+STATUS and NATIVE_CONTAINER_PLAN. The existing container pipeline is implemented;
+plan the remaining naming/host work without repeating that implementation. Also
+plan the dashboard's service/model/fake/UI changes before coding. Work on these two
+features only, in the original checkout, preserving all uncommitted work. Keep
+checks focused and distinguish fakes/offline FFmpeg from real VEGAS. Do not build
+the owner's installer or revive skipped features. Update STATUS/NEXT_AGENT with
+actual results and concrete remaining gates; no commit/install/push without its
+required authorization.
+
+## Carried-forward issues and decisions
+
+Reconciled against the historical app/platform notes on 2026-10-17. These feed
+the implementation queue above; they are not separate agent queues. Integration
+items completed in `df1ff9a` and delivered library/capability optimizations are
+not outstanding. Historical "not built" claims about native app-version preflight
+and B7 installer inputs are superseded too.
+
+| Item | Current disposition |
+| --- | --- |
+| Popup plug-in/core version warning | Implemented and verified: C4 plug-in/app release triplets and exact core stamps; missing stamps warn as unverified. Apply remains enabled. Same-stamp hash-distinct variants cannot be detected. Native PE prelaunch checks already cover popup and monitor. |
+| History list Speed | Implemented through native index, storage validation/recovery, models/fakes and UI. Uses recorded nullable `realtime`; legacy missing values stay unknown. No length/time inference. |
+| Late monitor job record | Implemented: terminal-only immediate read plus one-second polling until arrival/disposal. No active-render C6/core/library reads; late details/log access update. Failure retention unchanged. |
+| Preset-test failure messages | Implemented: plain `message` plus nullable separate `code`, without UI exception-wrapper parsing. |
+| Preset-test size and popup action | Resolved by owner 2026-10-17: desktop-only lightweight 320x180 P010 at 30 fps for v1. No popup action or project-sized test is outstanding for v1. |
+| Recommended quality band | Resolved by owner 2026-10-17: retain current numeric marks and no additional recommendation band for v1. |
+| Actual Render As path / project facts in popup | New edit-time extraction is owner-skipped for this release. Retain labelled sample/unknown facts and manual length; container naming/render-time suffix checks remain in scope. |
+| Advanced partial quote/chip behavior | Existing implementation confirmed by focused consumer assertion; preceding input/output chip guards survive an unfinished quote. No implementation change was needed. |
+| Window/startup polish | Historical observations are not a feature-development queue. Address a reproduced material defect if relevant; no new general polish/performance programme. |
+| Saved revision browsing/restore/diff | Owner-skipped for this release. Preserve internal revisions/history, CAS conflict handling and base-recipe diff/update; no new browser/restore UI. |
+| Advanced extra inputs | Owner-skipped for native rendering. Preserve safe input/map/complex-graph restrictions and working supported Advanced commands. |
+| VEGAS installation/status dashboard | Retained unfinished feature; implement read-only service plus Settings UI as item 2 above. Installer remains owner-owned. |
+
+Historical sources: [app Needs](product/workstreams/app.md#needs-from-platform),
+[app Open items](product/workstreams/app.md#open-items),
+[platform handoff](product/workstreams/platform.md#limits--app-handoff) and
+[installer inputs](B7_INSTALLER_INPUTS.md). Old manual file-dialog observations,
+IME/autocomplete placement notes, log-opening preferences and library-load UI
+observations remain review references, not newly reproduced bugs. Full app budget
+qualification and owner-deferred monitor measurements retain their recorded scope.
 
 ## Owner scope and operational continuity
 

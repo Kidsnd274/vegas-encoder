@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+
 import 'package:ve_core/ve_core.dart';
+
 import 'api.dart';
 import 'models.dart';
 import 'storage.dart';
@@ -11,6 +13,20 @@ import 'ffmpeg_parser.dart';
 import 'process_runner.dart';
 import 'operations.dart';
 import 'capabilities.dart';
+
+/// User-facing text and machine-readable identity are separate from an
+/// exception's debugging representation.
+(String, String) _failure(Object error) => switch (error) {
+  ServiceException(:final code, :final message) => (code, message),
+  CoreException(:final code, :final message) => (code, message),
+  FileSystemException(:final message, :final osError) => (
+    'PRESET-TEST-IO',
+    osError == null ? message : '$message: ${osError.message}',
+  ),
+  ProcessException(:final message) => ('PRESET-TEST-PROCESS', message),
+  FormatException(:final message) => ('PRESET-TEST-DATA', message),
+  _ => ('PRESET-TEST-FAILED', 'The preset test could not finish.'),
+};
 
 /// Process/output boundary only. Expected kinds/codecs are supplied by core;
 /// neither the UI nor services infer them from argv or command text.
@@ -112,6 +128,7 @@ class WindowsPresetTests implements PresetTests {
           void emit({
             String text = '',
             String message = '',
+            String? code,
             VerificationResult? verification,
           }) {
             final event = PresetTestProgress(
@@ -119,6 +136,7 @@ class WindowsPresetTests implements PresetTests {
               phase: phase,
               log: text,
               message: message,
+              code: code,
               framesDone: frames,
               commandLine: commandLine,
               logPath: logPath,
@@ -144,8 +162,7 @@ class WindowsPresetTests implements PresetTests {
 
           try {
             emit(
-              message:
-                  'Preparing 60 synthetic testsrc2 frames and two seconds of stereo sine.',
+              message: 'Preparing 60 synthetic testsrc2 frames and two seconds of stereo sine.',
             );
             await requireCurrentInstallation(
               installation,
@@ -320,7 +337,11 @@ class WindowsPresetTests implements PresetTests {
             );
             if (verified.state != 'passed') {
               phase = 'failed';
-              emit(message: verified.message, verification: verified);
+              emit(
+                message: verified.message,
+                code: 'PRESET-TEST-VERIFY',
+                verification: verified,
+              );
               return;
             }
             final decoded = await runner.run(
@@ -353,19 +374,22 @@ class WindowsPresetTests implements PresetTests {
             );
             phase = 'done';
             emit(
-              message:
-                  'Synthetic preset test passed; output streams matched and fully decoded.',
+              message: 'Synthetic preset test passed; output streams matched and fully decoded.',
               verification: verified,
             );
           } catch (e) {
             phase = op.token.cancelled && !logLimit && logFailure == null
                 ? 'cancelled'
                 : 'failed';
-            emit(
-              message: logLimit
-                  ? 'Test log exceeded 8 MiB; child stopped.'
-                  : (logFailure ?? e).toString(),
-            );
+            final (code, message) = logLimit
+                ? (
+                    'PRESET-TEST-LOG-LIMIT',
+                    'Test log exceeded 8 MiB; child stopped.',
+                  )
+                : phase == 'cancelled'
+                ? ('CANCELLED', 'Test cancelled.')
+                : _failure(logFailure ?? e);
+            emit(message: message, code: code);
           } finally {
             try {
               await log?.flush();
@@ -382,12 +406,15 @@ class WindowsPresetTests implements PresetTests {
               }
             } catch (e) {
               final previous = terminal;
+              final (_, message) = _failure(e);
               terminal = PresetTestProgress.fromJson({
                 ...?previous?.data,
                 'testId': id,
                 'phase': 'failed',
+                'code': 'PRESET-TEST-CLEANUP',
                 'message':
-                    '${previous?.message ?? ''} Test artifact cleanup/log write failed: $e',
+                    '${previous?.message ?? ''} Test artifact cleanup/log write failed: $message'
+                        .trim(),
               });
             } finally {
               if (terminal != null && !controller.isClosed)

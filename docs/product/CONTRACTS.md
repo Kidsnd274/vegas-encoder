@@ -134,7 +134,9 @@ decodePayload(Uint8List) -> PayloadResult
 MediaDescription {video:VideoMedia,audio:AudioMedia|null,durationSec:number|null}
 VideoMedia {width,height:int,fps:[positiveInt,positiveInt],pixfmt,sar:string}
 AudioMedia {rate,channels:int,sampleFmt:string}
-CompilePaths {ffmpeg:string,videoPipe:string,audioPipe:string|null,output:string,project:string}
+CompilePaths {ffmpeg:string,videoPipe:string,audioPipe:string|null,output:string,project:string,
+  target:NativeTarget|null}
+NativeTarget {id:"vegas-native-v1",outputPath:string|null}
 CoreCapabilities {installationId,label,identityKey,version:string,
   libavformatMajor:positiveInt|null,
   encoders:{name:{kind:"video"|"audio",options:EncoderOption[],availability:EncoderAvailability,...}},
@@ -145,7 +147,7 @@ Diagnostic {id,level,message,params,fix as above,start:int,end:int}
 CompileResult {executable:string,argv:string[],display:CommandToken[],commandLine:string,
   advancedTemplate:string,resolved:ResolvedSettings|null,signalPath:SignalPathFacts|null,
   issues:Issue[],summary:RecipeSummary,overriddenFields:string[],expectedStreams:ExpectedStream[]|null,
-  inputStreams:("video"|"audio")[]|null,outputContainerId:string|null}
+  inputStreams:("video"|"audio")[]|null,outputContainerId,outputExtension:string|null}
 ExpectedStream {kind:"video"|"audio",encoder:string|null,codec:string|null}
 CommandToken {text:string,role:"exe"|"global"|"input"|"map"|"video"|"audio"|"mux"|"output"|"extra"|"macro",
   field,replacedField,stage:string|null,isOption:bool|null,macros:string[],
@@ -193,9 +195,32 @@ B6 adds nullable `outputContainerId`, an established catalog ID (`mkv`, `mov`,
 etc.). Basic uses its emitted muxer; Advanced requires an explicit known final
 output `-f`. An absent/input-only/unknown muxer, partial quote or general output
 scope stays null. Neither filename extensions nor inactive Basic controls supply
-Advanced facts. The opt-in MKV native candidate uses this fact plus an established
-video `expectedStreams` entry before spawning FFmpeg. Historical fakes may omit
-the additive field and readers expose null; argv/validation remain core-owned.
+Advanced facts. `outputExtension` is the corresponding canonical suffix, including
+the dot; it is null when container identity is unknown. Historical fakes may omit
+these additive fields and readers expose null; argv/validation remain core-owned.
+
+The 2026-10-17 native-container implementation adds optional `paths.target`, outside
+the portable recipe. Omitted/null retains portable desktop behavior. With
+`id:"vegas-native-v1"`, compilation reports native admission errors for an unknown
+or non-single output, unestablished video/codec scope, audio-only output, general or
+duplicate maps and complex-filter outputs. Advanced requires a known output `-f`
+and all output options before the final `{output}`. Known measured incompatible
+stream/container combinations also fail; conditional rules remain warnings.
+`V-MUXER-MISSING` reports a required muxer absent from supplied capabilities.
+Native target errors use `N-CONTAINER`, `N-STREAMS`, `N-OUTPUT-ORDER`,
+`N-CONTAINER-video/audio`, `N-COMPLEX-FILTER` and `N-OUTPUT-SUFFIX`. Complex graph
+options (`-filter_complex`, `-lavfi`, script/file forms) are refused in both Basic
+Extra and Advanced native context; simple stream filters stay supported.
+Unknown target IDs are rejected.
+
+`target.outputPath` is the actual final destination when known. Its suffix must
+match `.mp4`, `.mkv`, `.mov`, `.webm` or `.mxf` case-insensitively. This check does
+not infer the muxer from that path. Omit/null when the destination is unknown;
+the sample preview is not a host destination. The native page and popup show
+core-produced suffix guidance; Render preserves the exact host-selected path,
+checks suffix before acquiring frames and recompiles against delivered media
+before spawning FFmpeg. The current class still advertises `*.mkv`; extension-list
+syntax and real-host filter/default behavior remain a separate gate.
 
 ### B6 opt-in native trial (2026-10-15)
 
@@ -223,8 +248,10 @@ It releases copied host frames before C7 reads, hashing, queues or process waits
 C5 monitor creation belongs to the independent job writer after its first atomic
 live publication, with the app directory as cwd, no inherited handles and no
 acknowledgement or process wait on Render. Monitor launch failure is nonfatal.
-The candidate requires MKV video, square pixels and the established P010/48 kHz
-stereo float input path; it does not activate arbitrary native formats/containers.
+The initial trial required MKV video. Current source uses the native target above
+for five known containers, while retaining square pixels and the established
+P010/48 kHz stereo float input path. New-container real-VEGAS qualification is
+pending; this does not activate arbitrary native formats or output scopes.
 The native private allocation rounds odd VEnc lengths up by one zero byte before
 the host's UTF-16 suffix. That byte is outside the core's strict envelope/checksum;
 only this exact padding is accepted. Earlier intact unpadded B6 envelopes still
@@ -517,11 +544,16 @@ HardwareTestResult {encoder:string,state:"ok"|"missing"|"failed"|"unknown",tenBi
   reason,stderr:string,testedAt:UTC,identityKey,gpuFingerprint:string}
 PresetTestProgress {testId:string,phase:"preparing"|"encoding"|"verifying"|"done"|"failed"|"cancelled",
   log,message:string,framesDone,framesTotal:int,commandLine,logPath,outputPath:string|null,
-  verification:VerificationResult|null,isFixture:bool}
+  verification:VerificationResult|null,code:string|null,isFixture:bool}
 Preset {vepreset:1,revision:positiveInt,favorite,pinned,builtin:bool,updatedAt:UTC,
   origin:string|null,requires:PresetRequirements,recipe:Recipe}
 PresetRequirements {encoders:string[],minFFmpegVersion:string|null,known:bool}
 ```
+
+Preset test failures expose a plain user-facing `message` and a separate nullable
+`code`; consumers do not parse an exception's string representation. This is the
+desktop-only lightweight synthetic check in v1 (320×180 P010, 30 fps, 60 frames),
+not a project-resolution or real-VEGAS qualification test.
 
 source is `ini|path|winget|scoop|chocolatey|manual`. identity.key combines executable
 and sorted sibling library hashes and parser version in B3; hardware also keys GPU
@@ -793,7 +825,8 @@ per-user ACL. Files are request.json and result.json. Request shape:
 EditSessionRequest {
   protocol:1,sessionId:string,templateName:string,recipe:Recipe,origin:Origin|null,
   baseRecipe:Recipe|null,
-  context:{hostVersion:string|null,project:string|null,media:MediaDescription|null},
+  context:{hostVersion:string|null,project:string|null,media:MediaDescription|null,
+    target:NativeTarget|null},
   ownerHwnd:decimalString,dllVersion:string,coreVersion:string
 }
 EditSessionResult {protocol:1,sessionId:string,action:"apply"|"cancel",
@@ -807,6 +840,18 @@ the native page commits only on host Apply/OK. No library lookup during renderin
 baseRecipe is the origin revision's copied snapshot when available; null means
 three-way update cannot be offered. Project facts may all be null: UI must say
 "Set by the project"; sample preview facts must be labeled as samples.
+
+The native recipe page supplies `context.target:{id:"vegas-native-v1"}` so the
+popup shares core admission checks before Apply. Old requests omit it and keep
+their prior behavior. Actual Render As destination remains unavailable at edit
+time; do not populate `outputPath` from the sample path. Native admission and
+actual-media compilation recheck the recipe independently of the app.
+
+The popup compares C4 `dllVersion`/`coreVersion` with the runner's `appVersion`
+channel and its loaded core. Plug-in/app numeric release triplets must match;
+suffix/build labels may differ. Core stamps must match exactly. Missing/malformed
+stamps show an unable-to-verify warning. Warnings do not disable Apply. Identical
+version stamps on hash-distinct development builds are not detected by this check.
 
 Missing, invalid, newer-version, mismatched, or crashed-editor result means cancel;
 no old draft leaks into the template. Result is written adjacent-temp then atomic
@@ -928,14 +973,15 @@ JobRecord {
   elapsedSec:number,sizeBytes:nonnegativeInt,avgFps:number|null,ffmpegExitCode:int|null,
   hresult:string,message,stderrTail:string,
   verification:{state:"passed"|"failed"|"skipped",message:string,
-    expectedCodecs:string[],actualCodecs:string[],ffprobeVersion:string|null},
+    expectedCodecs:string[],actualCodecs:string[],ffprobeVersion:string|null,
+    expectedContainerId,containerFamily,actualFormatNames,containerEvidenceScope:string|null},
   timings:{phase:seconds},published:bool,retainedPartialPath:string|null,
   commandLine,encoderSummary,logFile:string|null,durationSec,realtime:number|null,
   errorTokenIndices:nonnegativeInt[]
 }
 JobIndexEntry {index:1,id:string,recordFile:relativeBasename,startedAt:UTC,
   status:"succeeded"|"failed"|"cancelled",templateName:string,outputPath:string,
-  encoderSummary,project:string|null,durationSec,elapsedSec:number|null,sizeBytes:int|null}
+  encoderSummary,project:string|null,durationSec,elapsedSec,realtime:number|null,sizeBytes:int|null}
 ```
 
 argv excludes the executable (ffmpeg.path supplies it) and includes actual temp
@@ -956,6 +1002,11 @@ tokens. The app never parses stderr to produce them. `logFile` is the relative
 basename `<id>.ffmpeg.log` under the jobs root. JobLogs streams the full UTF-8 log
 without the 1 MiB JSON allocation limit; a missing historical log is NOT-FOUND.
 
+The index now copies the record's nullable `realtime` unchanged, including during
+rebuild and fake publication. Old/missing/null values remain unknown. History does
+not derive encoding speed from duration/elapsed time. Negative/nonfinite values
+and invalid types are rejected at the storage boundary.
+
 FileJobRepository reads the bounded lines of jobs.jsonl without reading every
 record. It ignores an incomplete final line and rejects malformed complete lines
 or unsafe recordFile references. Missing index can be reconstructed read-only from
@@ -970,6 +1021,17 @@ decoded count and dimensions for every video stream, and checks stream kinds/cou
 and known core codecs. Cancellation, timeout, diagnostics, JSON bounds and refusal
 to publish on failure remain enforced. This is sampled readability, not an exact
 frame count or a full-file corruption scan. Full decode qualification is separate.
+
+When the core establishes an output container, readback also requires its FFprobe
+demuxer family (`mov-mp4`, `matroska-webm` or `mxf`) and records the additive fields
+above with `containerEvidenceScope:"demuxer-family"`. Shared names cannot certify
+MP4 versus MOV or MKV versus WebM. Family mismatch refuses publication and retains
+the unpublished file as a verification failure; cancellation removes it.
+
+The monitor starts C6 lookup only after terminal C5 status. It reads immediately,
+then polls at one-second intervals until the record arrives or the window is
+disposed; a core-load failure stops lookup. A late record updates details and log
+access. Active renders do not start C6/core/library reads from the monitor.
 
 ## C7 — machine.json
 

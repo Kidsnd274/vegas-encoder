@@ -49,7 +49,7 @@ const Preset kPresets[] = {
     {{0x8f4af392, 0x31b0, 0x48c1, {0xa2, 0xa0, 0x4b, 0x40, 0xdf, 0x3f, 0x9c, 0x20}},
      MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder recipe (id 0)", L"Recipe candidate; use the visible settings preset."},
     {{0x381851c2, 0x9c94, 0x4bd2, {0x81, 0x76, 0xb4, 0xb8, 0x59, 0x8b, 0xe8, 0x0d}},
-     MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder settings (MKV)", L"Edit settings in the Vegas Encoder popup. Matroska video output only in this candidate."},
+     MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder settings", L"Edit settings in the Vegas Encoder popup. Match the Render As filename to the selected container."},
 #else
     {{0x5ac92e42, 0xf7bd, 0x4e84, {0x86, 0xe4, 0xaa, 0x50, 0xe4, 0xce, 0x44, 0x9b}},
      MAKEFOURCC('P', '0', '1', '0'),
@@ -319,7 +319,7 @@ class RenderClass final : public ISfRenderFileClass {
       if (!Tpl::Valid(src)) return E_INVALIDARG;
       Tpl s = Tpl::Copy(src);
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-      Tpl t = Tpl::Make(L"Project Settings", L"Vegas Encoder recipe (MKV)", 0);
+      Tpl t = Tpl::Make(L"Project Settings", L"Vegas Encoder recipe", 0);
 #else
       Tpl t = Tpl::Make(L"Project Settings", L"Render Audio and Video", sizeof(Extra));
 #endif
@@ -460,7 +460,7 @@ class RenderClass final : public ISfRenderFileClass {
       BestEffortDiagnostic([&] { Log("ShowAboutBox"); });
       std::wstring text = std::wstring(kDisplayName) + L" " + Widen(kVersion) +
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-                          L"\n\nRecipe-based Matroska candidate.\nLog folder: " +
+                          L"\n\nRecipe-based container candidate.\nLog folder: " +
 #else
                           L"\n\nFixed FFmpeg lossless MKV or raw diagnostic output.\nLog folder: " +
 #endif

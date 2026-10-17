@@ -128,10 +128,23 @@ std::string EncoderFailureMessage(const std::string& fallback, const std::string
   }
   return "FFmpeg: " + line;
 }
-ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expected) {
+ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expected, const std::string& outputContainerId) {
   auto result = Verification("failed","FFprobe returned invalid or unreadable streams.");
   if (!probe.is_object() || !probe.contains("streams") || !probe.at("streams").is_array() || probe.at("streams").empty()) return result;
   if (probe.contains("program_version")) result["ffprobeVersion"] = ve::Str(probe.at("program_version"),"version");
+  if (!outputContainerId.empty()) {
+    const auto format = probe.value("format",ve::Json::object());
+    const auto names = ve::Str(format,"format_name");
+    const auto family = outputContainerId == "mp4" || outputContainerId == "mov" ? "mov-mp4" :
+      outputContainerId == "mkv" || outputContainerId == "webm" ? "matroska-webm" : outputContainerId == "mxf" ? "mxf" : "";
+    result["expectedContainerId"] = outputContainerId; result["containerFamily"] = family;
+    result["actualFormatNames"] = names; result["containerEvidenceScope"] = "demuxer-family";
+    auto named = [&](const std::string& wanted) { return ("," + names + ",").find("," + wanted + ",") != std::string::npos; };
+    if (!*family || !(std::string(family) == "mov-mp4" ? named("mov") || named("mp4") :
+                      std::string(family) == "matroska-webm" ? named("matroska") || named("webm") : named("mxf"))) {
+      result["message"] = "Output demuxer family differs from the core's output container."; return result;
+    }
+  }
   const auto& streams = probe.at("streams");
   if (expected.is_array()) for (const auto& fact : expected) if (!fact.at("codec").is_null()) result["expectedCodecs"].push_back(fact.at("codec"));
   std::vector<bool> matched(streams.size(),false);
@@ -160,6 +173,7 @@ ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expected) {
   result["state"] = "passed"; result["message"] = expected.is_array() ?
     "FFprobe sample readback passed; stream kinds/count and known core codecs match." :
     "FFprobe sample readback passed; exact Advanced output scope is unknown to the core.";
+  if (!outputContainerId.empty()) result["message"] = ve::Str(result,"message") + " Container demuxer family matches; shared families do not distinguish MP4 from MOV or MKV from WebM.";
   return result;
 }
 ve::Json LiveVideoFacts(const ve::Json& compiled) {
@@ -233,17 +247,13 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
       throw std::runtime_error("Selected FFprobe identity changed or unknown.");
     const bool ok = encoder_.StartCompiled(Widen(ve::Str(installation,"path")), options.output,log,options.pipeTimeoutMs,options.finishTimeoutMs,
       [&](const std::wstring& video, const std::wstring& audio, const std::wstring& temp) {
-        const ve::Json paths{{"ffmpeg",installation.at("path")},{"videoPipe",Utf8(video.c_str())},{"audioPipe",Utf8(audio.c_str())},
+        ve::Json paths{{"ffmpeg",installation.at("path")},{"videoPipe",Utf8(video.c_str())},{"audioPipe",Utf8(audio.c_str())},
           {"output",Utf8(temp.c_str())},{"project",options.project},{"liveInputs",true},{"overwriteOutput",true}};
+        if (options.nativeTarget) paths["target"] = {{"id","vegas-native-v1"},{"outputPath",Utf8(options.output.c_str())}};
         compiled_ = ve::Compile({{"recipe",recipe},{"media",media},{"paths",paths},{"capabilities",capabilities}});
         const auto& summary = compiled_.at("summary");
         { std::lock_guard<std::mutex> lock(liveMutex_); live_["encoderSummary"] = ve::Str(summary,"video") + " / " + ve::Str(summary,"audio"); }
-        if (ve::HasErrors(compiled_.at("issues"))) throw std::runtime_error("Core validation refused this render recipe.");
-        if (!options.requiredOutputContainerId.empty() && compiled_.value("outputContainerId",ve::Json(nullptr)) != options.requiredOutputContainerId)
-          throw std::runtime_error("This VEGAS candidate requires Matroska (.mkv). Choose Matroska or explicit -f matroska in Advanced mode.");
-        if (options.requiredVideoOutput && (!compiled_.at("expectedStreams").is_array() ||
-            std::none_of(compiled_.at("expectedStreams").begin(),compiled_.at("expectedStreams").end(),[](const ve::Json& stream) { return ve::Str(stream,"kind") == "video"; })))
-          throw std::runtime_error("This VEGAS candidate requires an established video output; general maps/filters and audio-only commands are not supported yet.");
+        for (const auto& issue : compiled_.at("issues")) if (ve::Str(issue,"level") == "error") throw std::runtime_error(ve::Str(issue,"message"));
         const auto videoFacts = LiveVideoFacts(compiled_);
         { std::lock_guard<std::mutex> lock(liveMutex_);
           for (auto it = videoFacts.begin(); it != videoFacts.end(); ++it) live_[it.key()] = it.value();
@@ -310,10 +320,10 @@ bool RecipeJob::Verify(const Poll& poll) {
   // exact output frame-count check. Bound decoding to the first 32 packets,
   // retaining all stream metadata for kind/count/known-codec validation.
   const bool ok = ProbeChild(Widen(ve::Str(installation_,"ffprobePath")),
-    {L"-v",L"error",L"-read_intervals",L"%+#32",L"-count_frames",L"-show_entries",L"program_version=version:stream=codec_type,codec_name,width,height,nb_read_frames:format=duration",
+    {L"-v",L"error",L"-read_intervals",L"%+#32",L"-count_frames",L"-show_entries",L"program_version=version:stream=codec_type,codec_name,width,height,nb_read_frames:format=duration,format_name",
      L"-show_program_version",L"-of",L"json",stats.tempPath}, options_.probeTimeoutMs,[&] { return Check(poll); },bytes,failure);
   if (!ok) { verification_ = Verification("failed",failure); return false; }
-  try { verification_ = VerifyProbe(ve::Parse(reinterpret_cast<const uint8_t*>(bytes.data()),bytes.size()),compiled_.at("expectedStreams")); }
+  try { verification_ = VerifyProbe(ve::Parse(reinterpret_cast<const uint8_t*>(bytes.data()),bytes.size()),compiled_.at("expectedStreams"),ve::Str(compiled_,"outputContainerId")); }
   catch (const std::exception& e) { verification_ = Verification("failed",std::string("Invalid FFprobe readback: ")+e.what()); }
   return ve::Str(verification_,"state") == "passed";
 }

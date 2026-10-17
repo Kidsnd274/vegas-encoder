@@ -39,7 +39,16 @@ Future<void> main(List<String> args) async {
     final record = await repository.get(entry.id);
     check(record != null, 'Index refers to a complete validated C6 record.');
     check(record!.status == entry.status, 'Index status matches record.');
-    check(record.commandLine != null, 'Core commandLine is recorded.');
+    check(
+      entry.data.containsKey('realtime') && entry.realtime == record.realtime,
+      'Native index preserves recorded FFmpeg realtime including unknown.',
+    );
+    check(
+      record.argv.isEmpty
+          ? record.commandLine == null && !record.published
+          : record.commandLine != null,
+      'Core commandLine is recorded after compile and remains unknown on prelaunch refusal.',
+    );
     check(record.encoderSummary != null, 'Core encoder summary is recorded.');
     check(
       record.recipeSha256.length == 64,

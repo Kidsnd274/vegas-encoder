@@ -281,7 +281,7 @@ JobIndexEntry decodeIndex(JsonMap data) {
   for (final key in ['encoderSummary', 'project']) {
     stringField(data, key, required: false, nullable: true);
   }
-  for (final key in ['durationSec', 'elapsedSec']) {
+  for (final key in ['durationSec', 'elapsedSec', 'realtime']) {
     numberField(data, key, nullable: true);
   }
   intField(data, 'sizeBytes', required: false, nullable: true);

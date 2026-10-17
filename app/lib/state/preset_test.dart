@@ -82,7 +82,15 @@ class PresetTestController extends Notifier<PresetTestState> {
         .listen(
           _report,
           onError: (Object e) {
-            if (ref.mounted) state = state.copyWith(running: false, error: e is ServiceException ? e.message : '$e');
+            if (ref.mounted) {
+              state = state.copyWith(
+                running: false,
+                error: switch (e) {
+                  ServiceException(:final message) || CoreException(:final message) => message,
+                  _ => '$e',
+                },
+              );
+            }
           },
           onDone: () {
             if (ref.mounted) state = state.copyWith(running: false);

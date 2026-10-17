@@ -8,12 +8,22 @@ import 'package:vegas_encoder/design/theme.dart';
 import 'package:vegas_encoder/design/tokens.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
+import 'package:vegas_encoder/state/popup_version.dart';
 import 'package:vegas_encoder/state/services.dart';
 
 const goldenKey = ValueKey('golden');
 
 /// Both themes, for golden and widget tests.
 const themes = [Brightness.light, Brightness.dark];
+
+/// Ordinary popup images isolate editor behavior from historical C4 fixture
+/// version labels. Warning tests supply their own explicit mismatch facts.
+const matchingPopupVersions = PopupVersionStatus(
+  dllVersion: '0.1.7-recipe-proof',
+  coreVersion: '0.2.0-b2',
+  appVersion: '0.1.7+1',
+  appCoreVersion: '0.2.0-b2',
+);
 
 String themeName(Brightness b) => b == Brightness.dark ? 'dark' : 'light';
 

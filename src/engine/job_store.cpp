@@ -55,7 +55,7 @@ void Index(const std::wstring& root, const ve::Json& record) {
   }
   // Same byte [0,1) and lock basename as Dart FileJobRepository.rebuildIndex().
   ve::Json entry{{"index",1},{"id",record.at("id")},{"recordFile",ve::Str(record,"id") + ".json"}};
-  for (const auto* key : {"startedAt","status","templateName","outputPath","encoderSummary","project","durationSec","elapsedSec","sizeBytes"}) entry[key] = record.at(key);
+  for (const auto* key : {"startedAt","status","templateName","outputPath","encoderSummary","project","durationSec","elapsedSec","sizeBytes","realtime"}) entry[key] = record.at(key);
   File file;
   file.h = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   Check(file.h != INVALID_HANDLE_VALUE, "cannot open job index");

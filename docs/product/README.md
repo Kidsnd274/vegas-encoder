@@ -1,8 +1,12 @@
 # Vegas Encoder product plan
 
-Updated: 2026-10-16 (Asia/Singapore). Status: **being built by one agent** in the
+Updated: 2026-10-17 (Asia/Singapore). Status: **being built** in the
 original `L:\repos\vegas-encoder` checkout ([workflow](WORKSTREAMS.md)). The owner
 retired the app/platform worktree split. Current queue: [NEXT_AGENT.md](../NEXT_AGENT.md).
+The owner's 2026-10-17 scope reduction retains two unfinished product features:
+multi-container VEGAS support and the VEGAS installation/status dashboard. Other
+unfinished enhancements are skipped for this release; the owner builds the installer.
+See [current release scope](PRODUCT_SPEC.md#current-release-scope-owner-2026-10-17).
 This folder covers the product layer built on top of the adapter: the desktop app,
 presets, the shared editor, the VEGAS configuration popup and the progress window. What
 is built is in [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md). Earlier workstream files
@@ -111,6 +115,11 @@ the owner objects.
 | 21 | Installer | **Decided (2026-10-15):** the owner builds it with Inno Setup, guided by AI; agents supply inputs. One release installed together; setup records every VEGAS it installed into and updates them all by default. Older VEGAS versions wait on platform research | workstreams/app.md (Decisions) |
 | 22 | Development ownership | **Decided (2026-10-16):** one agent handles app and platform in the original `L:\repos\vegas-encoder` folder; no separate development worktree. Existing trials/rollback stay in place | WORKSTREAMS.md, ../NEXT_AGENT.md |
 | 22 | Progress window keep on top | **Decided:** off by default; the pin and Settings change the same C7 setting | UI_SPEC §12 |
+| 24 | Preset Test placement | **Decided (2026-10-17):** desktop-only for v1; no Test action in the VEGAS popup | UI_SPEC §2 |
+| 25 | Preset Test input scope | **Decided (2026-10-17):** retain the lightweight 320×180 P010, 30 fps synthetic check for v1; no automatic project-sized test | UI_SPEC §2 |
+| 26 | Recommended quality bands | **Decided (2026-10-17):** retain current numeric profile marks; no additional recommendation band for v1 | UI_SPEC §2 |
+| 27 | Remaining product features | **Decided (2026-10-17):** retain MP4/MOV/WebM/MXF in VEGAS alongside MKV, and a VEGAS installation/status dashboard. Skip the other unfinished enhancements for this release; preserve working features and existing internal plumbing | PRODUCT_SPEC current release scope, ../NEXT_AGENT.md |
+| 28 | Finished installer ownership | **Reconfirmed (2026-10-17):** the owner makes the installer. Agents provide matched inputs and documentation; the dashboard reports status without performing installation/repair/uninstall | ../B7_INSTALLER_INPUTS.md, UI_SPEC §6a |
 
 ## Design review notes
 

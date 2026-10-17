@@ -19,9 +19,12 @@ void main() {
   });
 
   group('result sentence', () {
-    test('a finished render: length, time taken, realtime and size', () {
-      expect(resultSentence(jobs['j-1042']!), 'Rendered 12:43 in 24:46, 0.51× realtime, 9.84\u00A0GB.');
-      expect(resultSentence(jobs['j-1040']!), 'Rendered 1:35 in 0:41, 2.30× realtime, 310\u00A0MB.');
+    test('a finished render uses recorded speed; old records leave it unknown', () {
+      expect(
+        resultSentence(jobs['j-1042']!.copyWith(realtime: 0.51)),
+        'Rendered 12:43 in 24:46, 0.51× realtime, 9.84\u00A0GB.',
+      );
+      expect(resultSentence(jobs['j-1040']!), 'Rendered 1:35 in 0:41, 310\u00A0MB.');
     });
 
     test('failed and cancelled renders give the record’s reason', () {
@@ -33,16 +36,16 @@ void main() {
       expect(resultSentence(jobs['j-1039']!.copyWith(message: '')), 'Failed after 0:03.');
     });
 
-    test('without a project length there is no realtime figure', () {
+    test('recorded speed is independent of project length and elapsed time', () {
       final r = jobs['j-1042']!;
       final noLength = r.copyWith(media: MediaDescription.fromJson({...r.media.toJson(), 'durationSec': null}));
-      expect(realtimeRatio(noLength), isNull);
-      expect(resultSentence(noLength), 'Rendered in 24:46, 9.84\u00A0GB.');
+      expect(realtimeRatio(noLength.copyWith(realtime: 0.7, elapsedSec: 0)), 0.7);
+      expect(resultSentence(noLength.copyWith(realtime: 0.7)), 'Rendered in 24:46, 0.70× realtime, 9.84\u00A0GB.');
     });
   });
 
-  test('realtime ratio needs both figures and some time taken', () {
-    expect(realtimeRatio(jobs['j-1042']!), closeTo(763.2 / 1486, 1e-9));
+  test('realtime is recorded, never inferred from duration and elapsed time', () {
+    expect(realtimeRatio(jobs['j-1042']!), isNull);
     expect(realtimeRatio(jobs['j-1042']!.copyWith(elapsedSec: 0)), isNull);
     expect(realtimeRatio(jobs['j-1039']!), isNull, reason: 'a failed render didn’t encode the whole length');
     expect(realtimeRatio(jobs['j-1041']!), isNull, reason: 'nor did a cancelled one');
@@ -176,18 +179,20 @@ void main() {
   });
 
   group('the list reads the index', () {
-    JobIndexEntry entry({String? encoder, String? project, double? duration, int? size}) => JobIndexEntry(
-      id: 'j-1',
-      recordFile: 'j-1.json',
-      startedAt: '2026-10-12T06:00:00Z',
-      status: 'succeeded',
-      templateName: 'T',
-      outputPath: r'D:\Renders\a.mp4',
-      encoderSummary: encoder,
-      project: project,
-      durationSec: duration,
-      sizeBytes: size,
-    );
+    JobIndexEntry entry({String? encoder, String? project, double? duration, double? speed, int? size}) =>
+        JobIndexEntry(
+          id: 'j-1',
+          recordFile: 'j-1.json',
+          startedAt: '2026-10-12T06:00:00Z',
+          status: 'succeeded',
+          templateName: 'T',
+          outputPath: r'D:\Renders\a.mp4',
+          encoderSummary: encoder,
+          project: project,
+          durationSec: duration,
+          realtime: speed,
+          sizeBytes: size,
+        );
 
     test('summaries show as the engine wrote them; absent or blank ones stay unknown', () {
       expect(indexEncoder(entry(encoder: 'x264 CRF 18 / AAC 320 kb/s')), 'x264 CRF 18 / AAC 320 kb/s');
@@ -203,6 +208,13 @@ void main() {
       expect(indexSize(entry(size: 9840000000)), '9.84\u00A0GB');
       expect(indexSize(entry(size: 0)), 'No file');
       expect(indexSize(entry()), isNull);
+    });
+
+    test('speed comes only from the index including partial render speed', () {
+      expect(indexSpeed(entry(speed: 0.73)), '0.73×');
+      expect(indexSpeed(entry(speed: 12.44)), '12.4×');
+      expect(indexSpeed(entry(duration: 60).copyWith(elapsedSec: 10)), isNull);
+      expect(indexSpeed(entry(speed: 0.2).copyWith(status: 'failed')), '0.20×');
     });
   });
 

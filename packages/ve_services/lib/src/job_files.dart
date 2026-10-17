@@ -52,6 +52,7 @@ class FileJobRepository implements JobRepository, JobLogs {
     project: record.project,
     durationSec: record.durationSec ?? record.media.durationSec,
     elapsedSec: record.elapsedSec,
+    realtime: record.realtime,
     sizeBytes: record.sizeBytes,
   );
   Future<List<JobIndexEntry>> _recover() async {

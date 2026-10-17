@@ -668,15 +668,17 @@ Future<void> main(List<String> args) async {
       jsonEncode(job.data),
     );
     check(
-      (await jobs.list()).single.durationSec == 60,
-      'missing index reconstructs complete record',
+      (await jobs.list()).single.durationSec == 60 &&
+          (await jobs.list()).single.realtime == 1.5,
+      'missing index reconstructs complete record including recorded speed',
     );
     await jobs.rebuildIndex();
     final indexPath = joinPath(paths.jobs, 'jobs.jsonl');
     await File(indexPath).writeAsString('{"index":', mode: FileMode.append);
     check(
-      (await jobs.list()).length == 1,
-      'truncated final job index line ignored',
+      (await jobs.list()).length == 1 &&
+          (await jobs.list()).single.realtime == 1.5,
+      'truncated final job index line ignored without losing speed',
     );
     check(
       (await jobs.get(jobId))!.commandLine == 'recorded command' &&
@@ -706,6 +708,25 @@ Future<void> main(List<String> args) async {
       (await jobs.list()).single.id == jobId,
       'explicit index reconstruction recovers interrupted append',
     );
+    final speedEntry = (await jobs.list()).single.toJson();
+    speedEntry['futureField'] = {'preserved': true};
+    speedEntry.remove('realtime');
+    await File(indexPath).writeAsString('${jsonEncode(speedEntry)}\n');
+    final legacyIndex = (await jobs.list()).single;
+    check(
+      legacyIndex.realtime == null &&
+          !legacyIndex.toJson().containsKey('realtime') &&
+          legacyIndex.copyWith(realtime: 0.75).data['futureField'] != null &&
+          legacyIndex.copyWith(realtime: null).realtime == null,
+      'legacy index speed stays absent and copies preserve unknown fields',
+    );
+    for (final invalidSpeed in [-1, 'fast', true]) {
+      await File(indexPath).writeAsString(
+        '${jsonEncode({...speedEntry, 'realtime': invalidSpeed})}\n',
+      );
+      await rejects(() => jobs.list(), 'INVALID-DATA');
+    }
+    await jobs.rebuildIndex();
     final fromHistory = await transfers.fromJob(job, newId: 'history-copy');
     check(
       fromHistory.origin == 'job/$jobId',

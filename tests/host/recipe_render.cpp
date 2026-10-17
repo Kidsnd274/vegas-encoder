@@ -86,11 +86,13 @@ Json Record(const std::wstring& root) {
 }
 Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT expected,
          LONGLONG cancelAt = -1, int failureSlot = 0, bool mutateAfterCreate = false, bool existing = false,
-         bool encoderFailure = false) {
+         bool encoderFailure = false, const wchar_t* pathExtension = nullptr, bool suffixOnlyName = false) {
   const auto folder = root + L"\\" + name;
   std::filesystem::create_directories(folder);
   selected.jobsRoot = folder + L"\\jobs";
-  const auto output = folder + L"\\render.mkv";
+  const auto container = ve::FindContainer(ve::Str(recipe.at("container"),"format"));
+  const auto extension = pathExtension ? std::wstring(pathExtension) : container ? Widen(ve::Str(*container,"ext")) : L".mkv";
+  const auto output = folder + L"\\" + (suffixOnlyName ? L"" : L"render") + extension;
   const bool success = expected == S_OK;
   if (existing) { std::ofstream file{std::filesystem::path(output)}; file << "preserve destination"; }
   auto value = Template(recipe);
@@ -112,6 +114,8 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
     Check(render->SetStreamReader(video, 0) == S_OK && render->SetStreamReader(audio, 1) == S_OK, "adapter retains readers");
     Check(render->SetFile(output.c_str()) == S_OK, "adapter accepts output path");
     const auto result = render->Render(progress);
+    wchar_t returnedPath[32768]{};
+    Check(render->GetFileName(returnedPath,32768) == S_OK && output == returnedPath,"GetFileName preserves exact SetFile destination");
     Check(render->CloseFile() == S_OK, "adapter CloseFile after render");
     Check(render->SetStreamReader(nullptr, 0) == S_OK && render->SetStreamReader(nullptr, 1) == S_OK,
           "adapter releases reader references before host audit");
@@ -123,12 +127,22 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
         "adapter preserves success/cancellation/host error HRESULT and returns encoder failures as failures");
   Check(host.served == host.released && !host.outstanding && !host.lockErrors && !host.callerThreadErrors && !host.tokenErrors,
         "adapter copies/releases frames and keeps all host calls on caller thread");
+  if (expected == E_INVALIDARG) {
+    Check(host.served == 0 && !std::filesystem::exists(output),"suffix mismatch is rejected before acquiring frames");
+    return nullptr;
+  }
   const auto record = Record(selected.jobsRoot);
+  Check(record.at("outputPath") == Utf8(output.c_str()),"C6 preserves exact selected destination");
   Check(ve::Str(record,"hresult") == Hr(expected == SF_E_RENDER_STOPPED ? SF_E_PROGRESS_CANCELLED : host.returned),
         "C6 preserves the original failure while the host receives its established cancellation mapping");
   Check(record.at("recipe").at("name") == recipe.at("name"), "record uses immutable Create snapshot");
   Check(record.at("status") == (success ? "succeeded" : expected == SF_E_RENDER_STOPPED ? "cancelled" : "failed"), "native C6 terminal classification");
-  if (success) Check(std::filesystem::file_size(output) > 20, "real FFmpeg output published");
+  if (success) {
+    Check(std::filesystem::file_size(output) > 20, "real FFmpeg output published");
+    const auto temporary = std::filesystem::path(Widen(record.at("argv").back().get<std::string>()));
+    Check(temporary.parent_path() == std::filesystem::path(output).parent_path() && temporary.extension() == extension &&
+      temporary.filename().wstring().find(L".ve-partial-") != std::wstring::npos,"unique temporary stays beside destination and retains final extension");
+  }
   else if (existing) {
     std::ifstream file{std::filesystem::path(output)}; const std::string bytes((std::istreambuf_iterator<char>(file)), {});
     Check(bytes == "preserve destination", "failed/cancelled recipe preserves existing output");
@@ -141,7 +155,7 @@ namespace vegas_encoder { RecipeRuntime LoadRecipeRuntime() { return selected; }
 
 int wmain(int argc, wchar_t** argv) {
   try {
-    Check(argc == 4, "usage: recipe-render <fixtures> <fresh-output-root> <ffmpeg>");
+    Check(argc == 4 || (argc == 5 && std::wstring(argv[4]) == L"--containers-only"), "usage: recipe-render <fixtures> <fresh-output-root> <ffmpeg> [--containers-only]");
     const auto root = std::filesystem::absolute(argv[2]).wstring();
     Check(!std::filesystem::exists(root), "fresh test output root required");
     std::filesystem::create_directories(root);
@@ -150,12 +164,38 @@ int wmain(int argc, wchar_t** argv) {
     WritePrivateProfileStringW(L"vegas-encoder", L"ShowEncoderErrors", L"1", ini.c_str());
     WritePrivateProfileStringW(L"vegas-encoder", L"LogDir", root.c_str(), ini.c_str());
     selected.installation = Installation(std::filesystem::absolute(argv[3]).wstring());
-    selected.capabilities = nullptr; selected.verifyOutput = true;
+    selected.capabilities = nullptr; selected.verifyOutput = true; selected.hostHwnd = "123456";
     auto recipe = Read(argv[1]).at("fixtures")[0].at("recipe");
     recipe["container"] = {{"format", "mkv"}, {"faststart", false}};
     recipe["video"]["encoder"] = "ffv1"; recipe["video"]["mode"] = "lossless";
     recipe["video"]["depth"] = 10; recipe["video"]["profile"] = nullptr; recipe["video"]["speed"] = nullptr;
     recipe["audio"][0]["encoder"] = "pcm_f32le"; recipe["audio"][0]["mode"] = "lossless";
+    if (argc == 5) {
+      Run(root,L"mkv-regression",recipe,S_OK);
+      for (const auto* id : {"mp4","mov","webm","mxf"}) {
+        auto current = recipe; current["container"]["format"] = id;
+        if (std::string(id) == "mp4") {
+          current["container"]["faststart"] = true;
+          current["video"]["encoder"] = "libx264"; current["video"]["mode"] = "crf"; current["video"]["quality"] = 20; current["video"]["depth"] = 8; current["video"]["speed"] = "ultrafast";
+          current["audio"][0]["encoder"] = "aac"; current["audio"][0]["mode"] = "bitrate";
+        } else if (std::string(id) == "mov") {
+          current["video"]["encoder"] = "prores_ks"; current["video"]["mode"] = "profile"; current["video"]["profile"] = "hq";
+          current["audio"][0]["encoder"] = "pcm_s24le";
+        } else if (std::string(id) == "webm") {
+          current["command"] = {{"mode","template"},{"template","{inputs} -map 0:v:0 -map 1:a:0 -c:v libvpx-vp9 -deadline realtime -cpu-used 5 -crf 35 -b:v 0 -pix_fmt yuv420p10le -c:a libopus -b:a 160k -f webm {output}"}};
+        } else {
+          current["video"]["encoder"] = "dnxhd"; current["video"]["mode"] = "profile"; current["video"]["profile"] = "dnxhr_hq"; current["video"]["depth"] = 8;
+          current["audio"][0]["encoder"] = "pcm_s16le";
+        }
+        const auto record = Run(root,Widen(id).c_str(),current,S_OK);
+        Check(record.at("verification").at("state") == "passed" && record.at("verification").at("containerEvidenceScope") == "demuxer-family","new container receives sampled readback and explicit family evidence");
+      }
+      Run(root,L"mismatched-suffix",recipe,E_INVALIDARG,-1,0,false,false,false,L".mp4");
+      Run(root,L"suffix-only-name",recipe,S_OK,-1,0,false,false,false,L".mkv",true);
+      Run(root,L"existing-destination",recipe,HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),-1,0,false,true);
+      printf("Native containers PASS: %d checks / five short fake-host real-FFmpeg renders, suffix preflight and existing destination. No VEGAS.\n",checks);
+      return 0;
+    }
     Run(root, L"immutable", recipe, S_OK, -1, 0, true);
     auto noAudio = recipe; noAudio["audio"][0]["enabled"] = false;
     Run(root, L"video-only", noAudio, S_OK);
@@ -164,8 +204,8 @@ int wmain(int argc, wchar_t** argv) {
     auto advanced = recipe;
     advanced["command"] = {{"mode", "template"}, {"template", "{inputs} -map 0:v:0 -map 1:a:0 -c:v ffv1 -pix_fmt yuv420p10le -c:a pcm_f32le -f matroska {output}"}};
     Run(root, L"advanced-mkv", advanced, S_OK);
-    auto invalid = recipe; invalid["container"]["format"] = "mp4";
-    Run(root, L"wrong-container", invalid, E_FAIL);
+    auto invalid = recipe; invalid["command"] = {{"mode","template"},{"template","{inputs} -c:v ffv1 -c:a pcm_f32le -f unknown_muxer {output}"}};
+    Run(root, L"unknown-muxer", invalid, E_FAIL);
     advanced["command"]["template"] = "{inputs} -c:v ffv1 -c:a pcm_f32le {output}";
     Run(root, L"unknown-container", advanced, E_FAIL);
     Run(root, L"recovery", recipe, S_OK);

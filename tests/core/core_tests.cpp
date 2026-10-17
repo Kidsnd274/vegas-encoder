@@ -76,6 +76,70 @@ int main(int argc, char** argv) {
         const auto original = recipe.dump();
         auto request = ve::Json{{"recipe",recipe},{"media",f.at("media")},{"paths",f.at("paths")}};
         const auto result = CallJson(ve_compile,request);
+        // Native admission is a compile target, not a portable preset field.
+        auto nativeRequest = request;
+        nativeRequest["paths"]["target"] = {{"id","vegas-native-v1"}};
+        for (const auto& container : ve::Profiles().at("containers")) {
+            auto current = nativeRequest;
+            const auto id = ve::Str(container,"id"), muxer = ve::Str(container,"muxer"), ext = ve::Str(container,"ext");
+            current["recipe"]["container"]["format"] = id;
+            // Use compatible curated stream families for each container.
+            if (id == "webm") { current["recipe"]["video"]["encoder"] = "libvpx-vp9"; current["recipe"]["video"]["profile"] = nullptr; current["recipe"]["video"]["speed"] = "4"; current["recipe"]["audio"][0]["encoder"] = "libopus"; }
+            if (id == "mov" || id == "mxf") { current["recipe"]["video"]["encoder"] = "prores_ks"; current["recipe"]["video"]["mode"] = "profile"; current["recipe"]["video"]["profile"] = "hq"; current["recipe"]["video"]["depth"] = 10; current["recipe"]["video"]["speed"] = nullptr; current["recipe"]["audio"][0]["encoder"] = "pcm_s16le"; current["recipe"]["audio"][0]["mode"] = "lossless"; }
+            const auto basicContainer = CallJson(ve_compile,current);
+            Check(!ve::HasErrors(basicContainer.at("issues")) && basicContainer.at("outputExtension") == ext,"Basic native target " + id + ": " + basicContainer.at("issues").dump());
+            current["recipe"]["command"] = {{"mode","template"},{"template","{inputs} -c:v " + ve::Str(current["recipe"]["video"],"encoder") + " -c:a " + ve::Str(current["recipe"]["audio"][0],"encoder") + " -f " + muxer + " {output}"}};
+            const auto compiledContainer = CallJson(ve_compile,current);
+            Check(!ve::HasErrors(compiledContainer.at("issues")) && compiledContainer.at("outputContainerId") == id && compiledContainer.at("outputExtension") == ext,"Advanced explicit muxer establishes native container independently of inactive Basic controls");
+            current["paths"]["target"]["outputPath"] = "D:\\Renders\\exact" + ext;
+            Check(!ve::HasErrors(CallJson(ve_compile,current).at("issues")),"matching destination accepted");
+            current["paths"]["target"]["outputPath"] = "D:\\Renders\\wrong.bin";
+            Check(ve::HasErrors(CallJson(ve_compile,current).at("issues")),"native destination suffix mismatch rejected");
+        }
+        for (const auto* command : {"{inputs} -c:v ffv1 -c:a pcm_f32le {output}", "-f matroska {inputs} -c:v ffv1 -c:a pcm_f32le {output}",
+            "{inputs} -c:v ffv1 -c:a pcm_f32le -f tee {output}", "{inputs} -c:v ffv1 -c:a pcm_f32le -f matroska {output} -f mov",
+            "{inputs} -c:v:1 ffv1 -c:a pcm_f32le -f matroska {output}", "{inputs} -c ffv1 -f matroska {output}",
+            "{inputs} -map 0:v:0 -map 0:v:0 -c:v ffv1 -f matroska {output}", "{inputs} -vn -c:a pcm_f32le -f matroska {output}",
+            "{inputs} -filter_complex null -c:v ffv1 -c:a pcm_f32le -f matroska {output}"}) {
+            nativeRequest["recipe"]["command"] = {{"mode","template"},{"template",command}};
+            Check(ve::HasErrors(CallJson(ve_compile,nativeRequest).at("issues")),"native target refuses unestablished muxer, order or stream scope");
+        }
+        nativeRequest["recipe"]["command"] = {{"mode","template"},{"template","{inputs} -c:v ffv1 -c:a pcm_f32le -vf null -f matroska {output}"}};
+        Check(!ve::HasErrors(CallJson(ve_compile,nativeRequest).at("issues")),"simple filter precision uncertainty is independent of output ownership");
+        for (const auto* graphOption : {"-filter_complex \"[0:v]split=2\"","-lavfi \"[0:v]split=2\"","-filter_complex_script graph.txt"}) {
+            for (const bool advancedGraph : {false,true}) {
+                auto graphRequest = request;
+                if (advancedGraph) graphRequest["recipe"]["command"] = {{"mode","template"},{"template",std::string("{inputs} ") + graphOption + " -c:v libx264 -c:a aac -f mp4 {output}"}};
+                else graphRequest["recipe"]["video"]["extra"] = graphOption;
+                Check(!ve::HasErrors(CallJson(ve_compile,graphRequest).at("issues")),"portable commands retain complex graph policy in both modes");
+                graphRequest["paths"]["target"] = {{"id","vegas-native-v1"}};
+                const auto graphResult = CallJson(ve_compile,graphRequest);
+                Check(std::any_of(graphResult.at("issues").begin(),graphResult.at("issues").end(),[](const ve::Json& issue) { return ve::Str(issue,"id") == "N-COMPLEX-FILTER" && ve::Str(issue,"level") == "error"; }),"native target rejects complex graph option, alias and script in both modes");
+            }
+        }
+        auto fileGraph = request;
+        fileGraph["recipe"]["command"] = {{"mode","template"},{"template","{inputs} -/filter_complex graph.txt -c:v libx264 -c:a aac -f mp4 {output}"}};
+        Check(!ve::HasErrors(CallJson(ve_compile,fileGraph).at("issues")),"portable file-loaded graph remains permissive");
+        fileGraph["paths"]["target"] = {{"id","vegas-native-v1"}};
+        auto fileGraphResult = CallJson(ve_compile,fileGraph);
+        Check(std::any_of(fileGraphResult.at("issues").begin(),fileGraphResult.at("issues").end(),[](const ve::Json& issue) { return ve::Str(issue,"id") == "N-COMPLEX-FILTER"; }),"native file-loaded graph is explicitly rejected");
+        fileGraph = request;
+        fileGraph["recipe"]["video"]["extra"] = "-/filter_complex graph.txt";
+        fileGraph["paths"]["target"] = {{"id","vegas-native-v1"}};
+        fileGraphResult = CallJson(ve_compile,fileGraph);
+        Check(std::any_of(fileGraphResult.at("issues").begin(),fileGraphResult.at("issues").end(),[](const ve::Json& issue) { return ve::Str(issue,"id") == "N-COMPLEX-FILTER"; }),"native Basic file-loaded graph is explicitly rejected too");
+        auto simpleExtra = request;
+        simpleExtra["paths"]["target"] = {{"id","vegas-native-v1"}};
+        simpleExtra["recipe"]["video"]["extra"] = "-vf null -metadata comment=lavfi";
+        Check(!ve::HasErrors(CallJson(ve_compile,simpleExtra).at("issues")),"native Basic retains simple filters");
+        simpleExtra["recipe"]["video"]["extra"] = "-metadata \"-lavfi\"";
+        Check(!ve::HasErrors(CallJson(ve_compile,simpleExtra).at("issues")),"quoted complex option name used as a value is not a graph");
+        simpleExtra["recipe"]["video"]["enabled"] = false;
+        simpleExtra["recipe"]["video"]["extra"] = "-filter_complex null";
+        const auto omittedExtra = CallJson(ve_compile,simpleExtra);
+        Check(std::none_of(omittedExtra.at("issues").begin(),omittedExtra.at("issues").end(),[](const ve::Json& issue) { return ve::Str(issue,"id") == "N-COMPLEX-FILTER"; }),"native guard ignores Extra that is not emitted");
+        auto missingMuxer = request; missingMuxer["capabilities"] = {{"encoders",{{"libx264",ve::Json::object()},{"aac",ve::Json::object()}}},{"muxers",ve::Json::object()}};
+        Check(ve::HasErrors(CallJson(ve_compile,missingMuxer).at("issues")),"known absent output muxer refuses compile");
         auto containerRequest = request;
         containerRequest["recipe"]["container"]["format"] = "unknown-container";
         Check(CallJson(ve_compile,containerRequest).at("outputContainerId").is_null(),"invalid Basic container remains unknown");

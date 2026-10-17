@@ -74,6 +74,12 @@ Json SessionRequest(const Json& request) {
     if (!OriginValid(request.value("origin",Json(nullptr)))) issues.push_back(Issue("S-ORIGIN","error","origin","Invalid session origin."));
     if (!request.contains("context") || !request.at("context").is_object()) issues.push_back(Issue("S-CONTEXT","error","context","Expected a session context object, with null facts when unknown."));
     else for (const auto& key : {"hostVersion","project"}) if (request.at("context").contains(key) && !request.at("context").at(key).is_null() && !request.at("context").at(key).is_string()) issues.push_back(Issue("S-CONTEXT","error",std::string("context.") + key,"Expected text or null."));
+    if (request.contains("context") && request.at("context").is_object() && request.at("context").contains("target") && !request.at("context").at("target").is_null()) {
+        const auto& target = request.at("context").at("target");
+        if (!target.is_object() || Str(target,"id") != "vegas-native-v1" ||
+            (target.contains("outputPath") && !target.at("outputPath").is_null() && !target.at("outputPath").is_string()))
+            issues.push_back(Issue("S-TARGET","error","context.target","Unsupported native target context."));
+    }
     if (request.contains("baseRecipe") && !request.at("baseRecipe").is_null()) for (const auto& issue : Structural(request.at("baseRecipe"))) issues.push_back(issue);
     if (request.contains("context") && request.at("context").is_object() && request.at("context").contains("media") && !request.at("context").at("media").is_null()) {
         try { CheckMedia(request.at("context").at("media")); } catch (const Error& e) { issues.push_back(Issue("S-MEDIA","error","context.media",e.what())); }

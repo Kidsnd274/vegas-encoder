@@ -427,7 +427,8 @@ final popupEditorProvider = Provider<EditorData?>((ref) {
   final projectMedia = s.request.context.media;
   final media = projectMedia ?? SamplePreview.media;
   final ext = catalog.containers.where((c) => c.id == recipe.container.format).firstOrNull?.ext;
-  final paths = SamplePreview.paths(ext);
+  final preview = compilePreview(core, recipe, media: media, basicExtension: ext, capabilities: capabilities, target: s.request.context.target);
+  final paths = preview.paths;
   final length = VeFormat.parseLength(s.lengthText);
   final advanced = recipe.command.mode == 'template';
   final asBasic = advanced ? recipe.copyWith(command: recipe.command.copyWith(mode: 'structured')) : recipe;
@@ -444,7 +445,7 @@ final popupEditorProvider = Provider<EditorData?>((ref) {
     media: media,
     paths: paths,
     preview: projectMedia == null ? PreviewMedia.projectUnknown : PreviewMedia.project,
-    compiled: CoreResult.run(() => core.compile(recipe, media: media, paths: paths, capabilities: capabilities)),
+    compiled: preview.result,
     perMinute: () => CoreResult.run(() => core.estimate(recipe, media: media)),
     total: () => length == null
         ? null

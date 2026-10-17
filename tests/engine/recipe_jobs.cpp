@@ -72,6 +72,12 @@ void PureChecks() {
   Json expected = Json::array({{{"kind","video"},{"codec","ffv1"}},{{"kind","audio"},{"codec","pcm_f32le"}}});
   Json probe{{"streams",Json::array({{{"codec_type","video"},{"codec_name","ffv1"},{"width",320},{"height",180},{"nb_read_frames","60"}},{{"codec_type","audio"},{"codec_name","pcm_f32le"}}})}};
   Require(VerifyProbe(probe,expected)["state"] == "passed","probe matches core facts");
+  auto containerProbe = probe; containerProbe["format"] = {{"format_name","mov,mp4,m4a,3gp,3g2,mj2"}};
+  for (const auto* id : {"mp4","mov"}) Require(VerifyProbe(containerProbe,expected,id)["state"] == "passed","shared MOV/MP4 demuxer family accepted explicitly as family evidence");
+  Require(VerifyProbe(containerProbe,expected,"mkv")["state"] == "failed","wrong container family refuses publication");
+  containerProbe["format"]["format_name"] = "matroska,webm";
+  for (const auto* id : {"mkv","webm"}) Require(VerifyProbe(containerProbe,expected,id)["containerEvidenceScope"] == "demuxer-family","shared Matroska/WebM evidence does not claim exact format distinction");
+  Require(VerifyProbe(probe,expected,"mxf")["state"] == "failed","missing container evidence refuses publication");
   auto changed = probe; changed["streams"][0]["codec_name"] = "h264";
   Require(VerifyProbe(changed,expected)["state"] == "failed","codec mismatch refuses publication");
   changed = probe; changed["streams"].erase(1);
@@ -361,7 +367,7 @@ int Child(int argc, wchar_t** argv) {
   if (probe) {
     if (boundedIntervals != 1 || selectedStreams) { fputs("Probe must sample 32 packets and retain all streams.\n",stderr); return 11; }
     if (output.find(L"probe-sampled")!=std::wstring::npos) {
-      puts("{\"program_version\":{\"version\":\"B4 bounded sample fixture\"},\"streams\":[{\"codec_type\":\"video\",\"codec_name\":\"ffv1\",\"width\":320,\"height\":180,\"nb_read_frames\":\"1\"},{\"codec_type\":\"audio\",\"codec_name\":\"pcm_f32le\"}]}"); return 0;
+      puts("{\"program_version\":{\"version\":\"B4 bounded sample fixture\"},\"format\":{\"format_name\":\"matroska,webm\"},\"streams\":[{\"codec_type\":\"video\",\"codec_name\":\"ffv1\",\"width\":320,\"height\":180,\"nb_read_frames\":\"1\"},{\"codec_type\":\"audio\",\"codec_name\":\"pcm_f32le\"}]}"); return 0;
     }
     if (output.find(L"probe-timeout")!=std::wstring::npos || output.find(L"probe-cancel")!=std::wstring::npos) { Sleep(20000); return 0; }
     if (output.find(L"probe-limit")!=std::wstring::npos) { const std::string bytes(2*1024*1024,'a'); fwrite(bytes.data(),1,bytes.size(),stdout); return 0; }

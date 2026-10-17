@@ -241,6 +241,12 @@ void FlutterWindow::HandleMethodCall(
   } else if (method == "setKeepOnTop") {
     SetKeepOnTop(AsBool(Find(args, "value")).value_or(false));
     result->Success();
+  } else if (method == "appVersion") {
+#if defined(FLUTTER_VERSION)
+    result->Success(EncodableValue(std::string(FLUTTER_VERSION)));
+#else
+    result->Success();
+#endif
   } else if (method == "getState") {
     result->Success(EncodableValue(EncodableMap{
         {EncodableValue("maximized"), EncodableValue(IsWindowMaximized())},

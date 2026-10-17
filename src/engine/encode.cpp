@@ -7,6 +7,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <deque>
+#include <filesystem>
 #include <limits>
 #include <mutex>
 #include <thread>
@@ -257,7 +258,14 @@ bool FfmpegEncoder::StartImpl(const std::wstring& exe, const std::wstring& outpu
   wchar_t nonce[64];
   StringFromGUID2(id, nonce, 64);
   std::wstring prefix = L"\\\\.\\pipe\\vegas-encoder-" + std::to_wstring(GetCurrentProcessId()) + nonce;
-  p.stats.tempPath = output + L"." + nonce + L".partial";
+  const std::filesystem::path destination(output);
+  // Treat a suffix-only basename (".mkv") consistently with core admission;
+  // filesystem::extension treats that as a dotfile with no extension.
+  const auto filename = destination.filename().wstring();
+  const auto dot = filename.find_last_of(L'.');
+  const auto stem = dot == std::wstring::npos ? filename : filename.substr(0,dot);
+  const auto suffix = dot == std::wstring::npos ? std::wstring() : filename.substr(dot);
+  p.stats.tempPath = (destination.parent_path() / (stem + L".ve-partial-" + nonce + suffix)).wstring();
   p.stats.stderrPath = logPath.empty() ? output + L".ffmpeg.log" : logPath;
   Handle temp;
   temp.h = CreateFileW(p.stats.tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);

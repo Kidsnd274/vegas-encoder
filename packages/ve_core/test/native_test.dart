@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
+
 import 'package:ve_core/ve_core.dart';
+
 import 'b1_argv.dart';
 
 int checks = 0;
@@ -270,6 +272,7 @@ Future<void> main(List<String> args) async {
   );
   final exactFormatCaps = CoreCapabilities(
     installationId: 'exact-format',
+    muxers: {'mp4': {}},
     encoders: {
       'libx264': {
         'kind': 'video',
@@ -462,6 +465,7 @@ Future<void> main(List<String> args) async {
   );
   final buildCaps = CoreCapabilities(
     installationId: 'b1',
+    muxers: {'mp4': {}},
     libavformatMajor: 59,
     encoders: {
       'libx264': {'kind': 'video', 'options': []},
@@ -492,6 +496,7 @@ Future<void> main(List<String> args) async {
   );
   final caps = CoreCapabilities(
     installationId: 'test',
+    muxers: {'mp4': {}},
     encoders: {
       'libx264': {
         'kind': 'video',
@@ -522,8 +527,7 @@ Future<void> main(List<String> args) async {
     f.recipe.copyWith(
       command: CommandSettings(
         mode: 'template',
-        template:
-            'ffmpeg -hide_banner {inputs} -map {v} -map {a} -c:v libx265 -crf 18 -pix_fmt yuv420p10le -g {gop:2s} -c:a aac -f matroska {output}',
+        template: 'ffmpeg -hide_banner {inputs} -map {v} -map {a} -c:v libx265 -crf 18 -pix_fmt yuv420p10le -g {gop:2s} -c:a aac -f matroska {output}',
       ),
     ),
     media: f.media,
@@ -534,6 +538,29 @@ Future<void> main(List<String> args) async {
   );
   check(!errors(avr.issues), 'advanced macro compile');
   check(avr.outputContainerId == 'mkv', 'typed Advanced output container');
+  check(avr.outputExtension == '.mkv', 'typed canonical Advanced extension');
+  final targetPaths = f.paths.copyWith(
+    target: {'id': 'vegas-native-v1', 'outputPath': r'D:\Renders\exact.MKV'},
+  );
+  final targetResult = core.compile(
+    f.recipe.copyWith(
+      command: CommandSettings(
+        mode: 'template',
+        template: '{inputs} -c:v ffv1 -c:a pcm_f32le -f matroska {output}',
+      ),
+    ),
+    media: f.media,
+    paths: targetPaths,
+  );
+  check(
+    !errors(targetResult.issues),
+    'native context crosses FFI and suffix matching is case insensitive',
+  );
+  check(
+    targetPaths.copyWith().target?['id'] == 'vegas-native-v1' &&
+        targetPaths.copyWith(target: null).target == null,
+    'nullable target context copy semantics',
+  );
   check(
     avr.copyWith().outputContainerId == 'mkv' &&
         avr.copyWith(outputContainerId: null).outputContainerId == null &&
@@ -595,8 +622,7 @@ Future<void> main(List<String> args) async {
     f.recipe.copyWith(
       command: CommandSettings(
         mode: 'template',
-        template:
-            '{inputs} -i logo.png -map 2:v -c:v libx264 -pix_fmt yuv420p {output}',
+        template: '{inputs} -i logo.png -map 2:v -c:v libx264 -pix_fmt yuv420p {output}',
       ),
     ),
     media: f.media,
@@ -612,8 +638,7 @@ Future<void> main(List<String> args) async {
     f.recipe.copyWith(
       command: CommandSettings(
         mode: 'template',
-        template:
-            '{inputs} -c:v libx265 -pix_fmt yuv420p10le {output} -c:v libx264 -pix_fmt yuv420p another.mp4',
+        template: '{inputs} -c:v libx265 -pix_fmt yuv420p10le {output} -c:v libx264 -pix_fmt yuv420p another.mp4',
       ),
     ),
     media: f.media,

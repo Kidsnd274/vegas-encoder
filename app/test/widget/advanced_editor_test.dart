@@ -291,15 +291,27 @@ void main() {
       expect(find.text(option.message), findsOneWidget);
     });
 
-    testWidgets('an unterminated quote is underlined from the quote to the end', (tester) async {
+    testWidgets('an unterminated quote is underlined and keeps preceding chip guards', (tester) async {
       await pump(tester);
       await ctrlM(tester);
-      const command = '{inputs} -c:v libx264 "x {output}';
+      const command = '{inputs} -c:v libx264 {output} -metadata "x';
       await setCommand(tester, command);
       final mark = text(tester).model.marks.single;
       expect(mark.wholeCommand, isFalse);
       expect(mark.underlined, isTrue);
       expect((mark.start, mark.end), (command.indexOf('"'), command.length));
+      final chips = text(tester).model.chips;
+      expect(chips.map((chip) => chip.role.name), ['inputs', 'output']);
+      final chip = chips.first;
+      await userEdit(
+        tester,
+        TextEditingValue(
+          text: command.replaceRange(chip.start + 1, chip.start + 2, 'x'),
+          selection: TextSelection.collapsed(offset: chip.start + 2),
+        ),
+      );
+      expect(template(tester), command);
+      expect(find.text(inputsLockedMessage), findsOneWidget);
     });
 
     testWidgets('errors are allowed in a draft; the library marks it', (tester) async {
@@ -373,7 +385,12 @@ void main() {
       final resolved = find.textContaining(r'\\.\pipe\vegas-encoder-0000-video', findRichText: true);
       expect(resolved, findsOneWidget);
       expect(find.textContaining('-g 60', findRichText: true), findsOneWidget);
-      expect(find.textContaining(r'"D:\Renders\Sample project.mp4"', findRichText: true), findsOneWidget);
+      expect(
+        editor(tester).compiled.value!.outputExtension,
+        isNull,
+        reason: 'the active command has no explicit muxer',
+      );
+      expect(find.textContaining(r'"D:\Renders\Sample project"', findRichText: true), findsOneWidget);
 
       await tester.tap(find.text('Copy'));
       await tester.pumpAndSettle();
@@ -396,6 +413,7 @@ void main() {
       expect(d.video!.outputBits, 10);
       expect(d.video!.availability, isNotNull, reason: 'the core establishes the scoped command encoder ID');
       expect(d.container.label, 'MKV');
+      expect(d.fileName, 'Sample project.mkv', reason: 'uses the active muxer, not the inactive Basic MP4');
       expect(tester.widget<SignalPath>(find.byType(SignalPath)).selected, isNull);
 
       await setCommand(tester, '{inputs} -c:v libx264 {output}');
@@ -404,6 +422,7 @@ void main() {
       expect(d.video!.conversion, isNull);
       expect(d.video!.formatLabel, isNull);
       expect(d.container.label, 'From file name');
+      expect(d.fileName, 'Sample project', reason: 'unknown muxer does not borrow the Basic suffix');
 
       await setCommand(tester, '{inputs} -c:v copy {output}');
       expect(diagram(tester).video!.availability, isNull, reason: 'stream copy has no encoder ID');

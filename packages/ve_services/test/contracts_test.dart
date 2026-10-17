@@ -506,6 +506,14 @@ Future<void> main() async {
     (await jobs.get(index.first.id))!.ffmpeg.isFixture,
     'job identity is illustrative',
   );
+  final speedRecord = (await jobs.get(index.first.id))!.copyWith(realtime: 0.73);
+  jobs.publish(speedRecord);
+  final speedIndex = (await jobs.list()).first;
+  check(
+    speedIndex.realtime == 0.73 &&
+        speedIndex.copyWith(realtime: null).realtime == null,
+    'fake index projects authoritative speed and supports explicit unknown',
+  );
   final sessions = FakeEditSessionService();
   final request = await sessions.readRequest('b0-session');
   check(

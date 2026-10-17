@@ -10,6 +10,13 @@ recorded real-host checks do not qualify every planned feature. Native exchange 
 versioned payloads (A7) remain the gates in [ADAPTER_PLAN.md](../ADAPTER_PLAN.md);
 designs that depend on them are marked **gated**.
 
+The [owner's reduced release scope](PRODUCT_SPEC.md#current-release-scope-owner-2026-10-17)
+supersedes unfinished-feature suggestions in this architecture plan. Remaining
+product work is native multi-container integration and the read-only installation/
+status dashboard; the owner builds the installer. Other unfinished enhancements
+(including live-edit/prewarm paths) are not active tasks. Existing boundaries and
+working internal storage/session/diff behavior remain.
+
 ## 1. Decisions in one table
 
 | # | Decision | Recommendation | Why | Alternative kept open |

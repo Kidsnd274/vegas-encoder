@@ -52,7 +52,7 @@ FFmpegCapabilities _capabilities(FFmpegInstallation installation) {
     },
     muxers: {
       for (final c in jsonMaps(jsonMap(b0Fixtures()['profiles'])['containers']))
-        c['id'] as String: c,
+        c['muxer'] as String: c,
     },
     hardware: {
       for (final entry in installation.availability.entries)
@@ -505,6 +505,7 @@ class FakeJobRepository implements JobRepository, JobLogs {
         project: r.project,
         durationSec: r.durationSec ?? r.media.durationSec,
         elapsedSec: r.elapsedSec,
+        realtime: r.realtime,
         sizeBytes: r.sizeBytes,
       ),
     ),

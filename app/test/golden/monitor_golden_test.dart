@@ -33,6 +33,10 @@ void main() {
       DesktopAppLauncher? launcher,
     }) async {
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      addTearDown(() async {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump();
+      });
       tester.platformDispatcher.platformBrightnessTestValue = b;
       await pumpApp(
         tester,

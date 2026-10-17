@@ -16,6 +16,7 @@ import 'package:vegas_encoder/design/components/button.dart';
 import 'package:vegas_encoder/features/presets/panels/extra_field.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
+import 'package:vegas_encoder/state/popup_version.dart';
 import 'package:vegas_encoder/state/services.dart';
 
 import '../helpers.dart';
@@ -33,6 +34,7 @@ void main() {
     WidgetTester tester,
     Brightness brightness, {
     EditSessionRequest? request,
+    PopupVersionStatus versions = matchingPopupVersions,
     Size view = const Size(1120, 740),
     List<Override> overrides = const [],
   }) async {
@@ -47,6 +49,7 @@ void main() {
         windowControllerProvider.overrideWithValue(FakeWindowController()),
         editSessionServiceProvider.overrideWithValue(FakeEditSessionService(requests: {'session': request ?? b0})),
         desktopAppLauncherProvider.overrideWithValue(WindowsDesktopAppLauncher(launch: (_, _) async {})),
+        popupVersionsProvider.overrideWith((ref) async => versions),
         ...overrides,
       ],
     );
@@ -122,6 +125,24 @@ void main() {
     testWidgets('$theme popup_min', (tester) async {
       await pump(tester, b, view: const Size(960, 640));
       await expectGolden('popup_min_$theme');
+    });
+
+    testWidgets('$theme popup_native_mismatch', (tester) async {
+      await pump(
+        tester,
+        b,
+        request: withRequest({
+          'context': b0.context.copyWith(target: {'id': 'vegas-native-v1'}).toJson(),
+        }),
+        versions: const PopupVersionStatus(
+          dllVersion: '0.1.6-recipe-proof',
+          coreVersion: '0.2.0-b2',
+          appVersion: '0.1.7+1',
+          appCoreVersion: '0.2.0-b2',
+        ),
+        view: const Size(960, 640),
+      );
+      await expectGolden('popup_native_mismatch_$theme');
     });
   }
 }

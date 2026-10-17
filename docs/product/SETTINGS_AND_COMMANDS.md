@@ -1,6 +1,6 @@
 # Recipes and FFmpeg command compilation
 
-Updated: 2026-10-12 (Asia/Singapore). Status: proposal (schema v1 draft). Basic and
+Updated: 2026-10-17 (Asia/Singapore). Schema v1 and current implementation rules. Basic and
 Advanced are the round 1 Guided and Command modes, renamed by the owner.
 
 B1/B2 implementation note (2026-10-13): the portable C++ core and Dart FFI implement
@@ -209,7 +209,20 @@ are measured for delivered float32 stereo; FDK AAC was absent and remains unknow
   their navigation `field` continues to point at the Extra arguments box.
 - **Output.** The engine writes `<dir>\<name>.ve-partial-<job>.<ext>`. It always passes
   `-f <muxer>` explicitly, then publishes by rename after exit 0 and successful output
-  verification.
+  verification. Temporary creation is exclusive, and neither an existing nor a
+  racing destination is replaced. Native renders require the actual destination's
+  suffix to agree with the active core-produced container, case-insensitively;
+  they publish to exactly that path. They do not append/replace a final extension.
+
+Native admission uses optional compile target `vegas-native-v1` (CONTRACTS C2/C4),
+outside the portable recipe. Basic uses the selected container. Advanced requires
+one known explicit output `-f`, established video/codec scope and output options
+before final `{output}`; inactive Basic container fields supply no identity.
+General/duplicate maps, complex-filter outputs, extra outputs and audio-only scope
+remain unsupported for native v1. The preview asks the core for the active suffix;
+an unknown Advanced container uses an extensionless sample path. Actual Render As
+path remains unknown in the popup. The class still advertises `*.mkv`; broader
+filter/default behavior and new-container real-VEGAS renders remain unqualified.
 
 ## 4. Advanced mode
 

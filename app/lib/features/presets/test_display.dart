@@ -51,7 +51,7 @@ PresetTestView presetTestView(PresetTestState s) {
     return PresetTestView(
       outcome: PresetTestOutcome.failed,
       headline: 'The test couldn’t run',
-      detail: _sentence(serviceMessage(error)),
+      detail: _sentence(error),
       sample: sample,
     );
   }
@@ -101,9 +101,7 @@ PresetTestView presetTestView(PresetTestState s) {
       return PresetTestView(
         outcome: PresetTestOutcome.failed,
         headline: 'Failed',
-        detail: why.trim().isEmpty
-            ? 'The test failed. FFmpeg’s output below may say why.'
-            : _sentence(serviceMessage(why)),
+        detail: why.trim().isEmpty ? 'The test failed. FFmpeg’s output below may say why.' : _sentence(why),
         facts: facts,
         sample: sample,
       );
@@ -126,12 +124,6 @@ PresetTestView presetTestView(PresetTestState s) {
       return PresetTestView(outcome: PresetTestOutcome.running, headline: 'Testing…', sample: sample);
   }
 }
-
-/// A service's message without the exception wrapper the test service puts
-/// around a failure's text (`ServiceException(PROBE-REQUIRED): Probe this
-/// installation before testing a preset.`); other text stays as written.
-/// workstreams/app.md, Needs, asks for the plain message instead.
-String serviceMessage(String text) => text.trim().replaceFirst(RegExp(r'^ServiceException\([A-Z0-9-]+\):\s*'), '');
 
 /// "1,204 lines from FFmpeg." or "The last 400 of 1,204 lines from FFmpeg."
 String presetTestLogSummary(PresetTestState s, String shownText) {

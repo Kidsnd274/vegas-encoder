@@ -17,6 +17,7 @@ import '../../design/tokens.dart';
 import '../../state/app_state.dart';
 import '../../state/popup.dart';
 import '../../state/popup_placement.dart';
+import '../../state/popup_version.dart';
 import '../../state/services.dart';
 import '../../state/ui_state.dart';
 import '../advanced/mode_switch.dart';
@@ -26,6 +27,7 @@ import '../presets/preset_header.dart' show EditorMode;
 import '../presets/save_check.dart';
 import 'popup_dialogs.dart';
 import 'popup_editor.dart';
+import 'popup_version.dart';
 
 /// The VEGAS popup (`--edit-session`, S3, UI_SPEC §4): one render template,
 /// owned by VEGAS's dialog. Apply writes the template's settings as the
@@ -359,6 +361,7 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
     _watchUndo(s?.undo);
     final launcher = ref.watch(desktopAppLauncherProvider);
     final blocked = data == null ? null : applyBlocked(data);
+    final versions = ref.watch(popupVersionsProvider).asData?.value;
 
     final Widget body;
     if (widget.launchError case final error?) {
@@ -418,6 +421,7 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
                 onClose: () => unawaited(_cancel()),
                 closeLabel: 'Cancel',
               ),
+              if (s != null && versions != null) PopupVersionWarning(status: versions),
               Expanded(
                 child: Stack(
                   children: [
@@ -443,6 +447,7 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
               ),
               _Footer(
                 blocked: s == null ? null : blocked,
+                outputExtension: s?.request.context.target == null ? null : data?.compiled.value?.outputExtension,
                 canApply: s != null && data != null && blocked == null && s.finished == null,
                 onCancel: () => unawaited(_cancel()),
                 onApply: () => unawaited(_apply()),
@@ -465,10 +470,17 @@ String _message(Object? error) => switch (error) {
 
 /// `.pp-foot`: what Apply does, Cancel and Apply to template.
 class _Footer extends StatelessWidget {
-  const _Footer({required this.blocked, required this.canApply, required this.onCancel, required this.onApply});
+  const _Footer({
+    required this.blocked,
+    required this.canApply,
+    required this.onCancel,
+    required this.onApply,
+    this.outputExtension,
+  });
 
   /// Why Apply is off, said beside it.
   final String? blocked;
+  final String? outputExtension;
   final bool canApply;
   final VoidCallback onCancel;
   final VoidCallback onApply;
@@ -478,6 +490,10 @@ class _Footer extends StatelessWidget {
     final t = VeTokens.of(context);
     final c = t.colors;
     final why = blocked;
+    final extension = outputExtension;
+    final guidance = extension == null
+        ? 'Apply updates this render template. Save it in VEGAS to keep it for next time.'
+        : 'Use $extension for the Render As filename. Apply updates this template; save it in VEGAS to keep it.';
     return Container(
       height: 58,
       padding: const EdgeInsets.only(left: 20, right: 16),
@@ -493,7 +509,7 @@ class _Footer extends StatelessWidget {
             child: Semantics(
               liveRegion: true,
               child: Text(
-                why ?? 'Apply updates this render template. Save it in VEGAS to keep it for next time.',
+                why ?? guidance,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: t.text.small.copyWith(color: why == null ? c.muted : c.errorText),

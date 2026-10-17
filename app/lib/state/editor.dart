@@ -42,6 +42,29 @@ class CoreResult<T> {
 final _sampleCompiles =
     Expando<({VeCore core, CoreCapabilities? capabilities, String? ext, CoreResult<CompileResult> result})>();
 
+/// Ask the core for the active container before presenting an Advanced preview
+/// filename. The suffix is display guidance, never an input to muxer identity.
+({CompilePaths paths, CoreResult<CompileResult> result}) compilePreview(
+  VeCore core,
+  Recipe recipe, {
+  required MediaDescription media,
+  String? basicExtension,
+  CoreCapabilities? capabilities,
+  JsonMap? target,
+}) {
+  final extension = recipe.command.mode == 'template' ? null : basicExtension;
+  var paths = SamplePreview.paths(extension);
+  if (target != null) paths = paths.copyWith(target: target);
+  var result = CoreResult.run(() => core.compile(recipe, media: media, paths: paths, capabilities: capabilities));
+  final activeExtension = result.value?.outputExtension;
+  if (activeExtension != null && activeExtension != extension) {
+    paths = SamplePreview.paths(activeExtension);
+    if (target != null) paths = paths.copyWith(target: target);
+    result = CoreResult.run(() => core.compile(recipe, media: media, paths: paths, capabilities: capabilities));
+  }
+  return (paths: paths, result: result);
+}
+
 /// [recipe] compiled by [core] for the documented sample, with [ext] as the
 /// output's extension.
 CoreResult<CompileResult> compileSample(VeCore core, Recipe recipe, {String? ext, CoreCapabilities? capabilities}) {
@@ -49,9 +72,13 @@ CoreResult<CompileResult> compileSample(VeCore core, Recipe recipe, {String? ext
   if (last != null && identical(last.core, core) && identical(last.capabilities, capabilities) && last.ext == ext) {
     return last.result;
   }
-  final result = CoreResult.run(
-    () => core.compile(recipe, media: SamplePreview.media, paths: SamplePreview.paths(ext), capabilities: capabilities),
-  );
+  final result = compilePreview(
+    core,
+    recipe,
+    media: SamplePreview.media,
+    basicExtension: ext,
+    capabilities: capabilities,
+  ).result;
   _sampleCompiles[recipe] = (core: core, capabilities: capabilities, ext: ext, result: result);
   return result;
 }
@@ -202,8 +229,9 @@ final editorProvider = Provider<EditorData?>((ref) {
   final media = SamplePreview.media;
   final ext = catalog.containers.where((c) => c.id == recipe.container.format).firstOrNull?.ext;
   final length = ref.watch(sizeLengthSecProvider);
-  final paths = SamplePreview.paths(ext);
   final advanced = recipe.command.mode == 'template';
+  final compiled = compileSample(core, recipe, ext: ext, capabilities: capabilities);
+  final paths = SamplePreview.paths(compiled.value?.outputExtension ?? (advanced ? null : ext));
   final asBasic = advanced ? recipe.copyWith(command: recipe.command.copyWith(mode: 'structured')) : recipe;
 
   return EditorData(
@@ -217,7 +245,7 @@ final editorProvider = Provider<EditorData?>((ref) {
     defaultInstallationId: settings?.defaultFFmpegId,
     media: media,
     paths: paths,
-    compiled: compileSample(core, recipe, ext: ext, capabilities: capabilities),
+    compiled: compiled,
     perMinute: () => CoreResult.run(() => core.estimate(recipe, media: media)),
     total: () => length == null
         ? null

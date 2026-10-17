@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
 
@@ -65,27 +67,40 @@ Future<({int? host, bool keepOnTop})> monitorPlacement(ProviderContainer contain
   return (host: h, keepOnTop: k);
 }
 
-/// How often, and how many times, [monitorJobRecordProvider] looks for the
-/// record. The engine writes it as the render ends, beside the final status.
-const monitorRecordAttempts = 8;
-const monitorRecordInterval = Duration(milliseconds: 250);
+/// How often [monitorJobRecordProvider] looks for a late record after the
+/// render ends. No record/index polling is started during an active render.
+const monitorRecordInterval = Duration(seconds: 1);
 
-/// The job's record (C6) once the render has ended, or null if it doesn't
-/// appear within about two seconds or can't be read. The window then words
-/// the result from the live file alone.
-final monitorJobRecordProvider = FutureProvider.family<JobRecord?, String>((ref, jobId) async {
+/// The job's record (C6) once the render has ended. The window initially
+/// words the result from C5, then adopts the record whenever it arrives.
+/// One timer/read at a time; disposal cancels the delay and further reads.
+final monitorJobRecordProvider = StreamProvider.autoDispose.family<JobRecord?, String>((ref, jobId) async* {
   final jobs = ref.watch(jobRepositoryProvider);
-  for (var attempt = 1; ; attempt++) {
+  Timer? timer;
+  Completer<void>? waiting;
+  ref.onDispose(() {
+    timer?.cancel();
+    if (waiting case final pending? when !pending.isCompleted) pending.complete();
+  });
+  while (ref.mounted) {
+    JobRecord? record;
     try {
-      final record = await jobs.get(jobId);
-      if (record != null) return record;
+      record = await jobs.get(jobId);
     } on ServiceException {
-      // Not complete yet, or malformed: look again, then give up.
+      // Missing, not complete yet, or malformed: keep the live result.
     } on CoreException {
-      return null; // the core didn't load: no record can be decoded
+      if (ref.mounted) yield null;
+      return; // the core didn't load: no record can be decoded
     }
-    if (attempt >= monitorRecordAttempts || !ref.mounted) return null;
-    await Future<void>.delayed(monitorRecordInterval);
+    if (!ref.mounted) return;
+    yield record;
+    if (record != null || !ref.mounted) return;
+    final pending = Completer<void>();
+    waiting = pending;
+    timer = Timer(monitorRecordInterval, pending.complete);
+    await pending.future;
+    timer = null;
+    waiting = null;
   }
 }, retry: (_, _) => null);
 

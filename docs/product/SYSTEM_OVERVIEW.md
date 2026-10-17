@@ -1,6 +1,6 @@
 # System overview: what is built, in what, and how it fits
 
-Updated: 2026-10-16 (Asia/Singapore). App and platform now have one agent in the
+Updated: 2026-10-17 (Asia/Singapore). App and platform now have one agent in the
 original `L:\repos\vegas-encoder` checkout, on `master`.
 See [workflow](WORKSTREAMS.md) and the current [queue](../NEXT_AGENT.md).
 This describes the system
@@ -197,13 +197,20 @@ the core gives no fact, the app shows less and asks platform for it (app.md, Nee
 
 - **Working now:** the desktop app on the real core and the real services: the preset
   library, the Basic and Advanced editors, FFmpeg discovery and checks, History, Settings.
-  The popup works when started with a session folder (tested with a fake VEGAS window).
-- **The installed exporter** still renders its fixed baseline (FFV1 video and float PCM
-  audio in MKV). Rendering from a recipe is built in the engine and tested with the fake
-  host, but not connected to VEGAS yet.
-- **Not connected yet:** VEGAS launching the popup from the template page, renders using
-  the app's presets, and the progress window. That is platform milestone B6, gated on
-  real-VEGAS evidence (A5–A7 in STATUS.md); the progress window's UI is app milestone F6.
+  The native template page launches the popup through C4, stores complete snapshots,
+  renders from them and launches the progress window independently of Render.
+- **Installed owner trial:** 0.1.7 template-name-fix on VEGAS 2026.0.3.189, with
+  recipe rendering and owner-confirmed behavior at STATUS's recorded scope. Current
+  source changes have not replaced that installation. Older statements that B6 is
+  entirely unconnected are superseded; remaining qualification is explicit in STATUS.
+- **Current container source:** five-container shared preflight/engine/preview
+  paths pass offline checks; writer extension advertising still returns `*.mkv`.
+  Naming/filter/default behavior and new-container real-host checks remain.
+- **Remaining product features:** finish native MP4/MOV/WebM/MXF support alongside
+  MKV, and add a read-only VEGAS installation/status dashboard. The owner makes the
+  installer. Other unfinished enhancements are skipped for this release; preserve
+  existing history/conflict, snapshot/diff, log and sample-fallback plumbing. See
+  [current scope](PRODUCT_SPEC.md#current-release-scope-owner-2026-10-17).
 
 ## Tests, by layer
 

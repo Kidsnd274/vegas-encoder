@@ -73,12 +73,10 @@ void ValidateCandidateRecipe(const ve::Json& recipe) {
   const ve::Json media{{"video",{{"width",1920},{"height",1080},{"fps",{30000,1001}},{"pixfmt","p010le"},{"sar","1:1"}}},
                        {"audio",{{"rate",48000},{"channels",2},{"sampleFmt","f32le"}}},{"durationSec",nullptr}};
   const ve::Json paths{{"ffmpeg","ffmpeg.exe"},{"videoPipe","candidate-video"},{"audioPipe","candidate-audio"},{"output","candidate.mkv"},{"project",""}};
-  const auto compiled = ve::Compile({{"recipe",recipe},{"media",media},{"paths",paths}});
-  if (compiled.value("outputContainerId",ve::Json(nullptr)) != "mkv")
-    throw std::runtime_error("This first VEGAS candidate supports Matroska (.mkv) only. Choose Matroska, or use explicit -f matroska in Advanced mode.");
-  if (!compiled.at("expectedStreams").is_array() ||
-      std::none_of(compiled.at("expectedStreams").begin(),compiled.at("expectedStreams").end(),[](const ve::Json& stream) { return ve::Str(stream,"kind") == "video"; }))
-    throw std::runtime_error("This first VEGAS candidate requires one established video output. General maps/filters and audio-only commands are not supported yet.");
+  auto targetPaths = paths; targetPaths["target"] = {{"id","vegas-native-v1"}};
+  const auto compiled = ve::Compile({{"recipe",recipe},{"media",media},{"paths",targetPaths}});
+  for (const auto& issue : compiled.at("issues")) if (ve::Str(issue,"level") == "error")
+    throw std::runtime_error(ve::Str(issue,"message"));
 }
 }
 ve::Json DefaultRecipeSnapshot() {
@@ -145,6 +143,7 @@ configuration::RecipePageOptions RecipeEditorOptions() {
   catch (...) { ve_free(version.data); throw; }
   ve_free(version.data);
   options.context["hostVersion"] = FileVersion(ModulePath(nullptr));
+  options.context["target"] = {{"id","vegas-native-v1"}};
   options.beforeLaunch = [root = options.sessionRoot] { AppReady(); EnsureDirectory(root); };
   options.validateRecipe = ValidateCandidateRecipe;
   return options;

@@ -519,6 +519,7 @@ class PresetTestProgress extends JsonModel {
     required String phase,
     String log = '',
     String message = '',
+    String? code,
     int framesDone = 0,
     int framesTotal = 60,
     String? commandLine = null,
@@ -531,6 +532,7 @@ class PresetTestProgress extends JsonModel {
          'phase': phase,
          'log': log,
          'message': message,
+         'code': code,
          'framesDone': framesDone,
          'framesTotal': framesTotal,
          'commandLine': commandLine,
@@ -544,6 +546,7 @@ class PresetTestProgress extends JsonModel {
   String get phase => data['phase'] as String;
   String get log => data['log'] as String? ?? '';
   String get message => data['message'] as String? ?? '';
+  String? get code => data['code'] as String?;
   int get framesDone => data['framesDone'] as int? ?? 0;
   int get framesTotal => data['framesTotal'] as int? ?? 60;
   String? get commandLine => data['commandLine'] as String?;
@@ -833,16 +836,19 @@ class EditContext extends JsonModel {
     String? hostVersion = null,
     String? project = null,
     MediaDescription? media = null,
+    JsonMap? target,
     JsonMap extensions = const {},
   }) : super({
          'hostVersion': hostVersion,
          'project': project,
          'media': media?.toJson(),
+         if (target != null) 'target': target,
          'extensions': extensions,
        });
   EditContext.fromJson(super.json);
   String? get hostVersion => data['hostVersion'] as String?;
   String? get project => data['project'] as String?;
+  JsonMap? get target => data['target'] == null ? null : jsonMap(data['target']);
   MediaDescription? get media => data['media'] == null
       ? null
       : MediaDescription.fromJson(jsonMap(data['media']));
@@ -850,6 +856,7 @@ class EditContext extends JsonModel {
     Object? hostVersion = absent,
     Object? project = absent,
     Object? media = absent,
+    Object? target = absent,
     Object? extensions = absent,
   }) => EditContext.fromJson(
     changed({
@@ -857,6 +864,7 @@ class EditContext extends JsonModel {
       if (!identical(project, absent)) 'project': project,
       if (!identical(media, absent))
         'media': (media as MediaDescription?)?.toJson(),
+      if (!identical(target, absent)) 'target': target,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1353,6 +1361,7 @@ class JobIndexEntry extends JsonModel {
     String? project = null,
     double? durationSec = null,
     double? elapsedSec = null,
+    double? realtime = null,
     int? sizeBytes = null,
     JsonMap extensions = const {},
   }) : super({
@@ -1367,6 +1376,7 @@ class JobIndexEntry extends JsonModel {
          'project': project,
          'durationSec': durationSec,
          'elapsedSec': elapsedSec,
+         'realtime': realtime,
          'sizeBytes': sizeBytes,
          'extensions': extensions,
        });
@@ -1382,6 +1392,7 @@ class JobIndexEntry extends JsonModel {
   String? get project => data['project'] as String?;
   double? get durationSec => (data['durationSec'] as num?)?.toDouble();
   double? get elapsedSec => (data['elapsedSec'] as num?)?.toDouble();
+  double? get realtime => (data['realtime'] as num?)?.toDouble();
   int? get sizeBytes => data['sizeBytes'] as int?;
   JobIndexEntry copyWith({
     Object? index = absent,
@@ -1395,6 +1406,7 @@ class JobIndexEntry extends JsonModel {
     Object? project = absent,
     Object? durationSec = absent,
     Object? elapsedSec = absent,
+    Object? realtime = absent,
     Object? sizeBytes = absent,
     Object? extensions = absent,
   }) => JobIndexEntry.fromJson(
@@ -1410,6 +1422,7 @@ class JobIndexEntry extends JsonModel {
       if (!identical(project, absent)) 'project': project,
       if (!identical(durationSec, absent)) 'durationSec': durationSec,
       if (!identical(elapsedSec, absent)) 'elapsedSec': elapsedSec,
+      if (!identical(realtime, absent)) 'realtime': realtime,
       if (!identical(sizeBytes, absent)) 'sizeBytes': sizeBytes,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),

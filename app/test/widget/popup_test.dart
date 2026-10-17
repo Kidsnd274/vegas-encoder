@@ -16,6 +16,7 @@ import 'package:vegas_encoder/features/presets/panels/extra_field.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
 import 'package:vegas_encoder/state/popup.dart';
+import 'package:vegas_encoder/state/popup_version.dart';
 import 'package:vegas_encoder/state/services.dart';
 
 import '../helpers.dart';
@@ -42,6 +43,7 @@ void main() {
     bool noRequest = false,
     FakeEditSessionService? service,
     FakePresetLibrary? presets,
+    PopupVersionStatus versions = matchingPopupVersions,
     Size view = const Size(1120, 740),
     List<Override> overrides = const [],
   }) async {
@@ -57,6 +59,7 @@ void main() {
         windowControllerProvider.overrideWithValue(window),
         editSessionServiceProvider.overrideWithValue(sessions),
         presetLibraryProvider.overrideWithValue(library),
+        popupVersionsProvider.overrideWith((ref) async => versions),
         ...overrides,
       ],
     );
@@ -88,6 +91,33 @@ void main() {
       EditSessionRequest.fromJson({...b0.toJson(), ...changes});
 
   group('opening', () {
+    testWidgets('a version mismatch warns without blocking Apply', (tester) async {
+      await pump(
+        tester,
+        versions: const PopupVersionStatus(
+          dllVersion: '0.1.6-recipe-proof',
+          coreVersion: '0.2.0-b2',
+          appVersion: '0.1.7+1',
+          appCoreVersion: '0.2.0-b2',
+        ),
+      );
+      expect(rich('Vegas Encoder versions don’t match.'), findsOneWidget);
+      expect(button(tester, 'Apply to template').onPressed, isNotNull);
+      await keys(tester, LogicalKeyboardKey.enter, control: true);
+      expect(result()!.action, 'apply');
+    });
+
+    testWidgets('a native target shows the active container suffix without claiming a destination', (tester) async {
+      await pump(
+        tester,
+        request: withRequest({
+          'context': b0.context.copyWith(target: {'id': 'vegas-native-v1'}).toJson(),
+        }),
+      );
+      expect(rich('Use .mp4 for the Render As filename.'), findsOneWidget);
+      expect(button(tester, 'Apply to template').onPressed, isNotNull);
+    });
+
     testWidgets('the template, its origin and the VEGAS facts in the strip', (tester) async {
       await pump(tester);
       expect(find.text('YouTube 4K upload (Lakeside)'), findsOneWidget);

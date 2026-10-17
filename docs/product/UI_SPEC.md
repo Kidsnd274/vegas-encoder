@@ -186,8 +186,8 @@ encoder profile.
   convention). Lower-is-better scales such as CRF, CQ and QP are drawn reversed: CRF 51
   at the left, 0 at the right. The ends read "Smaller file" and "Higher quality". The
   field shows the native value and unit name ("CRF 18").
-- Mark a recommended band per resolution where the encoder profile provides one (for
-  example x264 CRF 18–23 at 1080p).
+- **v1 owner decision (2026-10-17):** keep the current numeric profile marks, with no
+  additional shaded recommendation band. Curated quality recommendations are deferred.
 - Arrow keys step by 1; Page Up and Page Down step by 5.
 - Bitrate modes switch the control to Mb/s with common values (2 to 80 Mb/s; any value
   can be typed), and an optional peak. The read-out says "8 Mb/s average, 12 Mb/s
@@ -202,11 +202,12 @@ encoder profile.
 
 ### Test this preset
 
-**Test this preset** (desktop and popup) runs the selected FFmpeg on synthetic frames,
-without starting a VEGAS render. The input is `lavfi` testsrc2 plus a sine tone, at the
-sample or project context's size, rate and pixel format, for 60 frames. Output goes to
-a temp file, then through the same ffprobe verification as a render. The log streams
-into a panel.
+**Test this preset** is desktop-only in v1 (owner, 2026-10-17). It runs the selected
+FFmpeg on 60 generated 320×180 P010 frames at 30 fps plus two seconds of stereo sine,
+without starting a VEGAS render. Output goes to a temporary file, then through
+ffprobe verification and a full synthetic-output decode. The log streams into a
+panel. This is a lightweight check of those settings on that input; it does not
+establish project-resolution or real VEGAS behavior.
 
 This catches failing hardware encoders and bad extra arguments early. Voukoder Pro's
 "Scene Test" is the precedent.
@@ -219,9 +220,9 @@ command from the core, or with errors. A dialog shows the phase ("Encoding: fram
 checked out: h264 and aac."; "Failed" with the service's reason), the output check
 (Expected / Found), and FFmpeg's output as it streams (last 400 lines, opening at the
 end), with Show log, Show file, Stop test and Test again. Closing stops a running test.
-The service decides the synthetic input (320×180 P010, 30 fps, two seconds of tone), not
-the project's size; the dialog claims no size. **Not in the popup yet** (workstreams/app.md,
-Open items).
+The service retains the lightweight input instead of the project's size; no popup
+Test action or project-sized test is required for v1. This resolves the old app
+handoff's placement/input-size questions without increasing test resource use.
 
 ### Command preview
 
@@ -301,7 +302,9 @@ range, check, suggestion and expansion is the core's (C2): the app tokenizes not
   sample context laid out like the user's lines: what Vegas Encoder adds first, real pipe
   names, the output path and macros expanded (`{gop:2s}` → 60), errors underlined. Copy
   (and Ctrl+Shift+C) copies the core's command line. The output is the sample Render As
-  path; the engine's temporary name isn't in C2 yet.
+  path; the engine's temporary name isn't in C2 yet. Both this path and the diagram's
+  File node use the active command's core-produced `outputExtension`; an unknown
+  container leaves the sample extensionless, without borrowing the Basic suffix.
 - **Signal path** (§2): dashed nodes from the core's facts for the active command only:
   the encoder and codec it names ("From command" when none), "From command, slow", the
   muxer `-f` names or "From file name" without one. Unknown formats claim no conversion,
@@ -340,6 +343,13 @@ commits the result on VEGAS's own Apply/OK is B6 work behind A5–A7.
 - A request that is missing or can't be read: "Vegas Encoder couldn’t open this template:
   <reason>. Closing this window leaves the template as it was." Apply is off; closing
   writes nothing, which VEGAS treats as Cancel.
+- Plug-in/app release or core-stamp mismatch shows a warning beneath the titlebar
+  with the actual stamps and guidance to use one release. Missing stamps say the
+  versions could not be verified. The warning does not disable Apply. It compares
+  version stamps, not development-build hashes.
+- Sessions carrying the native target show core admission errors before Apply and
+  the active container's required Render As suffix in the footer. Actual destination
+  is unknown here; no mismatch or automatic rename is inferred from the sample path.
 
 ### Header
 
@@ -527,10 +537,10 @@ panel at the right (380 px below 1280 px).
 - **List** (from the index only since the follow-ups, 2026-10-15; no record per row):
   status with icon and word; start time (local); template over project; encoder (the
   engine's summary, "x264 CRF 18, slow / AAC 320 kb/s", full text in a tooltip); length;
-  time taken; size ("No file" when nothing was published). A summary an older index line
-  lacks shows a dash. **No speed column**: the index has no realtime figure (the detail's
-  sentence has it; workstreams/app.md, Needs). Filter: All / Succeeded / Failed /
-  Cancelled, with a count. Below 860 px the length and time-taken columns drop.
+  time taken; speed from the index's recorded `realtime`; size ("No file" when nothing
+  was published). A summary an older index line lacks shows a dash; speed is never
+  derived from length/time. Filter: All / Succeeded / Failed / Cancelled, with a
+  count. Below 860 px the length, time-taken and speed columns drop.
 - **Detail order:** result sentence; actions; FFmpeg said (stderr tail); how it stopped
   (exit code, HRESULT); output path; FFmpeg identity (shortened hash, full value in a
   tooltip); output check; the command, with the arguments FFmpeg's error points at
@@ -548,6 +558,32 @@ panel at the right (380 px below 1280 px).
   in its row and in the detail.
 
 ## 6a. Settings screen
+
+**Retained upcoming work (owner, 2026-10-17): VEGAS installation/status dashboard.**
+Add a read-only VEGAS integration section; it is not implemented yet. Discover
+hosts and inspect exporter/discovery files through ve_services, keeping registry,
+filesystem and native operations out of widgets. Reuse/audit existing detection
+and development-manifest rules before choosing the service contract.
+
+- Show each detected host's name, actual version and executable path, plus the
+  exporter/discovery paths checked and the actual DLL version when readable.
+- Distinguish **Not installed**, **Installed, verified**, **Installed, unverified**
+  (missing/unsupported manifest), **Files missing or changed**, and **Could not
+  check**. Show the relevant manifest path and concrete error/detail. Only say
+  verified for bytes/paths actually covered by the supported installed manifest;
+  version equality is not an integrity check. Unknown app/shared-runtime coverage
+  stays unknown rather than implying a whole installation was verified.
+- Keep supported/tested host scope separate from detection and file integrity;
+  finding an older VEGAS executable does not establish compatibility.
+- Include explicit Refresh and readable loading, empty and partial-error states.
+  An unreadable host/manifest must not prevent other rows from being shown.
+- This section reports status and gives installer guidance. No install, repair,
+  uninstall, download or automatic replacement action is part of this task. The
+  owner builds the installer; support current recorded manifests and show other
+  formats as unverified without inventing that installer's future schema.
+
+Scope/test details are in NEXT_AGENT. Other unfinished Settings/log-management
+and expanded About features are skipped; the existing cards below remain.
 
 Built in F3 (`app/lib/features/settings/`). Settings (Ctrl+4) is one centred column,
 at most 720 px wide, of surface cards. Every control saves at once to C7 `machine.json`
@@ -685,7 +721,7 @@ Undo), and in `features/presets/`: the Ctrl+K palette, `BitrateField`, and
 | --- | --- |
 | `EncoderPicker` | F1 (`VeEncoderPicker`). Grouped by codec; hardware vendor; availability state with reason; search still to come |
 | `RateModeSwitch` | F1 as `VeSegmented`. Segmented; only the encoder's modes |
-| `QualityControl` | F1 (`VeQualityControl`): slider, field, marks, recommended band. Bitrate and profile-steps variants in F2 |
+| `QualityControl` | F1 (`VeQualityControl`): slider, field and numeric profile marks; no extra recommended band in v1 (owner, 2026-10-17). Bitrate and profile-steps variants in F2 |
 | `SignalPath` | F1. Full and strip layouts; nodes, wires sized by bit depth, conversion pips, marks; keyboard navigation (`CustomPainter` for wires) |
 | `ExtraArgumentsField` | F2 (`features/presets/panels/extra_field.dart`): mono field per stream; the core's warnings for the field show under it |
 | `CommandView` | F1. Tokens with roles; collapsed inputs chip; copy; multi-line |

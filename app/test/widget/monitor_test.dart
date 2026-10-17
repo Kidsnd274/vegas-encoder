@@ -22,9 +22,19 @@ void main() {
   Future<
     ({FakeWindowController window, FakeLiveRenderStatusReader live, FakeJobRepository jobs, FakeFileReveal reveal})
   >
-  pump(WidgetTester tester, {LiveRenderStatus? status, JobRecord? record, DesktopAppLauncher? launcher}) async {
+  pump(
+    WidgetTester tester, {
+    LiveRenderStatus? status,
+    JobRecord? record,
+    DesktopAppLauncher? launcher,
+    FakeJobRepository? jobs,
+  }) async {
     final window = FakeWindowController();
-    final m = monitorOverrides(status: status, record: record, window: window, launcher: launcher);
+    final m = monitorOverrides(status: status, record: record, window: window, launcher: launcher, repository: jobs);
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
     await pumpApp(tester, view: view, overrides: m.overrides);
     return (window: window, live: m.live, jobs: m.jobs, reveal: m.reveal);
   }
@@ -173,7 +183,7 @@ void main() {
 
     testWidgets('without its record it says what the live file says', (tester) async {
       await pump(tester, status: liveSample(RenderState.done));
-      await tester.pump(monitorRecordInterval * (monitorRecordAttempts + 1));
+      await tester.pump(const Duration(seconds: 3));
       expect(find.text('Rendered in 4:07, 2.06× realtime.'), findsOneWidget);
       await tester.pump(const Duration(seconds: 10));
     });
@@ -213,7 +223,7 @@ void main() {
       const cause = "FFmpeg: No such filter: 'vegas_encoder_deliberate_failure'";
       final m = await pump(tester, status: liveSample(RenderState.failed).copyWith(message: cause));
       expect(find.text(cause), findsOneWidget);
-      await tester.pump(monitorRecordInterval * (monitorRecordAttempts + 1));
+      await tester.pump(const Duration(seconds: 3));
       expect(find.text(cause), findsOneWidget);
       await tester.pump(const Duration(minutes: 10));
       expect(closed(m.window), isFalse);
@@ -302,6 +312,49 @@ void main() {
     });
   });
 
+  testWidgets('a record arriving after two seconds updates failure details and enables its log', (tester) async {
+    final jobs = _CountingJobs(logs: {'b0-render': 'FFmpeg failure log'});
+    final m = await pump(tester, status: liveAt(RenderState.encoding, 10), jobs: jobs);
+    await tester.pump(const Duration(seconds: 3));
+    expect(jobs.reads, 0, reason: 'no C6 or index reads during encoding');
+
+    m.live.publish(liveFile, liveAt(RenderState.failed, 11).copyWith(message: 'Immediate live cause'));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(monitorRecordInterval);
+      await tester.pump();
+    }
+    expect(find.text('Immediate live cause'), findsOneWidget);
+    expect(jobs.reads, greaterThan(3));
+    expect(jobs.logReads, 0, reason: 'log access waits for the record');
+
+    jobs.publish((await recordFor(RenderState.failed)).copyWith(message: 'Delayed recorded cause'));
+    await tester.pump(monitorRecordInterval);
+    await tester.pumpAndSettle();
+    expect(find.text('Delayed recorded cause'), findsOneWidget);
+    expect(find.text('Immediate live cause'), findsNothing);
+    expect(jobs.logReads, 1);
+    await tester.tap(find.widgetWithText(VeButton, 'Show log'));
+    await tester.pump();
+    expect(m.reveal.revealed, ['fixture/b0-render.ffmpeg.log']);
+    final reads = jobs.reads;
+    await tester.pump(const Duration(minutes: 10));
+    expect(jobs.reads, reads, reason: 'record lookup stops after success');
+    expect(closed(m.window), isFalse, reason: 'late record leaves failure retention unchanged');
+  });
+
+  testWidgets('disposing a monitor cancels missing-record lookup', (tester) async {
+    final jobs = _CountingJobs();
+    await pump(tester, status: liveSample(RenderState.failed), jobs: jobs);
+    expect(jobs.reads, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    final reads = jobs.reads;
+    await tester.pump(const Duration(minutes: 10));
+    expect(jobs.reads, reads);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the pin keeps the window on top and is remembered (C7)', (tester) async {
     final m = await pump(tester, status: liveSample(RenderState.encoding));
     await tester.tap(find.bySemanticsLabel('Keep on top'));
@@ -363,5 +416,23 @@ class _Launcher implements DesktopAppLauncher {
   Future<void> openJob(String jobId) async {
     if (fail) throw const ServiceException('APP-LAUNCH', 'The desktop app could not be started.');
     jobs.add(jobId);
+  }
+}
+
+class _CountingJobs extends FakeJobRepository {
+  _CountingJobs({super.logs}) : super(records: const []);
+  int reads = 0;
+  int logReads = 0;
+
+  @override
+  Future<JobRecord?> get(String id) {
+    reads++;
+    return super.get(id);
+  }
+
+  @override
+  Future<String?> logLocation(String id) {
+    logReads++;
+    return super.logLocation(id);
   }
 }

@@ -163,8 +163,6 @@ Json Validate(const Json& request, const Json* capabilities) {
     const Json& caps = capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCaps;
     if (!media.is_null()) CheckMedia(media);
     const bool withVideo = Bool(v,"enabled",true), withAudio = Bool(a,"enabled",true);
-    if (!withVideo && !withAudio) issues.push_back(Issue("V-STREAMS","error","video.enabled","Turn on video, audio, or both."));
-    else if (!withVideo) issues.push_back(Issue("V-AUDIO-ONLY","error","video.enabled","Audio-only renders are not supported by the VEGAS adapter yet."));
     if (Str(r.at("command"),"mode") == "template") {
         for (const auto& d : Lint(Json{{"text",Str(r.at("command"),"template")}},&caps)) {
             Json params = d.at("params"); params["start"] = d.at("start"); params["end"] = d.at("end");
@@ -172,6 +170,8 @@ Json Validate(const Json& request, const Json* capabilities) {
         }
         issues.push_back(Issue("V-UNTESTED","info","","Not tested with VEGAS yet.")); return issues;
     }
+    if (!withVideo && !withAudio) issues.push_back(Issue("V-STREAMS","error","video.enabled","Turn on video, audio, or both."));
+    else if (!withVideo) issues.push_back(Issue("V-AUDIO-ONLY","error","video.enabled","Audio-only renders are not supported by the VEGAS adapter yet."));
     Json res = Resolve(r);
     // Extra replaces generated profile/pixel options. Standalone validation and
     // compilation must check the same final combination, not displaced controls.

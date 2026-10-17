@@ -546,8 +546,8 @@ SignalPathModel _commandSignalPath({
     );
   }
 
-  // The command names a muxer (-f) or FFmpeg picks one from the file name.
-  final ext = catalog.container(recipe.container.format)?.ext ?? '';
+  // Only an active-command core fact can supply the preview's suffix.
+  final ext = compiled?.outputExtension ?? '';
   final muxer = s('container');
   final cp = muxer == null ? null : catalog.containers.where((c) => c.label == muxer).firstOrNull;
   return SignalPathModel(

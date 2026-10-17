@@ -529,8 +529,6 @@ class RenderFile final : public ISfRenderFile {
     if (!cfg.validMode) fail("OutputMode must be ffmpeg or raw", E_INVALIDARG);
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
     else if (!cfg.encode) fail("B6 recipe candidate requires OutputMode=ffmpeg", E_INVALIDARG);
-    else if (path_.size() < 4 || _wcsicmp(path_.c_str() + path_.size() - 4, L".mkv") != 0)
-      fail("the B6 VEGAS candidate currently requires a .mkv output filename", E_INVALIDARG);
     else if (!video) fail("B6 recipe rendering requires a video render stream", E_NOINTERFACE);
 #else
     else if (path_.size() < 4 || _wcsicmp(path_.c_str() + path_.size() - 4, L".mkv") != 0)
@@ -540,6 +538,20 @@ class RenderFile final : public ISfRenderFile {
     else if (audio && (fmt.format != SFAUDIO_FORMAT_FLOAT32 || fmt.sampleRate != 48000 ||
                        fmt.channels != 2 || fmt.blockAlign != 8))
       fail("fixed FFmpeg profile requires float32 stereo at 48000 Hz", E_INVALIDARG);
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    if (ok) try {
+      // Destination agreement is independent of delivered dimensions/rate. Check
+      // it before acquiring frames; actual-media compile remains authoritative.
+      const ve::Json media{{"video",{{"width",1920},{"height",1080},{"fps",{30000,1001}},{"pixfmt","p010le"},{"sar","1:1"}}},
+        {"audio",{{"rate",48000},{"channels",2},{"sampleFmt","f32le"}}},{"durationSec",nullptr}};
+      const ve::Json paths{{"videoPipe","preflight-video"},{"audioPipe","preflight-audio"},{"output",Utf8(path_.c_str())},
+        {"target",{{"id","vegas-native-v1"},{"outputPath",Utf8(path_.c_str())}}}};
+      const auto preflight = ve::Compile({{"recipe",recipeSnapshot_.at("recipe")},{"media",media},{"paths",paths}});
+      for (const auto& issue : preflight.at("issues")) if (ve::Str(issue,"id") == "N-OUTPUT-SUFFIX") {
+        fail(ve::Str(issue,"message").c_str(),E_INVALIDARG); break;
+      }
+    } catch (const std::exception& error) { fail(error.what(),E_INVALIDARG); }
+#endif
     if (ok) {
       HRESULT hr = video->GetFrameCount(&r.frameCountReported);
       if (FAILED(hr) || r.frameCountReported <= 0) fail("cannot obtain a positive frame count", hr);
@@ -663,8 +675,7 @@ class RenderFile final : public ISfRenderFile {
           options.templateName = r.tplName; options.hostHwnd = runtime.hostHwnd;
           options.verifyOutput = runtime.verifyOutput;
           options.monitorApplication = runtime.monitorApplication;
-          options.requiredOutputContainerId = "mkv";
-          options.requiredVideoOutput = true;
+          options.nativeTarget = true;
           options.pipeTimeoutMs = cfg.pipeTimeoutMs; options.finishTimeoutMs = cfg.finishTimeoutMs;
           ve::Json media{{"video", {{"width", r.width}, {"height", r.height},
               {"fps", ve::Json::array({r.rate.num, r.rate.den})}, {"pixfmt", "p010le"},

@@ -5,6 +5,76 @@ Updated: 2026-10-17 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proo
 
 ## Current progress
 
+**Owner scope reduction (2026-10-17):** keep the implemented product and finish
+only two unfinished product features: MP4/MOV/WebM/MXF in VEGAS alongside MKV,
+and a read-only VEGAS installation/status dashboard. The owner makes the finished
+installer; agents supply matched inputs and documentation. Other unfinished
+enhancements are skipped for this release, including revision browsing/restore,
+native extra inputs/complex graphs, new popup project/path extraction, richer
+native-page shortcuts, pinned Render As presets, per-preset FFmpeg override,
+log-management extras and the remaining wishlist. Existing internal history,
+conflict handling, template snapshots/diff/update, logs and sample fallbacks remain.
+This changes the product queue, not implementation/qualification evidence. No
+code, installation or real-host state changed from this documentation update.
+See [current scope](product/PRODUCT_SPEC.md#current-release-scope-owner-2026-10-17)
+and [next-agent brief](NEXT_AGENT.md#next-agent-execution-brief).
+
+**Containers and carried-forward integration (2026-10-17):** the owner authorized
+three bounded implementation agents, with plans reviewed before coding and one
+shared original checkout/queue. Changes are currently uncommitted. No installed
+candidate, trial data, dependency or machine-wide tool was changed.
+
+- Shared core native-target admission now accepts known MP4/MKV/MOV/WebM/MXF
+  recipes with established video/codec scope. C4 propagates the target, so the
+  popup shows native errors before Apply. Missing muxers, ambiguous output,
+  unsupported stream scope and measured incompatibilities are surfaced by core.
+  Actual-media compilation checks again before launching FFmpeg.
+- Native rendering preserves the exact selected destination and refuses a
+  mismatched suffix before acquiring frames. Advanced preview and native-page/
+  popup guidance use the active command's core-produced suffix. Actual edit-time
+  Render As path remains unknown. Temporary output retains the final suffix;
+  exclusive creation, no replacement and existing cleanup/retention remain.
+- Output readback records/checks the demuxer family while retaining the sampled
+  32-packet scope. It does not distinguish MP4 from MOV or MKV from WebM or claim
+  a full-file decode. **Naming gate still open:** the class advertises `*.mkv`;
+  exact writer multi-extension syntax and filter/default behavior are unresolved.
+  New-container real-VEGAS renders/persistence remain unqualified. Details:
+  [container plan](product/NATIVE_CONTAINER_PLAN.md).
+- History Speed now comes from nullable C6 index `realtime`, including recovery
+  and fakes. Legacy values stay unknown; detail no longer fabricates speed from
+  length/time. Monitor polls for late terminal C6 records until arrival/disposal,
+  enabling details/log access without active-render C6/core/library reads.
+- Popup warns on plug-in/app release or core-stamp mismatch; unreadable stamps
+  remain unverified and Apply is unaffected. Same-stamp hash-distinct development
+  builds remain indistinguishable. Preset tests expose plain messages and separate
+  error codes. Advanced unfinished-quote chip protection was already implemented;
+  the added consumer assertion passes.
+- Owner decisions are recorded: preset Test stays desktop-only and lightweight
+  (320×180 P010, 30 fps, 60 frames); current quality marks remain without a new
+  recommended band. These are no longer v1 decision gaps.
+
+Focused app validation passes: **61** History/monitor and **67** popup/Advanced/
+service-boundary unit/widget checks; **8** History, **18** monitor and **23** popup/
+warning golden checks. Six changed History and four new popup/warning light/dark
+images were visually reviewed; existing popup and monitor images are unchanged.
+Final Advanced display/widget/golden checks pass (**57**): the diagram File node
+and resolved sample command agree on the active suffix, including extensionless
+unknowns. Four affected light/dark Advanced images were refreshed/reviewed.
+Final app analysis is clean and the Windows release runner builds against the
+final source with existing tools. Native validation passes **3,104** core checks,
+**233** real Dart FFI/model checks, **87** fake service-contract and **154** isolated
+Windows repository checks, **81** verification-fact and **21** native-runtime
+checks. The optimized recipe-proof exporter builds/relinks with the final core.
+B6 snapshot/session/page regressions pass **216 / 97 / 124** checks and the fake
+monitor-writer check passes. Focused adapter validation passes **120** assertions
+using supplied FFmpeg 5.1.2: five short format renders (including MP4 faststart and
+Advanced WebM), suffix-only basename, mismatch-before-frames and existing-file
+preservation. This is fake-host/real-FFmpeg validation, not real VEGAS.
+Native C5/C6 Dart-reader checks pass **111** assertions across seven saved jobs,
+including nullable prelaunch facts and exact record/index realtime agreement,
+without rerendering. No installation or real-VEGAS qualification was performed.
+Existing owner-deferred limits remain unchanged.
+
 **Integration completion pass (2026-10-17):** at the owner's explicit request,
 three agents planned bounded tasks before implementation in this original
 checkout, with parent integration/review and one current queue. No worktree,
@@ -50,10 +120,10 @@ FFmpeg or VEGAS checks. Reproduce with `run_window_spikes.ps1 -Checks integratio
 validation; full performance budgets and real VEGAS behavior of these new paths
 remain unqualified. Installed trial and all owner-deferred checks below stand.
 
-The current native recipe candidate still refuses non-MKV output and general or
-ambiguous Advanced output; desktop/core support for more formats is not a VEGAS
-compatibility claim. The next queue audits v1 scope and addresses this gap before
-release/installer work. See [NEXT_AGENT.md](NEXT_AGENT.md).
+The earlier read-only container investigation distinguished explicit MKV-only
+candidate policy from unresolved host filename/extension behavior. The subsequent
+implementation above replaces those policy guards; it does not close native
+advertising or real-host qualification gates. Current queue: [NEXT_AGENT.md](NEXT_AGENT.md).
 
 **Owner-authorized commit/merge (2026-10-16):** committed the platform snapshot
 as `fd4edb3`, preserving its 34 changed/new files. Verified that all of its runtime,

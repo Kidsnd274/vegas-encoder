@@ -68,6 +68,10 @@ abstract interface class WindowController {
   /// outside the Windows runner.
   Future<({WindowBounds bounds, bool maximized})?> restoredBounds();
   Future<WindowState> state();
+
+  /// The runner's actual build stamp, including --build-name/--build-number;
+  /// null when no Windows runner supplies it.
+  Future<String?> appVersion();
   Stream<WindowState> get changes;
   Future<void> startDrag();
   Future<void> minimize();
@@ -172,6 +176,9 @@ class MethodChannelWindowController implements WindowController {
   }
 
   @override
+  Future<String?> appVersion() => _invoke<String>('appVersion');
+
+  @override
   Stream<WindowState> get changes => _changes.stream;
 
   @override
@@ -231,6 +238,7 @@ class FakeWindowController implements WindowController {
 
   /// What [saveFile] returns: the path "chosen" in the Save dialog.
   String? savedFile;
+  String? buildVersion;
   final StreamController<WindowState> _changes = StreamController<WindowState>.broadcast();
 
   void emit(WindowState state) {
@@ -260,6 +268,9 @@ class FakeWindowController implements WindowController {
 
   @override
   Future<WindowState> state() async => _state;
+
+  @override
+  Future<String?> appVersion() async => buildVersion;
 
   @override
   Stream<WindowState> get changes => _changes.stream;

@@ -466,6 +466,7 @@ class CompilePaths extends JsonModel {
     String? audioPipe = null,
     required String output,
     String project = '',
+    JsonMap? target,
     JsonMap extensions = const {},
   }) : super({
          'ffmpeg': ffmpeg,
@@ -473,6 +474,7 @@ class CompilePaths extends JsonModel {
          'audioPipe': audioPipe,
          'output': output,
          'project': project,
+         if (target != null) 'target': target,
          'extensions': extensions,
        });
   CompilePaths.fromJson(super.json);
@@ -481,12 +483,14 @@ class CompilePaths extends JsonModel {
   String? get audioPipe => data['audioPipe'] as String?;
   String get output => data['output'] as String;
   String get project => data['project'] as String? ?? '';
+  JsonMap? get target => data['target'] == null ? null : jsonMap(data['target']);
   CompilePaths copyWith({
     Object? ffmpeg = absent,
     Object? videoPipe = absent,
     Object? audioPipe = absent,
     Object? output = absent,
     Object? project = absent,
+    Object? target = absent,
     Object? extensions = absent,
   }) => CompilePaths.fromJson(
     changed({
@@ -495,6 +499,7 @@ class CompilePaths extends JsonModel {
       if (!identical(audioPipe, absent)) 'audioPipe': audioPipe,
       if (!identical(output, absent)) 'output': output,
       if (!identical(project, absent)) 'project': project,
+      if (!identical(target, absent)) 'target': target,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -953,6 +958,7 @@ class CompileResult extends JsonModel {
     List<String> overriddenFields = const [],
     List<ExpectedStream>? expectedStreams = null,
     String? outputContainerId = null,
+    String? outputExtension = null,
     JsonMap extensions = const {},
   }) : super({
          'executable': executable,
@@ -967,6 +973,7 @@ class CompileResult extends JsonModel {
          'overriddenFields': overriddenFields,
          'expectedStreams': expectedStreams?.map((v) => v.data).toList(),
          'outputContainerId': outputContainerId,
+         'outputExtension': outputExtension,
          'extensions': extensions,
        });
   CompileResult.fromJson(super.json);
@@ -992,6 +999,7 @@ class CompileResult extends JsonModel {
 
   /// Established output container; unknown in unscoped Advanced commands.
   String? get outputContainerId => data['outputContainerId'] as String?;
+  String? get outputExtension => data['outputExtension'] as String?;
   String get advancedTemplate => data['advancedTemplate'] as String? ?? '';
   ResolvedSettings? get resolved => data['resolved'] == null
       ? null
@@ -1019,6 +1027,7 @@ class CompileResult extends JsonModel {
     Object? overriddenFields = absent,
     Object? expectedStreams = absent,
     Object? outputContainerId = absent,
+    Object? outputExtension = absent,
     Object? extensions = absent,
   }) => CompileResult.fromJson(
     changed({
@@ -1046,6 +1055,7 @@ class CompileResult extends JsonModel {
             .toList(),
       if (!identical(outputContainerId, absent))
         'outputContainerId': outputContainerId,
+      if (!identical(outputExtension, absent)) 'outputExtension': outputExtension,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );

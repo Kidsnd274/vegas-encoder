@@ -59,14 +59,17 @@ Future<JobRecord> recordFor(RenderState state) async {
 monitorOverrides({
   LiveRenderStatus? status,
   JobRecord? record,
+  FakeJobRepository? repository,
   FakeWindowController? window,
   DesktopAppLauncher? launcher,
 }) {
   final live = FakeLiveRenderStatusReader(initial: {liveFile: status});
-  final jobs = FakeJobRepository(
-    records: [?record],
-    logs: {if (record?.logFile != null) record!.id: '[libsvtav1] Error setting preset 14\n'},
-  );
+  final jobs =
+      repository ??
+      FakeJobRepository(
+        records: [?record],
+        logs: {if (record?.logFile != null) record!.id: '[libsvtav1] Error setting preset 14\n'},
+      );
   final reveal = FakeFileReveal();
   return (
     overrides: [

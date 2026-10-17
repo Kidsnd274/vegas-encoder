@@ -1,10 +1,13 @@
 #include "core.h"
 #include <algorithm>
 #include <cmath>
+#include <cctype>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <regex>
 #include <sstream>
+#include <utility>
 
 namespace ve {
 namespace {
@@ -219,6 +222,7 @@ void Reflected(const Json& tokens, Json& res) {
     Json video = Json::array(), audio = Json::array();
     std::string kind = "video";
     for (size_t i = 0; i < tokens.size(); ++i) {
+        if (Str(tokens[i],"role") == "output") break; // Later options cannot describe this output.
         // TokenMetadata already establishes input/output option scope. Options
         // before {inputs}/-i describe that input, not the encoded output.
         if (Str(tokens[i],"stage") == "input") continue;
@@ -289,7 +293,7 @@ Json Compile(const Json& request, const Json* capabilities) {
     CheckMedia(media);
     if (!paths.is_object() || Str(paths,"ffmpeg","ffmpeg").empty() || Str(paths,"videoPipe").empty() || Str(paths,"output").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Executable, video pipe and output path must be nonempty strings.");
     Json issues = Validate(request,capabilities); const auto exe = Str(paths,"ffmpeg","ffmpeg");
-    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr},{"outputContainerId",nullptr}};
+    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr},{"outputContainerId",nullptr},{"outputExtension",nullptr}};
     if (HasErrors(Structural(r))) return result;
     const bool audioInput = Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null();
     result["inputStreams"] = audioInput ? Json::array({"video","audio"}) : Json::array({"video"});
@@ -352,7 +356,9 @@ Json Compile(const Json& request, const Json* capabilities) {
         Reflected(reflected,res);
         const bool extraInputs = std::any_of(issues.begin(),issues.end(),[](const Json& issue) { return Str(issue,"id") == "L-INPUT"; });
         const bool extraOutputs = std::any_of(issues.begin(),issues.end(),[](const Json& issue) { return Str(issue,"id") == "L-OUTPUTS"; });
-        if (extraInputs || extraOutputs) {
+        const auto output = std::find_if(reflected.begin(),reflected.end(),[](const Json& token) { return Str(token,"role") == "output"; });
+        const bool trailingOptions = output != reflected.end() && std::next(output) != reflected.end();
+        if (extraInputs || extraOutputs || trailingOptions) {
             // General stream selection/output scoping needs FFmpeg. Keep the
             // source node, but do not label another input/output as the VG stream.
             res["pixfmt"] = ""; res["videoEncoder"] = ""; res["audioEncoder"] = "";
@@ -413,7 +419,7 @@ Json Compile(const Json& request, const Json* capabilities) {
     // is required there; partial/general output scope leaves it unknown.
     if (!partialCommand && !Bool(res,"unknownOutputScope")) {
         const auto container = FindContainer(advanced ? Str(res,"container") : Str(r.at("container"),"format"));
-        if (container) result["outputContainerId"] = Str(*container,"id");
+        if (container) { result["outputContainerId"] = Str(*container,"id"); result["outputExtension"] = Str(*container,"ext"); }
     }
     // IDs are established below only after conservative stream-map qualification.
     result["summary"]["videoEncoderId"] = nullptr; result["summary"]["audioEncoderId"] = nullptr;
@@ -425,8 +431,12 @@ Json Compile(const Json& request, const Json* capabilities) {
         size_t videoMaps = 0, audioMaps = 0; bool mapped = false;
         for (size_t i = 0; i < tokens.size(); ++i) {
             if (Str(tokens[i],"field") != "command.template") continue;
+            if (Str(tokens[i],"stage") == "input") continue;
             if (!IsOption(Str(tokens[i],"text")) || (tokens[i].contains("isOption") && !Bool(tokens[i],"isOption"))) continue;
             const auto key = OptionKey(Str(tokens[i],"text"));
+            const auto option = Str(tokens[i],"text");
+            if (key == "c" && option != "-c:v" && option != "-c:a" && option != "-c:v:0" && option != "-c:a:0" &&
+                option != "-vcodec" && option != "-acodec" && option != "-codec:v" && option != "-codec:a") expectedScope = false;
             if (key == "filter_complex") expectedScope = false;
             if (key != "map") continue;
             mapped = true;
@@ -469,6 +479,76 @@ Json Compile(const Json& request, const Json* capabilities) {
         }
         if (explicitScope) for (const auto& stream : expected) {
             result["summary"][Str(stream,"kind") + "EncoderId"] = Str(stream,"encoder") == "copy" ? Json(nullptr) : stream.at("encoder");
+        }
+    }
+    const auto container = result.at("outputContainerId").is_string() ? FindContainer(result.at("outputContainerId").get<std::string>()) : nullptr;
+    if (container && caps.is_object() && caps.contains("muxers") && caps.at("muxers").is_object() &&
+        !caps.at("muxers").contains(Str(*container,"muxer")))
+        result["issues"].push_back(Issue("V-MUXER-MISSING","error",advanced ? "command.template" : "container.format",
+            "The selected FFmpeg does not list the required output muxer.",{{"muxer",Str(*container,"muxer")}}));
+    // Target constraints are transport context, never portable recipe policy.
+    const auto target = paths.value("target",Json(nullptr));
+    if (!target.is_null()) {
+        if (!target.is_object() || Str(target,"id") != "vegas-native-v1") throw Error(VE_INVALID_ARGUMENT,"TARGET","Unknown compile target.");
+        auto& targetIssues = result["issues"];
+        // Complex graphs can create arbitrary output streams, including through
+        // FFmpeg's -lavfi alias or its legacy script option. Apply native
+        // admission in both modes; portable desktop commands remain permissive.
+        const auto complexGraphOption = [](const std::string& option) {
+            const auto key = OptionKey(option.rfind("-/",0) == 0 ? "-" + option.substr(2) : option);
+            return key == "filter_complex" || key == "filter_complex_script" || key == "lavfi";
+        };
+        const auto hasComplexGraph = [&](const std::string& text) {
+            try {
+                auto words = Tokenize(text);
+                // FFmpeg's slash form loads the option's argument from a file.
+                // Normalize only for admission metadata, never the emitted argv.
+                for (auto& word : words) if (word.text.rfind("-/",0) == 0 && complexGraphOption(word.text)) word.text.erase(1,1);
+                const auto metadata = TokenMetadata(words,caps);
+                for (size_t i = 0; i < words.size(); ++i)
+                    if (Bool(metadata[i],"isOption") && complexGraphOption(words[i].text)) return true;
+            } catch (const Error&) {} // Existing lint owns malformed command text.
+            return false;
+        };
+        std::string complexGraphField;
+        if (advanced) {
+            if (std::any_of(tokens.begin(),tokens.end(),[&](const Json& token) { return Str(token,"field") == "command.template" && complexGraphOption(Str(token,"text")); }) &&
+                hasComplexGraph(Str(r.at("command"),"template"))) complexGraphField = "command.template";
+        } else {
+            for (const auto& extra : {std::pair{"video.extra",Str(r.at("video"),"extra")},std::pair{"audio[0].extra",Str(r.at("audio")[0],"extra")}}) {
+                // Only inspect fields actually emitted. Existing token metadata
+                // distinguishes an option from a quoted literal option-name value.
+                if (std::none_of(tokens.begin(),tokens.end(),[&](const Json& token) { return Str(token,"field") == extra.first && complexGraphOption(Str(token,"text")); })) continue;
+                if (hasComplexGraph(extra.second)) complexGraphField = extra.first;
+                if (!complexGraphField.empty()) break;
+            }
+        }
+        if (!complexGraphField.empty()) targetIssues.push_back(Issue("N-COMPLEX-FILTER","error",complexGraphField,
+            "Complex filter graphs are not supported by the VEGAS output. Use simple video or audio filters instead."));
+        if (advanced && container && result.at("expectedStreams").is_array()) for (const auto& stream : result.at("expectedStreams")) {
+            const auto kind = Str(stream,"kind"); const auto profile = FindProfile(kind,Str(stream,"encoder"));
+            const auto support = profile ? ContainerSupport(kind,*profile,Str(*container,"id"),caps) : "";
+            if (support == "no" || support == "warn") targetIssues.push_back(Issue("N-CONTAINER-" + kind,support == "no" ? "error" : "warn","command.template",
+                support == "no" ? "The output container cannot hold this stream in the measured FFmpeg rule set." : "This output combination depends on FFmpeg version, stream settings or player support.",{{"encoder",Str(stream,"encoder")},{"container",Str(*container,"id")}}));
+        }
+        if (!container) targetIssues.push_back(Issue("N-CONTAINER","error",advanced ? "command.template" : "container.format",
+            "VEGAS requires one explicit MP4, MKV, MOV, WebM or MXF output muxer. Put -f before {output} in Advanced mode."));
+        if (!result.at("expectedStreams").is_array() ||
+            std::count_if(result.at("expectedStreams").begin(),result.at("expectedStreams").end(),[](const Json& stream) { return Str(stream,"kind") == "video"; }) != 1 ||
+            std::any_of(result.at("expectedStreams").begin(),result.at("expectedStreams").end(),[](const Json& stream) { return Str(stream,"encoder").empty() || Str(stream,"encoder") == "copy"; }))
+            targetIssues.push_back(Issue("N-STREAMS","error",advanced ? "command.template" : "video.enabled",
+                "VEGAS requires one established video output. Use explicit video/audio codec selectors and simple maps; general maps, complex filters and audio-only outputs are not supported."));
+        if (advanced) {
+            const auto output = std::find_if(tokens.begin(),tokens.end(),[](const Json& token) { return Str(token,"role") == "output"; });
+            if (output != tokens.end() && std::next(output) != tokens.end()) targetIssues.push_back(Issue("N-OUTPUT-ORDER","error","command.template","Place all output options before the final {output} macro."));
+        }
+        if (target.contains("outputPath") && !target.at("outputPath").is_null()) {
+            if (!target.at("outputPath").is_string()) throw Error(VE_INVALID_ARGUMENT,"TARGET","Target outputPath must be text or null.");
+            auto path = Str(target,"outputPath");
+            std::transform(path.begin(),path.end(),path.begin(),[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            const auto ext = container ? Str(*container,"ext") : std::string();
+            if (container && (path.size() < ext.size() || path.compare(path.size()-ext.size(),ext.size(),ext) != 0))
+                targetIssues.push_back(Issue("N-OUTPUT-SUFFIX","error","outputPath","Change the Render As filename to end in " + ext + "; Vegas Encoder preserves the exact destination you selected.",{{"extension",ext}}));
         }
     }
     return result;

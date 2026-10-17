@@ -12,6 +12,13 @@ exporter; the app loads its own core DLL. These are a matched set, not interchan
 downloads. B6 qualification remains pending; this is installer preparation, not
 a release or an implemented Inno Setup installer.
 
+**Owner scope reconfirmed (2026-10-17):** the owner makes the finished installer.
+Agent work is limited to matched inputs/documentation plus the retained native
+multi-container feature and read-only VEGAS installation/status dashboard. The
+dashboard may consume the existing development installed-manifest format, but
+must report unknown formats/coverage as unverified. It must not implement setup,
+repair or uninstall actions or dictate a new schema for the owner's installer.
+
 ## Rebuild and stage
 
 Use the existing MSVC and Flutter SDKs without upgrading them:

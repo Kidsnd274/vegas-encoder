@@ -12,8 +12,7 @@ struct RecipeJobOptions {
   ve::Json hostHwnd = nullptr;
   bool verifyOutput = true;
   std::wstring monitorApplication;
-  std::string requiredOutputContainerId;
-  bool requiredVideoOutput = false;
+  bool nativeTarget = false;
   DWORD pipeTimeoutMs = 10000, finishTimeoutMs = 120000, probeTimeoutMs = 120000;
 };
 // Immutable, already-selected installation/capability snapshot from C7/C3; B6
@@ -55,7 +54,7 @@ class RecipeJob {
   bool cancelled_ = false, terminal_ = false, startedOnce_ = false, encoderFailure_ = false;
 };
 // Pure fact comparison, independently exercised with malformed/mismatched probes.
-ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expectedStreams);
+ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expectedStreams, const std::string& outputContainerId = {});
 // C5's nullable video facts come only from a successfully compiled, scoped
 // native-core result. No FFmpeg command or human-readable summary is parsed.
 ve::Json LiveVideoFacts(const ve::Json& compiled);

@@ -210,6 +210,14 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
   }
   void Status(const std::wstring& text) {
     statusText_ = text;
+    if (draft_) try {
+      const ve::Json media{{"video",{{"width",1920},{"height",1080},{"fps",{30000,1001}},{"pixfmt","p010le"},{"sar","1:1"}}},
+        {"audio",{{"rate",48000},{"channels",2},{"sampleFmt","f32le"}}},{"durationSec",nullptr}};
+      const ve::Json paths{{"videoPipe","preview-video"},{"audioPipe","preview-audio"},{"output","preview"}};
+      const auto compiled = ve::Compile({{"recipe",draft_->Snapshot().at("recipe")},{"media",media},{"paths",paths}});
+      const auto ext = ve::Str(compiled,"outputExtension");
+      if (!ext.empty()) statusText_ += L" Use a " + Widen(ext) + L" filename in Render As.";
+    } catch (...) { /* Preserve the useful status when malformed drafts cannot compile. */ }
     if (status_) SetWindowTextW(status_, statusText_.c_str());
   }
   void SyncButton() noexcept { if (button_) EnableWindow(button_, draft_ && !editor_ && !launching_); }

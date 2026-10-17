@@ -59,8 +59,11 @@ int wmain(int argc, wchar_t** argv) {
     Check(!options.coreVersion.empty() && options.context.at("media").is_null() && options.context.at("project").is_null(),"editor core version is owned and unestablished context stays null");
     options.beforeLaunch(); Check(fs::is_directory(options.sessionRoot),"matching real app version accepted; session root prepared");
     const auto recipe = DefaultRecipeSnapshot().at("recipe"); options.validateRecipe(recipe); ++checks;
-    auto unsupported = recipe; unsupported["container"]["format"] = "mp4";
-    Reject([&] { options.validateRecipe(unsupported); },"non-MKV candidate rejected before native draft Apply");
+    auto supported = recipe; supported["command"] = {{"mode","template"},{"template","{inputs} -c:v libx264 -c:a aac -f mp4 {output}"}};
+    options.validateRecipe(supported); ++checks;
+    Check(options.context.at("target").at("id") == "vegas-native-v1","native target reaches popup before Apply");
+    auto unsupported = recipe; unsupported["command"] = {{"mode","template"},{"template","{inputs} -c:v ffv1 -c:a pcm_f32le {output}"}};
+    Reject([&] { options.validateRecipe(unsupported); },"unknown output muxer rejected before native draft Apply");
     machine["progressWindow"] = true; Write(machineFile,machine);
     Check(LoadRecipeRuntime().monitorApplication == argv[2],"matching app monitor selected from C7 preference");
     printf("B6 C7 RUNTIME PASSED: %d checks; isolated files and real app version resource, no VEGAS\n",checks);

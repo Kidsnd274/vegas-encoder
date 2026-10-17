@@ -51,9 +51,8 @@ class JobStatus extends StatelessWidget {
 }
 
 /// The list's columns, all from the index (C6 `jobs.jsonl`). Below
-/// [compactWidth] the length and time-taken columns give way; the detail
-/// still has both. Speed (× realtime) shows in the detail only: the index
-/// has no realtime figure (workstreams/app.md, Needs).
+/// [compactWidth] the length, time-taken and speed columns give way; the
+/// detail still has the recorded figures. Legacy speed stays unknown.
 enum JobColumn {
   status('Status', 104),
   started('Started', 104),
@@ -61,6 +60,7 @@ enum JobColumn {
   encoder('Encoder', null, flex: 4),
   length('Length', 60, end: true),
   took('Took', 60, end: true),
+  speed('Speed', 60, end: true),
   size('Size', 76, end: true);
 
   const JobColumn(this.label, this.width, {this.end = false, this.flex = 1});
@@ -77,8 +77,9 @@ enum JobColumn {
 const double compactWidth = 860;
 const double _cellPad = 8;
 
-List<JobColumn> _columns(bool compact) =>
-    JobColumn.values.where((c) => !compact || (c != JobColumn.length && c != JobColumn.took)).toList();
+List<JobColumn> _columns(bool compact) => JobColumn.values
+    .where((c) => !compact || (c != JobColumn.length && c != JobColumn.took && c != JobColumn.speed))
+    .toList();
 
 Widget _cells(List<JobColumn> cols, Widget Function(JobColumn c) cell) => Row(
   children: [
@@ -279,6 +280,7 @@ class JobRow extends StatelessWidget {
       JobColumn.encoder => text(encoder, tooltip: encoder),
       JobColumn.length => text(indexDuration(e.durationSec)),
       JobColumn.took => text(indexDuration(e.elapsedSec)),
+      JobColumn.speed => text(indexSpeed(e)),
       JobColumn.size => text(size, style: e.sizeBytes == 0 ? quiet : null),
     };
 
