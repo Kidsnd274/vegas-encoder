@@ -5,6 +5,7 @@
 // either writes raw diagnostic files or streams P010/float stereo to external
 // FFmpeg. The tested phase-2 host interface remains centralized in sfio_abi.h.
 #pragma once
+#include "../../version.generated.h"
 
 #include "../abi/sfio_abi.h"
 #include "../host/template.h"
@@ -24,13 +25,13 @@ static_assert(sizeof(void*) == 8 && sizeof(LONG_PTR) == 8, "VEGAS x64 pointer wi
 namespace vegas_encoder {
 
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-inline constexpr const char* kVersion = "0.1.7-recipe-proof";
+inline constexpr const char* kVersion = VE_EXPORTER_VERSION;
 #elif defined(VEGAS_ENCODER_PROGRESS_TEXT_PROOF)
-inline constexpr const char* kVersion = "0.1.3-progress-text-proof";
+inline constexpr const char* kVersion = VE_LEGACY_PROGRESS_TEXT_VERSION;
 #elif defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
-inline constexpr const char* kVersion = "0.1.2-config-proof";
+inline constexpr const char* kVersion = VE_LEGACY_CONFIGURATION_VERSION;
 #else
-inline constexpr const char* kVersion = "0.1.1-dev";
+inline constexpr const char* kVersion = VE_LEGACY_DEFAULT_VERSION;
 #endif
 
 // Own identities (never reuse another plug-in's IDs).

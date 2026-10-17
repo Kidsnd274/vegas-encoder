@@ -2,7 +2,7 @@ name: vegas_encoder
 description: "Vegas Encoder desktop app, VEGAS popup editor and render progress window."
 publish_to: 'none'
 
-version: 0.1.0+1
+version: 0.1.7+1
 
 environment:
   sdk: ^3.13.5

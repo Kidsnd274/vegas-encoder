@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+<title id="title">Vegas Encoder — Signal bold</title>
+<desc id="desc">The same thick-to-thin signal, with a stronger silhouette and a larger conversion node.</desc>
+<rect x="3" y="3" width="58" height="58" rx="15" fill="#1D2228" stroke="#3A434E" stroke-width="2"/>
+<path d="M14 32H31" stroke="#3DB6C1" stroke-width="10" stroke-linecap="round"/>
+<path d="M32 32H50" stroke="#3DB6C1" stroke-width="4" stroke-linecap="round"/>
+<circle cx="32" cy="32" r="10" fill="#F0B04F"/>
+</svg>

@@ -1,0 +1,61 @@
+#Requires -Version 7.0
+<# Build the current product and/or stage installer inputs. Never installs or runs setup. #>
+[CmdletBinding()]
+param(
+  [ValidateSet('All','Build','Package')][string]$Action = 'All',
+  [string]$OutputDir,
+  [string]$FlutterPath = $(if (Test-Path -LiteralPath 'L:\flutter\bin\flutter.bat') { 'L:\flutter\bin\flutter.bat' } else { 'flutter.bat' }),
+  [string]$PythonPath = 'python',
+  [string]$VcVarsPath
+)
+$ErrorActionPreference = 'Stop'
+$repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+. (Join-Path $PSScriptRoot 'Version.ps1')
+. (Join-Path $PSScriptRoot 'Release-Inputs.ps1')
+$version = Get-VeBuildVersion -PythonPath $PythonPath
+if ($Action -eq 'Build' -and $OutputDir) { throw 'OutputDir is only used by All or Package.' }
+if ($Action -ne 'Build') {
+  if (-not $OutputDir) { $OutputDir = Join-Path $repo ("build/releases/vegas-encoder-$($version.app)-" + (Get-Date -Format 'yyyyMMdd-HHmmssfff')) }
+  $OutputDir = Assert-VeReleaseOutput $repo $OutputDir
+}
+$oldPython = $env:VEGAS_ENCODER_PYTHON
+$oldVcVars = $env:VEGAS_ENCODER_VCVARS
+Push-Location $repo
+try {
+  $env:VEGAS_ENCODER_PYTHON = $PythonPath
+  if ($VcVarsPath) { $env:VEGAS_ENCODER_VCVARS = (Resolve-Path -LiteralPath $VcVarsPath).Path }
+  if ($Action -ne 'Package') {
+    & $PythonPath -I scripts/Generate-Versions.py
+    if ($LASTEXITCODE -ne 0) { throw 'Version generation failed.' }
+    & $PythonPath -I scripts/Generate-CoreData.py
+    if ($LASTEXITCODE -ne 0) { throw 'Core data generation failed.' }
+    Push-Location app
+    try {
+      & $FlutterPath pub get
+      if ($LASTEXITCODE -ne 0) { throw 'Flutter dependency resolution failed.' }
+    } finally { Pop-Location }
+    # Capture after pub get and before either compiler starts.
+    $sourceBefore = Get-VeSourceState $repo | ConvertTo-Json -Depth 6 -Compress
+    cmd /d /c 'scripts\build.cmd "" release'
+    if ($LASTEXITCODE -ne 0) { throw 'Native build failed.' }
+    Push-Location app
+    try {
+      & $FlutterPath build windows --release --build-name $version.release --build-number $version.build
+      if ($LASTEXITCODE -ne 0) { throw 'App build failed.' }
+    } finally { Pop-Location }
+    $sourceAfter = Get-VeSourceState $repo
+    if ($sourceBefore -cne ($sourceAfter | ConvertTo-Json -Depth 6 -Compress)) { throw 'Source changed during build. Rebuild before packaging.' }
+    Write-VeBuildReceipt $repo $version $sourceAfter
+    Write-Output 'Product build complete: build/release/vegas-encoder and app/build/windows/x64/runner/Release'
+  }
+  if ($Action -ne 'Build') {
+    $null = Get-VeBuildVersion -PythonPath $PythonPath -CheckGenerated
+    Test-VeBuildReceipt $repo $version (Get-VeSourceState $repo)
+    & (Join-Path $PSScriptRoot 'Prepare-B7.ps1') -OutputDir $OutputDir -PythonPath $PythonPath
+    Write-Output "Installer inputs ready: $OutputDir"
+  }
+} finally {
+  Pop-Location
+  $env:VEGAS_ENCODER_PYTHON = $oldPython
+  $env:VEGAS_ENCODER_VCVARS = $oldVcVars
+}

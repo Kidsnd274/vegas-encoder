@@ -18,7 +18,11 @@ function Reject([scriptblock]$Action, [string]$Pattern) {
   Check ($caught -and $caught -match $Pattern) "Expected refusal matching '$Pattern', got '$caught'"
 }
 $manifest = Get-Content -LiteralPath "$bundle\installer-inputs.json" -Raw | ConvertFrom-Json
-Check ($manifest.numericFileVersion -eq '0.1.7.1' -and -not $manifest.installedByPreparation -and -not $manifest.releaseQualified) 'Matched version and pending gates required'
+. (Join-Path $PSScriptRoot 'Version.ps1')
+$version = Get-VeBuildVersion -CheckGenerated
+Check ($manifest.numericFileVersion -eq $version.numeric -and $manifest.app -eq $version.app -and $manifest.candidate -eq $version.exporter -and -not $manifest.installedByPreparation -and -not $manifest.releaseQualified) 'Matched version and pending gates required'
+Check (($manifest.versions.manifestSha256 -eq $version.manifestSha256) -and
+  (Get-Content -LiteralPath "$bundle\installer\version.iss" -Raw).Contains($version.numeric)) 'Central versions and setup include required'
 foreach ($record in $manifest.files) {
   $path = [IO.Path]::GetFullPath((Join-Path $bundle $record.file))
   Check ($path.StartsWith($bundle + '\', [StringComparison]::OrdinalIgnoreCase)) 'Manifest path escapes bundle'

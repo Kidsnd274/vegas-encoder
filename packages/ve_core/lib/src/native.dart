@@ -7,6 +7,7 @@ import 'api.dart';
 import 'json_model.dart';
 import 'models.dart';
 import 'native_bindings.dart';
+import 'version.g.dart';
 
 /// Isolate-local facade over the C++ core. No domain rules live in Dart.
 class NativeVeCore implements VeCore, VeCoreMacroCatalog {
@@ -33,7 +34,7 @@ class NativeVeCore implements VeCore, VeCoreMacroCatalog {
     }
     try {
       final bindings = load();
-      if (sizeOf<NativeBuffer>() != 16 || bindings.abiVersion() != 1) {
+      if (sizeOf<NativeBuffer>() != 16 || bindings.abiVersion() != expectedCoreAbi) {
         throw const CoreException(
           'ABI-MISMATCH',
           'Core ABI does not match this app.',

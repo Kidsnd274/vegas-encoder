@@ -4,7 +4,8 @@
 param(
   [Parameter(Mandatory)][string]$OutputDir,
   [string]$AppDir = (Join-Path $PSScriptRoot '..\app\build\windows\x64\runner\Release'),
-  [string]$PluginDir = (Join-Path $PSScriptRoot '..\build\recipe-proof\vegas-encoder'),
+  [string]$PluginDir = (Join-Path $PSScriptRoot '..\build\release\vegas-encoder'),
+  [string]$PythonPath = 'python',
   [string[]]$VegasDir = @('C:\Program Files\BorisFX\Vegas Pro 2026',
     'L:\Program Files\VEGAS\VEGAS Pro 23.0', 'L:\Program Files\VEGAS\VEGAS Pro 22.0',
     'L:\Program Files\VEGAS\VEGAS Pro 21.0'),
@@ -12,6 +13,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'Version.ps1')
+$version = Get-VeBuildVersion -PythonPath $PythonPath -CheckGenerated
 function Assert-PlainPath([string]$Path) {
   $full = [IO.Path]::GetFullPath($Path)
   for ($cursor = $full; $cursor; $cursor = [IO.Path]::GetDirectoryName($cursor)) {
@@ -56,10 +59,10 @@ foreach ($item in Get-ChildItem -LiteralPath $appSource -Force) {
 $nativeDll = Assert-PlainPath (Join-Path $pluginSource 'vegas-encoder.dll')
 $native = Read-Pe $nativeDll
 $frontend = Read-Pe (Join-Path $appSource 'VegasEncoder.exe')
-if ($native.ProductVersion -ne '0.1.7-recipe-proof' -or $frontend.ProductVersion -ne '0.1.7+1' -or
-    $native.FileMajorPart -ne 0 -or $native.FileMinorPart -ne 1 -or $native.FileBuildPart -ne 7 -or $native.FilePrivatePart -ne 1 -or
-    $frontend.FileMajorPart -ne 0 -or $frontend.FileMinorPart -ne 1 -or $frontend.FileBuildPart -ne 7 -or $frontend.FilePrivatePart -ne 1) {
-  throw 'Require matched native 0.1.7-recipe-proof / frontend 0.1.7+1, numeric 0.1.7.1.'
+function Numeric-Version($info) { return "$($info.FileMajorPart).$($info.FileMinorPart).$($info.FileBuildPart).$($info.FilePrivatePart)" }
+if ($native.ProductVersion -ne $version.exporter -or $frontend.ProductVersion -ne $version.app -or
+    (Numeric-Version $native) -ne $version.numeric -or (Numeric-Version $frontend) -ne $version.numeric) {
+  throw "Require matched native $($version.exporter) / frontend $($version.app), numeric $($version.numeric)."
 }
 foreach ($name in 'flutter_windows.dll','ve_core.dll','ve_windows_services.dll') { $null = Read-Pe (Join-Path $appSource $name) }
 $sourceIni = Assert-PlainPath (Join-Path $pluginSource 'vegas-encoder.ini')
@@ -88,6 +91,7 @@ if (Test-Path -LiteralPath "$pluginSource\vegas-encoder.pdb") {
 [IO.File]::WriteAllText("$output\plugin\vegas-encoder.ini", "$ini`r`nAppPath=$output\app\VegasEncoder.exe`r`nLogDir=$output\logs`r`n")
 [IO.File]::WriteAllText("$output\installer\vegas-encoder.ini.in", "$ini`r`nAppPath={app}\VegasEncoder.exe`r`n")
 [IO.File]::WriteAllText("$output\installer\VegasEncoder-x64.fio2007-config", "[FileIO Plug-Ins]`r`nvegas-encoder=FileIO Plug-Ins\vegas-encoder\vegas-encoder.dll`r`n")
+Copy-Item -LiteralPath "$repo\config\version.generated.iss" -Destination "$output\installer\version.iss"
 $files = foreach ($file in Get-ChildItem -LiteralPath "$output\app","$output\plugin","$output\installer" -Recurse -File) {
   $relative = [IO.Path]::GetRelativePath($output, $file.FullName)
   [ordered]@{file=$relative; bytes=$file.Length; sha256=(Get-FileHash -LiteralPath $file.FullName).Hash}
@@ -95,8 +99,8 @@ $files = foreach ($file in Get-ChildItem -LiteralPath "$output\app","$output\plu
 $commit = (& git -C $repo rev-parse HEAD).Trim()
 $dirty = [bool](& git -C $repo status --porcelain --untracked-files=normal)
 $manifest = [ordered]@{
-  schema='vegas-encoder-installer-inputs/1'; release='0.1.7'; candidate='0.1.7-recipe-proof'; app='0.1.7+1'
-  numericFileVersion='0.1.7.1'; architecture='x64'; sourceCommit=$commit; sourceDirty=$dirty
+  schema='vegas-encoder-installer-inputs/1'; release=$version.release; candidate=$version.exporter; app=$version.app
+  numericFileVersion=$version.numeric; versions=$version; architecture='x64'; sourceCommit=$commit; sourceDirty=$dirty
   installedByPreparation=$false; releaseQualified=$false
   openChecks=@('MXF render and MKV regression owner-skipped after all-container VEGAS value handoff confirmation',
     'two-container template restart remains unconfirmed; not an automatic owner test request',

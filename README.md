@@ -28,7 +28,9 @@ Offline tests and source consolidation do not close real-host qualification gate
 ## Build and validate
 
 For the current recipe-enabled exporter, Flutter app, core/services DLLs and
-their output paths, use [the build guide](docs/BUILDING.md). The commands below
+their output paths, use [the build guide](docs/BUILDING.md). Configure root
+`version.json`, then run `.\scripts\Build-Release.ps1` to build and stage fresh
+installer inputs. The commands below
 retain the original fixed-profile native validation workflow.
 
 Requirements: Windows x64, MSVC x64 C++17 tools plus Windows SDK, PowerShell 7,

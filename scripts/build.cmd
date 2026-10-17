@@ -27,8 +27,11 @@ if "%~2"=="progress-text-proof" (
   set "VE_BUILD_PROOF_OBJECTS=template_draft.obj proof_page.obj native_store.obj"
 )
 set "VE_BUILD_TESTS=%VE_BUILD_ROOT%\build\fiohost"
-if "%~2"=="recipe-proof" (
-  set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\recipe-proof\vegas-encoder"
+set "VE_BUILD_MODE=%~2"
+rem Retain the old argument as an alias, but never write to the legacy folder.
+if "%VE_BUILD_MODE%"=="recipe-proof" set "VE_BUILD_MODE=release"
+if "%VE_BUILD_MODE%"=="release" (
+  set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\release\vegas-encoder"
   set "VE_BUILD_PROOF_FLAGS=/DVEGAS_ENCODER_B6_RECIPE_PROOF"
   set VE_BUILD_PROOF_SOURCES="%VE_BUILD_ROOT%\src\vegas\configuration\recipe_template.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\editor_session.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\recipe_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\recipe_runtime.cpp"
   set "VE_BUILD_PROOF_OBJECTS=recipe_template.obj editor_session.obj recipe_page.obj native_store.obj recipe_runtime.obj"

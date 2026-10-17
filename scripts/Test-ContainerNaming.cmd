@@ -8,7 +8,7 @@ set "VE_NAMING_OUT=%VE_NAMING_ROOT%\build\test-results\container-naming"
 if not exist "%VE_NAMING_OUT%" mkdir "%VE_NAMING_OUT%"
 pushd "%VE_NAMING_OUT%" || exit /b 1
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 "%VE_NAMING_ROOT%\tests\host\container_naming.cpp" "%VE_NAMING_ROOT%\src\vegas\configuration\recipe_template.cpp" "%VE_NAMING_ROOT%\src\vegas\host\template.cpp" "%VE_NAMING_ROOT%\src\support\diagnostics.cpp" "%VE_NAMING_ROOT%\build\core\ve_core_static.lib" /link /OUT:container-naming.exe ole32.lib oleaut32.lib user32.lib version.lib bcrypt.lib || goto :fail
-container-naming.exe "%VE_NAMING_ROOT%\build\recipe-proof\vegas-encoder\vegas-encoder.dll" "%VE_NAMING_ROOT%\schema\fixtures\b0\core-and-services.json"
+container-naming.exe "%VE_NAMING_ROOT%\build\release\vegas-encoder\vegas-encoder.dll" "%VE_NAMING_ROOT%\schema\fixtures\b0\core-and-services.json"
 set "VE_NAMING_RESULT=%ERRORLEVEL%"
 popd
 exit /b %VE_NAMING_RESULT%

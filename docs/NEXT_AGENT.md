@@ -11,6 +11,15 @@ No separate worktree or permanent ownership split was introduced. Read [AGENTS.m
 [status](STATUS.md) and relevant contracts/specs. Former workstream handoffs are
 history; their old locations, ownership splits and queues do not apply.
 
+## Selected app icon
+
+The owner selected option A. Source: `app/assets/icon/app_icon.svg`; regenerate
+the Windows ICO/PNG and Markdown PNG using `scripts\export_app_icons.bat`.
+`--check` verifies freshness. See [icon workflow](../app/assets/icon/README.md)
+and STATUS for checks. The title-bar mark already matches A and keeps its theme
+colours. No `flutter_launcher_icons` dependency is needed. README icon/layout
+changes await the owner's later instructions; installed candidates remain intact.
+
 ## Consolidation baseline (2026-10-16)
 
 Master `86aefaf` already contained the earlier app/platform milestones. The latest
@@ -41,6 +50,35 @@ authorized a local commit of this integration checkpoint afterward. No installed
 candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
+
+**Current owner-requested build consolidation:** root `version.json` and generated
+native/Dart/pubspec/setup projections are the version source. Use
+`scripts/Build-Release.ps1` (All/Build/Package) and [BUILDING.md](BUILDING.md).
+Current exporter output is **`build/release/vegas-encoder`**, using the `release`
+build argument. The legacy `recipe-proof` argument aliases that same output;
+old folders/candidates/rollback stay intact. Packaging/receipts/tests use the
+new path. This folder change does not change version labels or host behavior.
+The unified release build/stage passes into `build/release-inputs-release-folder`
+(25 verified files); 11 receipt guards and 62 naming checks pass with a fake
+host. Receipts validate the new output and the legacy folder remains preserved.
+The owner's `setup/setup_script.iss` now includes the generated config version
+definitions for AppVersion and numeric VersionInfoVersion. Actual compiler
+validation with output disabled passes for current and changed-JSON fixtures;
+no installer executable was built or run. Compile Setup separately after the
+product build; automatic setup compilation is not part of the unified command.
+The owner explicitly added this workflow request after committing the retained
+features as `b5d66de`. Preserve installed/old staged variants and owner-added
+icon assets/scripts/runner icon; new workflow changes are uncommitted. The full
+All command passed and staged `build/release-inputs-central-versions` (25 files),
+with 8 version tests, 11 receipt guards, 66 packaging checks, 5 core/version unit
+checks, 2 unchanged About light/dark goldens and clean app/core/services analysis.
+That initial bundle predated concurrent icon changes, and Package-only correctly
+refused the stale source receipt. The final rebuild included the current icon
+and staged `build/release-inputs-central-versions-current` (all 25 hashes verified);
+Package-only then passed into `build/release-inputs-central-versions-repack`
+without recompilation. Do not rewrite receipts or mutate old bundles. See STATUS for
+the built hash and exact validation scope.
+This does not reopen other feature work or skipped/deferred host trials.
 
 The owner reduced the remaining scope on 2026-10-17 to native multi-container
 support and the read-only VEGAS installation/status dashboard. Both now have
@@ -150,8 +188,9 @@ Library-watch and capability-transfer optimizations are delivered; do not redo t
 Read the current scope above, STATUS, CONTRACTS C3, UI_SPEC §6a,
 NATIVE_CONTAINER_PLAN and CONTAINER_TRIAL. The owner closed the active container
 test queue after confirming all-container value handoff. Fresh matched inputs,
-including Profile-list UI, are ready in `build/release-inputs-profile-list`;
-next is the owner's installer build. The owner requested the current local source
+including Profile-list UI and central versions, were staged in
+`build/release-inputs-central-versions-current`; subsequent source changes require
+another unified build before the owner's installer build. The owner requested the current local source
 checkpoint; future commits still require owner authorization. Existing bundle
 manifests retain their earlier `c8e6e39` / `sourceDirty:true` creation state; do not
 rewrite them after committing. Re-stage to a fresh directory when a clean-source

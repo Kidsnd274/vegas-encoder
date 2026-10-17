@@ -41,18 +41,29 @@ packaging checks are reused; no broad suite was repeated. The fresh bundle is no
 installed and has no copied trial data/logs/rollback. Both variants retain the
 same product versions; their manifests/hashes distinguish the bytes.
 
+**Central-version workflow handoff:** `build/release-inputs-central-versions`
+was built/staged through the unified command, with 25 file records and 66 passing
+packaging checks. It includes `installer/version.iss` and the resolved central
+version object/hash. It predates concurrent icon changes. The final rebuild is in
+**`build/release-inputs-central-versions-current`**, including the current icon;
+all 25 file sizes/hashes verify. Package-only also passed into a separate fresh
+`build/release-inputs-central-versions-repack` without recompiling. Use the current
+bundle; existing bundles and installed rollback remain intact.
+
 ## Rebuild and stage
 
-Use the existing MSVC and Flutter SDKs without upgrading them:
+The current exporter source is `build/release/vegas-encoder`; the latest verified
+handoff after that path change is `build/release-inputs-release-folder` (25 files).
+All previous bundles/rollback paths remain intact.
+
+Versions are now configured in root `version.json`; generated pubspec/native
+inputs and staging checks consume it. Use the unified command with the existing
+MSVC/Flutter SDKs, without upgrading them:
 
 ```powershell
 Set-Location L:\repos\vegas-encoder
-cmd /d /c 'scripts\build.cmd "" recipe-proof'
-Push-Location app
-L:\flutter\bin\flutter.bat build windows --release --build-name 0.1.7 --build-number 1
-Pop-Location
-.\scripts\Prepare-B7.ps1 -OutputDir "$PWD\build\release-inputs-0.1.7"
-.\scripts\Test-B7.ps1 -BundleDir "$PWD\build\release-inputs-0.1.7"
+.\scripts\Build-Release.ps1 -OutputDir "$PWD\build\my-fresh-installer-inputs"
+.\scripts\Test-B7.ps1 -BundleDir "$PWD\build\my-fresh-installer-inputs"
 ```
 
 Earlier candidates remain in the retired platform checkout. Choose a **fresh**
@@ -63,6 +74,9 @@ packaged file in `installer-inputs.json`. It does not execute a payload, install
 elevate, close VEGAS or modify the source bundle. `sourceCommit` plus `sourceDirty`
 describe the source state; a clean release build must have `sourceDirty:false`.
 The manifest records open checks and `releaseQualified:false` explicitly.
+For build-only/repackage-only modes and tool overrides, see [BUILDING.md](BUILDING.md).
+The lower-level `Prepare-B7.ps1` remains available for controlled custom inputs;
+the unified command adds build-receipt/source/output freshness checks before it.
 
 ## File and destination map
 
@@ -74,6 +88,7 @@ The manifest records open checks and `releaseQualified:false` explicitly.
 | `plugin\vegas-encoder.dll` | Each selected `{vegasDir}\FileIO Plug-Ins\vegas-encoder\` |
 | `plugin\vegas-encoder.pdb` | Optional matching diagnostic symbols, same plug-in directory; omit from public setup if desired, retain privately |
 | `installer\vegas-encoder.ini.in` | Render `{app}` to setup's actual absolute directory; write as `vegas-encoder.ini` beside each DLL; hash the **rendered bytes** |
+| `installer\version.iss` | Generated version definitions for the owner's future setup; shares the manifest's resolved `versions` and `version.json` hash |
 | `installer\VegasEncoder-x64.fio2007-config` | Each selected VEGAS root, with that exact name |
 | `installer-inputs.json` | Build/verification input; not a per-target installed manifest |
 

@@ -5,6 +5,83 @@ Updated: 2026-10-18 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proo
 
 ## Current progress
 
+**Release output folder (owner request, 2026-10-18):** the product exporter now
+builds into `build/release/vegas-encoder`, selected by `build.cmd "" release`.
+The unified build, packaging defaults, receipts and naming runner use this path.
+The old `recipe-proof` argument is a compatibility alias that also writes to
+`release`; no existing legacy folder, installed candidate or rollback was moved
+or deleted. Runtime version values are unchanged. The unified native/app release
+build and staging pass. All **25** staged sizes/hashes verify in
+`build/release-inputs-release-folder`, with the packaged DLL matching the new
+release output. New receipts contain only the new path and pass validation;
+**11** fake-file receipt guards and **62** candidate-DLL naming checks (fake
+host, no real VEGAS) pass. The old folder remains intact. Native SHA-256:
+`84AFD4D18A7FFFB6B6D4913E70BCA0CC7B7278BDB6324C2C3869558951118ACF`.
+No UI/encoding behavior changed, so passed UI/engine suites were not repeated.
+No installation or existing bundle/rollback mutation was performed.
+
+**Setup version wiring (owner request, 2026-10-18):**
+`setup/setup_script.iss` now includes `config/version.generated.iss` from the
+central JSON build projection. Its display `AppVersion` uses `VeReleaseVersion`
+and Windows `VersionInfoVersion` uses `VeFileVersion`; the wizard's hardcoded
+`1.5` is removed. The installed Inno Setup compiler accepts the actual script
+with output disabled. Isolated copies also resolve current `0.1.7` / `0.1.7.1`
+and changed JSON `2.3.4` / `2.3.4.17` correctly. No installer executable was
+created or run. This only wires versions into the owner's existing setup script;
+it does not qualify installer/deployment behavior or change installed files.
+
+**Selected app icon and generation workflow (owner request, 2026-10-18):**
+option A is maintained at `app/assets/icon/app_icon.svg`. One command,
+`scripts\export_app_icons.bat`, uses existing Inkscape and Python's standard
+library to export a 256 px PNG, `docs/assets/app-icon.png` (512 px, ready for
+Markdown), and the runner's Windows ICO with nine directly rendered sizes
+(16/20/24/32/40/48/64/128/256). `--check` regenerates temporarily and detects stale
+outputs. No Flutter dependency was added: existing `Runner.rc` embeds the ICO.
+The already-matching title-bar painter retains its light/dark theme behaviour.
+The main README's icon edit awaits the owner's instructions.
+
+Validation: actual Inkscape generation and reproducibility check pass; missing
+renderer reports a nonzero error. All nine frames decode and load using real
+Windows `LoadImageW`; PNG dimensions/alpha and ICO offsets/payload bounds pass.
+The 512 px Markdown image was visually reviewed. **47** existing icon/window/
+design-system tests pass with fake core/services, including unchanged light/dark
+goldens. Windows release app build passes; resource readback confirms all nine
+embedded PNG frames match the generated ICO byte-for-byte. No app/VEGAS launch,
+installed candidate replacement, release staging or new real-host qualification
+was performed for this icon change. Generation details: [icon workflow](../app/assets/icon/README.md).
+
+**Central versions and release workflow (owner request, 2026-10-18):**
+`version.json` now owns release/build/exporter labels, core runtime/package/ABI/
+schema/contract stamps, services package metadata and retained legacy proof labels.
+Generation feeds native/Dart constants, pubspecs and a setup include. The unified
+`Build-Release.ps1` supports All/Build/Package, configured tool paths, fresh output
+directories and build receipts that reject changed version/source/output inputs.
+It never installs, replaces a candidate or runs setup. Current version values are
+preserved; this is not a new real-host compatibility result. Validation passes:
+**8** Python version/projection tests (including a changed release/core/ABI and
+invalid/stale inputs), **11** fake-file receipt/output guards, **66** packaging/
+detection checks, **5** native-core/version compatibility unit checks and **2**
+unchanged About light/dark goldens. App/core/services analysis is clean. The
+end-to-end default command completed native + release app builds and staged
+`build/release-inputs-central-versions` with **25** hash-covered inputs, including
+`installer/version.iss` and resolved version metadata. Native SHA-256:
+the final rebuilt handoff's hash is
+`4280015FA103274D34D949791BBFC52BC64BA3ADF6CAF2901A5E4AA3B5D8036C`.
+Manifest records `b5d66de`, `sourceDirty:true`, no installation/release qualification.
+The subsequent Package-only attempt correctly refused changed source after
+concurrent icon work added files and changed the runner icon; it created no output
+directory. The All path exercised the same receipt check/staging successfully
+before that source change. A subsequent full rebuild incorporated the current
+icon and staged **`build/release-inputs-central-versions-current`**, followed by
+a successful Package-only run into `build/release-inputs-central-versions-repack`
+without recompilation. All 25 final staged sizes/hashes verify. The current build
+receipt reflects that final build; do not rewrite it to bypass future source/
+output changes. Existing owner-skipped/deferred
+trials remain unchanged. New changes are uncommitted after checkpoint `b5d66de`;
+the concurrent icon work (`docs/product/design/icon-options/`, `app/assets/icon/`,
+runner icon and icon-export scripts) is preserved. No broad engine/host render
+suites were rerun. Installed trial/candidate/rollback files remain intact.
+
 **Owner-requested source checkpoint (2026-10-18):** the owner requested committing
 all current source changes, including containers, dashboard, Profile-list UI,
 tests/goldens and documentation. This changeset records that local checkpoint;
@@ -24,7 +101,7 @@ request it or resume deferred tests. No further container test is queued. The
 fresh matched handoff is prepared below; next is the owner's installer build.
 All installed trial and rollback files stay intact.
 
-**Latest installer inputs (2026-10-18):**
+**Previous installer inputs, before version consolidation (2026-10-18):**
 `build/release-inputs-profile-list` contains the containers/dashboard implementation
 and shared Profile-list refinement. Native optimized rebuild and release app build
 pass, matched at 0.1.7-recipe-proof / 0.1.7+1 (numeric 0.1.7.1). Staging's version

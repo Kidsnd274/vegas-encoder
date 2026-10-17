@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+<title id="title">Vegas Encoder — Encode frame</title>
+<desc id="desc">A video frame around an amber play symbol. A direct, familiar link to video encoding.</desc>
+<rect x="3" y="3" width="58" height="58" rx="15" fill="#1D2228" stroke="#3A434E" stroke-width="2"/>
+<path d="M24 17H16V47H24M40 17H48V47H40" fill="none" stroke="#3DB6C1" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M27 23L41 32L27 41Z" fill="#F0B04F" stroke="#F0B04F" stroke-width="2" stroke-linejoin="round"/>
+</svg>

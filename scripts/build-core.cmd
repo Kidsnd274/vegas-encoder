@@ -5,6 +5,9 @@ if not defined VE_CORE_VCVARS set "VE_CORE_VCVARS=%VEGAS_ENCODER_VCVARS%"
 if not defined VE_CORE_VCVARS if exist "L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" set "VE_CORE_VCVARS=L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
 if defined VE_CORE_VCVARS (call "%VE_CORE_VCVARS%" >nul || exit /b 1) else (where cl >nul 2>nul || exit /b 1)
 set "VE_CORE_ROOT=%~dp0.."
+set "VE_CORE_PYTHON=%VEGAS_ENCODER_PYTHON%"
+if not defined VE_CORE_PYTHON set "VE_CORE_PYTHON=python"
+"%VE_CORE_PYTHON%" -I "%~dp0Generate-Versions.py" --check || exit /b 1
 set "VE_CORE_OUT=%VE_CORE_ROOT%\build\core"
 if not exist "%VE_CORE_OUT%" mkdir "%VE_CORE_OUT%"
 pushd "%VE_CORE_OUT%" || exit /b 1

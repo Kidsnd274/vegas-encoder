@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+<title id="title">Vegas Encoder — VE monogram</title>
+<desc id="desc">A compact lettermark: a teal V beside an amber E. Simple shapes for a distinctive app identity.</desc>
+<rect x="3" y="3" width="58" height="58" rx="15" fill="#1D2228" stroke="#3A434E" stroke-width="2"/>
+<path d="M13 20L23 44L33 20" fill="none" stroke="#3DB6C1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M50 20H39V44H50M39 32H48" fill="none" stroke="#F0B04F" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

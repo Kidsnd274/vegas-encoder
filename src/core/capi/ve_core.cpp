@@ -70,7 +70,7 @@ template<class Operation> ve_status Call(const uint8_t* json, uint32_t length, v
 uint32_t ve_core_abi_version(void) { return VE_CORE_ABI_VERSION; }
 uint32_t ve_schema_max(void) { return VE_CORE_SCHEMA_MAX; }
 void ve_free(void* allocation) { std::free(allocation); }
-ve_status ve_core_version(ve_buffer* out) { return Guard(out,[&] { return JsonBytes(ve::Json{{"core","0.2.0-b2"},{"abi",1},{"schemaMax",1},{"contracts",1},{"isFake",false}},out); }); }
+ve_status ve_core_version(ve_buffer* out) { return Guard(out,[&] { return JsonBytes(ve::Json{{"core",VE_CORE_VERSION},{"abi",VE_CORE_ABI_VERSION},{"schemaMax",VE_CORE_SCHEMA_MAX},{"contracts",VE_CORE_CONTRACTS_VERSION},{"isFake",false}},out); }); }
 ve_status ve_profiles(ve_buffer* out) { return Guard(out,[&] { return JsonBytes(ve::Profiles(),out); }); }
 ve_status ve_recipe_normalize(const uint8_t* json, uint32_t length, ve_buffer* out) { return Call(json,length,out,ve::Normalize); }
 ve_status ve_recipe_validate(const uint8_t* json, uint32_t length, ve_buffer* out) { return Call(json,length,out,[](const ve::Json& r) { const auto caps = Acquire(r); return ve::Json{{"issues",ve::Validate(r,caps.get())}}; }); }

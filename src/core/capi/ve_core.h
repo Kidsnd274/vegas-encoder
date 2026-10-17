@@ -4,6 +4,7 @@
 /* Product core ABI 1, contract 1. Implemented/built in B2.
  * Portable C and C++17. No Windows or VEGAS types cross this boundary. */
 #include <stdint.h>
+#include "../../version.generated.h"
 
 #if defined(_WIN32) && defined(VE_CORE_BUILD_DLL)
 #define VE_CORE_API __declspec(dllexport)
@@ -17,8 +18,6 @@
 extern "C" {
 #endif
 
-#define VE_CORE_ABI_VERSION 1u
-#define VE_CORE_SCHEMA_MAX 1u
 #define VE_CORE_JSON_LIMIT 1048576u
 #define VE_CORE_PAYLOAD_LIMIT 16384u
 

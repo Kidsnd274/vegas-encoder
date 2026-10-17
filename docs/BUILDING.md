@@ -12,50 +12,105 @@ they are not bundled product components.
 | Flutter app: desktop, VEGAS editor popup and progress window in one executable | `app/lib`, `app/windows/runner` | `app/build/windows/x64/runner/Release/VegasEncoder.exe`, with compiled Dart code in `data/app.so` |
 | Portable C++ core: compile, validation, lint, completion and recipe/payload logic | `src/core`, Dart interface in `packages/ve_core` | App-bundled `ve_core.dll`; standalone `build/core/ve_core.dll` and `ve_core_static.lib` |
 | Windows services: file operations, GPU information and read-only VEGAS inspection | `src/services`, Dart interface in `packages/ve_services` | App-bundled `ve_windows_services.dll` |
-| VEGAS exporter: Render As integration and FFmpeg render engine | `src/vegas`, `src/engine`, `src/support` | `build/recipe-proof/vegas-encoder/vegas-encoder.dll` |
+| VEGAS exporter: Render As integration and FFmpeg render engine | `src/vegas`, `src/engine`, `src/support` | `build/release/vegas-encoder/vegas-encoder.dll` |
 
 The exporter links `ve_core_static.lib` into its DLL. It does not load the app's
 `ve_core.dll`. The engine has no separate runtime DLL. The desktop, editor popup
 and monitor use the same app executable, selected by launch arguments.
 
-## Build the current exporter and app
+## Configure versions once
+
+Edit **`version.json`** at the repository root. This is the authoritative input:
+
+| Field | Controls |
+| --- | --- |
+| `release.version` / `release.build` | App version, exporter numeric file version, staging versions and setup include |
+| `release.exporterSuffix` | Optional exporter product suffix, currently `recipe-proof`; empty removes it |
+| `core.version` / `core.packageVersion` | Core runtime stamp / Dart package metadata |
+| `core.abi` / `core.schemaMax` / `core.contracts` | Implemented compatibility levels; not release counters |
+| `services.packageVersion` | Windows services Dart package metadata |
+| `legacyExporters` | Retained historical proof variants; normal product builds do not use these |
+
+For example, release `0.1.7` and build `1` produce app `0.1.7+1` and Windows
+numeric version `0.1.7.1`. The exporter suffix adds `-recipe-proof` to its product
+label. Ordinary release bumps do not require bumping ABI/schema/contracts;
+those values must reflect actual implemented interface/format support.
+
+`scripts/Generate-Versions.py` projects this input into `src/version.generated.h`,
+the core's Dart ABI constant, all three pubspec version fields, and
+`config/version.generated.iss`. These are derived outputs, not separate settings.
+The core's API, native preflight, exporter resources and staging all consume these
+values. Core/services DLLs still have no separate Windows PE version resource;
+the core reports its runtime stamp through its API.
+
+## Build and package with one command
 
 Run in PowerShell:
 
 ```powershell
 Set-Location L:\repos\vegas-encoder
 
-# Embed the current committed schema/catalog into the C++ header.
-python -I scripts/Generate-CoreData.py
-
-# Builds the native core, then the current recipe-enabled VEGAS exporter.
-cmd /d /c 'scripts\build.cmd "" recipe-proof'
-
-# Builds the app AND its core/services DLLs through package build hooks.
-Push-Location app
-L:\flutter\bin\flutter.bat pub get
-L:\flutter\bin\flutter.bat build windows --release --build-name 0.1.7 --build-number 1
-Pop-Location
+.\scripts\Build-Release.ps1
 ```
 
-Stop if a command fails. The empty first argument to `build.cmd` lets the script
-find this machine's existing MSVC tools. To override, pass `vcvars64.bat` as the
-first argument or set `VEGAS_ENCODER_VCVARS`.
+The default `-Action All` validates/synchronizes versions, generates core data,
+resolves the pinned Flutter dependencies, builds the core and recipe-enabled
+exporter, builds the app/core/services bundle with matching version flags, writes
+a build receipt, and stages a fresh installer-input directory. It stops on failure.
+It does not upgrade tools, install, launch VEGAS, run an installer or execute tests.
 
-Use **`recipe-proof`** for the current product integration; invoking `build.cmd`
-without that argument produces the older fixed-profile development variant.
-The current exporter is `0.1.7-recipe-proof`, numeric `0.1.7.1`, and requires
-the app build stamped `0.1.7+1`. Keep the explicit app version flags: the current
-`app/pubspec.yaml` default is still `0.1.0+1`.
+```powershell
+# Compile only, retaining the output folders below.
+.\scripts\Build-Release.ps1 -Action Build
+
+# Repackage the recorded build without recompiling.
+.\scripts\Build-Release.ps1 -Action Package -OutputDir "$PWD\build\my-fresh-bundle"
+
+# Build and stage to an explicit fresh directory.
+.\scripts\Build-Release.ps1 -OutputDir "$PWD\build\my-other-fresh-bundle"
+```
+
+Without `-OutputDir`, staging chooses a new timestamped directory under
+`build/releases/`. Existing bundles are never replaced. Package-only requires
+`build/product-build.json`: it refuses changed versions, tracked build-input
+patches/commits, changed new-source path metadata, missing/added runtime files
+or changed runtime hashes. The receipt covers the complete app runtime and native
+DLL/INI/PDB. New untracked source files are tracked by path/size/mtime; commit
+source before the final release build for a stable source identity.
+
+Tool paths are configurable with `-FlutterPath`, `-PythonPath` and `-VcVarsPath`.
+Flutter defaults to the existing `L:\flutter\bin\flutter.bat` when present,
+otherwise `flutter.bat` on PATH. MSVC uses the existing build script's detection
+or `VEGAS_ENCODER_VCVARS`. No tool installation or upgrade is performed.
 
 Flutter supports these version overrides in its
 [Windows build documentation](https://docs.flutter.dev/deployment/windows).
 The actual x64 paths here are verified against this checkout's build output.
 
-## Build just the native core
+Native hooks also register the version inputs as incremental build dependencies
+and refuse stale projections, using Dart's [build-hook dependency tracking](https://dart.dev/tools/hooks).
+
+## App icon assets
+
+The selected option A SVG is `app/assets/icon/app_icon.svg`. After editing it,
+run `scripts\export_app_icons.bat` from the repository root (or invoke that batch
+file by absolute path from another folder). It exports a 256 px PNG alongside
+the source, a 512 px Markdown PNG at `docs/assets/app-icon.png`, and a multi-size
+Windows ICO directly to `app/windows/runner/resources/app_icon.ico`.
+`scripts\export_app_icons.bat --check` verifies generated files without replacing
+them. Generation needs Python and Inkscape; normal builds use the checked-in ICO.
+See [icon workflow](../app/assets/icon/README.md) for tool overrides and details.
+
+Flutter's existing `Runner.rc` embeds the ICO on the next Windows app build.
+No `flutter_launcher_icons` dependency or separate generation step is needed.
+The in-app title-bar mark already has the selected geometry and retains its
+light/dark theme colours. The main README awaits the owner's later icon instructions.
+
+## Lower-level builds and checks
 
 ```powershell
 Set-Location L:\repos\vegas-encoder
+python -I scripts/Generate-Versions.py
 python -I scripts/Generate-CoreData.py
 cmd /d /c scripts\build-core.cmd
 ```
@@ -65,6 +120,19 @@ Outputs are `build/core/ve_core.dll` and `build/core/ve_core_static.lib`.
 builds its own core DLL from the same source; building only this standalone
 core does not update an already-built app or exporter. Rebuild the affected
 consumer to incorporate core changes.
+
+For a manual exporter build, use `cmd /d /c 'scripts\build.cmd "" release'`;
+without `release` it builds the historical fixed-profile variant. The old
+`recipe-proof` argument is retained as an alias for `release`, using the same new
+output folder. Existing legacy folders/candidates are preserved. The native
+script and Flutter hooks check that generated version outputs are fresh. The
+unified command handles generation automatically. Freshness/fixture checks:
+
+```powershell
+python -I scripts/Generate-Versions.py --check
+python -I scripts/Test-Versions.py
+.\scripts\Test-ReleaseInputs.ps1
+```
 
 ## Runtime files and installer inputs
 
@@ -93,13 +161,15 @@ The exporter build folder also contains `vegas-encoder.ini`, a matching
 diagnostic files. The development INI must be rendered for the intended app path.
 
 The latest prepared bundle is
-`L:\repos\vegas-encoder\build\release-inputs-profile-list\`:
+`L:\repos\vegas-encoder\build\release-inputs-release-folder\`
+(earlier bundles are preserved):
 
 | Directory/file | Purpose |
 | --- | --- |
 | `app/` | Complete app runtime plus dependency/font notices |
 | `plugin/` | Exporter DLL, matching optional PDB and development INI |
 | `installer/vegas-encoder.ini.in` | Installer INI template; substitute the final `{app}` path |
+| `installer/version.iss` | Generated version definitions for the owner's future setup script |
 | `installer/VegasEncoder-x64.fio2007-config` | VEGAS discovery file |
 | `installer-inputs.json` | Exact file hashes, versions and source state at staging time |
 
@@ -107,6 +177,15 @@ See [installer handoff](B7_INSTALLER_INPUTS.md) for staging commands and final
 destinations. The per-host exporter goes under
 `{vegasDir}\FileIO Plug-Ins\vegas-encoder\`; the shared app has its own directory.
 Do not ship worktree paths from the development INI.
+
+The manifest includes the complete resolved version configuration and the SHA-256
+of `version.json`, alongside packaged file hashes. The owner's
+`setup/setup_script.iss` includes `config/version.generated.iss`: `AppVersion`
+uses the release version and `VersionInfoVersion` uses the four-part numeric
+version. Run the unified product build before compiling Setup in the IDE so its
+include and app binaries stay matched. Bundle-based setup can use the staged
+`installer/version.iss` equivalent. The unified command does not compile or run
+Setup automatically.
 
 Build/staging output is ignored by Git. Existing staged manifests remain records
 of their creation state even after a source commit; create a fresh bundle to

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 18 18" role="img" aria-labelledby="title desc">
+<title id="title">Vegas Encoder</title>
+<desc id="desc">A teal signal wire with an amber conversion node inside a rounded dark tile.</desc>
+<rect x="1" y="1" width="16" height="16" rx="4" fill="#1D2228" stroke="#3A434E"/>
+<path d="M3.5 9H9" stroke="#3DB6C1" stroke-width="3.2"/>
+<path d="M9 9h5.5" stroke="#3DB6C1" stroke-width="1.4"/>
+<circle cx="9" cy="9" r="2.4" fill="#F0B04F"/>
+</svg>
