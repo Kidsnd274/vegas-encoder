@@ -18,3 +18,4 @@ export 'src/windows_gpu.dart';
 export 'src/windows_services.dart';
 export 'src/capabilities.dart';
 export 'src/desktop_app.dart';
+export 'src/vegas_installations.dart';

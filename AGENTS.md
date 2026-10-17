@@ -91,8 +91,10 @@ replace an installed exporter without asking. Upgrading the Flutter SDK or other
 machine-wide tools is the owner's call.
 
 Existing sibling worktrees and `.claude/` are preserved, not active development
-locations. The installed trial's INI still points to candidate app/log files under
-`L:\repos\vegas-encoder-platform\build`; keep those candidates, isolated trial
+locations. The owner authorized the containers/dashboard trial installation on
+2026-10-18; its INI points to this checkout's `build/release-inputs-containers-dashboard`.
+The prior trial's exact rollback INI still references candidate app/log files under
+`L:\repos\vegas-encoder-platform\build`; keep both candidates, isolated trial
 data and exact rollback files intact. Do not rewrite installed paths, relocate a
 live candidate, delete old worktrees or copy their build caches as part of routine
 development. New builds/tests belong in this checkout's ignored build folders.

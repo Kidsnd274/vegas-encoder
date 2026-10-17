@@ -253,7 +253,7 @@ are flagged, not removed.
 | No audio-only renders | STATUS limits | Video can't be turned off while audio is on |
 | Color metadata unknown; HDR unqualified | ADAPTER_DATA_FLOW | BT.709 tagging only; HDR via Advanced mode with a warning |
 | Single-pass only: frames stream once | Pipe design | No two-pass modes; "two-pass via lossless intermediate" listed as Later |
-| Current class advertises `*.mkv`; broader extension-filter/default behavior remains unqualified | NATIVE_CONTAINER_PLAN | Native target accepts known MP4/MKV/MOV/WebM/MXF recipes and shows the required suffix. Render refuses a mismatched destination, preserves the exact selected path and never silently renames it. The popup has no actual Render As path to compare. Real-VEGAS qualification for new containers is pending. |
+| Five-extension advertising and template wildcard are implemented; real Render As defaults/filter behavior remains unqualified | NATIVE_CONTAINER_PLAN | Native target accepts MP4/MKV/MOV/WebM/MXF; selector 11 uses the active core-produced suffix. Render refuses a mismatched destination and preserves the exact selected path. The popup has no actual Render As path to compare. New-container real-VEGAS renders and template restart remain pending. |
 | Untested encoder/container combinations with VEGAS | Qualification gates | "Not tested with VEGAS yet" info, never blocking |
 
 ## 5. Not in v1

@@ -58,7 +58,7 @@ public SDK or richer UI framework is required for this foundation.
 | FFmpeg offline behavior | F-048: decoded fixtures, fractional rate, short reads, video-only, cancel and selected failures pass in fiohost | Fake streams are consistency tests, not real-host compatibility evidence |
 | FFmpeg real-host success | F-050: one short fixture passes on 2026.0.3.189 with installed 0.2.0 | Repeat/cancel/error, fractional/1080p and slow/long real renders remain pending |
 | Configuration UI | F-032/F-033/F-038: property-page calls observed on Voukoder Pro | Our exporter exposes zero pages; VEGAS-specific template-editing interface, ownership and commit behavior need recovery |
-| Container naming | F-050: class-wide `*.mkv` and successful MKV path; current source adds five-container core/adapter preflight with exact suffix enforcement | Writer multi-extension syntax and filter/default behavior remain unresolved; no new-container real-host qualification. See product/NATIVE_CONTAINER_PLAN.md. |
+| Container naming | F-050: working MKV path. Current recipe source advertises five extensions and returns the active template wildcard through selector 11; exact 2026 MP4 writer/host static evidence is in product/NATIVE_CONTAINER_PLAN.md | Real Render As defaults/filtering, template switching/restart and new-container renders remain unqualified. Static/fake-host checks do not pass that gate. |
 
 Keep [INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md) as the evidence authority.
 Any proposed helper or internal product interface below is an implementation
@@ -395,7 +395,7 @@ does not require an experiment note or evidence archive.
 | Configuration exchange unknown | A5 measured contract and A6 small native proof before richer editor |
 | Several native fields/flags unknown | Preserve tested values/opaque bytes and documented limits |
 | Source threads / simultaneous jobs | Caller-thread host access; no concurrent-render support claim without evidence |
-| Container-specific extensions | Core/native admission now handles five known containers; advertised filter stays MKV until exact writer-list syntax is established. Real-host naming/rendering is a separate gate. |
+| Container-specific extensions | Five-extension recipe-class list and core-derived selector-11 wildcard are implemented from exact-host static evidence. Real-host naming/rendering is a separate gate. |
 | Color/HDR/performance | No blanket guarantee; qualify independently with appropriate fixtures/measurements |
 | UI hosting | Native proof first; shared editor design after page/persistence evidence |
 | Build system | Preserve existing MSVC build first; broader packaging can follow |

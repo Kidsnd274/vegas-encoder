@@ -98,7 +98,11 @@ $manifest = [ordered]@{
   schema='vegas-encoder-installer-inputs/1'; release='0.1.7'; candidate='0.1.7-recipe-proof'; app='0.1.7+1'
   numericFileVersion='0.1.7.1'; architecture='x64'; sourceCommit=$commit; sourceDirty=$dirty
   installedByPreparation=$false; releaseQualified=$false
-  openChecks=@('real foreground close retest','controlled cancellation/failure recovery','payload capacity','monitor overhead/memory')
+  openChecks=@('MXF render and MKV regression owner-skipped after all-container VEGAS value handoff confirmation',
+    'two-container template restart remains unconfirmed; not an automatic owner test request',
+    'exact large-template save/restart sequence remains unconfirmed',
+    'owner-deferred extra failure recovery and progress-window performance trials',
+    'owner installer, runtime deployment policy, project license and release signoff')
   targets=$targets; appDestination='{app}'; pluginDestination='{vegasDir}\FileIO Plug-Ins\vegas-encoder'
   iniTemplate='installer\vegas-encoder.ini.in'; files=@($files)
 }

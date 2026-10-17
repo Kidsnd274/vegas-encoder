@@ -206,6 +206,20 @@ for (const f of [...fixtures,popupFixture]) {
   decodedPayloads[encoded] = {snapshot,migrated:false,issues:[]};
   diffs[canonical(f.recipe)+'\n'+canonical(f.recipe)] = [];
 }
+// Display metadata shares the product catalog; compiled design fixtures stay
+// illustrative. Do not maintain a second set of profile descriptions here.
+const productProfiles = JSON.parse(fs.readFileSync(path.join(root, 'schema/encoder-profiles.v1.json'), 'utf8'));
+for (const profile of profiles.video) {
+  const product = productProfiles.video.find((p) => p.id === profile.id);
+  if (!product) continue;
+  if (profile.profileQuality && product.profileQuality) {
+    profile.profileQuality.names = product.profileQuality.names;
+    if (product.profileQuality.descriptions) {
+      profile.profileQuality.descriptions = product.profileQuality.descriptions;
+      profile.profileQuality.descriptionSource = product.profileQuality.descriptionSource;
+    }
+  }
+}
 const bundle = { fixtures, additionalFixtures: [popupFixture], profiles, installations, details, lint, complete, payloads, decodedPayloads, diffs };
 const dest = path.join(root, 'schema/fixtures/b0');
 writeFile(path.join(dest, 'core-and-services.json'), JSON.stringify(bundle, null, 2) + '\n');

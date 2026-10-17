@@ -63,6 +63,8 @@ class FakeAppServices implements AppServices {
   @override
   final FakeFileReveal fileReveal = FakeFileReveal();
   @override
+  final FakeVegasInstallations vegasInstallations = FakeVegasInstallations();
+  @override
   ServicePaths? get paths => null;
 
   @override

@@ -75,6 +75,41 @@ external int _libraryMetadata(
   int capacity,
 );
 
+@Native<Int32 Function(Pointer<Uint8>, Uint32, Pointer<Uint8>, Uint32)>(
+  symbol: 've_vegas_installations',
+)
+external int _vegasInstallations(
+  Pointer<Uint8> options,
+  int length,
+  Pointer<Uint8> buffer,
+  int capacity,
+);
+
+/// System inspection stays off the UI isolate, independent of the product core.
+Future<String> readVegasInstallationJson(String options) => Isolate.run(() {
+  final bytes = utf8.encode(options);
+  if (bytes.length > 65536)
+    throw const ServiceException(
+      'VEGAS-STATUS-LIMIT',
+      'Too many candidate directory paths to inspect.',
+    );
+  final input = calloc<Uint8>(bytes.length);
+  final output = calloc<Uint8>(1048576);
+  try {
+    input.asTypedList(bytes.length).setAll(0, bytes);
+    final length = _vegasInstallations(input, bytes.length, output, 1048576);
+    if (length < 0 || length > 1048576)
+      throw ServiceException(
+        'VEGAS-STATUS',
+        'Cannot inspect VEGAS installations (native status $length).',
+      );
+    return utf8.decode(output.asTypedList(length));
+  } finally {
+    calloc.free(input);
+    calloc.free(output);
+  }
+});
+
 /// Null means the bounded fast path cannot represent this directory; use legacy
 /// enumeration in a worker. Other failures must not hide a bad library.
 String? readLibraryDirectoryMetadata(String directory) {

@@ -2,7 +2,12 @@
 
 Status: investigation complete; shared-core/native/engine/editor implementation
 is in the original checkout and passes focused offline checks and optimized builds.
-New-container real-host qualification has not started. Updated 2026-10-17
+Writer advertising and template-specific naming are now implemented and checked
+against the candidate DLL. The installed 2026.0.3.189 trial has successful
+MP4/MOV/WebM renders and owner confirmation of correct values passed to VEGAS
+for all five containers. The owner closed the active test queue; MXF render/MKV
+regression are skipped and two-container restart is unconfirmed. See STATUS for
+the exact recipe scopes. Updated 2026-10-18
 (Asia/Singapore). The earlier integration follow-ups are committed at `df1ff9a`.
 The original read-only investigation made no production or trial changes; the
 owner subsequently authorized implementation with bounded parallel agents.
@@ -12,8 +17,8 @@ Use the original checkout and one current queue. The earlier explicitly parallel
 implementation pass is complete; default to one agent unless asked otherwise.
 No new worktree is needed.
 Implementation authorization does not authorize commits, installation or VEGAS
-trials. Preserve the installed
-0.1.7 template-name-fix trial, its platform-folder paths, candidates, isolated
+trials. Preserve the installed containers/dashboard trial in this checkout and
+the prior template-name-fix trial's platform-folder paths, candidates, isolated
 data and exact rollback files. Do not reopen the owner-deferred encoder-failure
 recovery or faster-progress/performance trials. Existing large-template restart
 and other qualification limits remain unchanged.
@@ -27,14 +32,14 @@ installer. Skipped features in PRODUCT_SPEC must not be added to this naming tas
 
 MP4, MOV, WebM and MXF can use the existing evidenced P010/float-audio delivery
 interface. The former MKV-only candidate guards have been replaced in current source.
-The unresolved native issue is how VEGAS advertises, filters and chooses output
-filenames when templates select different containers. Changing FFmpeg's muxer or
+The remaining gate is real VEGAS filtering/default-name behavior and rendering
+when templates select different containers. Changing FFmpeg's muxer or
 renaming the finished output does not establish correct host integration.
 
 Recommended direction: retain the current exporter identity, resolve the active
 command's container through the shared C++ core, require the host destination's
 suffix to match it, and publish to exactly that path. Advertise a class-wide
-five-extension list only after establishing the exact-host parser syntax.
+five-extension list using the exact-host writer contract established below.
 
 ## Findings and evidence
 
@@ -52,12 +57,50 @@ five-extension list only after establishing the exact-host parser syntax.
   exclusive creation, no replacement, cancellation and verification-failure
   retention remain. C6 readback adds demuxer-family evidence, with the same
   sampled 32-packet scope; exact MP4/MOV or MKV/WebM discrimination is not claimed.
-- **Still open:** `GetStrings` ID 4 advertises `*.mkv`. Bounded exact-module
-  GetStrings/vtable/RTTI inspection establishes that AIF's semicolon list belongs
-  to its reader; its writer returns only `*.aif`. This does not establish writer
-  multi-extension syntax or prove the host parser/default behavior.
-  No delimiter, flag or per-template callback was guessed. Complete this naming
-  gate and later exact-host checks before claiming full native container support.
+- Recipe exporter `GetStrings` ID 4 now returns
+  `*.mkv;*.mp4;*.mov;*.webm;*.mxf`, keeping MKV first. Historical fixed-profile
+  proof builds still advertise only MKV. Writer selector 11 returns the active
+  recipe's wildcard through the shared core, including Advanced output identity.
+  Unknown selectors retain `E_NOTIMPL`; corrupt/unknown output cannot guess a
+  suffix. Exact destination/suffix enforcement remains the final defense.
+
+### Exact 2026 writer naming contract (static inspection)
+
+This resolves the earlier bounded naming question without loading a third-party
+module or changing the installed exporter. It is static ABI evidence, **not a
+real Render As/UI qualification**. The earlier AIF reader observation was insufficient;
+this chain is the MP4 **writer's** recovered render-class vtable and the host caller.
+
+- Exact host remains VEGAS **2026.0.3.189**, SHA-256
+  `2B93C6613E1BDD4A435B65F63E3FC0B0EAD9EDB06B45F2458C43B63F784A73AF`.
+  Installed `FileIO Plug-Ins/mp4plug3/mp4plug3.dll` SHA-256:
+  `122AE99C8CBB7828F829F8D633FF09FD305E1889AC09CF8FCEAEE93BB1EB832B`.
+  Addresses below are RVAs on these bytes, not reusable across versions.
+- MP4 constructor `0x3EEF` installs the interface table at `0x5ED90` on the
+  object's `+8` subobject. Its slot 8 points to `0x4770`, slot 10 (Create) to
+  `0x4500`, and slot 17 to `0x4A60`. GetStrings `0x4787` supplies the four-entry
+  ID/text table at `0x6BBA0`; its ID-4 entry at `0x6BBC0` points to `0x5EB40`,
+  the UTF-16 `*.mp4;*.m2ts;*.avc` list. This ties the delimiter to writer ID 4,
+  rather than inferring it from a built-in wildcard string alone.
+- Slot 17 at `0x4A7E` compares its fifth argument with **11**. The branch
+  checks the UTF-16 buffer and capacity, then copies `*.mp4` (`0x5EC90`) or
+  template-selected `*.m2ts`/`*.avc`. The capacity is in **WCHARs**, including
+  the terminator, despite the older recovered parameter name `cb`.
+- Host `0x246CBD` passes selector 11, `r9d=0x104`, a UTF-16 destination and the
+  selected template before calling vtable `+0x88` at `0x246CD6`. Other host
+  calls use `0x20` characters (`0x2752BD`/`0x2752C5`) and `0x104`
+  (`0x4605F9`/`0x460610`). These corroborate the method/argument layout.
+  Static calls do not establish every UI refresh/filter path or default update.
+- Reproduce the bounded inspection with the existing MSVC `dumpbin
+  /disasm:nobytes` on those two exact modules and inspect the listed RVAs/table
+  bytes. Ignored diagnostics are in `build/test-results/container-naming/`.
+  No new finding series or research checkout dependency was introduced.
+
+`scripts/Test-ContainerNaming.cmd` checks the actual recipe candidate DLL through
+a fake allocator/host: **62 checks**, five suffixes, Advanced precedence, class
+strings, conformance, exact/small/zero/null buffers, unknown selectors, corrupt
+snapshots, immutability and balanced host allocations. This complements the prior
+passed core/engine/fake-host FFmpeg checks; it does not repeat their render matrix.
 
 Validation results and the next queue are recorded in STATUS and NEXT_AGENT.
 The following table records the pre-implementation investigation baseline; its

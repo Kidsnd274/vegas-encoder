@@ -97,6 +97,8 @@ abstract interface class AppServices {
   /// Shows a file or folder in Explorer.
   FileReveal get fileReveal;
 
+  VegasInstallations get vegasInstallations;
+
   /// Where the services keep their files, for Settings > About; null for
   /// the fakes, which keep nothing.
   ServicePaths? get paths;
@@ -144,6 +146,8 @@ final class WindowsAppServices implements AppServices {
   late final LiveRenderStatusReader liveStatus = FileLiveRenderStatusReader();
   @override
   late final FileReveal fileReveal = WindowsFileReveal();
+  @override
+  late final VegasInstallations vegasInstallations = WindowsVegasInstallations();
 
   /// Needs the native core: a core that didn't load makes this throw
   /// `CORE-CONTRACT`, which the popup shows like any unreadable session.
@@ -177,6 +181,16 @@ final servicesProvider = Provider<AppServices>((ref) {
 });
 
 final presetLibraryProvider = Provider<PresetLibrary>((ref) => ref.watch(servicesProvider).library);
+
+final vegasInstallationsProvider = Provider<VegasInstallations>(
+  (ref) => ref.watch(servicesProvider).vegasInstallations,
+);
+final vegasInstallationStatusProvider = FutureProvider.autoDispose<VegasInstallationSnapshot>(
+  (ref) => ref.watch(vegasInstallationsProvider).inspect(),
+  // Inspection is user-refreshed; do not hide read failures behind auto retry
+  // or repeatedly hash installation files after an access error.
+  retry: (count, error) => null,
+);
 
 /// Stars and pins, built-ins included (C3 `PresetPreferences`). The library
 /// implements it, real and fake alike.

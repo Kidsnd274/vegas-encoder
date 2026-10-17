@@ -21,6 +21,11 @@ namespace vegas_encoder {
 namespace {
 
 const wchar_t kDisplayName[] = L"Vegas Encoder";
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+const wchar_t kEncodeExtensions[] = L"*.mkv;*.mp4;*.mov;*.webm;*.mxf";
+#else
+const wchar_t kEncodeExtensions[] = L"*.mkv"; // Historical fixed-profile proof.
+#endif
 
 // Private template bytes (abExtra) so our templates are recognisable.
 struct Extra {
@@ -205,7 +210,9 @@ class RenderClass final : public ISfRenderFileClass {
         switch (ids[i]) {
           case 1: s = kDisplayName; break;
           case 2: s = kDisplayName; break;
-          case 4: s = encode ? L"*.mkv" : L"*.ffdiag"; break;
+          // Exact 2026 mp4plug3 writer ID-4 table uses semicolon-separated
+          // wildcards. Keep MKV first for legacy/default class-wide naming.
+          case 4: s = encode ? kEncodeExtensions : L"*.ffdiag"; break;
           case 5: s = kDisplayName; break;
         }
         strings[i] = s ? SysAllocString(s) : nullptr;
@@ -406,10 +413,30 @@ class RenderClass final : public ISfRenderFileClass {
     });
   }
 
-  HRESULT STDMETHODCALLTYPE GetTemplateInfo(const SFTEMPLATE*, BYTE*, LONG cb, LONG type) override {
+  HRESULT STDMETHODCALLTYPE GetTemplateInfo(const SFTEMPLATE* value, BYTE* info, LONG cch, LONG type) override {
     return NativeBoundary([&]() -> HRESULT {
-      // Voukoder Pro returns E_NOTIMPL to every observed call (F-038).
-      if (LogDetail("class.17")) BestEffortDiagnostic([&] { Log("GetTemplateInfo(cb=%ld, type=%ld) -> E_NOTIMPL", cb, type); });
+      // 2026.0.3.189 mp4plug3 writer slot 17 / selector 11 returns a UTF-16
+      // wildcard for this template; capacity is WCHARs, not bytes. The host
+      // calls it with 0x104 and 0x20-character buffers. See container plan.
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      if (type == 11 && Cfg().encode) {
+        if (!info || !value) return E_POINTER;
+        if (cch <= 0) return E_INVALIDARG;
+        const wchar_t zero = L'\0';
+        memcpy(info, &zero, sizeof zero);
+        const auto snapshot = configuration::ReadRecipeSnapshot(Tpl::Copy(value), GUID_VegasEncoderType);
+        const auto extension = configuration::RecipeOutputExtension(snapshot.at("recipe"));
+        if (extension.empty()) return E_FAIL;
+        const auto wildcard = L"*" + extension;
+        if (static_cast<size_t>(cch) <= wildcard.size()) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+        memcpy(info, wildcard.c_str(), (wildcard.size() + 1) * sizeof(wchar_t));
+        return S_OK;
+      }
+#else
+      (void)value; (void)info;
+#endif
+      // Other selectors remain unestablished (F-038).
+      if (LogDetail("class.17")) BestEffortDiagnostic([&] { Log("GetTemplateInfo(cch=%ld, type=%ld) -> E_NOTIMPL", cch, type); });
       return E_NOTIMPL;
     });
   }

@@ -92,11 +92,15 @@ EncoderProfile {id,label,codec,family,blurb:string, hw:string|null, modes:string
 NumericControl {flag:string, min,max,step:number, def:number|null,
   lowerIsBetter:bool, marks:[[number,string], ...]}
 ChoiceControl {flag:string, values:string[], def:string|null, names:{value:label},
-  slowFirst:bool, slowLabel,fastLabel:string}
+  descriptions:{value:shortDescription}, slowFirst:bool, slowLabel,fastLabel:string}
 ```
 
-Encoder fields not relevant to an encoder may be omitted/null. Profile-specific
-additional facts (e.g. profileQuality.mbps1080/pixfmt, PCM bits, vendor, vbrMode)
+Encoder fields not relevant to an encoder may be omitted/null. Choice
+descriptions are optional (absent reads as an empty map). ProRes profile
+display names/descriptions share the product catalog, including in design fakes;
+the catalog retains their Apple source URL as `descriptionSource`. Encoder IDs,
+profile values and compilation semantics are unchanged.
+Additional profile facts (e.g. profileQuality.mbps1080/pixfmt, PCM bits, vendor, vbrMode)
 survive in model.data and toJson. B1's native catalog embeds 12 video/11 audio
 profiles and five containers with measured Windows option/format facts. B0 fakes
 retain their historical design samples. `qualification` identifies the help builds
@@ -814,6 +818,65 @@ built-ins, Extra arguments and disabled audio on all three supplied builds (61
 parity/reuse checks). Warm Basic FFI compile means are 2.5–2.9 ms with 27–33 KiB
 maps, versus 10.5–13.2 ms full-map means (50 calls/build). App frames and the complete 4 ms edit budget still
 need F7 measurements; the full Advanced map remains materially slower.
+
+### Read-only VEGAS installation status (2026-10-17, additive)
+
+`VegasInstallations.inspect() -> Future<VegasInstallationSnapshot>` is independent
+of the core, library and C7. The app composes it through `AppServices` and only
+watches it in Settings. A new inspection runs on entry or explicit Refresh, with
+no automatic retry after error. During refresh the UI hides old verification
+claims. No install, repair, uninstall, download or replacement API exists.
+
+`WindowsVegasInstallations` calls `ve_vegas_installations` in the bundled
+`ve_windows_services.dll` on a worker isolate. The native implementation uses
+read-only HKLM/HKCU uninstall/App Paths enumeration (both registry views), actual
+`vegas<digits>.exe` PE and version resources, and known exporter paths. Helpers
+are excluded; canonical candidate directories are deduplicated. No inspected DLL
+is loaded and no process/PowerShell/installer is launched. The implementation
+audits the discovery/install rules in the existing development scripts; it does
+not impose a new format on the owner's future installer.
+
+```text
+VegasInstallationSnapshot {hosts:VegasHostStatus[], errors:string[]}
+VegasHostStatus {name,version,executable:string, x64:bool,
+  exporterPath,discoveryPath,manifestPath:string, exporterVersion:string|null,
+  state:notInstalled|verified|unverified|changed|unreadable, details:string[]}
+```
+
+- `notInstalled`: no owned exporter/discovery files found. Failed access never
+  becomes missing. `unverified`: files present but no supported manifest or
+  invalid/unsupported identity/path/hash coverage. `changed`: required or recorded
+  files absent, recorded hashes differ, or unrecorded plug-in entries exist.
+  `unreadable`: filesystem/version/JSON/locking/link or other inspection failure.
+  Each host retains its own failure; registration/directory errors accompany
+  successfully inspected rows rather than hiding them.
+- `verified` requires a structurally valid `vegas-encoder-install/1` manifest,
+  matching product/host/plugin/discovery paths, exactly DLL+INI and optional PDB
+  without duplicate/escaping records, valid SHA-256 values, matching file bytes
+  and no unrecorded plug-in entries. Only known derived paths are read. Matching
+  version text is never an integrity check. Reparse paths are refused. This is
+  byte agreement with a local record, not an authenticated release guarantee.
+- Manifest coverage excludes the shared app/runtime. That stays unknown even
+  for a verified row. `selectedHostVersion` identifies x64 2026.0.3.189 only;
+  detection, numeric/string version agreement and byte verification establish
+  no compatibility of the current candidate or an older host.
+- Native counted-JSON input/output are limited to 64 KiB / 1 MiB, 128 candidate
+  directories, 64 hosts, 256 matching directory entries, 32 plug-in entries,
+  1 MiB manifest/version resources, 512 MiB per hashed file and 1 GiB per scan.
+  A 30-second budget is checked between registry/directory/hash operations;
+  a blocking Windows filesystem call can exceed it. UI stays off that thread.
+  All handles close before return. Global transport/bounds failures surface as
+  `ServiceException('VEGAS-STATUS', message)`; no cached verified fallback exists.
+- `FakeVegasInstallations` supplies explicit snapshots/failures and call counts
+  for app checks. Its default empty result does not inspect the user's system.
+
+API references used for the direct read-only implementation:
+[RegOpenKeyExW](https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regopenkeyexw),
+[RegEnumKeyExW](https://learn.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regenumkeyexw),
+[VerQueryValueW](https://learn.microsoft.com/en-us/windows/win32/api/winver/nf-winver-verqueryvaluew),
+[GetFileAttributesW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileattributesw).
+Current Dart filesystem and Riverpod 3 refresh/retry documentation were retrieved
+through Context7. This adds no dependency or machine-wide tool change.
 
 ## C4 — Edit sessions
 

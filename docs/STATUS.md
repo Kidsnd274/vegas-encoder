@@ -1,9 +1,164 @@
 # Vegas Encoder status
 
-Updated: 2026-10-17 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proof
-(frontend 0.1.7+1; template-name-fix variant installed on VEGAS 2026.0.3.189).
+Updated: 2026-10-18 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proof
+(frontend 0.1.7+1; containers/dashboard trial installed on VEGAS 2026.0.3.189).
 
 ## Current progress
+
+**Owner-requested source checkpoint (2026-10-18):** the owner requested committing
+all current source changes, including containers, dashboard, Profile-list UI,
+tests/goldens and documentation. This changeset records that local checkpoint;
+no push or installed-file change is authorized by it. Existing bundle manifests
+remain the original `c8e6e39` / `sourceDirty:true` staging records. A fresh staging
+directory is needed to record the new clean commit. [BUILDING.md](BUILDING.md)
+maps component responsibilities, exact commands and finished output locations.
+
+**Owner closes the container test queue (2026-10-18):** the owner reports checking
+every supported container and confirms the correct values are passed to VEGAS.
+This is real-host owner confirmation for MKV/MP4/MOV/WebM/MXF value handoff on
+the installed 2026.0.3.189 trial. The owner elects to skip the remaining MXF render
+and MKV regression; these are **skipped, not passed**. MP4/MOV/WebM successful
+render/readback evidence below remains at its actual recipe scope. The distinct
+two-container save/restart sequence remains unconfirmed; do not automatically
+request it or resume deferred tests. No further container test is queued. The
+fresh matched handoff is prepared below; next is the owner's installer build.
+All installed trial and rollback files stay intact.
+
+**Latest installer inputs (2026-10-18):**
+`build/release-inputs-profile-list` contains the containers/dashboard implementation
+and shared Profile-list refinement. Native optimized rebuild and release app build
+pass, matched at 0.1.7-recipe-proof / 0.1.7+1 (numeric 0.1.7.1). Staging's version
+guard rejected an initial app build with its default 0.1.0+1 stamp; rebuilding with
+the documented 0.1.7/1 flags resolved that before any bundle was created.
+All **24** staged file sizes/SHA-256 hashes verify. Native SHA-256:
+`8B9DB29B9A8DEC012A6C6A908B849F79327946B2107BBBDEE64C6044CFB9D201`.
+Manifest records checkpoint `c8e6e39`, `sourceDirty:true`,
+`installedByPreparation:false`, `releaseQualified:false`, and the actual skipped/
+unconfirmed/deferred checks. Earlier 63 packaging, functional and UI checks remain
+reused; no broad suites were repeated for this metadata/staging pass. The installed
+trial's DLL still matches its prior hash. This new bundle is **not installed** or
+newly real-host qualified, and carries no trial data/rollback. Source remains
+uncommitted at staging time; owner installer/runtime policy/license/release signoff remain open.
+
+**Owner-requested Profile refinement (2026-10-18):** the desktop and VEGAS popup
+share `VideoPanel` and the existing `VeSelect` / `VeListbox`. Profile-based encoders
+now use a list instead of cramped segments. All six ProRes profiles have readable
+labels and short descriptions paraphrased from [Apple](https://support.apple.com/en-us/102207),
+authored once in the core catalog and reused by design fixtures. At the owner's
+correction the encoder name remains **`prores_ks`**. Encoder/profile IDs, defaults,
+argv and input precision are unchanged. This refinement is not installed in the
+current trial; its paths and files remain intact. **Six** focused widget tests
+pass on the native core with fake platform services: desktop/popup selection,
+Reset and keyboard editing retain the generated profile value; DNxHR also uses
+the shared list when descriptions are absent. **Ten** light/dark golden images
+pass and were visually reviewed (including minimum popup/narrow desktop). The
+two existing ProRes audio goldens remain unchanged and pass. App/core-package
+analysis, generated-data freshness and Windows release app build pass. Package
+analysis initially lacked local dependency configuration; offline cached restore
+resolved it without a tracked lockfile/dependency or SDK change. No real-host UI
+qualification or new installation is claimed from these tests.
+
+**Owner-authorized installation (2026-10-18):** installed
+`build/release-inputs-containers-dashboard` using the reversible development
+installer after confirming VEGAS/Encoder were closed. All 24 candidate inputs,
+five exact rollback/baseline files and the unchanged target host hash were checked
+before mutation. Installed DLL/INI/PDB now match the candidate; installed-manifest
+and discovery hashes verify. INI app/log paths select this original-checkout
+candidate. The direct Windows service reports the installed covered files verified.
+The prior platform template-name-fix candidate/data/logs and all rollback files
+remain intact. VEGAS was launched with the new isolated, progress-window-off
+profile. Owner confirms the Render As filename changes to **`.mp4`**. First two
+attempts did not qualify a successful MP4 render: `test.mp4` already existed
+(0x80070050, preserved); `test_mp4.mp4` used a modified default recipe (`vegas-mkv`,
+H.264 plus `pcm_f32le`, not the prepared H.264/AAC trial preset). FFmpeg 5.1.2
+rejected PCM float in MP4 and exited 1; C6/C5 record the actionable codec message,
+HRESULT 0x8007006D and `published:false`. No final second output was left. Since
+the isolated profile disables the progress window, only VEGAS's generic error
+was visible; this does not qualify live failure presentation for this trial.
+The owner then changed audio to AAC and reports success. C6 job
+`C24475AA-4C26-420B-9D5C-C4E1C5D81795` records S_OK, successful publication and
+passed sampled verification for `C:\Users\Samuel Tee\Desktop\test_video\test_mp4.mp4`.
+Agent readback counts **182 video frames, 1920×1080, 30000/1001 fps**, H.264
+10-bit 4:2:0 and 48 kHz stereo AAC; full video/audio decode passes without errors.
+This used the modified default recipe with **faststart:true**. The output has
+`moov` at byte 32 before `mdat` at byte 8106, confirming faststart for this render. The owner requested keeping the progress window: isolated C7 now
+has `progressWindow:true` (revision 7), with other settings preserved and its
+prior snapshot saved in the candidate rollback folder. VEGAS error-text integration
+is left separate at the owner's direction. Performance comparison and extra
+failure-recovery trials remain deferred. The owner also confirms MOV rendered
+correctly. C6 job `0DA59B34-CD66-4153-A21B-08267D4CA81E` published
+`C:\Users\Samuel Tee\Desktop\test_video\test_mov.mov`; agent full video/audio
+decode passes. Readback is **ProRes LT**, 10-bit 4:2:2, 1920×1080, 30000/1001 fps,
+182 frames, with 48 kHz stereo 24-bit PCM (6.073 seconds). This was the owner's
+modified-default recipe, not the prepared HQ preset; other ProRes profiles are
+not thereby qualified. The owner also confirms WebM completed. C6 job
+`67F333E0-FE7A-4024-A9EA-BCB27C14E98E` succeeded and published
+`C:\Users\Samuel Tee\Desktop\test_video\test_vp9.webm`; FFmpeg exited 0,
+sampled verification passed and C5 ended `done` at 182/182 frames. Agent full
+video/audio decode passes. Readback: **VP9 Profile 2, 10-bit 4:2:0**, 1920×1080,
+30000/1001 fps, 182 frames, 48 kHz stereo Opus, 6.080 seconds, 726,231 bytes.
+This used the owner's structured modified-default recipe (`libvpx-vp9`, CRF 31,
+`-deadline good`, `libopus` 192 kb/s, `-f webm`), not the prepared Advanced
+realtime preset. FFprobe identifies the shared Matroska/WebM demuxer family;
+this readback alone does not distinguish those two container identities.
+The later owner confirmation above closes the active test queue. No complete naming
+or all-container qualification is claimed from these MP4/MOV/WebM results.
+
+**Retained features implemented at offline scope (2026-10-18):** pre-existing
+changes were committed at the owner's request as `c8e6e39`; the subsequent naming
+and dashboard work was initially uncommitted in this original checkout and is
+included in the later owner-requested checkpoint above. The later installation
+is recorded separately above. No push, new worktree or old-worktree deletion.
+
+- Recipe writer advertising is now `*.mkv;*.mp4;*.mov;*.webm;*.mxf` (MKV first).
+  The exact 2026 MP4 writer's ID-4 table establishes semicolon syntax. Its slot-17
+  selector **11**, corroborated by host callers, returns a template-specific
+  UTF-16 wildcard with capacity in WCHARs. Our callback uses the shared core's
+  active-command suffix, including Advanced; it performs no machine-settings or
+  library reads. Other selectors and historical fixed-profile proofs keep their
+  prior behavior. See [static ABI chain](product/NATIVE_CONTAINER_PLAN.md).
+- Settings now includes a read-only **VEGAS integration** dashboard: detected host
+  name/version/executable, exporter version/paths, discovery and installed-manifest
+  paths, hash verification, expandable selectable details and explicit Refresh.
+  Missing/changed, unverified/unsupported manifest, unreadable and empty/partial
+  discovery states stay distinct. Old verified claims disappear during refresh;
+  errors wait for explicit retry. The package calls direct Windows APIs on a worker
+  isolate, with no PowerShell/host/exporter launch or install/repair writes.
+  Only recorded DLL/INI/optional PDB/discovery bytes are verified; app/shared-runtime
+  coverage and host compatibility stay separate. Current-machine read-only scan:
+  five hosts; the installed 2026 trial's recorded hashes match its manifest,
+  four older hosts have no exporter; stale registration problems remain visible.
+- Focused checks pass: **62** actual candidate-DLL naming assertions with a fake
+  allocator/host; **26** real Windows API/temporary-installation service checks
+  (including same-version changed bytes, malformed/escaping/duplicate manifests,
+  missing/unrecorded files, locked-manifest isolation/recovery and input bounds);
+  **12** existing Settings widget tests and **1** display unit check, plus
+  **3** new dashboard widget tests;
+  **24** golden checks (18 new dashboard states and six Settings, light/dark).
+  All new dashboard images and the two changed Settings About images were
+  visually reviewed. Final app/service analysis is clean. Optimized native and
+  Windows release app builds pass; prior passed core/engine/fake-host FFmpeg
+  container suites were reused because their pipeline did not change.
+- Matched candidate: `build/release-inputs-containers-dashboard`, native
+  0.1.7-recipe-proof / app 0.1.7+1 (numeric 0.1.7.1). **63** packaging checks pass.
+  Native SHA-256:
+  `9799B6CD65528101788658F4CCE59354BC8BAC6D4796A6670D0A18D2D0266707`.
+  Manifest records `sourceCommit:c8e6e39`, `sourceDirty:true` and
+  `releaseQualified:false`. Five exact installed rollback files are hash-checked
+  under its `rollback/`; new isolated trial settings and five validated container
+  presets are prepared. The profile initially disabled the progress window; the
+  owner requested it enabled again. This does not resume the deferred performance
+  comparison. Installed paths now
+  select this candidate; platform candidates/data/logs and prior rollback are intact.
+
+**Qualification limits after owner acceptance:** the owner confirms all five
+containers pass the correct values to VEGAS. MXF render/MKV regression are
+owner-skipped; two different containers saved/reopened after restart remain
+unconfirmed. No new pass is inferred from static inspection, mocks or FFmpeg/fake-host
+checks. These are recorded limits, not an active test request. The installer
+remains owner-owned. Existing deferred recovery/progress trials, exact large-template
+restart uncertainty and broader A5–A8/performance/support limits below stay unchanged.
+See [focused owner checklist](CONTAINER_TRIAL.md).
 
 **Owner scope reduction (2026-10-17):** keep the implemented product and finish
 only two unfinished product features: MP4/MOV/WebM/MXF in VEGAS alongside MKV,
@@ -21,7 +176,7 @@ and [next-agent brief](NEXT_AGENT.md#next-agent-execution-brief).
 
 **Containers and carried-forward integration (2026-10-17):** the owner authorized
 three bounded implementation agents, with plans reviewed before coding and one
-shared original checkout/queue. Changes are currently uncommitted. No installed
+shared original checkout/queue. That checkpoint is now committed as `c8e6e39`. No installed
 candidate, trial data, dependency or machine-wide tool was changed.
 
 - Shared core native-target admission now accepts known MP4/MKV/MOV/WebM/MXF
@@ -36,8 +191,9 @@ candidate, trial data, dependency or machine-wide tool was changed.
   exclusive creation, no replacement and existing cleanup/retention remain.
 - Output readback records/checks the demuxer family while retaining the sampled
   32-packet scope. It does not distinguish MP4 from MOV or MKV from WebM or claim
-  a full-file decode. **Naming gate still open:** the class advertises `*.mkv`;
-  exact writer multi-extension syntax and filter/default behavior are unresolved.
+  a full-file decode. At that checkpoint the class still advertised `*.mkv`;
+  the later naming implementation above resolves writer syntax, while real UI
+  filter/default behavior remains unqualified.
   New-container real-VEGAS renders/persistence remain unqualified. Details:
   [container plan](product/NATIVE_CONTAINER_PLAN.md).
 - History Speed now comes from nullable C6 index `realtime`, including recovery

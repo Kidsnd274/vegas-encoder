@@ -19,8 +19,11 @@ void main(List<String> args) async {
         input.packageRoot
             .resolve('../../src/services/windows_gpu.cpp')
             .toFilePath(),
+        input.packageRoot
+            .resolve('../../src/services/windows_vegas.cpp')
+            .toFilePath(),
       ],
-      libraries: ['dxgi'],
+      libraries: ['dxgi', 'advapi32', 'version', 'bcrypt'],
       language: Language.cpp,
       std: 'c++17',
       flags: ['/EHsc', '/W4', '/WX', '/utf-8'],

@@ -5,6 +5,12 @@
 #include <cstring>
 
 namespace vegas_encoder::configuration {
+std::wstring RecipeOutputExtension(const ve::Json& recipe) {
+  const ve::Json media{{"video",{{"width",1920},{"height",1080},{"fps",{30000,1001}},{"pixfmt","p010le"},{"sar","1:1"}}},
+    {"audio",{{"rate",48000},{"channels",2},{"sampleFmt","f32le"}}},{"durationSec",nullptr}};
+  const ve::Json paths{{"videoPipe","preview-video"},{"audioPipe","preview-audio"},{"output","preview"}};
+  return Widen(ve::Str(ve::Compile({{"recipe",recipe},{"media",media},{"paths",paths}}),"outputExtension"));
+}
 namespace {
 void RequireTemplate(const host::Tpl& value, const GUID& owner) {
   if (!host::Tpl::Valid(value.Ptr(), value.b.size()) ||

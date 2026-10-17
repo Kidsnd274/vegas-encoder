@@ -288,7 +288,9 @@ ISfRenderFileClass : IUnknown {
                                                             const SFTEMPLATE* base,
                                                             const SFTEMPLATE* source,
                                                             LONG reason) = 0;  // 16 [rt]
-  virtual HRESULT STDMETHODCALLTYPE GetTemplateInfo(const SFTEMPLATE* tpl, BYTE* info, LONG cb,
+  // Selector 11: UTF-16 wildcard, capacity in WCHARs. Static-observed in the
+  // 2026.0.3.189 host and mp4plug3 writer; see NATIVE_CONTAINER_PLAN.md.
+  virtual HRESULT STDMETHODCALLTYPE GetTemplateInfo(const SFTEMPLATE* tpl, BYTE* info, LONG cch,
                                                     LONG type) = 0;           // 17 [rt]
   virtual HRESULT STDMETHODCALLTYPE GetPropertyPageCount(LONG* a, LONG* b, LONG* c) = 0;  // 18 [rt]
   virtual HRESULT STDMETHODCALLTYPE GetPropertyPage(LONG index, IPropertyPage** page) = 0;  // 19 [rt]

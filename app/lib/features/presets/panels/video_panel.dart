@@ -183,11 +183,12 @@ class VideoPanel extends StatelessWidget {
               onReset: s.reset('video.profile'),
               messages: s.messages(['video.profile']),
               blurb: const Text('The profile sets the data rate. There is no quality dial.'),
-              child: VeSegmented<String>(
+              child: VeSelect<String>(
                 semanticLabel: 'Profile',
-                expand: true,
-                segments: [for (final x in pq.values) VeSegment(x, choiceName(pq, x))],
-                selected: v.profile ?? s.resolved?.profile ?? pq.def,
+                options: [
+                  for (final x in pq.values) VeOption(x, choiceName(pq, x), detail: pq.descriptions[x] as String?),
+                ],
+                value: v.profile ?? s.resolved?.profile ?? pq.def,
                 onChanged: (x) => s.edit((r) => r.withVideo((v) => v.copyWith(profile: x))),
               ),
             ),

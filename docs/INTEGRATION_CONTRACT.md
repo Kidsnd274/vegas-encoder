@@ -45,10 +45,13 @@ or a third-party capture as qualification of our current binary.
 The owner-authorized 2026-10-17 container implementation adds shared C2 native
 target preflight, C4 target propagation, exact suffix/path enforcement, retained
 temporary suffixes and C6 demuxer-family readback. Core/engine/fake-host checks
-establish implementation behavior only. The class still advertises `*.mkv`;
-multi-extension writer syntax, defaults/filtering and new-container real-VEGAS
-renders remain unqualified. No new host method, selector meaning or per-template
-filename mechanism was inferred. See [container plan](product/NATIVE_CONTAINER_PLAN.md)
+establish implementation behavior only. The recipe class now advertises all five
+extensions using the exact 2026 MP4 writer's semicolon ID-4 contract. Slot 17,
+selector 11 supplies the template's core-derived UTF-16 wildcard (capacity in
+WCHARs); its MP4 writer/host static chain and exact-module identities are in the
+[container plan](product/NATIVE_CONTAINER_PLAN.md). Other selectors stay unknown.
+Real Render As defaults/filtering, switching, new-container renders and two-container
+template restart remain unqualified. See that plan
 and current STATUS for results. Existing imported observations retain their scope.
 
 B5 establishes the exact `CSfRenderProgress` text effects on the unchanged

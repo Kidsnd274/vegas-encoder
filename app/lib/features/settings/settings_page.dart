@@ -18,6 +18,7 @@ import '../../state/services.dart';
 import '../../state/settings.dart';
 import '../presets/panels/panel_kit.dart';
 import 'display.dart';
+import 'vegas_integration.dart';
 
 /// Settings (Ctrl+4): this PC's choices, stored in machine settings (C7).
 /// Appearance is app-only; the default FFmpeg and the rendering switches are
@@ -155,6 +156,8 @@ class _SettingsList extends ConsumerWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: VeSpace.s4),
+              const VegasIntegrationCard(),
               const SizedBox(height: VeSpace.s4),
               _Section(
                 title: 'About',

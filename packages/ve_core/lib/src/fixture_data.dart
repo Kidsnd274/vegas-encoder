@@ -6734,8 +6734,8 @@ const String b0FixtureJson = r'''{
           "def": "hq",
           "names": {
             "4444": "4444",
-            "proxy": "Proxy",
-            "lt": "LT",
+            "proxy": "422 Proxy",
+            "lt": "422 LT",
             "standard": "422",
             "hq": "422 HQ",
             "4444xq": "4444 XQ"
@@ -6747,7 +6747,16 @@ const String b0FixtureJson = r'''{
             "standard": 147,
             "hq": 220,
             "4444xq": 500
-          }
+          },
+          "descriptions": {
+            "4444": "High-quality full-resolution color for motion graphics and compositing.",
+            "proxy": "Compact files for offline editing and lightweight previews.",
+            "lt": "Smaller files when storage space and bandwidth are limited.",
+            "standard": "Balances image quality and file size for editing.",
+            "hq": "Preserves fine detail through repeated editing and encoding.",
+            "4444xq": "Highest data rate for demanding visual effects and HDR imagery."
+          },
+          "descriptionSource": "https://support.apple.com/en-us/102207"
         },
         "speed": null,
         "tune": null,

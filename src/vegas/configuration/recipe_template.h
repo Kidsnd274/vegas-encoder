@@ -4,6 +4,8 @@
 #include <functional>
 
 namespace vegas_encoder::configuration {
+// Active-command naming fact from the shared core; no C7 or filesystem reads.
+std::wstring RecipeOutputExtension(const ve::Json& recipe);
 
 // Used by the opt-in B6 recipe candidate. Native persistence and production
 // activation remain unqualified until the owner's real-host A5-A7 tests.

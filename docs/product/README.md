@@ -1,10 +1,11 @@
 # Vegas Encoder product plan
 
-Updated: 2026-10-17 (Asia/Singapore). Status: **being built** in the
+Updated: 2026-10-18 (Asia/Singapore). Status: **being built** in the
 original `L:\repos\vegas-encoder` checkout ([workflow](WORKSTREAMS.md)). The owner
 retired the app/platform worktree split. Current queue: [NEXT_AGENT.md](../NEXT_AGENT.md).
-The owner's 2026-10-17 scope reduction retains two unfinished product features:
-multi-container VEGAS support and the VEGAS installation/status dashboard. Other
+The owner's 2026-10-17 scope reduction retains multi-container VEGAS support and
+the VEGAS installation/status dashboard. Both are now implemented at offline
+scope; current qualification/owner trial gates are in STATUS and NEXT_AGENT. Other
 unfinished enhancements are skipped for this release; the owner builds the installer.
 See [current release scope](PRODUCT_SPEC.md#current-release-scope-owner-2026-10-17).
 This folder covers the product layer built on top of the adapter: the desktop app,

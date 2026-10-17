@@ -9,8 +9,11 @@ Matched trial: **0.1.7-recipe-proof / frontend 0.1.7+1**, Windows x64.
 Both now have numeric PE file version **0.1.7.1**. Native preflight requires that
 exact frontend version. The native core remains statically linked into the
 exporter; the app loads its own core DLL. These are a matched set, not interchangeable
-downloads. B6 qualification remains pending; this is installer preparation, not
-a release or an implemented Inno Setup installer.
+downloads. Qualification limits remain in STATUS; this is installer preparation,
+not a release or an implemented Inno Setup installer. The owner closed the active
+container test queue after confirming all five containers pass the correct values
+to VEGAS; MXF render/MKV regression are skipped, not passed, and the two-container
+template restart remains unconfirmed. Do not request those tests automatically.
 
 **Owner scope reconfirmed (2026-10-17):** the owner makes the finished installer.
 Agent work is limited to matched inputs/documentation plus the retained native
@@ -18,6 +21,25 @@ multi-container feature and read-only VEGAS installation/status dashboard. The
 dashboard may consume the existing development installed-manifest format, but
 must report unknown formats/coverage as unverified. It must not implement setup,
 repair or uninstall actions or dictate a new schema for the owner's installer.
+
+**Installed container/dashboard trial:**
+`build/release-inputs-containers-dashboard`, same matched 0.1.7 / 0.1.7+1 stamps,
+five-extension recipe writer plus template-specific wildcard and read-only Settings
+dashboard. Native/app release builds, analysis and 63 packaging checks pass.
+The manifest records checkpoint `c8e6e39` plus uncommitted source changes
+(`sourceDirty:true`); this is a review/trial input, not clean release signoff.
+The dashboard verifies the existing development installed-manifest coverage;
+shared app/runtime integrity stays unknown. See STATUS for focused checks and
+[CONTAINER_TRIAL.md](CONTAINER_TRIAL.md) for the new focused owner trial/rollback.
+
+This is the **installed trial**, preserved for continuity. The later shared
+Profile-list update is built separately; the fresh installer handoff is staged
+under `build/release-inputs-profile-list`. Use the newer handoff for the updated
+UI, preserving the installed trial and its rollback. Native/app release rebuilds
+pass with matched 0.1.7/1 stamps, and all 24 staged sizes/hashes verify. Prior 63
+packaging checks are reused; no broad suite was repeated. The fresh bundle is not
+installed and has no copied trial data/logs/rollback. Both variants retain the
+same product versions; their manifests/hashes distinguish the bytes.
 
 ## Rebuild and stage
 
@@ -79,7 +101,7 @@ at setup time; do not hardcode these local paths as universal destinations.
 
 | Local detected host | x64 | Installer eligibility now |
 | --- | --- | --- |
-| Boris FX 2026.0.3.189 | yes | Only current owner-trial target; B6 gates still open |
+| Boris FX 2026.0.3.189 | yes | Current owner-trial target; actual confirmations/skipped checks in STATUS |
 | VEGAS 23 build 278 | yes | Detection only, older-host adapter research pending |
 | VEGAS 22 build 248 | yes | Detection only |
 | VEGAS 21 build 108 | yes | Detection only |

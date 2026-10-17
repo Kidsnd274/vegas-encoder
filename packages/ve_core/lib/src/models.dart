@@ -1360,6 +1360,7 @@ class ChoiceControl extends JsonModel {
     List<String> values = const [],
     String? def = null,
     JsonMap names = const {},
+    JsonMap descriptions = const {},
     bool slowFirst = false,
     String slowLabel = '',
     String fastLabel = '',
@@ -1369,6 +1370,7 @@ class ChoiceControl extends JsonModel {
          'values': values,
          'def': def,
          'names': names,
+         'descriptions': descriptions,
          'slowFirst': slowFirst,
          'slowLabel': slowLabel,
          'fastLabel': fastLabel,
@@ -1380,6 +1382,8 @@ class ChoiceControl extends JsonModel {
       List<String>.unmodifiable((data['values'] as List? ?? []).cast<String>());
   String? get def => data['def'] as String?;
   JsonMap get names => jsonMap(data['names'] ?? <String, Object?>{});
+  JsonMap get descriptions =>
+      jsonMap(data['descriptions'] ?? <String, Object?>{});
   bool get slowFirst => data['slowFirst'] as bool? ?? false;
   String get slowLabel => data['slowLabel'] as String? ?? '';
   String get fastLabel => data['fastLabel'] as String? ?? '';
@@ -1388,6 +1392,7 @@ class ChoiceControl extends JsonModel {
     Object? values = absent,
     Object? def = absent,
     Object? names = absent,
+    Object? descriptions = absent,
     Object? slowFirst = absent,
     Object? slowLabel = absent,
     Object? fastLabel = absent,
@@ -1398,6 +1403,7 @@ class ChoiceControl extends JsonModel {
       if (!identical(values, absent)) 'values': values,
       if (!identical(def, absent)) 'def': def,
       if (!identical(names, absent)) 'names': names,
+      if (!identical(descriptions, absent)) 'descriptions': descriptions,
       if (!identical(slowFirst, absent)) 'slowFirst': slowFirst,
       if (!identical(slowLabel, absent)) 'slowLabel': slowLabel,
       if (!identical(fastLabel, absent)) 'fastLabel': fastLabel,

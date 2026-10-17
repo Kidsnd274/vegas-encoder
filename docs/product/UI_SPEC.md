@@ -137,6 +137,14 @@ encoder, Container, and File. Every panel must:
 Basic has no list of every FFmpeg option and no cross-setting search. The curated
 controls cover the common settings; anything else goes in Extra arguments.
 
+Profile-based encoders use the shared `VideoPanel` / `VeSelect` list in both the
+desktop and VEGAS popup, rather than a row of truncated segments. ProRes keeps
+the encoder name `prores_ks`. Its six profiles have full labels and short
+descriptions in the list, paraphrased from [Apple](https://support.apple.com/en-us/102207)
+and authored once in the core catalog. Profile IDs, encoding and input precision
+are unchanged; format descriptions do not promise additional source color detail
+or alpha. Keyboard selection, modified state and Reset use the existing controls.
+
 ### Extra arguments
 
 - One field per stream, in a monospace font. It is the place for any option without a
@@ -559,11 +567,11 @@ panel at the right (380 px below 1280 px).
 
 ## 6a. Settings screen
 
-**Retained upcoming work (owner, 2026-10-17): VEGAS installation/status dashboard.**
-Add a read-only VEGAS integration section; it is not implemented yet. Discover
-hosts and inspect exporter/discovery files through ve_services, keeping registry,
-filesystem and native operations out of widgets. Reuse/audit existing detection
-and development-manifest rules before choosing the service contract.
+**Implemented (2026-10-18): VEGAS installation/status dashboard.**
+The read-only VEGAS integration card follows Rendering. Hosts and exporter files
+are inspected through ve_services and its native Windows service DLL on a worker
+isolate; widgets do not access registration/files. No PowerShell or inspected
+host/exporter process is started. The contract is in CONTRACTS C3.
 
 - Show each detected host's name, actual version and executable path, plus the
   exporter/discovery paths checked and the actual DLL version when readable.
@@ -577,6 +585,9 @@ and development-manifest rules before choosing the service contract.
   finding an older VEGAS executable does not establish compatibility.
 - Include explicit Refresh and readable loading, empty and partial-error states.
   An unreadable host/manifest must not prevent other rows from being shown.
+  Refresh hides old verification claims while checking; a failed scan remains
+  visible until explicit Refresh (no automatic retry). Each row offers Show/Hide
+  paths and details, with selectable full paths and concrete verification errors.
 - This section reports status and gives installer guidance. No install, repair,
   uninstall, download or automatic replacement action is part of this task. The
   owner builds the installer; support current recorded manifests and show other

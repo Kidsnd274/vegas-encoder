@@ -27,6 +27,10 @@ Offline tests and source consolidation do not close real-host qualification gate
 
 ## Build and validate
 
+For the current recipe-enabled exporter, Flutter app, core/services DLLs and
+their output paths, use [the build guide](docs/BUILDING.md). The commands below
+retain the original fixed-profile native validation workflow.
+
 Requirements: Windows x64, MSVC x64 C++17 tools plus Windows SDK, PowerShell 7,
 Python 3.9+, and FFmpeg/FFprobe. No research checkout, captured `.tpl`, Voukoder
 installation or downloaded binary is required for build/fake tests. This machine's
