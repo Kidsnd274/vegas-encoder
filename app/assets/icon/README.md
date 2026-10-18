@@ -18,7 +18,7 @@ scripts\export_app_icons.bat --check
 
 `INKSCAPE_EXE` also overrides Inkscape; `VEGAS_ENCODER_PYTHON` overrides Python.
 No tools are installed or downloaded. The implementation is
-`scripts/Export-AppIcons.py` and uses only Python's standard library.
+`scripts/etc/Export-AppIcons.py` and uses only Python's standard library.
 `--check` renders temporary outputs and fails if any generated file is missing
 or stale, without replacing files. Check in the source and generated outputs.
 Normal app builds use the checked-in ICO and do not require Inkscape.

@@ -78,7 +78,7 @@ is the owner test's question. A successful setter HRESULT proves only a store.
 Reproduce the narrow byte/RTTI/consumer checks with standard-library Python:
 
 ```powershell
-python -I scripts/Inspect-VegasProgress.py --host 'C:\Program Files\BorisFX\Vegas Pro 2026\vegas2026.exe'
+python -I scripts/etc/Inspect-VegasProgress.py --host 'C:\Program Files\BorisFX\Vegas Pro 2026\vegas2026.exe'
 ```
 
 Optional `--dumpbin <existing-dumpbin.exe>` prints the two setter bodies. The
@@ -89,9 +89,9 @@ disassembler library or machine-wide tool installation was added.
 ## Opt-in candidate
 
 ```powershell
-cmd /d /c 'scripts\build.cmd "" progress-text-proof'
-scripts/Test-B5.ps1 -SkipBuild -HostPath 'C:\Program Files\BorisFX\Vegas Pro 2026\vegas2026.exe'
-scripts/Prepare-B5StatusLine.ps1 -OutputDir build/b5-owner-review -FFmpegPath 'C:\ffmpeg\bin\ffmpeg.exe'
+cmd /d /c 'scripts\etc\build.cmd "" progress-text-proof'
+scripts/etc/Test-B5.ps1 -SkipBuild -HostPath 'C:\Program Files\BorisFX\Vegas Pro 2026\vegas2026.exe'
+scripts/etc/Prepare-B5StatusLine.ps1 -OutputDir build/b5-owner-review -FFmpegPath 'C:\ffmpeg\bin\ffmpeg.exe'
 ```
 
 Preparation creates three separate DLL/PDB/INI candidates and `review.json` with

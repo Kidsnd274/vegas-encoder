@@ -202,8 +202,8 @@ Install or provide:
 git clone https://github.com/Kidsnd274/vegas-encoder.git
 Set-Location vegas-encoder
 flutter doctor -v
-python -I scripts/Generate-Versions.py
-python -I scripts/Generate-CoreData.py
+python -I scripts/etc/Generate-Versions.py
+python -I scripts/etc/Generate-CoreData.py
 Push-Location app
 flutter pub get
 flutter run -d windows
@@ -277,13 +277,13 @@ Choose checks relevant to your change. From the repository root:
 
 ```powershell
 # Generated versions/data and release-input guards.
-python -I scripts/Generate-Versions.py --check
-python -I scripts/Generate-CoreData.py --check
-python -I scripts/Test-Versions.py
-.\scripts\Test-ReleaseInputs.ps1
+python -I scripts/etc/Generate-Versions.py --check
+python -I scripts/etc/Generate-CoreData.py --check
+python -I scripts/etc/Test-Versions.py
+.\scripts\etc\Test-ReleaseInputs.ps1
 
 # Native core checks, after a product build.
-cmd /d /c scripts\Test-CoreNative.cmd
+cmd /d /c scripts\etc\Test-CoreNative.cmd
 
 # App analysis, widget tests, and light/dark golden comparisons.
 Push-Location app
@@ -292,16 +292,16 @@ flutter test
 Pop-Location
 
 # Staged bundle verification; this does not install it.
-.\scripts\Test-B7.ps1 -BundleDir "$PWD\build\my-installer-inputs"
+.\scripts\etc\Test-B7.ps1 -BundleDir "$PWD\build\my-installer-inputs"
 
 # Development installer checks against fake installation trees.
-.\scripts\Test-Install.ps1 -EvidenceDir build\test-results\installer-new
+.\scripts\etc\Test-Install.ps1 -EvidenceDir build\test-results\installer-new
 ```
 
 For deliberate UI changes, review both themes before updating golden baselines
 with `flutter test --update-goldens test/golden` from `app/`. Package checks and
-FFmpeg/engine runners live under `packages/*/test/` and `scripts/Test-*.ps1` /
-`scripts/Test-*.py`; use the component-specific instructions in the build and
+FFmpeg/engine runners live under `packages/*/test/` and `scripts/etc/Test-*.ps1` /
+`scripts/etc/Test-*.py`; use the component-specific instructions in the build and
 product docs. Test runners may need explicit tool paths on another machine.
 Use fresh test-output folders; `-EvidenceDir` is the legacy name for that folder.
 

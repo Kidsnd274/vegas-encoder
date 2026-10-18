@@ -5,12 +5,12 @@
     "sha256": "B1878936BB48655CE7D97CF81C6C2D59225B9A8404A685A0AB4BB639E8AC4B56"
   },
   {
-    "path": "scripts/Check-EncodedRender.py",
+    "path": "scripts/etc/Check-EncodedRender.py",
     "bytes": 9110,
     "sha256": "2742A85627B09457EB7E10ADE8C68E15EB292CD59BDCB33AEA573BCBFB0C9507"
   },
   {
-    "path": "scripts/Check-RawRender.py",
+    "path": "scripts/etc/Check-RawRender.py",
     "bytes": 35161,
     "sha256": "9CE9354EC8B5771F6BC4DE5B83623D6858B4E204BC0DEEFA9BCFFDCA15369D2F"
   },
@@ -20,32 +20,32 @@
     "sha256": "EA27296BB8DC28195E615D69FE1870BE8183289002290DF660F9B7C016734946"
   },
   {
-    "path": "scripts/Make-BaselineMedia.py",
+    "path": "scripts/etc/Make-BaselineMedia.py",
     "bytes": 3855,
     "sha256": "8C14C135AE1A22D3566C99E0AA27DD0740C2E3E869D56CDD2513301EBC7F15A4"
   },
   {
-    "path": "scripts/Make-HostTemplate.py",
+    "path": "scripts/etc/Make-HostTemplate.py",
     "bytes": 1606,
     "sha256": "5777CF1ECA5FB41549FC113B1F0791008A026B6887C3FA6647F25A0EB1583F71"
   },
   {
-    "path": "scripts/Test-Check-RawRender.py",
+    "path": "scripts/etc/Test-Check-RawRender.py",
     "bytes": 10867,
     "sha256": "E926F1F9F5767823B3DDE0BA5CB3F435FC58AAEA1239622F72B49DCCDC04329E"
   },
   {
-    "path": "scripts/Test-Install.ps1",
+    "path": "scripts/etc/Test-Install.ps1",
     "bytes": 6245,
     "sha256": "E706FDE1B45DDA9231810369B31B77EA5991F18FA17E303ABC1E47355E6C4FB2"
   },
   {
-    "path": "scripts/Test-VegasEncoder.ps1",
+    "path": "scripts/etc/Test-VegasEncoder.ps1",
     "bytes": 11410,
     "sha256": "C8D5140E1400D6147A79485C7E4FA10CB57E42D687FE0B2A148CCCF3971BD102"
   },
   {
-    "path": "scripts/build.cmd",
+    "path": "scripts/etc/build.cmd",
     "bytes": 2352,
     "sha256": "6BC6A82AC078F07161765B5EF9704121836E7A2D55C1937C153F847ED8CAD6F7"
   },

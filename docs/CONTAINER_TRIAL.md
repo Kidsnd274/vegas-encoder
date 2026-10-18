@@ -45,7 +45,7 @@ $trial = 'L:\repos\vegas-encoder\build\release-inputs-containers-dashboard'
 .\scripts\Install-VegasEncoder.ps1 `
   -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' `
   -BuildDir "$trial\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
 ```
 
 The development installer requests elevation and refuses changed/unrecorded
@@ -108,7 +108,7 @@ $vegas = 'C:\Program Files\BorisFX\Vegas Pro 2026'
 # Restore the exact old manifest as well as the old DLL/INI/PDB/discovery bytes.
 Copy-Item -LiteralPath "$trial\rollback\plugin\install-manifest.json" `
   -Destination "$vegas\FileIO Plug-Ins\vegas-encoder\install-manifest.json"
-.\scripts\Start-B6Trial.ps1 -Target Vegas `
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas `
   -CandidateRoot 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.7-template-name-fix'
 ```
 

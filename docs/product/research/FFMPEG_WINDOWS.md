@@ -165,8 +165,8 @@ Corrections made by B1:
 
 ## Reproduction and limits
 
-Run `scripts/Capture-FFmpegFacts.py <exe> <source-url> <fresh-build-folder>`, then
-`scripts/Test-FFmpegMatrix.py <exe> <capture-folder>` per build.
+Run `scripts/etc/Capture-FFmpegFacts.py <exe> <source-url> <fresh-build-folder>`, then
+`scripts/etc/Test-FFmpegMatrix.py <exe> <capture-folder>` per build.
 `Generate-WindowsFFmpegData.py` takes older gyan, current gyan and current BtbN
 folders in that order; `Generate-CoreData.py` embeds the promoted data.
 After `build-core.cmd`, `Test-CoreFFmpegProfiles.py` exercises native-generated

@@ -5,7 +5,7 @@
 // mode 0, no handle, lock value = data pointer, rows bottom-up, F-041), a
 // 176-byte frame info, frame locks released through slot 15, exporter-filled
 // audio tokens (mode 0, caller PID). Pixel content is the baseline fixture
-// from scripts/Make-BaselineMedia.py so scripts/Check-RawRender.py --fixture
+// from scripts/etc/Make-BaselineMedia.py so scripts/etc/Check-RawRender.py --fixture
 // can validate the exporter's output. Slot-6 cancel now follows F-045 and
 // a final audio read returns S_FALSE with data (F-041).
 #include "fakehost.h"

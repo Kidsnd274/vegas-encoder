@@ -11,8 +11,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-. (Join-Path $PSScriptRoot 'Version.ps1')
-. (Join-Path $PSScriptRoot 'Release-Inputs.ps1')
+. (Join-Path $PSScriptRoot 'etc\Version.ps1')
+. (Join-Path $PSScriptRoot 'etc\Release-Inputs.ps1')
 $version = Get-VeBuildVersion -PythonPath $PythonPath
 if ($Action -eq 'Build' -and $OutputDir) { throw 'OutputDir is only used by All or Package.' }
 if ($Action -ne 'Build') {
@@ -26,9 +26,9 @@ try {
   $env:VEGAS_ENCODER_PYTHON = $PythonPath
   if ($VcVarsPath) { $env:VEGAS_ENCODER_VCVARS = (Resolve-Path -LiteralPath $VcVarsPath).Path }
   if ($Action -ne 'Package') {
-    & $PythonPath -I scripts/Generate-Versions.py
+    & $PythonPath -I scripts/etc/Generate-Versions.py
     if ($LASTEXITCODE -ne 0) { throw 'Version generation failed.' }
-    & $PythonPath -I scripts/Generate-CoreData.py
+    & $PythonPath -I scripts/etc/Generate-CoreData.py
     if ($LASTEXITCODE -ne 0) { throw 'Core data generation failed.' }
     Push-Location app
     try {
@@ -37,9 +37,9 @@ try {
     } finally { Pop-Location }
     # Capture after pub get and before either compiler starts.
     $sourceBefore = Get-VeSourceState $repo | ConvertTo-Json -Depth 6 -Compress
-    cmd /d /c 'scripts\build.cmd "" release'
+    cmd /d /c 'scripts\etc\build.cmd "" release'
     if ($LASTEXITCODE -ne 0) { throw 'Native build failed.' }
-    cmd /d /c scripts\Build-SetupHelper.cmd
+    cmd /d /c scripts\etc\Build-SetupHelper.cmd
     if ($LASTEXITCODE -ne 0) { throw 'Setup helper build failed.' }
     Push-Location app
     try {
@@ -55,7 +55,7 @@ try {
   if ($Action -ne 'Build') {
     $null = Get-VeBuildVersion -PythonPath $PythonPath -CheckGenerated
     Test-VeBuildReceipt $repo $version (Get-VeSourceState $repo)
-    & (Join-Path $PSScriptRoot 'Prepare-B7.ps1') -OutputDir $OutputDir -PythonPath $PythonPath
+    & (Join-Path $PSScriptRoot 'etc\Prepare-B7.ps1') -OutputDir $OutputDir -PythonPath $PythonPath
     Write-Output "Installer inputs ready: $OutputDir"
     & (Join-Path $PSScriptRoot 'Build-Installer.ps1') -BundleDir $OutputDir -IsccPath $IsccPath
   }

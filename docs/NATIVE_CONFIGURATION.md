@@ -117,12 +117,12 @@ to the existing `.vegas-encoder.json` sidecar. No encoding format changes.
 Build and focused checks from the product checkout:
 
 ```powershell
-cmd /d /c scripts\build.cmd
-cmd /d /c scripts\build-configuration-proof.cmd
+cmd /d /c scripts\etc\build.cmd
+cmd /d /c scripts\etc\build-configuration-proof.cmd
 .\build\host-tests\native-configuration.exe
 .\build\host-tests\host-helpers.exe
 .\build\host-tests\native-boundary.exe
-.\scripts\Test-ConfigurationProof.ps1 -OutputDir build\test-results\configuration-proof-new
+.\scripts\etc\Test-ConfigurationProof.ps1 -OutputDir build\test-results\configuration-proof-new
 ```
 
 Both default and opt-in x64 C++17 `/W4 /WX` builds pass. The corrected opt-in build

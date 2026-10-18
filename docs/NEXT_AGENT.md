@@ -52,6 +52,22 @@ candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
 
+**Current scripts layout (owner request, 2026-10-18):** the pre-cleanup installer
+checkpoint is committed/pushed as `392493d`. The five routine entry points stay
+at `scripts/`; supporting builds, generators, tests and old trial utilities are
+under `scripts/etc/`. Use [scripts/README.md](../scripts/README.md) and the updated
+active commands. Historical experiment/workstream commands and frozen bundles
+retain their creation-time paths; do not rewrite their records. Native hooks
+import `scripts/etc/version_hook.dart`. STATUS records the focused checks and
+the unavailable historical B3 parser-capture input. This organization does not
+resume deferred trials or authorize installing anything.
+Full native/helper/Flutter build and Inno compilation pass through the new
+layout into `build/release-inputs-scripts-layout` (32 files), with **81** packaging
+checks, **5** input guards and the wizard harness passing. Latest compiled
+installer is `dist/VegasEncoder-0.1.7.1-windows-x64-setup-20261018-140036555.exe`
+with its provenance sidecar. Product Setup was not run. Older bundles remain
+unchanged records; do not rewrite their source state after committing.
+
 **Latest installer fix (2026-10-18):** the owner's startup error is fixed by
 separating path-independent detection/validation requests from app lifecycle
 requests; `InitializeWizard` no longer expands the early `app` constant. An
@@ -62,7 +78,8 @@ protected ProgramData, with exact transactional rollback and cross-app ownership
 guards. Keep the combined setup AppId stable. The current wizard still manages
 one VEGAS 2026 target; future split/multi-host installers must explicitly migrate
 uninstaller ownership and app dependencies (see [INSTALLER.md](INSTALLER.md)).
-This does not authorize installation, commits or new host compatibility claims.
+The owner later authorized committing/pushing this checkpoint as `392493d`;
+installation and new host compatibility claims remain separate.
 The full release rebuild and Inno compile pass into fresh
 `build/release-inputs-setup-identity` (32 files); **81** packaging/detection checks
 and **5** frozen-input refusal checks pass. Latest corrected installer:
@@ -83,8 +100,8 @@ checks and retained rollback transactions. See [installer behavior](INSTALLER.md
 
 `scripts/Build-Release.ps1` All/Package now compiles a verified frozen bundle to
 `dist/` using the existing Inno compiler; it never runs Setup. Build is compile
-only. Source/output receipts include setup inputs and the helper. Current work
-is uncommitted; do not commit again without owner direction. Preserve concurrent
+only. Source/output receipts include setup inputs and the helper. This work
+was committed/pushed as `392493d` before the scripts cleanup. Preserve concurrent
 README work and all old bundles, worktrees, installed candidate and rollback.
 
 Focused checks pass: 26 confined native helper fixtures (including Unicode INI

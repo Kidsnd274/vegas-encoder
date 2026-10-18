@@ -24,7 +24,7 @@ After closing VEGAS and Encoder windows, install and launch:
 Set-Location L:\repos\vegas-encoder
 $trial = 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.7-faster-progress'
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
 ```
 
 Render a normal working preset to a fresh filename and observe progress updates.
@@ -40,7 +40,7 @@ after closing VEGAS/Encoder:
 
 ```powershell
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\rollback\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.7-template-name-fix'
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.7-template-name-fix'
 ```
 
 ## Immediate large-preset reopen fix (2026-10-16; installed, owner-confirmed)
@@ -66,7 +66,7 @@ Installation commands retained for reference:
 Set-Location L:\repos\vegas-encoder-platform
 $trial = "$PWD\build\b6-candidate-0.1.7-template-name-fix"
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
 ```
 
 Next, save the applied **B6 capacity 16000** as a new disposable VEGAS template,
@@ -75,7 +75,7 @@ then relaunch with the matching profile:
 
 ```powershell
 Set-Location L:\repos\vegas-encoder-platform
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.7-template-name-fix"
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.7-template-name-fix"
 ```
 
 Select that saved template, reopen the editor and check the visible encoding
@@ -100,7 +100,7 @@ Rollback after closing VEGAS/Encoder:
 
 ```powershell
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\rollback\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.7-error-ui"
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.7-error-ui"
 ```
 
 The current next check is save/restart/end-marker integrity above.
@@ -154,7 +154,7 @@ After closing VEGAS and all Encoder windows, the owner installs/launches:
 Set-Location L:\repos\vegas-encoder-platform
 $trial = "$PWD\build\b6-candidate-0.1.7-error-ui"
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
 ```
 
 Repeat the disposable invalid-filter recipe with a fresh output filename.
@@ -168,7 +168,7 @@ Rollback after closing VEGAS/Encoder:
 
 ```powershell
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\rollback\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.7-error-fix"
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.7-error-fix"
 ```
 
 The earlier candidate instructions below are retained as historical checkpoints.
@@ -196,7 +196,7 @@ After closing VEGAS and Encoder windows, the owner installs/launches:
 Set-Location L:\repos\vegas-encoder-platform
 $trial = "$PWD\build\b6-candidate-0.1.7-error-fix"
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
 ```
 
 Repeat the disposable bad-filter template to a fresh output name. The monitor
@@ -210,7 +210,7 @@ To restore the original 0.1.7, close VEGAS/Encoder and run:
 
 ```powershell
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\rollback\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.7"
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.7"
 ```
 
 The earlier instructions below describe the original 0.1.7 checkpoints.
@@ -246,7 +246,7 @@ Close VEGAS and all trial app/editor/monitor windows, then manually install:
 Set-Location L:\repos\vegas-encoder-platform
 $trial = "$PWD\build\b6-candidate-0.1.7"
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot $trial
 ```
 
 1. Open an existing working template's editor. Switch to the full-screen app,
@@ -327,7 +327,7 @@ VEGAS limit; refine the boundary only if needed after this bounded pass.
 The toggle is in the **separate desktop app**, not the template popup:
 
 ```powershell
-.\scripts\Start-B6Trial.ps1 -Target App -CandidateRoot $trial
+.\scripts\etc\Start-B6Trial.ps1 -Target App -CandidateRoot $trial
 ```
 
 Settings → Rendering → **Show a progress window during renders**. Use the existing
@@ -345,7 +345,7 @@ Rollback after closing VEGAS/app windows uses the existing reversible installer:
 
 ```powershell
 .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir "$trial\rollback\plugin" -Update
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.6"
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot "$PWD\build\b6-candidate-0.1.6"
 ```
 
 The original discovery file/manifest and `rollback\backup-sha256.json` are retained;
@@ -410,7 +410,7 @@ owner's successful test.
    ```powershell
    Set-Location L:\repos\vegas-encoder-platform
    .\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -BuildDir 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.6\plugin' -Update
-   .\scripts\Start-B6Trial.ps1 -Target Vegas
+   .\scripts\etc\Start-B6Trial.ps1 -Target Vegas
    ```
 
 The launcher sets `VEGAS_ENCODER_DATA_ROOT` only in the launched process's
@@ -426,7 +426,7 @@ window enabled. No hardware test/probe qualification is implied. To inspect or
 change **trial** settings/History, launch the matching desktop app with:
 
 ```powershell
-.\scripts\Start-B6Trial.ps1 -Target App
+.\scripts\etc\Start-B6Trial.ps1 -Target App
 ```
 
 ## First test: popup and saved templates
@@ -541,7 +541,7 @@ installer, which regenerates/verifies its discovery manifest. Launch the old
 candidate's isolated data after rollback with:
 
 ```powershell
-.\scripts\Start-B6Trial.ps1 -Target Vegas -CandidateRoot 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.5'
+.\scripts\etc\Start-B6Trial.ps1 -Target Vegas -CandidateRoot 'L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.5'
 ```
 
 Trial data and saved native templates remain. Versions 0.1.5 and 0.1.6 use the

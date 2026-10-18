@@ -87,7 +87,7 @@ MSVC/Flutter SDKs, without upgrading them:
 ```powershell
 Set-Location L:\repos\vegas-encoder
 .\scripts\Build-Release.ps1 -OutputDir "$PWD\build\my-fresh-installer-inputs"
-.\scripts\Test-B7.ps1 -BundleDir "$PWD\build\my-fresh-installer-inputs"
+.\scripts\etc\Test-B7.ps1 -BundleDir "$PWD\build\my-fresh-installer-inputs"
 ```
 
 Earlier candidates remain in the retired platform checkout. Choose a **fresh**

@@ -20,7 +20,7 @@ fakes when the native core fails. A fake is selected explicitly for tests.
 
 Build tools: the owner's Dart 3.13.5 / Flutter 3.47.7, installed MSVC x64 C++17 tools
 and Windows SDK. The hook uses the source under `../../src/core/`, also built by
-`scripts/build-core.cmd` as DLL and static library. No research checkout, FFmpeg
+`scripts/etc/build-core.cmd` as DLL and static library. No research checkout, FFmpeg
 download, SDK upgrade or exporter installation is needed to build the core.
 Standalone AOT consumers use [`dart build cli`](https://dart.dev/tools/dart-build) so native assets are bundled;
 `dart compile exe` does not run build hooks. Flutter's native-asset build is the
@@ -44,10 +44,10 @@ core and offline encodes do not establish any new real VEGAS qualification.
 fixtures or fail `B0-FIXTURE-MISSING`. No edited-state sweep or domain rules in Dart.
 Its capability-specific display highlights use `CoreFixture.compileIssues`.
 
-Run `scripts/Test-B2.ps1 -Asan -Aot -Encoder` from the repository root for focused
+Run `scripts/etc/Test-B2.ps1 -Asan -Aot -Encoder` from the repository root for focused
 native/static, real FFI, sanitizer, AOT-bundle and synthetic-encoder checks. Encoder
 checks use the existing `C:\ffmpeg\bin\ffmpeg.exe` by default, with FFprobe beside it,
-and write only ignored build/test-results/. `scripts/Test-B0.ps1` retains model/fake
+and write only ignored build/test-results/. `scripts/etc/Test-B0.ps1` retains model/fake
 and fixture checks. Read [third-party notices](THIRD_PARTY_NOTICES.md) for the pinned
 MIT/BSD source and build dependencies; no project license is selected.
 

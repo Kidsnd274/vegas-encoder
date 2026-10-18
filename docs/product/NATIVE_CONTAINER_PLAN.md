@@ -96,7 +96,7 @@ this chain is the MP4 **writer's** recovered render-class vtable and the host ca
   bytes. Ignored diagnostics are in `build/test-results/container-naming/`.
   No new finding series or research checkout dependency was introduced.
 
-`scripts/Test-ContainerNaming.cmd` checks the actual recipe candidate DLL through
+`scripts/etc/Test-ContainerNaming.cmd` checks the actual recipe candidate DLL through
 a fake allocator/host: **62 checks**, five suffixes, Advanced precedence, class
 strings, conformance, exact/small/zero/null buffers, unknown selectors, corrupt
 snapshots, immutability and balanced host allocations. This complements the prior

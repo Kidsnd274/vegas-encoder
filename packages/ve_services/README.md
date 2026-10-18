@@ -63,12 +63,12 @@ poll, replay per listener, pause reads and finish their read on cancellation.
 Cancel every watch subscription on disposal. The six built-ins contain adopted
 recipe policy only, with runtime facts derived by the native core.
 
-Run `scripts/Test-B3Repositories.ps1` from the repository root for the real Windows
+Run `scripts/etc/Test-B3Repositories.ps1` from the repository root for the real Windows
 file/concurrency suite. It builds a native-asset AOT bundle so parent and competing
 processes do not race Dart build hooks over a loaded DLL. Tests use isolated,
 temporary directories under ignored build/test-results and remove only their
 own directory. They do not touch user settings, FFmpeg, installed exporters or
-VEGAS. `python -I scripts/Generate-ServiceBuiltins.py --check` verifies packaging.
+VEGAS. `python -I scripts/etc/Generate-ServiceBuiltins.py --check` verifies packaging.
 
 Contract v1 additions: `LiveRenderStatus.hostHwnd` carries the host main window for
 monitor placement; `MachineSettings.uiState` carries desktop bounds/maximize and
@@ -91,10 +91,10 @@ All installation hashes, paths, GPU results and history are illustrative, marked
 `isFixture: true`; they do not describe the developer machine or real VEGAS.
 
 Run `dart pub get --offline`, `dart analyze`, and
-`dart run test/contracts_test.dart`, or the repository's `scripts/Test-B0.ps1`.
-`scripts/Test-B3Services.ps1` checks captured parser text, fake FFmpeg boundaries,
+`dart run test/contracts_test.dart`, or the repository's `scripts/etc/Test-B0.ps1`.
+`scripts/etc/Test-B3Services.ps1` checks captured parser text, fake FFmpeg boundaries,
 real Windows process cancellation/timeouts and the DXGI helper.
-`scripts/Test-B3Runtime.ps1 -FFmpegPaths @(...)` checks explicitly supplied FFmpeg
+`scripts/etc/Test-B3Runtime.ps1 -FFmpegPaths @(...)` checks explicitly supplied FFmpeg
 builds on native-compiled preset encodes/readbacks/full decodes. Run these runners
 sequentially so build hooks do not replace a loaded DLL. Outputs stay in ignored
 build/test-results; no fake host or VEGAS is involved. Parser fixtures are committed;

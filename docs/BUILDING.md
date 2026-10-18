@@ -5,6 +5,10 @@ PowerShell 7, Python and Flutter SDK (`L:\flutter`). Builds do not install or
 replace the VEGAS exporter. FFmpeg/FFprobe are user-supplied runtime tools;
 they are not bundled product components.
 
+The [scripts guide](../scripts/README.md) lists the top-level commands intended
+for routine use. Supporting builds, generators and test runners live in
+`scripts/etc/`; the release and icon entry points invoke them automatically.
+
 ## Components
 
 | Component | Source | Built output |
@@ -37,7 +41,7 @@ numeric version `0.1.7.1`. The exporter suffix adds `-recipe-proof` to its produ
 label. Ordinary release bumps do not require bumping ABI/schema/contracts;
 those values must reflect actual implemented interface/format support.
 
-`scripts/Generate-Versions.py` projects this input into `src/version.generated.h`,
+`scripts/etc/Generate-Versions.py` projects this input into `src/version.generated.h`,
 the core's Dart ABI constant, all three pubspec version fields, and
 `setup/version.generated.iss`. These are derived outputs, not separate settings.
 The core's API, native preflight, exporter resources and staging all consume these
@@ -114,9 +118,9 @@ light/dark theme colours. The main README awaits the owner's later icon instruct
 
 ```powershell
 Set-Location L:\repos\vegas-encoder
-python -I scripts/Generate-Versions.py
-python -I scripts/Generate-CoreData.py
-cmd /d /c scripts\build-core.cmd
+python -I scripts/etc/Generate-Versions.py
+python -I scripts/etc/Generate-CoreData.py
+cmd /d /c scripts\etc\build-core.cmd
 ```
 
 Outputs are `build/release/vegas-encoder/core/ve_core.dll` and `build/release/vegas-encoder/core/ve_core_static.lib`.
@@ -125,7 +129,7 @@ builds its own core DLL from the same source; building only this standalone
 core does not update an already-built app or exporter. Rebuild the affected
 consumer to incorporate core changes.
 
-For a manual exporter build, use `cmd /d /c 'scripts\build.cmd "" release'`;
+For a manual exporter build, use `cmd /d /c 'scripts\etc\build.cmd "" release'`;
 without `release` it builds the historical fixed-profile variant. The old
 `recipe-proof` argument is retained as an alias for `release`, using the same new
 output folder. Existing legacy folders/candidates are preserved. The native
@@ -133,9 +137,9 @@ script and Flutter hooks check that generated version outputs are fresh. The
 unified command handles generation automatically. Freshness/fixture checks:
 
 ```powershell
-python -I scripts/Generate-Versions.py --check
-python -I scripts/Test-Versions.py
-.\scripts\Test-ReleaseInputs.ps1
+python -I scripts/etc/Generate-Versions.py --check
+python -I scripts/etc/Test-Versions.py
+.\scripts\etc\Test-ReleaseInputs.ps1
 ```
 
 ## Runtime files and installer inputs
@@ -168,7 +172,7 @@ The exporter build folder also contains `vegas-encoder.ini`, a matching
 diagnostic files. The development INI must be rendered for the intended app path.
 
 The latest prepared bundle is
-`L:\repos\vegas-encoder\build\release-inputs-setup-repack\`
+`L:\repos\vegas-encoder\build\release-inputs-scripts-layout\`
 (earlier bundles are preserved):
 
 | Directory/file | Purpose |

@@ -1,7 +1,7 @@
 import 'package:code_assets/code_assets.dart';
 import 'package:hooks/hooks.dart';
 import 'package:native_toolchain_c/native_toolchain_c.dart';
-import '../../../scripts/version_hook.dart';
+import '../../../scripts/etc/version_hook.dart';
 
 void main(List<String> args) async {
   await build(args, (input, output) async {

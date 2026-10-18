@@ -77,7 +77,7 @@ not existing product paths:
 | `src/ffbridge/ffbridge.h`, `diag.cpp` | Separate declarations by responsibility; template mechanics to `vegas/host`, product config/reporting elsewhere |
 | `src/ffbridge/encode.h`, `encode.cpp` | Seed `src/engine/`; keep current process/pipe behavior first, then introduce plain media/job types |
 | `src/fiohost/` | Seed product fake-host tests; document any comparison-connector mode separately from normal fake tests |
-| `scripts/Make-BaselineMedia.py`, raw/encoded checkers and relevant tests | Self-contained deterministic fixture generation and output verification in the product |
+| `scripts/etc/Make-BaselineMedia.py`, raw/encoded checkers and relevant tests | Self-contained deterministic fixture generation and output verification in the product |
 | `scripts/Test-FfmpegProof.ps1` | Product baseline runner, with paths updated and current coverage preserved |
 | `scripts/Install-FfBridge.ps1` | Seed reversible product installer; identity/path decisions must be deliberate |
 | Build scripts and `.def` / `.ini` | Preserve x64 toolchain and baseline behavior, update only necessary paths at import |

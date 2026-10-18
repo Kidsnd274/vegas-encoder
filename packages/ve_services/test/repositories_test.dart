@@ -53,7 +53,7 @@ Future<void> main(List<String> args) async {
     File(Platform.resolvedExecutable).uri.pathSegments.last.toLowerCase(),
   )) {
     throw StateError(
-      'Run scripts/Test-B3Repositories.ps1 to bundle native assets for process tests.',
+      'Run scripts/etc/Test-B3Repositories.ps1 to bundle native assets for process tests.',
     );
   }
   final build = Directory('../../build/test-results').absolute;

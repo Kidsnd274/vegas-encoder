@@ -25,7 +25,7 @@ encoder exit zero; cancel/failure removes temporary output. The diagnostic schem
 `ffbridge-diag/1` is kept for checker compatibility. New product sidecar suffix is
 `.vegas-encoder.json`; stderr suffix remains `.ffmpeg.log`.
 
-Run `scripts/Test-VegasEncoder.ps1` with a fresh evidence directory, explicit Python/
+Run `scripts/etc/Test-VegasEncoder.ps1` with a fresh evidence directory, explicit Python/
 FFmpeg paths if necessary, and optional `-Include1080p`. Inspect its identities,
 commands, per-case logs/manifests and decoded checker output. Finalize real-host
 qualification separately using [VEGAS_RUNTIME.md](VEGAS_RUNTIME.md).

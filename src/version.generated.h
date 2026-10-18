@@ -1,4 +1,4 @@
-// Generated from version.json by scripts/Generate-Versions.py. Do not edit.
+// Generated from version.json by scripts/etc/Generate-Versions.py. Do not edit.
 #pragma once
 #define VE_RELEASE_VERSION "0.1.7"
 #define VE_APP_VERSION "0.1.7+1"

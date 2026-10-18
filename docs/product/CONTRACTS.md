@@ -1163,8 +1163,8 @@ FakeVeCore.fixtures contexts, or inject edited-state fixtures for widget/golden
 tests. The app owns display formatting, workflow, focus/window behavior, and skins;
 platform owns domain/system rules. No app or design files changed for B0.
 
-Run `scripts/Test-B0.ps1` for Dart model/fake contract tests, recipe/fixture bounds
-and MSVC C/C++ ABI-header checks. `scripts/Test-B2.ps1 -Asan -Aot -Encoder` adds
+Run `scripts/etc/Test-B0.ps1` for Dart model/fake contract tests, recipe/fixture bounds
+and MSVC C/C++ ABI-header checks. `scripts/etc/Test-B2.ps1 -Asan -Aot -Encoder` adds
 static/DLL/FFI, sanitizer, bundled AOT and synthetic encoder checks. Dart pub
 resolution uses the cached, pinned MIT/BSD dependencies; notices are in ve_core.
 Existing fake-host/fake-installer

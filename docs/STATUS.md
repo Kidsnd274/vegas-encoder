@@ -5,6 +5,46 @@ Updated: 2026-10-18 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proo
 
 ## Current progress
 
+**Scripts organization (owner request, 2026-10-18):** the installer/source
+checkpoint was committed and pushed as `392493d`. Routine human entry points
+remain at the top of `scripts/`: `Build-Release.ps1`, `Build-Installer.ps1`,
+`export_app_icons.bat`, `Get-VegasTargets.ps1` and the development-only
+`Install-VegasEncoder.ps1`. **52** supporting build/generator/test/trial scripts
+now live under `scripts/etc/`. [scripts/README.md](../scripts/README.md) describes
+the commands. Repository-root calculations, sibling calls, Dart native-hook
+imports, generated-source provenance and active documentation follow the move.
+Historical experiment/component-handoff commands and frozen bundles retain
+their recorded paths. The raw checker self-test now defaults to ignored
+`build/test-results/` rather than creating another evidence tree.
+
+Focused checks pass: **8** version tests, **15** fake-file receipt guards,
+**36** confined setup helper fixtures, the manual installer's fake-tree checks,
+**295** B0 fixture checks, **180** B1 data checks, core argv golden freshness,
+B0/service built-in freshness, raw-render checker self-test, icon `--check`,
+read-only VEGAS detection and PowerShell parsing. The old B3 parser-fixture
+generator could not run because its historical
+`build/ffmpeg-b1/capture-old/version.txt` input is absent; no capture was
+regenerated or historical source changed. No app UI behavior, live installed
+exporter or real-VEGAS qualification changed.
+
+The full native/helper/Flutter release build and Inno **6.7.1** compilation
+pass through the reorganized scripts into `build/release-inputs-scripts-layout`
+(32 files). All **81** packaging/detection checks, **5** frozen-input refusal
+checks and the relocated non-installing wizard harness pass. New compiled
+artifact: `dist/VegasEncoder-0.1.7.1-windows-x64-setup-20261018-140036555.exe`,
+with its hash/provenance sidecar; it is not installed or release-qualified.
+No runtime dependencies or Flutter UI changed, so widget/golden suites were
+not repeated for this path refactor.
+
+The full native/helper/Flutter release build and Inno **6.7.1** compilation
+pass through the reorganized scripts into `build/release-inputs-scripts-layout`
+(32 files). All **81** packaging/detection checks, **5** frozen-input refusal
+checks and the relocated non-installing wizard harness pass. New compiled
+artifact: `dist/VegasEncoder-0.1.7.1-windows-x64-setup-20261018-140036555.exe`,
+with its hash/provenance sidecar; it is not installed or release-qualified.
+No runtime dependencies or Flutter UI changed, so widget/golden suites were
+not repeated for this path refactor.
+
 **Setup startup fix and component identity (owner request, 2026-10-18):**
 the owner-reported `app`-constant error came from `InitializeWizard` calling
 the common helper request initializer before Inno had resolved the app path.

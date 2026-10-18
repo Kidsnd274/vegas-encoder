@@ -166,9 +166,9 @@ the documentation and offline files/processes do not qualify VEGAS page modality
 ## Focused checks
 
 ```powershell
-scripts/Test-B6.ps1
+scripts/etc/Test-B6.ps1
 # Optional sanitizer mode; current continuation did not complete it:
-scripts/Test-B6.ps1 -Asan
+scripts/etc/Test-B6.ps1 -Asan
 ```
 
 The optimized x64 `/W4 /WX` run passes **95 boundary + 89 transport checks**.

@@ -41,7 +41,7 @@ Future<void> main(List<String> args) async {
         File(Platform.resolvedExecutable).uri.pathSegments.last.toLowerCase(),
       )) {
     throw StateError(
-      'Use scripts/Test-B3Services.ps1 (Windows AOT with native assets).',
+      'Use scripts/etc/Test-B3Services.ps1 (Windows AOT with native assets).',
     );
   }
   final parser = WindowsFFmpegHelpParser();

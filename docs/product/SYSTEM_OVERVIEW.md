@@ -61,13 +61,13 @@ Dart packages are Riverpod and the Dart team's build-hook and FFI packages.
 
 ```mermaid
 flowchart LR
-    schema[schema/*.json<br/>profiles, measured FFmpeg facts] -- scripts/Generate-CoreData.py --> data[src/core/profiles/data.h]
+    schema[schema/*.json<br/>profiles, measured FFmpeg facts] -- scripts/etc/Generate-CoreData.py --> data[src/core/profiles/data.h]
     data --> core[src/core/*.cpp]
     core -- build hook in packages/ve_core<br/>native_toolchain_c drives MSVC --> dll[ve_core.dll]
-    core -- scripts/build-core.cmd --> lib[ve_core_static.lib]
+    core -- scripts/etc/build-core.cmd --> lib[ve_core_static.lib]
     gpu[src/services/windows_gpu.cpp] -- build hook in packages/ve_services --> gdll[ve_windows_services.dll]
     lib --> exp[vegas-encoder.dll]
-    vegas[src/vegas + src/engine + src/support] -- scripts/build.cmd --> exp
+    vegas[src/vegas + src/engine + src/support] -- scripts/etc/build.cmd --> exp
     app[app/lib Dart + packages Dart] -- flutter build windows --> exe[VegasEncoder.exe]
     runner[app/windows/runner C++] -- CMake via Flutter --> exe
     dll --> bundle[(app/build/.../Release)]
@@ -84,13 +84,13 @@ flowchart LR
   `ve_windows_services.dll`. Flutter then places both DLLs beside `VegasEncoder.exe`
   ("native assets"). So the C++ core is built as part of the Flutter build; nothing else
   needs to run first.
-- **The exporter.** `scripts/build.cmd` compiles the core into `ve_core_static.lib`
+- **The exporter.** `scripts/etc/build.cmd` compiles the core into `ve_core_static.lib`
   (`build-core.cmd`), compiles the VEGAS adapter, engine and support code, and links them
   into `build/vegas-encoder/vegas-encoder.dll` with its INI. It also builds the fake host
   and helper tests. The installer script copies the DLL into VEGAS's plug-in folder,
   reversibly; that is only done with the owner.
 - **The catalog.** `src/core/profiles/data.h` is generated from `schema/` by
-  `scripts/Generate-CoreData.py`. It holds what each encoder offers (rate modes, quality
+  `scripts/etc/Generate-CoreData.py`. It holds what each encoder offers (rate modes, quality
   ranges and their marks, speed presets, tunes, profiles, bit depths), the containers and
   which codecs each can hold, measured from real Windows FFmpeg builds (B1).
 
@@ -216,9 +216,9 @@ the core gives no fact, the app shows less and asks platform for it (app.md, Nee
 
 | Layer | Tests | Command |
 | --- | --- | --- |
-| Core | `tests/core/core_tests.cpp`, C ABI header checks, recipe-to-argv fixtures | `scripts/Test-CoreNative.cmd`, `scripts/Test-B2.ps1` |
-| Exporter and engine | `tests/fiohost` (fake VEGAS host driving the real DLL), `tests/host`, `tests/engine` | `scripts/build.cmd`, `scripts/Test-VegasEncoder.ps1`, `scripts/Test-B4.ps1` |
-| Dart packages | `packages/*/test` (models, fakes, real files and processes on temporary folders) | `dart test` in each package, `scripts/Test-B3*.ps1` |
+| Core | `tests/core/core_tests.cpp`, C ABI header checks, recipe-to-argv fixtures | `scripts/etc/Test-CoreNative.cmd`, `scripts/etc/Test-B2.ps1` |
+| Exporter and engine | `tests/fiohost` (fake VEGAS host driving the real DLL), `tests/host`, `tests/engine` | `scripts/etc/build.cmd`, `scripts/etc/Test-VegasEncoder.ps1`, `scripts/etc/Test-B4.ps1` |
+| Dart packages | `packages/*/test` (models, fakes, real files and processes on temporary folders) | `dart test` in each package, `scripts/etc/Test-B3*.ps1` |
 | App | `app/test`: unit, widget and golden tests (light and dark), mostly on the fakes, the native core where results matter | `flutter test` in `app/` |
 | App windows | Start time, popup ownership, the no-activate progress window, against a fake VEGAS window | `app/tool/spikes/run_window_spikes.ps1` |
 | Real VEGAS | Gated checks with the owner on the exact target build | [VEGAS_RUNTIME.md](../VEGAS_RUNTIME.md) |

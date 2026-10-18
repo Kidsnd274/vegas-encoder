@@ -155,13 +155,13 @@ libraries, jobs, caches, VEGAS templates and user-supplied FFmpeg are retained.
 
 ## Validation scope
 
-`scripts/Build-SetupHelper.cmd test` builds a separate test-only executable.
-`python -I scripts/Test-Setup.py` confines all mutations to a new fixture root
+`scripts/etc/Build-SetupHelper.cmd test` builds a separate test-only executable.
+`python -I scripts/etc/Test-Setup.py` confines all mutations to a new fixture root
 under `build/test-results`; its fake app/DLL/host bytes are never loaded. The
 production helper has no test-root, version-bypass or failure-injection switch.
 Junction creation requires running the test outside a restricted sandbox.
 
-`python -I scripts/Test-SetupWizard.py` compiles and runs an unprivileged Inno
+`python -I scripts/etc/Test-SetupWizard.py` compiles and runs an unprivileged Inno
 harness using the actual helper/host scripts and read-only production detection.
 It aborts in `InitializeWizard`, before any install lifecycle or file deployment.
 This covers the early `app`-constant startup regression without running the
