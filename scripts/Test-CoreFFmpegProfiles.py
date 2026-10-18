@@ -130,7 +130,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('ffmpeg',type=Path)
     parser.add_argument('capture_directory',type=Path)
-    parser.add_argument('--core',type=Path,default=ROOT/'build/core/ve_core.dll')
+    parser.add_argument('--core',type=Path,default=ROOT/'build/release/vegas-encoder/core/ve_core.dll')
     parser.add_argument('--recheck',action='store_true',help='Compile-only parity with the recorded successful/failed hardware run; no new encodes')
     args = parser.parse_args()
     directory = args.capture_directory.resolve(strict=True)

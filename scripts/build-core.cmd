@@ -8,7 +8,7 @@ set "VE_CORE_ROOT=%~dp0.."
 set "VE_CORE_PYTHON=%VEGAS_ENCODER_PYTHON%"
 if not defined VE_CORE_PYTHON set "VE_CORE_PYTHON=python"
 "%VE_CORE_PYTHON%" -I "%~dp0Generate-Versions.py" --check || exit /b 1
-set "VE_CORE_OUT=%VE_CORE_ROOT%\build\core"
+set "VE_CORE_OUT=%VE_CORE_ROOT%\build\release\vegas-encoder\core"
 if not exist "%VE_CORE_OUT%" mkdir "%VE_CORE_OUT%"
 pushd "%VE_CORE_OUT%" || exit /b 1
 cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 /DVE_CORE_BUILD_DLL "%VE_CORE_ROOT%\src\core\json.cpp" "%VE_CORE_ROOT%\src\core\text.cpp" "%VE_CORE_ROOT%\src\core\recipe.cpp" "%VE_CORE_ROOT%\src\core\signal.cpp" "%VE_CORE_ROOT%\src\core\compile.cpp" "%VE_CORE_ROOT%\src\core\lint.cpp" "%VE_CORE_ROOT%\src\core\payload.cpp" "%VE_CORE_ROOT%\src\core\capi\ve_core.cpp" || goto :fail

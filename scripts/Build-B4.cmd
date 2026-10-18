@@ -7,7 +7,7 @@ if not defined VE_B4_VCVARS set "VE_B4_VCVARS=L:\Program Files\Microsoft Visual 
 call "%VE_B4_VCVARS%" >nul || exit /b 1
 set "VE_B4_OUT=%VE_B4_ROOT%\build\b4-tests"
 set "VE_B4_FLAGS=/O2 /Zi"
-set VE_B4_CORE="%VE_B4_ROOT%\build\core\ve_core_static.lib"
+set VE_B4_CORE="%VE_B4_ROOT%\build\release\vegas-encoder\core\ve_core_static.lib"
 set "VE_B4_CORE_SOURCES="
 if "%~2"=="asan" (
   set "VE_B4_OUT=%VE_B4_ROOT%\build\b4-tests-asan"

@@ -17,7 +17,7 @@ function Assert-VeReleaseOutput([string]$Repo, [string]$OutputDir) {
 function Get-VeSourceState([string]$Repo) {
   $commit = (& git -C $Repo rev-parse HEAD).Trim()
   if ($LASTEXITCODE -ne 0) { throw 'Cannot read source commit.' }
-  $paths = @('app','packages','src','schema','scripts','config','version.json')
+  $paths = @('app','packages','src','schema','scripts','config','setup','version.json')
   $patch = (& git -C $Repo -c core.safecrlf=false diff --no-ext-diff --binary HEAD -- @paths) -join "`n"
   if ($LASTEXITCODE -ne 0) { throw 'Cannot read source changes.' }
   $untrackedPaths = @(& git -C $Repo ls-files --others --exclude-standard -- @paths)
@@ -33,8 +33,8 @@ function Get-VeSourceState([string]$Repo) {
 }
 
 function Get-VeBuildPaths([string]$Repo) {
-  $app = 'app/build/windows/x64/runner/Release'
-  $plugin = 'build/release/vegas-encoder'
+  $app = 'build/release/vegas-encoder/app'
+  $plugin = 'build/release/vegas-encoder/plugin'
   $root = Join-Path $Repo $app
   $entries = @((Get-Item -LiteralPath $root)) + @(Get-ChildItem -LiteralPath $root -Recurse -Force)
   foreach ($entry in $entries) {
@@ -44,7 +44,32 @@ function Get-VeBuildPaths([string]$Repo) {
     [IO.Path]::GetRelativePath($Repo, $_.FullName).Replace('\', '/')
   })
   $paths += "$plugin/vegas-encoder.dll", "$plugin/vegas-encoder.ini", "$plugin/vegas-encoder.pdb"
+  $paths += 'build/release/vegas-encoder/setup/ve-install.exe'
   return @($paths | Sort-Object)
+}
+
+# Flutter keeps its normal CMake/intermediate paths. Publish its complete runtime
+# into the common product folder, retaining the previous runtime in ignored build/.
+function Publish-VeApp([string]$Repo) {
+  $source = Join-Path $Repo 'app/build/windows/x64/runner/Release'
+  $destination = Join-Path $Repo 'build/release/vegas-encoder/app'
+  foreach ($path in @($source,$destination)) {
+    for ($cursor = $path; $cursor; $cursor = [IO.Path]::GetDirectoryName($cursor)) {
+      if ((Test-Path -LiteralPath $cursor) -and ((Get-Item -LiteralPath $cursor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Do not follow reparse points: $cursor" }
+    }
+  }
+  foreach ($item in Get-ChildItem -LiteralPath $source -Recurse -Force) {
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Runtime contains a reparse point: $($item.FullName)" }
+  }
+  $temporary = Assert-VeReleaseOutput $Repo ($destination + '-new-' + [guid]::NewGuid().ToString('N'))
+  Copy-Item -LiteralPath $source -Destination $temporary -Recurse
+  foreach ($name in 'VegasEncoder.exe','flutter_windows.dll','ve_core.dll','ve_windows_services.dll','data/app.so','data/icudtl.dat','data/flutter_assets/AssetManifest.bin') {
+    if (-not (Test-Path -LiteralPath (Join-Path $temporary $name) -PathType Leaf)) { throw "Missing runtime input: $name" }
+  }
+  $backup = Join-Path $Repo ('build/previous-app-' + [guid]::NewGuid().ToString('N'))
+  if (Test-Path -LiteralPath $destination) { Move-Item -LiteralPath $destination -Destination $backup }
+  try { Move-Item -LiteralPath $temporary -Destination $destination }
+  catch { if (Test-Path -LiteralPath $backup) { Move-Item -LiteralPath $backup -Destination $destination }; throw }
 }
 
 function Write-VeBuildReceipt([string]$Repo, $Version, $SourceState) {

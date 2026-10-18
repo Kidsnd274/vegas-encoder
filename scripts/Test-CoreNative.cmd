@@ -10,7 +10,7 @@ if "%~2"=="asan" set "VE_CORE_TEST_OUT=%VE_CORE_TEST_ROOT%\build\core-tests-asan
 if not exist "%VE_CORE_TEST_OUT%" mkdir "%VE_CORE_TEST_OUT%"
 pushd "%VE_CORE_TEST_OUT%" || exit /b 1
 if "%~2"=="asan" goto :asan
-cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 "%VE_CORE_TEST_ROOT%\tests\core\core_tests.cpp" "%VE_CORE_TEST_ROOT%\build\core\ve_core_static.lib" /link /OUT:core-tests.exe || goto :fail
+cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 "%VE_CORE_TEST_ROOT%\tests\core\core_tests.cpp" "%VE_CORE_TEST_ROOT%\build\release\vegas-encoder\core\ve_core_static.lib" /link /OUT:core-tests.exe || goto :fail
 core-tests.exe "%VE_CORE_TEST_ROOT%\schema\fixtures\b0\core-and-services.json" "%VE_CORE_TEST_ROOT%\schema\fixtures\b1\core-argv.json" || goto :fail
 popd
 exit /b 0

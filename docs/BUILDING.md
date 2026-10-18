@@ -9,10 +9,11 @@ they are not bundled product components.
 
 | Component | Source | Built output |
 | --- | --- | --- |
-| Flutter app: desktop, VEGAS editor popup and progress window in one executable | `app/lib`, `app/windows/runner` | `app/build/windows/x64/runner/Release/VegasEncoder.exe`, with compiled Dart code in `data/app.so` |
-| Portable C++ core: compile, validation, lint, completion and recipe/payload logic | `src/core`, Dart interface in `packages/ve_core` | App-bundled `ve_core.dll`; standalone `build/core/ve_core.dll` and `ve_core_static.lib` |
+| Flutter app: desktop, VEGAS editor popup and progress window in one executable | `app/lib`, `app/windows/runner` | `build/release/vegas-encoder/app/VegasEncoder.exe`, with compiled Dart code in `data/app.so` |
+| Portable C++ core: compile, validation, lint, completion and recipe/payload logic | `src/core`, Dart interface in `packages/ve_core` | App-bundled `ve_core.dll`; standalone `build/release/vegas-encoder/core/ve_core.dll` and `ve_core_static.lib` |
 | Windows services: file operations, GPU information and read-only VEGAS inspection | `src/services`, Dart interface in `packages/ve_services` | App-bundled `ve_windows_services.dll` |
-| VEGAS exporter: Render As integration and FFmpeg render engine | `src/vegas`, `src/engine`, `src/support` | `build/release/vegas-encoder/vegas-encoder.dll` |
+| VEGAS exporter: Render As integration and FFmpeg render engine | `src/vegas`, `src/engine`, `src/support` | `build/release/vegas-encoder/plugin/vegas-encoder.dll` |
+| Installer support helper | `setup/native` | `build/release/vegas-encoder/setup/ve-install.exe` |
 
 The exporter links `ve_core_static.lib` into its DLL. It does not load the app's
 `ve_core.dll`. The engine has no separate runtime DLL. The desktop, editor popup
@@ -38,7 +39,7 @@ those values must reflect actual implemented interface/format support.
 
 `scripts/Generate-Versions.py` projects this input into `src/version.generated.h`,
 the core's Dart ABI constant, all three pubspec version fields, and
-`config/version.generated.iss`. These are derived outputs, not separate settings.
+`setup/version.generated.iss`. These are derived outputs, not separate settings.
 The core's API, native preflight, exporter resources and staging all consume these
 values. Core/services DLLs still have no separate Windows PE version resource;
 the core reports its runtime stamp through its API.
@@ -56,17 +57,18 @@ Set-Location L:\repos\vegas-encoder
 The default `-Action All` validates/synchronizes versions, generates core data,
 resolves the pinned Flutter dependencies, builds the core and recipe-enabled
 exporter, builds the app/core/services bundle with matching version flags, writes
-a build receipt, and stages a fresh installer-input directory. It stops on failure.
+a build receipt, stages a fresh installer-input directory, and compiles Inno Setup
+into `dist/`. It stops on failure.
 It does not upgrade tools, install, launch VEGAS, run an installer or execute tests.
 
 ```powershell
 # Compile only, retaining the output folders below.
 .\scripts\Build-Release.ps1 -Action Build
 
-# Repackage the recorded build without recompiling.
+# Repackage the recorded product and compile Setup without recompiling the app/core.
 .\scripts\Build-Release.ps1 -Action Package -OutputDir "$PWD\build\my-fresh-bundle"
 
-# Build and stage to an explicit fresh directory.
+# Build, stage to an explicit fresh directory, and compile Setup into dist/.
 .\scripts\Build-Release.ps1 -OutputDir "$PWD\build\my-other-fresh-bundle"
 ```
 
@@ -75,10 +77,12 @@ Without `-OutputDir`, staging chooses a new timestamped directory under
 `build/product-build.json`: it refuses changed versions, tracked build-input
 patches/commits, changed new-source path metadata, missing/added runtime files
 or changed runtime hashes. The receipt covers the complete app runtime and native
-DLL/INI/PDB. New untracked source files are tracked by path/size/mtime; commit
+DLL/INI/PDB and setup helper. New untracked source files are tracked by path/size/mtime; commit
 source before the final release build for a stable source identity.
 
-Tool paths are configurable with `-FlutterPath`, `-PythonPath` and `-VcVarsPath`.
+Tool paths are configurable with `-FlutterPath`, `-PythonPath`, `-VcVarsPath` and
+`-IsccPath`. Inno Setup 6.7.1 is the verified compiler; install it separately if
+missing. The default compiler is `%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe`.
 Flutter defaults to the existing `L:\flutter\bin\flutter.bat` when present,
 otherwise `flutter.bat` on PATH. MSVC uses the existing build script's detection
 or `VEGAS_ENCODER_VCVARS`. No tool installation or upgrade is performed.
@@ -115,7 +119,7 @@ python -I scripts/Generate-CoreData.py
 cmd /d /c scripts\build-core.cmd
 ```
 
-Outputs are `build/core/ve_core.dll` and `build/core/ve_core_static.lib`.
+Outputs are `build/release/vegas-encoder/core/ve_core.dll` and `build/release/vegas-encoder/core/ve_core_static.lib`.
 `ve_core.lib` is the DLL import library. The app's package hook independently
 builds its own core DLL from the same source; building only this standalone
 core does not update an already-built app or exporter. Rebuild the affected
@@ -137,7 +141,7 @@ python -I scripts/Test-Versions.py
 ## Runtime files and installer inputs
 
 The complete app runtime is under
-`L:\repos\vegas-encoder\app\build\windows\x64\runner\Release\`:
+`L:\repos\vegas-encoder\build\release\vegas-encoder\app\`:
 
 ```text
 VegasEncoder.exe
@@ -153,7 +157,10 @@ data/
 Keep this directory together; `VegasEncoder.exe` alone is not the app bundle.
 `flutter_windows.dll` is Flutter's engine runtime. Native-asset intermediates
 and caches under `app/build/native_assets` / `.dart_tool` are not the packaging
-source; use the finished Release directory.
+source. Flutter still builds into its usual `app/build/windows/x64/runner/Release`
+folder; the unified script publishes a complete copy into the product `app/` folder.
+Previous published runtimes are retained under `build/previous-app-*`; old
+candidates and installed paths are never relocated.
 
 The exporter build folder also contains `vegas-encoder.ini`, a matching
 `vegas-encoder.pdb` and compiler/linker intermediates (`.obj`, `.lib`, `.exp`,
@@ -161,7 +168,7 @@ The exporter build folder also contains `vegas-encoder.ini`, a matching
 diagnostic files. The development INI must be rendered for the intended app path.
 
 The latest prepared bundle is
-`L:\repos\vegas-encoder\build\release-inputs-release-folder\`
+`L:\repos\vegas-encoder\build\release-inputs-setup-repack\`
 (earlier bundles are preserved):
 
 | Directory/file | Purpose |
@@ -169,7 +176,8 @@ The latest prepared bundle is
 | `app/` | Complete app runtime plus dependency/font notices |
 | `plugin/` | Exporter DLL, matching optional PDB and development INI |
 | `installer/vegas-encoder.ini.in` | Installer INI template; substitute the final `{app}` path |
-| `installer/version.iss` | Generated version definitions for the owner's future setup script |
+| `setup/` | Frozen modular `.iss` files, generated version include and setup icon |
+| `installer/ve-install.exe`, `payload.json` | Installer helper and exact expected installed payload hashes |
 | `installer/VegasEncoder-x64.fio2007-config` | VEGAS discovery file |
 | `installer-inputs.json` | Exact file hashes, versions and source state at staging time |
 
@@ -178,14 +186,23 @@ destinations. The per-host exporter goes under
 `{vegasDir}\FileIO Plug-Ins\vegas-encoder\`; the shared app has its own directory.
 Do not ship worktree paths from the development INI.
 
-The manifest includes the complete resolved version configuration and the SHA-256
-of `version.json`, alongside packaged file hashes. The owner's
-`setup/setup_script.iss` includes `config/version.generated.iss`: `AppVersion`
-uses the release version and `VersionInfoVersion` uses the four-part numeric
-version. Run the unified product build before compiling Setup in the IDE so its
-include and app binaries stay matched. Bundle-based setup can use the staged
-`installer/version.iss` equivalent. The unified command does not compile or run
-Setup automatically.
+The manifest includes the resolved versions and the SHA-256 of `version.json`,
+alongside all app/plugin/helper/setup hashes. Setup consumes the frozen bundle,
+never the live Flutter output. `setup/version.generated.iss` supplies AppVersion
+and numeric VersionInfoVersion. All `.iss` sources remain under `setup/`.
+
+`Build-Installer.ps1` verifies the frozen file set/hashes before and after compiling.
+It writes a uniquely named `dist/VegasEncoder-<numeric-version>-windows-x64-setup-<timestamp>.exe`
+and a JSON provenance/hash sidecar. It never runs Setup. To recompile an existing
+verified bundle independently:
+
+```powershell
+.\scripts\Build-Installer.ps1 -BundleDir "$PWD\build\release-inputs-setup"
+```
+
+The native helper is built at `build/release/vegas-encoder/setup/ve-install.exe`
+and installed under `{app}\setup-support`. It is only used by Setup; it is not
+an app service. See [installer behavior and rollback](INSTALLER.md).
 
 Build/staging output is ignored by Git. Existing staged manifests remain records
 of their creation state even after a source commit; create a fresh bundle to

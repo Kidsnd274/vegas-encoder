@@ -14,7 +14,7 @@ module = import_module('Test-CoreFFmpegProfiles')
 ROOT = module.ROOT
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--check',action='store_true')
-parser.add_argument('--core',type=Path,default=ROOT/'build/core/ve_core.dll')
+parser.add_argument('--core',type=Path,default=ROOT/'build/release/vegas-encoder/core/ve_core.dll')
 args = parser.parse_args()
 core = module.Core(args.core.resolve(strict=True))
 bundle = json.loads((ROOT/'schema/fixtures/b0/core-and-services.json').read_text(encoding='utf-8'))

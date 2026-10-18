@@ -7,7 +7,7 @@ if not defined VE_B6_VCVARS if exist "L:\Program Files\Microsoft Visual Studio\1
 if defined VE_B6_VCVARS (call "%VE_B6_VCVARS%" >nul || exit /b 1) else (where cl >nul 2>nul || exit /b 1)
 set "VE_B6_OUT=%VE_B6_ROOT%\build\b6-tests"
 set "VE_B6_FLAGS=/O2 /Zi"
-set VE_B6_CORE="%VE_B6_ROOT%\build\core\ve_core_static.lib"
+set VE_B6_CORE="%VE_B6_ROOT%\build\release\vegas-encoder\core\ve_core_static.lib"
 set "VE_B6_CORE_SOURCES="
 if "%~2"=="asan" (
   set "VE_B6_OUT=%VE_B6_ROOT%\build\b6-tests-asan"

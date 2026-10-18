@@ -46,7 +46,7 @@ class VersionTests(unittest.TestCase):
             self.assertIn('version: ' + expected, text)
             self.assertIn('example: 1.0.0', text)
         self.assertIn('expectedCoreAbi = 2', (self.root / 'packages/ve_core/lib/src/version.g.dart').read_text())
-        self.assertIn('VeFileVersion "1.2.3.42"', (self.root / 'config/version.generated.iss').read_text())
+        self.assertIn('VeFileVersion "1.2.3.42"', (self.root / 'setup/version.generated.iss').read_text())
         self.assertEqual(versions.sync(self.root, value, check=True), [])
 
     def test_stale_check_does_not_write(self):

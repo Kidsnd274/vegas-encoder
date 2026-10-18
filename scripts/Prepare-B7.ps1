@@ -3,8 +3,8 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)][string]$OutputDir,
-  [string]$AppDir = (Join-Path $PSScriptRoot '..\app\build\windows\x64\runner\Release'),
-  [string]$PluginDir = (Join-Path $PSScriptRoot '..\build\release\vegas-encoder'),
+  [string]$AppDir = (Join-Path $PSScriptRoot '..\build\release\vegas-encoder\app'),
+  [string]$PluginDir = (Join-Path $PSScriptRoot '..\build\release\vegas-encoder\plugin'),
   [string]$PythonPath = 'python',
   [string[]]$VegasDir = @('C:\Program Files\BorisFX\Vegas Pro 2026',
     'L:\Program Files\VEGAS\VEGAS Pro 23.0', 'L:\Program Files\VEGAS\VEGAS Pro 22.0',
@@ -91,8 +91,24 @@ if (Test-Path -LiteralPath "$pluginSource\vegas-encoder.pdb") {
 [IO.File]::WriteAllText("$output\plugin\vegas-encoder.ini", "$ini`r`nAppPath=$output\app\VegasEncoder.exe`r`nLogDir=$output\logs`r`n")
 [IO.File]::WriteAllText("$output\installer\vegas-encoder.ini.in", "$ini`r`nAppPath={app}\VegasEncoder.exe`r`n")
 [IO.File]::WriteAllText("$output\installer\VegasEncoder-x64.fio2007-config", "[FileIO Plug-Ins]`r`nvegas-encoder=FileIO Plug-Ins\vegas-encoder\vegas-encoder.dll`r`n")
-Copy-Item -LiteralPath "$repo\config\version.generated.iss" -Destination "$output\installer\version.iss"
-$files = foreach ($file in Get-ChildItem -LiteralPath "$output\app","$output\plugin","$output\installer" -Recurse -File) {
+Copy-Item -LiteralPath (Assert-PlainPath "$repo\build\release\vegas-encoder\setup\ve-install.exe") -Destination "$output\installer\ve-install.exe"
+foreach ($file in Get-ChildItem -LiteralPath "$repo\setup" -Recurse -File -Filter '*.iss') {
+  $null = Assert-PlainPath $file.FullName
+  $destination = Join-Path "$output\setup" ([IO.Path]::GetRelativePath("$repo\setup", $file.FullName))
+  New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+  Copy-Item -LiteralPath $file.FullName -Destination $destination
+}
+Copy-Item -LiteralPath "$repo\app\windows\runner\resources\app_icon.ico" -Destination "$output\setup\app_icon.ico"
+$owned = @(foreach ($file in Get-ChildItem -LiteralPath "$output\app" -Recurse -File) {
+  [ordered]@{ file=[IO.Path]::GetRelativePath("$output\app", $file.FullName); sha256=(Get-FileHash -LiteralPath $file.FullName).Hash }
+})
+$owned += [ordered]@{file='setup-support\ve-install.exe'; sha256=(Get-FileHash -LiteralPath "$output\installer\ve-install.exe").Hash}
+[ordered]@{schema='vegas-encoder-payload/1'; version=$version.app; coreVersion=$version.exporter; files=$owned
+  pluginSha256=(Get-FileHash -LiteralPath "$output\plugin\vegas-encoder.dll").Hash
+  iniSha256=(Get-FileHash -LiteralPath "$output\installer\vegas-encoder.ini.in").Hash
+  configSha256=(Get-FileHash -LiteralPath "$output\installer\VegasEncoder-x64.fio2007-config").Hash
+} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$output\installer\payload.json" -Encoding utf8
+$files = foreach ($file in Get-ChildItem -LiteralPath "$output\app","$output\plugin","$output\installer","$output\setup" -Recurse -File) {
   $relative = [IO.Path]::GetRelativePath($output, $file.FullName)
   [ordered]@{file=$relative; bytes=$file.Length; sha256=(Get-FileHash -LiteralPath $file.FullName).Hash}
 }
@@ -106,7 +122,7 @@ $manifest = [ordered]@{
     'two-container template restart remains unconfirmed; not an automatic owner test request',
     'exact large-template save/restart sequence remains unconfirmed',
     'owner-deferred extra failure recovery and progress-window performance trials',
-    'owner installer, runtime deployment policy, project license and release signoff')
+    'real installer install/update/uninstall qualification, project license and release signoff')
   targets=$targets; appDestination='{app}'; pluginDestination='{vegasDir}\FileIO Plug-Ins\vegas-encoder'
   iniTemplate='installer\vegas-encoder.ini.in'; files=@($files)
 }

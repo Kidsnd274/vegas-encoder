@@ -239,10 +239,11 @@ a new timestamped directory under `build/releases/`. Package-only refuses change
 version, source, or runtime inputs; rebuild when those inputs change.
 
 The script generates versions/core data, resolves Flutter dependencies, builds the
-native exporter and app, records the build, and stages `app/`, `plugin/`, and
-`installer/` inputs with a manifest. Tool overrides are `-FlutterPath`,
-`-PythonPath`, and `-VcVarsPath`. It does not run tests, install the exporter,
-or compile/run Setup.
+native exporter and app, publishes `build/release/vegas-encoder/{app,core,plugin,setup}`,
+records the build, stages matched inputs, and compiles the installer into `dist/`.
+Tool overrides are `-FlutterPath`, `-PythonPath`, `-VcVarsPath`, and `-IsccPath`.
+It does not run tests, install the exporter, or run Setup. See the
+[installer guide](docs/INSTALLER.md) for app/VEGAS 2026 options and recovery.
 
 The staged `app/` is the complete runtime; `plugin/` holds the exporter DLL and INI.
 Keep them matched. The exporter statically links its own core; replacing the app's
@@ -265,7 +266,7 @@ Edit **[version.json](version.json)** at the repository root:
 
 Then run `Build-Release.ps1` to regenerate and rebuild the matched product.
 `Generate-Versions.py` projects the JSON into native/Dart constants, pubspecs,
-and `config/version.generated.iss`; edit the JSON rather than those generated
+and `setup/version.generated.iss`; edit the JSON rather than those generated
 values. Ordinary release bumps do not require changing ABI/schema/contract levels.
 Compile the owner's Setup script separately after the product build so the setup
 version and binaries agree.

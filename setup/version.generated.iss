@@ -1,4 +1,4 @@
-; Generated from version.json. Include in a future owner-authored setup.
+; Generated from version.json. Do not edit; used by setup/setup_script.iss.
 #define VeReleaseVersion "0.1.7"
 #define VeAppVersion "0.1.7+1"
 #define VeFileVersion "0.1.7.1"

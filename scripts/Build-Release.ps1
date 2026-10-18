@@ -1,12 +1,13 @@
 #Requires -Version 7.0
-<# Build the current product and/or stage installer inputs. Never installs or runs setup. #>
+<# Build the product, publish runtime folders and compile Setup. Never installs or runs Setup. #>
 [CmdletBinding()]
 param(
   [ValidateSet('All','Build','Package')][string]$Action = 'All',
   [string]$OutputDir,
   [string]$FlutterPath = $(if (Test-Path -LiteralPath 'L:\flutter\bin\flutter.bat') { 'L:\flutter\bin\flutter.bat' } else { 'flutter.bat' }),
   [string]$PythonPath = 'python',
-  [string]$VcVarsPath
+  [string]$VcVarsPath,
+  [string]$IsccPath
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -38,21 +39,25 @@ try {
     $sourceBefore = Get-VeSourceState $repo | ConvertTo-Json -Depth 6 -Compress
     cmd /d /c 'scripts\build.cmd "" release'
     if ($LASTEXITCODE -ne 0) { throw 'Native build failed.' }
+    cmd /d /c scripts\Build-SetupHelper.cmd
+    if ($LASTEXITCODE -ne 0) { throw 'Setup helper build failed.' }
     Push-Location app
     try {
       & $FlutterPath build windows --release --build-name $version.release --build-number $version.build
       if ($LASTEXITCODE -ne 0) { throw 'App build failed.' }
     } finally { Pop-Location }
+    Publish-VeApp $repo
     $sourceAfter = Get-VeSourceState $repo
     if ($sourceBefore -cne ($sourceAfter | ConvertTo-Json -Depth 6 -Compress)) { throw 'Source changed during build. Rebuild before packaging.' }
     Write-VeBuildReceipt $repo $version $sourceAfter
-    Write-Output 'Product build complete: build/release/vegas-encoder and app/build/windows/x64/runner/Release'
+    Write-Output 'Product build complete: build/release/vegas-encoder/{app,core,plugin,setup}'
   }
   if ($Action -ne 'Build') {
     $null = Get-VeBuildVersion -PythonPath $PythonPath -CheckGenerated
     Test-VeBuildReceipt $repo $version (Get-VeSourceState $repo)
     & (Join-Path $PSScriptRoot 'Prepare-B7.ps1') -OutputDir $OutputDir -PythonPath $PythonPath
     Write-Output "Installer inputs ready: $OutputDir"
+    & (Join-Path $PSScriptRoot 'Build-Installer.ps1') -BundleDir $OutputDir -IsccPath $IsccPath
   }
 } finally {
   Pop-Location

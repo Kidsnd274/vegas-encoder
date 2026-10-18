@@ -1,4 +1,28 @@
-# B7 inputs for the owner's Inno Setup installer
+# Matched installer inputs and retained trials
+
+**Current workflow (2026-10-18):** the owner has now requested an implemented
+installer and automatic compilation. This supersedes the older owner-authored
+installer handoff scope below. `scripts/Build-Release.ps1` publishes the app,
+core and plug-in into `build/release/vegas-encoder/{app,core,plugin}`, builds the
+setup helper in the adjacent `setup/` directory, stages a fresh matched bundle,
+and compiles the frozen Inno sources into `dist/`. It never runs Setup or replaces
+the installed trial. See [build commands](BUILDING.md) and
+[installer choices, ownership and recovery](INSTALLER.md).
+
+The current bundle layout adds `setup/` (all `.iss` sources, version include,
+icon) and `installer/{ve-install.exe,payload.json}`. Generated definitions have
+moved to source `setup/version.generated.iss`; fresh bundles no longer use
+`installer/version.iss`. The public install omits PDB symbols, renders an INI
+for the chosen app path, and preserves the existing per-host manifest format.
+The app is required, the VEGAS 2026 integration is optional, and a detected or
+manually browsed target must pass actual x64/2026 executable validation.
+
+The historical snapshots and scope notes below describe their creation state;
+their paths/rollback must remain intact. They are not instructions to resume
+old development locations or to rebuild the old layout. Runtime compatibility
+claims and owner-skipped/deferred checks remain exactly as recorded in STATUS.
+
+## Earlier handoff history
 
 Source/build location after consolidation: **`L:\repos\vegas-encoder`**. One agent
 owns app/platform integration; the owner still builds/tests Inno Setup. Retained

@@ -96,8 +96,8 @@ def outputs(root, version):
     result['packages/ve_core/lib/src/version.g.dart'] = (
         '// Generated from version.json. Do not edit.\n'
         f'const expectedCoreAbi = {version["core"]["abi"]};\n')
-    result['config/version.generated.iss'] = (
-        '; Generated from version.json. Include in a future owner-authored setup.\n'
+    result['setup/version.generated.iss'] = (
+        '; Generated from version.json. Do not edit; used by setup/setup_script.iss.\n'
         f'#define VeReleaseVersion "{version["release"]}"\n'
         f'#define VeAppVersion "{version["app"]}"\n'
         f'#define VeFileVersion "{version["numeric"]}"\n'

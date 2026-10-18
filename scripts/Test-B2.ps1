@@ -33,7 +33,7 @@ try {
     Invoke-B2Check $DartPath @('pub','get','--offline')
     Invoke-B2Check $DartPath @('analyze','--fatal-infos')
     Invoke-B2Check $DartPath @('run','test/native_test.dart')
-    Invoke-B2Check $DartPath @('run','test/native_test.dart',(Join-Path $veB2Root 'build/core/ve_core.dll'))
+    Invoke-B2Check $DartPath @('run','test/native_test.dart',(Join-Path $veB2Root 'build/release/vegas-encoder/core/ve_core.dll'))
     if ($Aot) {
       $veAotDir = Join-Path $veB2Root 'build/core-aot'
       # dart build replaces its output directory. Verify the absolute target is

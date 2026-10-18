@@ -11,7 +11,7 @@ Future<void> checkVersionInputs(
     'scripts/Generate-Versions.py',
     'src/version.generated.h',
     'packages/ve_core/lib/src/version.g.dart',
-    'config/version.generated.iss',
+    'setup/version.generated.iss',
     'app/pubspec.yaml',
     'packages/ve_core/pubspec.yaml',
     'packages/ve_services/pubspec.yaml',

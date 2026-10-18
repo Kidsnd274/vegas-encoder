@@ -5,6 +5,96 @@ Updated: 2026-10-18 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proo
 
 ## Current progress
 
+**Setup startup fix and component identity (owner request, 2026-10-18):**
+the owner-reported `app`-constant error came from `InitializeWizard` calling
+the common helper request initializer before Inno had resolved the app path.
+Detection/validation now use path-independent requests; install/uninstall use
+an explicit app request. A compiled, unprivileged Inno harness runs the actual
+wizard scripts and production helper's read-only detection, then aborts before
+installation. Wizard initialization passes on Inno **6.7.1**.
+
+The current combined setup and Windows AppId are retained. Separate app and
+per-host core instance GUIDs, independent version metadata, paths and app/core
+links now live in the protected ProgramData component catalog and existing
+ownership manifests. Updates retain IDs; hash-verified legacy manifests are
+adopted; another app's core is refused. Exact catalog bytes participate in
+backup/rollback/restore/uninstall. **36** confined helper fixtures pass using
+real Windows file/INI/process APIs and fake, never-loaded app/host/payload bytes.
+They cover custom/separate paths, identity/version persistence, legacy adoption,
+catalog tamper/path guards, component removal, rollback and unrelated records.
+The launch harness is a non-installing fixture, not a product installation test.
+
+Full native/helper/Flutter release rebuild and Inno **6.7.1** compilation pass
+into fresh `build/release-inputs-setup-identity` (**32** file records). All **81**
+packaging/detection checks and **5** frozen-input refusal checks pass. The corrected
+artifact is `dist/VegasEncoder-0.1.7.1-windows-x64-setup-20261018-132157171.exe`
+(12,632,367 bytes), SHA-256
+`4A0246E29E096C4784B4112A2CD003C3D4F1F47203450468112F117421308C41`.
+Its provenance sidecar records `sourceDirty:true`, `installed:false` and
+`releaseQualified:false`. No product Setup was run. Full real install/update/
+uninstall and clean-machine prerequisite/locked-file qualification remain open.
+
+The current wizard still targets one VEGAS 2026 installation per app. Multiple
+simultaneous targets, other host binaries and split installers remain future
+work; their ownership/dependency migration is described in [INSTALLER.md](INSTALLER.md).
+No Flutter UI or native exporter behavior changed. Existing installed trial,
+candidate/rollback paths and owner-deferred VEGAS checks remain untouched.
+
+**Grouped release outputs and modular installer (owner request, 2026-10-18):**
+pre-work changes were committed as `586c7c6`. Finished outputs now share
+`build/release/vegas-encoder/{app,core,plugin,setup}`. Flutter retains its normal
+intermediates; the unified script publishes its complete runtime, retaining the
+previous published copy. Core/native wrappers, receipts and staging use the new
+paths. Existing trial/candidate/rollback/worktree paths are preserved.
+
+All Inno sources, including generated versions, now live in `setup/`. Setup
+offers the required app and optional VEGAS 2026 plug-in, registry detection plus
+manual Browse, x64/2026 executable validation, process closure, runtime prerequisite
+checks, ownership/hash/reparse guards and exact file backups. It preserves the
+existing per-host manifest format consumed by the read-only dashboard. One
+recorded 2026 target is updated/moved/removed with the shared app; older VEGAS
+versions remain unsupported. Unknown/modified files cause refusal. User settings,
+libraries/jobs/templates/FFmpeg stay intact. See [installer/recovery](INSTALLER.md)
+for scope, silent switches, pending-transaction recovery and retained backup paths.
+
+All/Package compile a verified frozen bundle through Inno Setup into `dist/`,
+with a hash/provenance JSON sidecar. Build remains compile-only. Setup sources and
+the helper are covered by build/staging freshness checks. The final complete All
+run passes into `build/release-inputs-setup-final` (**32** file records, **80**
+packaging/detection checks). Package-only also passes into
+`build/release-inputs-setup-repack` without rebuilding app/core/plug-in.
+That earlier installer was
+`dist/VegasEncoder-0.1.7.1-windows-x64-setup-20261018-033807001.exe`, with SHA-256
+`CC10E2460459BFEC2D06D650C4DEC73083DB00C07B958A0A8D5181A2B8713A8D`;
+its JSON sidecar records source commit `6a8e837`, `sourceDirty:true`, bundle/input
+hashes and `releaseQualified:false`. No installer was run and the installed trial
+was not changed; its DLL retains SHA-256 `9799B6CD...266707`.
+
+Focused checks: **26** native helper fixtures pass using real Windows file/INI/
+process APIs with fake app/host/payload bytes confined under build/test-results;
+**15** fake-file receipt/publishing guards, **5** frozen-bundle refusal checks,
+**8** version fixtures and actual Inno **6.7.1** no-output compilation pass.
+The rebuilt plug-in also passes **62** naming checks with a fake host. The actual
+production helper's read-only registry/executable check detects one eligible
+VEGAS **2026.0.3.189** installation; it does not mutate or qualify that host.
+These checks do not establish real installer or VEGAS compatibility. No Flutter
+UI changed, so existing app light/dark goldens and passed encoding suites were
+not repeated. Real Inno install/update/uninstall, clean-machine prerequisite/
+locked-file behavior, signing/project licensing and release signoff remain open.
+Owner-skipped/deferred VEGAS trials remain skipped/deferred. This supersedes
+earlier owner-only setup scope and previous output-layout notes below.
+
+**README refresh (owner request, 2026-10-18):** the root README now leads with
+the app, requirements, actual VEGAS compatibility scope, encoder profiles and
+GitHub installer download instructions (Setup is still being prepared). It uses
+the selected icon and two compact
+light/dark previews from existing Flutter golden captures, labelled as test data.
+Developer setup, build/version/test instructions, repository layout and a simple
+architecture diagram follow at the bottom. Local links/anchors and referenced
+script names pass checks; both preview images were visually inspected and
+`git diff --check` passes. No app code, runtime tests, installation or real-host
+qualification changed.
+
 **Release output folder (owner request, 2026-10-18):** the product exporter now
 builds into `build/release/vegas-encoder`, selected by `build.cmd "" release`.
 The unified build, packaging defaults, receipts and naming runner use this path.

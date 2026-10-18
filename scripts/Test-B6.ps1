@@ -3,7 +3,7 @@
 param([switch] $Asan)
 $ErrorActionPreference = 'Stop'
 $b6Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-foreach ($b6Output in 'build','build\core','build\b6-tests','build\b6-tests-asan','build\test-results') {
+foreach ($b6Output in 'build','build\release\vegas-encoder\core','build\b6-tests','build\b6-tests-asan','build\test-results') {
   $b6Path = Join-Path $b6Root $b6Output
   if ((Test-Path -LiteralPath $b6Path) -and
       ((Get-Item -LiteralPath $b6Path).Attributes -band [IO.FileAttributes]::ReparsePoint)) {

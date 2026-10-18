@@ -17,8 +17,9 @@ The owner selected option A. Source: `app/assets/icon/app_icon.svg`; regenerate
 the Windows ICO/PNG and Markdown PNG using `scripts\export_app_icons.bat`.
 `--check` verifies freshness. See [icon workflow](../app/assets/icon/README.md)
 and STATUS for checks. The title-bar mark already matches A and keeps its theme
-colours. No `flutter_launcher_icons` dependency is needed. README icon/layout
-changes await the owner's later instructions; installed candidates remain intact.
+colours. No `flutter_launcher_icons` dependency is needed. The owner-requested
+README refresh now uses the icon, app-first documentation and two compact UI
+previews, with developer instructions at the bottom. Installed candidates remain intact.
 
 ## Consolidation baseline (2026-10-16)
 
@@ -51,39 +52,60 @@ candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
 
-**Current owner-requested build consolidation:** root `version.json` and generated
-native/Dart/pubspec/setup projections are the version source. Use
-`scripts/Build-Release.ps1` (All/Build/Package) and [BUILDING.md](BUILDING.md).
-Current exporter output is **`build/release/vegas-encoder`**, using the `release`
-build argument. The legacy `recipe-proof` argument aliases that same output;
-old folders/candidates/rollback stay intact. Packaging/receipts/tests use the
-new path. This folder change does not change version labels or host behavior.
-The unified release build/stage passes into `build/release-inputs-release-folder`
-(25 verified files); 11 receipt guards and 62 naming checks pass with a fake
-host. Receipts validate the new output and the legacy folder remains preserved.
-The owner's `setup/setup_script.iss` now includes the generated config version
-definitions for AppVersion and numeric VersionInfoVersion. Actual compiler
-validation with output disabled passes for current and changed-JSON fixtures;
-no installer executable was built or run. Compile Setup separately after the
-product build; automatic setup compilation is not part of the unified command.
-The owner explicitly added this workflow request after committing the retained
-features as `b5d66de`. Preserve installed/old staged variants and owner-added
-icon assets/scripts/runner icon; new workflow changes are uncommitted. The full
-All command passed and staged `build/release-inputs-central-versions` (25 files),
-with 8 version tests, 11 receipt guards, 66 packaging checks, 5 core/version unit
-checks, 2 unchanged About light/dark goldens and clean app/core/services analysis.
-That initial bundle predated concurrent icon changes, and Package-only correctly
-refused the stale source receipt. The final rebuild included the current icon
-and staged `build/release-inputs-central-versions-current` (all 25 hashes verified);
-Package-only then passed into `build/release-inputs-central-versions-repack`
-without recompilation. Do not rewrite receipts or mutate old bundles. See STATUS for
-the built hash and exact validation scope.
-This does not reopen other feature work or skipped/deferred host trials.
+**Latest installer fix (2026-10-18):** the owner's startup error is fixed by
+separating path-independent detection/validation requests from app lifecycle
+requests; `InitializeWizard` no longer expands the early `app` constant. An
+unprivileged, abort-before-install Inno harness exercises the actual scripts and
+read-only detection. All **36** confined native helper fixtures pass. App/core
+component records now retain separate instance GUIDs, versions and paths under
+protected ProgramData, with exact transactional rollback and cross-app ownership
+guards. Keep the combined setup AppId stable. The current wizard still manages
+one VEGAS 2026 target; future split/multi-host installers must explicitly migrate
+uninstaller ownership and app dependencies (see [INSTALLER.md](INSTALLER.md)).
+This does not authorize installation, commits or new host compatibility claims.
+The full release rebuild and Inno compile pass into fresh
+`build/release-inputs-setup-identity` (32 files); **81** packaging/detection checks
+and **5** frozen-input refusal checks pass. Latest corrected installer:
+`dist/VegasEncoder-0.1.7.1-windows-x64-setup-20261018-132157171.exe`, with its
+hash/provenance sidecar. Product Setup was not run and no live trial was changed.
+Next deployment gate remains the controlled real installer trial below, requiring
+owner direction; the launch-only harness does not close it.
+
+**Current owner-requested build/installer consolidation:** pre-work changes were
+committed as `586c7c6`. Root `version.json` remains authoritative; the generated
+Inno include now lives in `setup/version.generated.iss`. Finished builds share
+`build/release/vegas-encoder/{app,core,plugin,setup}`. Flutter's intermediate
+output stays in its normal folder; the unified command publishes the runtime.
+All `.iss` sources are under `setup/`, split into helper, host-selection and
+lifecycle modules. App is required; VEGAS 2026 integration is optional, with
+registered detection, manual Browse, executable validation, exact ownership/hash
+checks and retained rollback transactions. See [installer behavior](INSTALLER.md).
+
+`scripts/Build-Release.ps1` All/Package now compiles a verified frozen bundle to
+`dist/` using the existing Inno compiler; it never runs Setup. Build is compile
+only. Source/output receipts include setup inputs and the helper. Current work
+is uncommitted; do not commit again without owner direction. Preserve concurrent
+README work and all old bundles, worktrees, installed candidate and rollback.
+
+Focused checks pass: 26 confined native helper fixtures (including Unicode INI
+reads through Windows, update/adoption, rollback, uninstall, running-process and
+junction guards); 15 fake-file build/publish receipt guards; 5 frozen-input refusal
+checks; 8 central-version tests and actual Inno 6.7.1 no-output script compilation.
+The final All build/installer compilation passes into `build/release-inputs-setup-final`
+(32 file records; 80 packaging/detection checks). Package-only also passes into
+`build/release-inputs-setup-repack` without rebuilding product binaries. That
+earlier installer was `dist/VegasEncoder-0.1.7.1-windows-x64-setup-20261018-033807001.exe`,
+with its hash/provenance sidecar. Actual production-helper read-only detection
+finds the installed 2026.0.3.189 host; this is detection, not installation testing.
+The rebuilt plug-in passes 62 naming checks with a fake host.
+No Flutter UI changed; existing app light/dark goldens were not repeated.
+This does not reopen skipped enhancements or owner-deferred host trials.
 
 The owner reduced the remaining scope on 2026-10-17 to native multi-container
 support and the read-only VEGAS installation/status dashboard. Both now have
 producer/consumer implementation and focused offline checks. Everything else
-unfinished remains skipped; the owner builds the finished installer.
+unfinished remains skipped. The later installer request above supersedes the
+earlier owner-only installer scope.
 
 The owner additionally requested a shared Profile list with descriptions on
 2026-10-18. It reuses `VideoPanel` / `VeSelect` in desktop and popup, with six
@@ -166,8 +188,9 @@ explicitly discarding those edits**. This inspection did not resume that skipped
    `build/release-inputs-containers-dashboard` remains intact with its exact
    five-file rollback, isolated data and logs; its DLL still matches its old hash.
    Progress window remains enabled at owner request. Old platform
-   data/candidates/logs/rollback remain intact. The owner builds/tests Inno Setup;
-   runtime deployment policy, project licensing and release signoff remain open.
+   data/candidates/logs/rollback remain intact. The later installer implementation
+   above supersedes the earlier owner-only build scope; real installer qualification,
+   project licensing and release signoff remain open.
 
 Deferred real-host checks below stay deferred. New integration implementation does
 not close A5–A8 or authorize installation, commits, publishing or support claims.
@@ -185,21 +208,21 @@ Library-watch and capability-transfer optimizations are delivered; do not redo t
 
 ## Next-agent execution brief
 
-Read the current scope above, STATUS, CONTRACTS C3, UI_SPEC §6a,
-NATIVE_CONTAINER_PLAN and CONTAINER_TRIAL. The owner closed the active container
-test queue after confirming all-container value handoff. Fresh matched inputs,
-including Profile-list UI and central versions, were staged in
-`build/release-inputs-central-versions-current`; subsequent source changes require
-another unified build before the owner's installer build. The owner requested the current local source
-checkpoint; future commits still require owner authorization. Existing bundle
-manifests retain their earlier `c8e6e39` / `sourceDirty:true` creation state; do not
-rewrite them after committing. Re-stage to a fresh directory when a clean-source
-installer input is needed. Build/output instructions are in [BUILDING.md](BUILDING.md).
-Do not report skipped/static/fake checks as real VEGAS support. No further feature implementation is queued unless
-a material defect appears in these two retained features. Preserve the new
-work, the checkpoint, all installed/trial/rollback files and old
-worktrees. No installer build, new general enhancement, deferred trial, commit,
-push or installation without its required owner direction.
+Read the current scope above, STATUS, [BUILDING.md](BUILDING.md) and
+[INSTALLER.md](INSTALLER.md). Complete only material defects in the retained
+features/build/installer. Next deployment gate is a controlled real Inno
+install/update/uninstall trial with fresh and known-owned inputs, a custom
+VEGAS 2026 path, closed/running processes and a missing-runtime machine/VM.
+Compiler/helper fixtures do not close that gate. Do not run/install Setup,
+replace the live trial, publish or request deferred VEGAS trials without new
+owner direction. The owner closed the active container test queue.
+
+New installer bundles are not installed or release-qualified. Preserve all prior
+candidate manifests as records of their creation state; never rewrite them after
+committing. Rebuild/stage a fresh directory for a clean-source release. The
+installed `build/release-inputs-containers-dashboard` and its five-file rollback
+must remain intact. Future commits require owner direction; no additional
+feature implementation is queued.
 
 ## Carried-forward issues and decisions
 

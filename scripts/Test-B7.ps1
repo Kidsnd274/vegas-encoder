@@ -22,18 +22,20 @@ $manifest = Get-Content -LiteralPath "$bundle\installer-inputs.json" -Raw | Conv
 $version = Get-VeBuildVersion -CheckGenerated
 Check ($manifest.numericFileVersion -eq $version.numeric -and $manifest.app -eq $version.app -and $manifest.candidate -eq $version.exporter -and -not $manifest.installedByPreparation -and -not $manifest.releaseQualified) 'Matched version and pending gates required'
 Check (($manifest.versions.manifestSha256 -eq $version.manifestSha256) -and
-  (Get-Content -LiteralPath "$bundle\installer\version.iss" -Raw).Contains($version.numeric)) 'Central versions and setup include required'
+  (Get-Content -LiteralPath "$bundle\setup\version.generated.iss" -Raw).Contains($version.numeric)) 'Central versions and setup include required'
 foreach ($record in $manifest.files) {
   $path = [IO.Path]::GetFullPath((Join-Path $bundle $record.file))
   Check ($path.StartsWith($bundle + '\', [StringComparison]::OrdinalIgnoreCase)) 'Manifest path escapes bundle'
   Check ((Get-Item -LiteralPath $path).Length -eq $record.bytes -and (Get-FileHash -LiteralPath $path).Hash -eq $record.sha256) "Changed bundle input: $path"
 }
-$actual = @(Get-ChildItem -LiteralPath "$bundle\app","$bundle\plugin","$bundle\installer" -Recurse -File)
+$actual = @(Get-ChildItem -LiteralPath "$bundle\app","$bundle\plugin","$bundle\installer","$bundle\setup" -Recurse -File)
 foreach ($license in 've_core.txt','ve_services.txt','InstrumentSans-OFL.txt','JetBrainsMono-OFL.txt') {
   Check (Test-Path -LiteralPath "$bundle\app\licenses\$license") "Required license notice: $license"
 }
 Check ($actual.Count -eq $manifest.files.Count) 'Manifest must cover every packaged file'
 Check ((Get-Content -LiteralPath "$bundle\installer\vegas-encoder.ini.in" -Raw) -match 'AppPath=\{app\}\\VegasEncoder.exe' ) 'Installer must render its selected application path'
+$payload = Get-Content -LiteralPath "$bundle\installer\payload.json" -Raw | ConvertFrom-Json
+Check ($payload.version -eq $version.app -and $payload.coreVersion -eq $version.exporter) 'App and host-core versions must be recorded independently'
 Check ((Get-Content -LiteralPath "$bundle\plugin\vegas-encoder.ini" -Raw).Contains("AppPath=$bundle\app\VegasEncoder.exe")) 'Trial must use its own app'
 $prepare = Join-Path $PSScriptRoot 'Prepare-B7.ps1'
 Reject { & $prepare -OutputDir $bundle } 'exists'
