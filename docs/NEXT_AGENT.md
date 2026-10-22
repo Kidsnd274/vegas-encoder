@@ -1,6 +1,6 @@
 # Continue the unified Vegas Encoder implementation
 
-Updated: 2026-10-18 (Asia/Singapore).
+Updated: 2026-10-23 (Asia/Singapore).
 
 Work in **`L:\repos\vegas-encoder`**, currently on **`master`**.
 The original folder remains the only development checkout. The earlier explicitly
@@ -18,8 +18,9 @@ the Windows ICO/PNG and Markdown PNG using `scripts\export_app_icons.bat`.
 `--check` verifies freshness. See [icon workflow](../app/assets/icon/README.md)
 and STATUS for checks. The title-bar mark already matches A and keeps its theme
 colours. No `flutter_launcher_icons` dependency is needed. The owner-requested
-README refresh now uses the icon, app-first documentation and two compact UI
-previews, with developer instructions at the bottom. Installed candidates remain intact.
+README refresh now uses the icon, app-first documentation and an owner-captured
+desktop screenshot at `docs/assets/preset-editor.png`, with developer instructions
+at the bottom. Installed candidates remain intact.
 
 ## Consolidation baseline (2026-10-16)
 
@@ -51,6 +52,66 @@ authorized a local commit of this integration checkpoint afterward. No installed
 candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
+
+**Expanded starters (owner request, 2026-10-23):** implemented all seven proposed
+additions and the owner's x264 CRF 16, x265 CRF 16 and 720p/3500 kbps NVENC
+presets. There are now 16 app recipes and 16 VEGAS starters; NVIDIA HEVC reuses
+its prior app recipe. [STARTER_PRESETS.md](STARTER_PRESETS.md) records settings.
+Preserve all prior recipes/revisions and slot/GUID identities. New entries append
+at slots 8-17. Only the explicit 720p starter fits/pads to 1280x720; all retain
+source frame rate and the others retain project dimensions. ProRes remains
+`prores_ks`. STATUS records native build, 357 fake-host checks, 154 repository,
+99 watch/cache, 39 widget/golden regressions, clean analysis, and 93 real FFmpeg
+checks with 17 synthetic encodes/full decodes plus one unavailable AV1 NVENC
+refusal. Light/dark images and three aspect-ratio resize cases were reviewed.
+No real VEGAS test, installation, commit or new installer bundle was performed
+by this preset task. Rebuild matched inputs before deployment; old six-starter
+bundles below are historical. Expanded list/save/restart and AV1 GPU encode
+qualification remain open; do not resume owner-deferred trials automatically.
+
+**Installer modes (owner decisions, 2026-10-23):** implemented. See
+[INSTALLER.md](INSTALLER.md) for the behaviour and STATUS for the checks.
+
+Next:
+1. Once the concurrent starter-preset edits settle, run `scripts/Build-Release.ps1`
+   to package an installer.
+2. The owner runs the real Setup trial:
+   - fresh install with and without VEGAS 2026 ticked;
+   - update over an older build;
+   - Modify, Repair and Uninstall from maintenance;
+   - the downgrade block;
+   - Retry with VEGAS open;
+   - light/dark appearance.
+
+Do not run Setup without owner direction. Adding another VEGAS version needs its
+exporter binary and the `supported()` change described in INSTALLER.md.
+
+**Initial fixed default presets (historical baseline, 2026-10-18):** implemented six
+exporter starters (H.264/MP4, software HEVC 10-bit/MP4, AV1 10-bit/MKV, ProRes
+422 HQ/MOV, DNxHR HQ/MXF and FFV1/MKV) plus the existing general settings template.
+`schema/builtin-presets.v1.json` generates both app built-ins and native rows.
+Original six app recipes are unchanged; software HEVC is the seventh. Preserve
+native GUIDs/indices and increment preset revisions for future recipe changes.
+Setup replaces bundled defaults through binaries, never user `.sft2` files.
+Saved snapshots retain settings/origin until explicit Update from library.
+Arbitrary pinned user presets remain skipped. STATUS records offline checks;
+new starter enumeration, save/restart and the installer still need owner testing.
+No installation, commit or deferred host trial is authorized by this source work.
+Matched inputs are `build/release-inputs-default-presets`; the latest compiled
+installer is `dist/VegasEncoder-0.1.7.1-windows-x64-setup-20261018-223603890.exe`
+with its provenance/hash sidecar. Build, 81 packaging checks and five frozen-input
+guards pass. Setup has not been run. The 180 fake-host/default checks and 45
+popup/widget/golden regressions do not establish new real-VEGAS compatibility.
+
+**Current deployment state (owner request, 2026-10-18):** the development
+exporter is now uninstalled and its six saved VEGAS test templates, normal app
+settings/cache/sessions and legacy logs are archived for a clean installer test.
+The owner will test Setup; it has not been run by this cleanup. Backup, exact
+path mappings and restoration instructions are under
+`C:\Users\Samuel Tee\AppData\Local\VegasEncoderInstallerTestBackup\20261018-clean-start`.
+STATUS records verified absent active paths and unchanged unrelated templates.
+Preserve that backup and all existing candidate/isolated-profile/rollback folders.
+Earlier installed-trial statements below describe history, not current deployment.
 
 **Current scripts layout (owner request, 2026-10-18):** the pre-cleanup installer
 checkpoint is committed/pushed as `392493d`. The five routine entry points stay
@@ -274,8 +335,9 @@ qualification and owner-deferred monitor measurements retain their recorded scop
 
 ## Owner scope and operational continuity
 
-- Installed trial: containers/dashboard 0.1.7 on VEGAS 2026.0.3.189, authorized
-  2026-10-18. Its INI points to `build/release-inputs-containers-dashboard` here.
+- Previous trial (now uninstalled for the owner's installer test): containers/
+  dashboard 0.1.7 on VEGAS 2026.0.3.189, authorized 2026-10-18. Its backed-up INI
+  points to `build/release-inputs-containers-dashboard` here.
   The exact previous template-name-fix INI/binaries/manifest/discovery are in the
   new trial's `rollback/`; its referenced platform app/log/data paths remain intact.
 - Faster-progress is prepared, **not installation-confirmed**. Owner deferred its

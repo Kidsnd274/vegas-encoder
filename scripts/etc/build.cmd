@@ -9,6 +9,9 @@ if defined VE_BUILD_VCVARS (
   where cl >nul 2>nul || (echo Run from an x64 MSVC developer prompt or pass vcvars64.bat. & exit /b 1)
 )
 set "VE_BUILD_ROOT=%~dp0..\.."
+set "VE_BUILD_PYTHON=%VEGAS_ENCODER_PYTHON%"
+if not defined VE_BUILD_PYTHON set "VE_BUILD_PYTHON=python"
+"%VE_BUILD_PYTHON%" -I "%~dp0Generate-ServiceBuiltins.py" --check || exit /b 1
 call "%~dp0build-core.cmd" "%VE_BUILD_VCVARS%" || exit /b 1
 set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\vegas-encoder"
 set "VE_BUILD_PROOF_FLAGS="

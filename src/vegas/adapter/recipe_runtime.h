@@ -13,4 +13,5 @@ struct RecipeRuntime {
 RecipeRuntime LoadRecipeRuntime();
 configuration::RecipePageOptions RecipeEditorOptions();
 ve::Json DefaultRecipeSnapshot();
+ve::Json BuiltinRecipeSnapshot(const char* presetJson);
 } // namespace vegas_encoder

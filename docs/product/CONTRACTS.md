@@ -577,6 +577,19 @@ Library root: `%APPDATA%\VegasEncoder\library\<id>.vepreset`. Save checks the
 expected revision atomically, increments it and preserves the last 20 old versions
 under `.history\<id>\<revision>.vepreset`. expectedRevision=null creates only;
 conflicting saves fail. get(id) means current; get(id,revision:N) may return history.
+The 16 product built-ins are bundled from `schema/builtin-presets.v1.json`.
+The same catalog generates 16 fixed VEGAS starter definitions with stable slots
+2-17 and GUIDs, after the reserved probe (0) and existing general template (1).
+The 2026-10-23 additions append without changing the previous recipes/identities;
+see [starter settings](../STARTER_PRESETS.md). Dimensions/rate follow the project,
+except the explicit 720p starter fits/pads to 1280x720 at the project frame rate.
+Each starter carries a core-normalized recipe and origin `{presetId, revision,
+name}` matching its app built-in. Built-in setting changes increment revision;
+existing IDs and slot/GUID identities stay stable. Installed binaries supply
+defaults; Setup never copies `.sft2` templates or replaces saved user snapshots.
+Explicit popup Update from library adopts newer settings. User pin metadata has
+no native enumeration effect. This is distinct from historical B0 fake fixtures.
+
 Built-ins are read-only. Duplicate/import requires a new ID and writes a user
 preset, origin `builtin/<id>` when duplicated from a built-in. Import/export JSON
 round-trips unknown keys. Real import/save uses core validation; the fake
@@ -629,8 +642,9 @@ copies use `job/<id>`. Imports retain their supplied origin (built-ins are relab
 Share format is `vepreset:1:<base64url UTF-8 exported preset JSON>` (padded). It is
 plain portable preset data, not encrypted or signed. Decoded data is bounded and
 validated through the same import path. Export writes only the user-selected path,
-atomically. Six packaged built-ins adopt the original recipe snapshots at product
-revision 1; design-time installation identities/results are never packaged with them.
+atomically. The six original packaged built-ins retain their recipe snapshots at
+product revision 1; software HEVC is an additional revision-1 product recipe.
+Design-time installation identities/results are never packaged with them.
 
 `PresetTransfer.importFrom(selectedPath, newId: ...)` reads only the caller-selected
 UTF-8 JSON file, bounded to 1 MiB even if it grows during the read. It delegates to

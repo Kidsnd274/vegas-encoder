@@ -243,6 +243,17 @@ The separate process costs ~0.5 s of startup and a session file. That is the bet
 
 ### 5.5 Fallback if A5 cannot establish a page exchange
 
+**Fixed starter templates (owner-approved 2026-10-18):** the exporter now supplies
+six named starters plus the preserved general settings template. The committed
+`schema/builtin-presets.v1.json` catalog generates app built-ins and native rows
+with snapshot recipes, origin IDs/revisions and stable native indices/GUIDs.
+The C++ core normalizes/encodes those recipes. No user library or app process is
+needed for enumeration or rendering. Setup replaces bundled defaults with its
+version's binaries; it does not write `.sft2` files or refresh saved snapshots.
+Popup Update from library remains explicit. Real-host list/restart behavior is
+unqualified for these new starters. This fixed list does not implement arbitrary
+user pinning or change the historical fallback research below.
+
 Expose **pinned library presets as exporter presets** in Render As (`GetPresetCount` /
 `GetPreset`), each carrying its snapshot payload. Users pick a preset in VEGAS and edit
 presets in the desktop app.

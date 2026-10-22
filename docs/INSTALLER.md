@@ -8,113 +8,245 @@ Setup. Neither command runs the installer. Inno Setup **6.7.1** is the verified
 compiler; `-IsccPath` overrides its location. Tool installation is separate.
 
 All Inno sources live under `setup/`: `setup_script.iss`, `version.generated.iss` and
-`includes/{helper,hosts,lifecycle}.iss`. The generated include comes from root
-`version.json`. `native/install.cpp` is a small Windows installer helper using
-the existing MIT-licensed JSON header; its notice ships with the app. It does
-not execute PowerShell, VEGAS, the Flutter app or FFmpeg.
+`includes/{helper,hosts,wizard,lifecycle}.iss`:
 
-## Installation choices
+- `helper.iss` runs the native helper with UTF-16 INI requests and results;
+- `hosts.iss` holds the detected VEGAS versions and the VEGAS integrations page;
+- `wizard.iss` picks the mode and drives the welcome, maintenance, ready and
+  finished pages;
+- `lifecycle.iss` prepares, commits, rolls back and uninstalls.
 
-The app is required; the VEGAS Pro **2026** exporter is optional. The installer
-reads 32/64-bit HKLM/HKCU uninstall and App Paths registrations, verifies the
-actual x64 `vegas2026.exe` and file-version major, and offers detected folders.
-Browse permits unregistered/custom locations. Other VEGAS versions are rejected.
-Detection does not qualify a new build: the tested host remains 2026.0.3.189.
+The generated include comes from root `version.json`. `native/install.cpp` is a
+small Windows installer helper using the existing MIT-licensed JSON header; its
+notice ships with the app. It does not execute PowerShell, VEGAS, the Flutter app
+or FFmpeg. The behaviour below was agreed with the owner on 2026-10-23.
 
-There is one selected VEGAS 2026 target per shared app installation. Updating
-that installation updates its recorded target; selecting another target moves
-the integration, and unchecking the component removes it. The wizard explains
-this before installation. Unrelated exporter folders are untouched. A missing
-VEGAS executable does not prevent removal of an already-owned integration.
+## Components and versions
 
-The installed exporter goes under
-`{vegasDir}\FileIO Plug-Ins\vegas-encoder`, with its discovery file at the VEGAS
-root. Setup renders a UTF-16 INI with the final app path and default log location;
-it never ships development app/log paths. PDBs stay in the private build bundle,
-not the public install. Existing recognized development installations can be
-adopted only when all recorded DLL/INI/PDB/discovery hashes still match.
+- **App**: exactly one per machine, always installed. It owns the Windows
+  uninstall entry and the existing Inno `AppId`.
+- **Core**: the VEGAS exporter. At most **one per VEGAS version**, installed in
+  that VEGAS folder. Each supported VEGAS version has its own core binary in the
+  bundle; today only VEGAS Pro 2026 is supported.
+- **Everything moves together.** The exporter refuses to render with any app build
+  other than its own (`AppReady` in `src/vegas/adapter/recipe_runtime.cpp`). After
+  every successful run, every installed core has the app's version: updating the
+  app always updates every installed core. There is no "keep the old core" choice.
 
-Setup requires administrator rights, Windows x64, and the x64 Microsoft Visual
-C++ runtime already installed (`vcruntime140`, `vcruntime140_1`, `msvcp140`).
-It reports a missing prerequisite rather than downloading or installing tools.
-Close Vegas Encoder (including popup/progress windows) and the affected VEGAS
-installations first. Processes are checked by executable location; Setup does
-not kill processes or schedule partial file replacement on reboot.
-Updates retain the existing app directory; uninstall first to relocate it.
+## Modes
 
-Startup detection and host validation deliberately omit the app directory from
-their helper requests. Inno has not initialized the `app` constant during
-`InitializeWizard`; only install/uninstall lifecycle requests expand it.
+Setup asks the helper for the installed app's version before the wizard opens and
+picks the mode from it:
 
-For unattended deployment, Inno's component/path switches can be used, for example:
+| Installed app | Mode | Offered |
+| --- | --- | --- |
+| None | Install | App location; VEGAS integrations, all unticked |
+| Older | Update | App location fixed; installed cores update (or untick to remove); other VEGAS versions can be ticked to add |
+| Same | Maintenance | Modify integrations, Repair, or Uninstall (opens the registered uninstaller) |
+| Newer | Blocked | "Vegas Encoder X is installed. Uninstall it before installing this older version." |
 
-```text
-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /COMPONENTS="app,vegas2026" /VEGASDIR="C:\Program Files\BorisFX\Vegas Pro 2026"
-```
+Versions compare by their numeric parts, then a release ranks above its
+prerelease, then the `+build` number (`0.1.7+1` < `0.1.7+2` < `0.1.8+1`).
+Downgrades are not supported. Anyone who needs one can replace the DLL by hand;
+the next setup run will simply overwrite it. The helper also refuses a downgrade
+during preparation, so a scripted install cannot bypass the check.
 
-Use `/COMPONENTS="app"` for app only. A selected plug-in with an invalid path
-fails preparation, including in silent mode. No post-install app launch occurs
-in silent mode.
+**Repair** reinstalls the app files and every recorded core from the bundle,
+overwriting changed or missing files. It does not add or remove integrations and
+skips the integrations and tasks pages.
 
-## Ownership, recovery and uninstall
+## VEGAS integrations
 
-`{app}\vegas-encoder-setup.json` records app payload hashes and its selected
-host. Per-host `install-manifest.json` retains the existing
-`vegas-encoder-install/1` format used by the read-only Settings dashboard.
-Shared app integrity is still outside that dashboard's existing coverage.
+- One row per detected VEGAS version. Detection reads the Windows uninstall
+  entries whose display name contains "VEGAS ... Pro", the `vegas*.exe` App Paths
+  registrations, the default VEGAS Pro 2026 folders and every recorded core
+  folder. It reads each `vegas<digits>.exe` file version without running it; the
+  major version decides the row (`vegas2026`, `vegas23`). A recorded folder wins
+  over a newly detected one for the same version.
+- Unsupported versions are shown disabled ("Not supported by this release") so the
+  user can see they were found. A supported version that was not detected is
+  listed as "Not found"; ticking it, or **Locate…**, asks for its folder.
+- Fresh install: every row unticked; the user ticks where the core goes.
+  Update/Modify: rows with an installed core start ticked, other rows unticked.
+  Unticking an installed row removes that core.
+- A row's folder can be changed to an unregistered location with **Change…**; it
+  must contain that version's x64 executable. Changing the folder of an installed
+  row moves the core and keeps its installation ID.
+- If no row is ticked when the user clicks Next, a task dialog asks "Install
+  without a VEGAS integration?" (**Continue without VEGAS** / **Go back**), or
+  "Remove the exporter from every VEGAS version?" (**Remove and continue** /
+  **Go back**) when installed integrations were unticked. Silent installs skip the
+  dialog and continue.
 
-### Component identity and future split installers
+## Screens
 
-Keep **one bundled setup for now**. Its Inno `AppId`
-`{0CF24E60-C0F5-4242-96AD-13FF2F9BF313}` remains the Windows program/update/
-uninstaller identity. Do not change it merely for a new release or host version.
-It is separate from the component catalog now written under the protected,
-administrator-readable `%ProgramData%\VegasEncoder\Installations\` directory.
-Every installed component has a `{instance-guid}.json` record:
+The visual reference is [installer.html](product/design/installer.html), an
+interactive light/dark approximation, not an Inno capture.
+
+- `WizardStyle=modern dynamic polar`: setup follows the Windows light/dark setting.
+- Update mode shows the version summary and the list of installed exporters on the
+  Welcome page; there is no separate status page.
+- Maintenance mode skips Welcome and opens on a Modify / Repair / Uninstall choice.
+- The VEGAS integrations page replaces the old Components and folder pages. Each
+  checklist row shows its status on the right ("Update 0.1.7+1 → 0.1.8+1",
+  "Installed", "Exporter will be added", "Exporter will be removed", "Exporter will
+  move here", "Not installed", "Not found", "Not supported by this release").
+  Below the list, a read-only field shows the selected row's folder.
+- The Ready page lists the app action and one line per VEGAS action. The Finished
+  page says which VEGAS versions to restart and offers to launch the app.
+- Programs still using the app or a selected VEGAS folder are named in a dialog
+  with **Retry** and **Cancel** before anything is changed.
+
+## Light ownership
+
+Setup does not police the exporter folder. It overwrites or removes its own file
+names without refusing when they were changed or deleted by hand, and leaves any
+unrecognized extra files alone (the folder stays if it is not empty). An
+exporter folder that setup did not record is taken over when its row is ticked.
+If a recorded core's DLL is missing, the row is treated as not installed and its
+record is cleaned up on the next run, so deleting the DLL by hand counts as
+removing it. If a recorded VEGAS folder no longer exists, its record is removed
+on the next run. If a user moves the DLL somewhere else, setup does not follow
+it. The per-run rollback transaction stays, so a failed run still restores what
+it replaced.
+
+Setup still refuses, before changing anything:
+
+- installing into a non-empty app folder that has no setup manifest;
+- a payload file that would overwrite an app file setup did not install;
+- reparse points (junctions or symbolic links) in any app, VEGAS or record path;
+- a VEGAS folder whose core is recorded for another app installation;
+- an installation record that is not valid for its component;
+- an interrupted earlier setup that still needs rollback.
+
+## Uninstall
+
+Uninstall from Windows removes the app and every recorded core, because a core
+cannot work without the app. It checks running programs first, saves another
+rollback transaction, removes setup's own file names from each recorded VEGAS
+folder, then lets Inno remove its registered app files. Unknown files are kept.
+User settings, libraries, jobs, caches, VEGAS templates and user-supplied FFmpeg
+are kept. To remove a single integration, run setup again and untick it under
+Modify, or delete its DLL by hand.
+
+## How setup tracks installations
+
+Setup keeps track of where things are installed in these places:
+
+1. **Installation records (authoritative).** One JSON file per installed component
+   in `%ProgramData%\VegasEncoder\Installations\{instance-guid}.json`
+   (readable and writable only by administrators and SYSTEM). There is one record
+   for the app and one per VEGAS version with a core. A core record holds the
+   VEGAS version (`hostFamily`, e.g. `vegas2026`), the VEGAS folder (`hostDir`),
+   the plug-in folder (`installDir`), the core version and the app record it
+   belongs to (see the field table below). Setup finds every installed core by
+   reading these records, not by scanning disks.
+2. **Files written into each VEGAS folder**, in each `{vegasDir}`:
+   - `FileIO Plug-Ins\vegas-encoder\vegas-encoder.dll`, the exporter;
+   - `vegas-encoder.ini`, holding the app path;
+   - `install-manifest.json`, a copy of the record plus file hashes, which the
+     app's Settings dashboard reads (`vegas-encoder-install/1`, unchanged);
+   - `VegasEncoder-x64.fio2007-config` at the VEGAS root, which tells VEGAS to
+     load the exporter.
+3. **The app's manifest**, `{app}\vegas-encoder-setup.json`, which lists the app's
+   files for Repair and uninstall and embeds the app record.
+
+VEGAS detection is separate (see VEGAS integrations): it says which VEGAS versions
+exist and where, and the records say which of those already have a core. If a
+record and the files in a VEGAS folder disagree, the record wins and the files are
+rewritten, or removed when the row is unticked.
+
+Installs made before the catalog existed named their single VEGAS 2026 folder in
+the app manifest's `host` field. Setup reads that field once, records the core
+under the catalog and no longer writes it. The Inno `Vegas2026Dir` previous-data
+value is retired for the same reason: it cannot represent more than one VEGAS
+version.
+
+### Record fields
 
 | Field | Meaning |
 | --- | --- |
 | `schema` | `vegas-encoder-component/1` |
-| `componentId` | `vegas-encoder.app.windows-x64` or `vegas-encoder.core.vegas2026.windows-x64` |
-| `instanceId` | Stable GUID for this installation, retained across updates |
+| `componentId` | `vegas-encoder.app.windows-x64` or `vegas-encoder.core.<hostFamily>.windows-x64` |
+| `instanceId` | Stable GUID for this installation, kept across updates and folder moves |
 | `version` | App version or exporter release version, recorded independently |
 | `installDir`, `manifest` | Absolute component and ownership-manifest paths |
 | `bundleId`, `architecture` | Current owning bundle's AppId and `x64` |
 | `appInstanceId` | Core's linked app installation GUID |
-| `hostDir`, `hostFamily` | Core's VEGAS root and `vegas2026` compatibility family |
+| `hostDir`, `hostFamily` | Core's VEGAS root and family, e.g. `vegas2026` |
 
 Here **core** means the host exporter DLL with its statically linked engine.
-The app's `ve_core.dll` remains part of the app runtime. Core records live
-alongside app records, rather than being discoverable only through a single
-Windows uninstall entry. Future elevated combined or split installers can
-enumerate this catalog to find exact installed paths and versions, then verify
-the referenced ownership manifest and file hashes before changing anything.
-Catalog presence alone is not proof of file integrity or host compatibility.
+The app's `ve_core.dll` remains part of the app runtime. Each record is also
+embedded as `installation` in its component's manifest; the catalog copy wins.
+Catalog changes participate in the same backup, rollback, restore and uninstall
+transaction as the payload.
 
-Each record is also embedded as `installation` in its component's existing
-ownership manifest. Hash-verified pre-catalog installs acquire IDs on update.
-Setup checks that embedded and central records agree; it refuses another app's
-core. Catalog changes participate in the same exact-byte backup, rollback,
-restore and uninstall transaction as the payload. Removing or moving the
-current host integration removes its old core record; the app ID survives.
+Keep **one bundled setup**. Its Inno `AppId`
+`{0CF24E60-C0F5-4242-96AD-13FF2F9BF313}` remains the Windows program/update/
+uninstaller identity; do not change it for a new release or VEGAS version.
 
-This leaves room for one shared app and separate core instances under each
-VEGAS installation's own `FileIO Plug-Ins\vegas-encoder` directory, including
-VEGAS roots on different drives. A future host family gets its own component
-type and compatible binary; a version update retains its existing instance ID.
-No portable path or shared core directory is assumed.
+**Adding a VEGAS version:** build its exporter, ship it in the bundle, and mark the
+family supported in the helper (`supported()` in `setup/native/install.cpp`, which
+today maps every supported family to `vegas-encoder.dll`). Detection, records and
+the wizard already handle several versions. Split installers are not implemented;
+a future split must migrate uninstaller ownership and protect app dependencies
+rather than assigning new AppIds that leave two uninstallers owning the same files.
 
-**Current limit:** the bundled wizard still manages one selected VEGAS 2026
-target per app. Multiple simultaneous targets, older-host binaries and split
-installers are not implemented. A future split must explicitly migrate bundle/
-uninstaller ownership and protect app dependencies when cores still reference
-the app; it must not simply assign new Inno AppIds and leave two uninstallers
-owning the same files. Existing app/core compatibility checks also remain in
-force; separate recorded versions do not permit arbitrary version combinations.
+## Requirements and unattended installs
 
-Unknown app installs, unknown plug-in files, changed owned files, conflicting
-files and reparse points cause refusal before replacement. The helper verifies
-the installed app against the frozen payload before committing the plug-in.
+Setup requires administrator rights, Windows x64, and the x64 Microsoft Visual
+C++ runtime already installed (`vcruntime140`, `vcruntime140_1`, `msvcp140`).
+It reports a missing prerequisite rather than downloading or installing tools.
+Setup does not kill processes or schedule partial file replacement on reboot.
+Updates keep the existing app directory; uninstall first to relocate it.
+Detection does not qualify a new build: the tested host remains 2026.0.3.189.
+
+The installed exporter goes under `{vegasDir}\FileIO Plug-Ins\vegas-encoder`, with
+its discovery file at the VEGAS root. Setup renders a UTF-16 INI with the final app
+path; it never ships development app/log paths. PDBs stay in the private build
+bundle, not the public install, and a development PDB found in the folder is
+removed (and kept in the rollback transaction).
+
+Startup detection and folder validation deliberately omit the app directory from
+their helper requests. Inno has not initialized the `app` constant during
+`InitializeSetup` or `InitializeWizard`; only lifecycle requests expand it.
+
+For unattended deployment:
+
+```text
+setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /VEGAS=2026 /VEGASDIR2026="C:\Program Files\BorisFX\Vegas Pro 2026"
+```
+
+- `/VEGAS=existing` (the default) keeps exactly the installed integrations;
+  `/VEGAS=none` installs or updates the app only and removes installed exporters;
+  `/VEGAS=2026,23` ticks the listed versions (unsupported ones are ignored).
+- `/VEGASDIR<version>="path"` sets the folder for one version, for example
+  `/VEGASDIR2026=`. Without it, the detected or recorded folder is used.
+- A ticked version with no valid folder fails preparation, including in silent
+  mode. No post-install app launch occurs in silent mode.
+
+The old `/COMPONENTS` and `/VEGASDIR` switches are gone with the Components page.
+
+## Default presets and saved templates
+
+With VEGAS integration selected, a newly rebuilt exporter supplies 16 fixed Render
+As starters, plus Vegas Encoder settings. The [starter list](STARTER_PRESETS.md)
+records all software/hardware recipes and the explicit 720p option. The
+general template retains its existing GUID/index; the reserved id-0 entry remains
+the historical hidden probe. All retain project frame rate; the 720p starter
+fits/pads to 1280x720 while the others follow project dimensions.
+
+`schema/builtin-presets.v1.json` is the shared source for app/exporter recipe
+settings and origin ID/revision. Software and NVIDIA hardware recipes are named
+separately in both consumers. Required encoders must exist in the user's FFmpeg.
+Setup installs the app/exporter, never user `.sft2` files. A successful install,
+update or repair supplies the defaults bundled with that version. Saved VEGAS
+templates and user library presets retain their own settings; adopting newer
+library settings requires explicit Update from library in the popup. No live
+library lookup occurs during rendering. New starter-list visibility/persistence
+still needs real-host verification; fake-host enumeration does not qualify it.
+
+## Recovery
 
 Before app replacement or uninstall, Setup saves exact owned app, plug-in,
 manifest and discovery bytes in a protected administrator/SYSTEM directory:
@@ -148,26 +280,25 @@ rerun the matching setup to restore that registration. Keep backups until the
 new installation has been accepted. Do not delete old candidates or trial
 rollback folders as installer cleanup.
 
-Uninstall checks ownership/hashes and running processes first, saves another
-rollback transaction, removes only the recorded plug-in files, then lets Inno
-remove its registered app files. Unknown files are preserved. User settings,
-libraries, jobs, caches, VEGAS templates and user-supplied FFmpeg are retained.
-
 ## Validation scope
 
 `scripts/etc/Build-SetupHelper.cmd test` builds a separate test-only executable.
 `python -I scripts/etc/Test-Setup.py` confines all mutations to a new fixture root
-under `build/test-results`; its fake app/DLL/host bytes are never loaded. The
-production helper has no test-root, version-bypass or failure-injection switch.
-Junction creation requires running the test outside a restricted sandbox.
+under `build/test-results`; its fake app/DLL/host bytes are never loaded. It
+covers install, update, repair-style replacement, moving and removing cores,
+pre-catalog migration, detection rows and version relations, downgrade refusal,
+running programs, rollback/restore and uninstall. The production helper has no
+test-root, version-bypass or failure-injection switch. Junction creation requires
+running the test outside a restricted sandbox.
 
 `python -I scripts/etc/Test-SetupWizard.py` compiles and runs an unprivileged Inno
-harness using the actual helper/host scripts and read-only production detection.
-It aborts in `InitializeWizard`, before any install lifecycle or file deployment.
-This covers the early `app`-constant startup regression without running the
-product installer or replacing the installed trial.
+harness using the actual helper, hosts and wizard scripts and the production
+helper's read-only detection. It builds the integrations page from real detection
+and the update and maintenance variants of the wizard, then aborts in
+`InitializeWizard`, before any install lifecycle or file deployment.
 
-Compiler checks and helper fixtures do not qualify real Inno install/update/
-uninstall behavior. That deployment trial, missing-runtime/locked-file behavior
+Compiler checks, the harness and helper fixtures do not qualify real Inno install/
+update/uninstall behavior, page layout at different DPI settings, or the real
+light/dark rendering. That deployment trial, missing-runtime/locked-file behavior
 on a clean Windows machine, and release signing/licensing remain release gates.
 The existing owner-deferred VEGAS render/progress trials stay deferred.

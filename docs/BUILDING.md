@@ -120,6 +120,7 @@ light/dark theme colours. The main README awaits the owner's later icon instruct
 Set-Location L:\repos\vegas-encoder
 python -I scripts/etc/Generate-Versions.py
 python -I scripts/etc/Generate-CoreData.py
+python -I scripts/etc/Generate-ServiceBuiltins.py
 cmd /d /c scripts\etc\build-core.cmd
 ```
 

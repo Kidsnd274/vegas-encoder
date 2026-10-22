@@ -23,6 +23,7 @@ are historical; current implementation and real-VEGAS evidence/limits are in
 | [WORKSTREAMS.md](WORKSTREAMS.md) | One-agent workflow, original checkout, contracts and retained trial artifacts |
 | [design/index.html](design/index.html) | The round 1 gallery of eight directions, plus the shared VEGAS native page |
 | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Features and priorities, key user flows, and the adapter limits shown to users |
+| [FUTURE_FEATURES.md](FUTURE_FEATURES.md) | Future resolution/upscaling and collapsed filter controls, plus the native VEGAS selected-preset summary; writeup only |
 | [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) | Processes, shared C++ core, Flutter app, popup session protocol, payload, testing |
 | [SETTINGS_AND_COMMANDS.md](SETTINGS_AND_COMMANDS.md) | Recipe schema v1, how settings become an FFmpeg command, Advanced mode, validation, size estimate |
 | [FFMPEG_INTEGRATION.md](FFMPEG_INTEGRATION.md) | Which FFmpeg is used, and how the app knows what it can do on this PC |
@@ -123,6 +124,15 @@ the owner objects.
 | 28 | Finished installer ownership | **Reconfirmed (2026-10-17):** the owner makes the installer. Agents provide matched inputs and documentation; the dashboard reports status without performing installation/repair/uninstall | ../B7_INSTALLER_INPUTS.md, UI_SPEC §6a |
 
 ## Design review notes
+
+Additional owner decision, 2026-10-18: provide six fixed VEGAS starters linked to
+the app built-ins (H.264, software H.265 10-bit, AV1 10-bit, ProRes 422 HQ, DNxHR HQ
+and FFV1), plus the general settings template. Share recipe policy and origin
+ID/revision; saved VEGAS templates keep their snapshots through Setup updates.
+Arbitrary Render As pinning remains outside this release. On 2026-10-23 the owner
+expanded this to [16 shared starters](../STARTER_PRESETS.md), adding review/GPU,
+ProRes LT/Proxy, VP9/WebM, CRF 16 software presets and 720p NVENC at 3500 kbps.
+The explicit 720p preset fits/pads to 1280x720; the others retain project dimensions.
 
 All eight round 1 directions are built and screenshotted. Strengths, weaknesses, known
 issues, the original recommendation and the owner's decision are in

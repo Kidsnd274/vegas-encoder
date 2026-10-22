@@ -5,9 +5,11 @@
 #include "version.generated.iss"
 #define MyAppName "Vegas Encoder"
 #define MyAppURL "https://github.com/Kidsnd274/vegas-encoder"
+; Windows program/update/uninstaller identity. Never change it for a release or VEGAS version.
+#define VeAppId "{0CF24E60-C0F5-4242-96AD-13FF2F9BF313}"
 
 [Setup]
-AppId={{0CF24E60-C0F5-4242-96AD-13FF2F9BF313}
+AppId={{#VeAppId}
 AppName={#MyAppName}
 AppVersion={#VeReleaseVersion}
 VersionInfoVersion={#VeFileVersion}
@@ -23,11 +25,13 @@ ArchitecturesInstallIn64BitMode=x64os
 PrivilegesRequired=admin
 DisableProgramGroupPage=yes
 DisableWelcomePage=no
+DisableDirPage=auto
 OutputDir=..\dist
 OutputBaseFilename=VegasEncoder-{#VeReleaseVersion}-{#VeFileVersion}-windows-x64-setup
 Compression=lzma2
 SolidCompression=yes
-WizardStyle=modern dark polar
+; Follows the Windows light/dark setting.
+WizardStyle=modern dynamic polar
 CloseApplications=no
 RestartApplications=no
 Uninstallable=yes
@@ -35,13 +39,6 @@ SetupLogging=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-
-[Types]
-Name: "custom"; Description: "Choose components"; Flags: iscustom
-
-[Components]
-Name: "app"; Description: "Vegas Encoder app"; Types: custom; Flags: fixed
-Name: "vegas2026"; Description: "VEGAS Pro 2026 exporter plug-in (uncheck to remove an existing integration)"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -65,4 +62,5 @@ Filename: "{app}\VegasEncoder.exe"; Description: "Launch Vegas Encoder"; Flags: 
 [Code]
 #include "includes\helper.iss"
 #include "includes\hosts.iss"
+#include "includes\wizard.iss"
 #include "includes\lifecycle.iss"

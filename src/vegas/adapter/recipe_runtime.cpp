@@ -1,6 +1,7 @@
 #include "recipe_runtime.h"
 #include "vegas_encoder.h"
 #include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <regex>
 
@@ -78,6 +79,15 @@ void ValidateCandidateRecipe(const ve::Json& recipe) {
   for (const auto& issue : compiled.at("issues")) if (ve::Str(issue,"level") == "error")
     throw std::runtime_error(ve::Str(issue,"message"));
 }
+}
+ve::Json BuiltinRecipeSnapshot(const char* presetJson) {
+  const auto preset = ve::Parse(reinterpret_cast<const uint8_t*>(presetJson), std::strlen(presetJson));
+  const auto normalized = ve::Normalize({{"recipe",preset.at("recipe")}});
+  if (ve::HasErrors(normalized.at("issues"))) throw std::runtime_error("Built-in recipe failed native normalization.");
+  const auto& recipe = normalized.at("recipe");
+  return {{"recipe",recipe},
+          {"origin",{{"presetId",recipe.at("id")},{"revision",preset.at("revision")},{"name",recipe.at("name")}}},
+          {"vegasPrefs",ve::Json::object()},{"writtenBy",kVersion}};
 }
 ve::Json DefaultRecipeSnapshot() {
   const ve::Json recipe{{"schema",1},{"id","vegas-mkv"},{"name","VEGAS render"},{"notes",""},{"tags",ve::Json::array()},{"category","archive"},

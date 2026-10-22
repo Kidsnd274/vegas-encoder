@@ -32,16 +32,10 @@ the generated FFmpeg command, so encoding decisions are easier to understand.
 
 ## Screenshots
 
-<table>
-  <tr><th>Dark mode</th><th>Light mode</th></tr>
-  <tr>
-    <td><a href="app/test/golden/goldens/presets_native_video_dark.png"><img src="app/test/golden/goldens/presets_native_video_dark.png" alt="Dark preset editor with signal path, video settings, and command preview" width="480" /></a></td>
-    <td><a href="app/test/golden/goldens/presets_native_video_light.png"><img src="app/test/golden/goldens/presets_native_video_light.png" alt="Light preset editor with signal path, video settings, and command preview" width="480" /></a></td>
-  </tr>
-</table>
+[![Vegas Encoder desktop app in dark mode, showing the preset library, signal path, video settings, and generated FFmpeg command](docs/assets/preset-editor.png)](docs/assets/preset-editor.png)
 
-Click either image for full size. These previews show the implemented Flutter UI
-with test data, rather than live VEGAS renders.
+The desktop app's Basic editor in dark mode. Click the screenshot for full size.
+The signal path uses sample project details for the preview.
 
 ## Features
 
@@ -135,6 +129,12 @@ Download the Windows x64 installer from the
    installation and check its available encoders. FFmpeg and FFprobe are supplied
    separately; see [Requirements](#requirements).
 4. Start VEGAS Pro and open **Render As** to use Vegas Encoder.
+
+Setup records each install it makes. One record for the app and one for each
+VEGAS version you integrate with are kept under
+`%ProgramData%\VegasEncoder\Installations\`. Later setup runs use these records
+to find and update every integration together. See the
+[installer guide](docs/INSTALLER.md#how-setup-tracks-installations) for details.
 
 To build or contribute to the project, see [For developers](#for-developers) below.
 

@@ -145,10 +145,11 @@ Future<void> main() async {
     metadataBounds(root.path);
     final builtins = await library.list();
     check(
-      builtins.length == 6 && !Directory(paths.library).existsSync(),
+      builtins.length == 16 && !Directory(paths.library).existsSync(),
       'missing root is read-only and supplies built-ins',
     );
-    for (var i = 0; i < 494; i++) {
+    final userPresetCount = 500 - builtins.length;
+    for (var i = 0; i < userPresetCount; i++) {
       final source = builtins[i % builtins.length];
       final preset = source.copyWith(
         builtin: false,
@@ -167,7 +168,7 @@ Future<void> main() async {
     final initial = await library.list();
     cold.stop();
     check(
-      initial.length == 500 && core.normalizes == 988,
+      initial.length == 500 && core.normalizes == userPresetCount * 2,
       'new files decoded and requirements derived by native core once per new entry',
     );
     final calls = core.normalizes;

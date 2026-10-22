@@ -215,6 +215,32 @@ Future<void> main(List<String> args) async {
           phases.add(event);
         }
         final result = phases.last;
+        // Bundled hardware recipes can outlive a supplied FFmpeg build/GPU.
+        // Exercise their explicit refusal rather than calling it an encode pass.
+        final blockedEncoders =
+            [
+              recipe.video.encoder,
+              if (recipe.audio.first.enabled) recipe.audio.first.encoder,
+            ].where((name) {
+              if (!nativeCapabilities.encoders.containsKey(name)) return true;
+              final encoder = jsonMap(nativeCapabilities.encoders[name]);
+              final availability = jsonMap(encoder['availability'] ?? {});
+              return ['missing', 'failed'].contains(availability['state']);
+            }).toList();
+        if (blockedEncoders.isNotEmpty) {
+          check(
+            result.phase == 'failed' &&
+                !phases.any((p) => p.phase == 'encoding'),
+            'unavailable encoders fail before encoding: ${recipe.id}',
+          );
+          results.add({
+            'recipe': recipe.id,
+            'phase': result.phase,
+            'notEncoded': true,
+            'unavailableEncoders': blockedEncoders,
+          });
+          continue;
+        }
         check(
           result.phase == 'done',
           '${installation.version} ${recipe.id}: ${result.phase} ${result.message}',
@@ -247,7 +273,7 @@ Future<void> main(List<String> args) async {
                 (s) => s['codec_type'] == 'video',
               )['nb_read_frames'] ==
               '60',
-          '60 source frames remain in unfiltered test',
+          '60 source frames remain after encoding, including the 720p resize',
         );
         results.add({
           'recipe': recipe.id,
@@ -310,8 +336,22 @@ Future<void> main(List<String> args) async {
         '  ',
       ).convert({'checks': checks, 'builds': reports}),
     );
+    final encoded = reports.fold<int>(
+      0,
+      (count, report) =>
+          count +
+          jsonMaps(report['results']).where((r) => r['phase'] == 'done').length,
+    );
+    final refused = reports.fold<int>(
+      0,
+      (count, report) =>
+          count +
+          jsonMaps(
+            report['results'],
+          ).where((r) => r['notEncoded'] == true).length,
+    );
     print(
-      'B3 REAL FFMPEG PASSED: $checks checks, ${reports.length} supplied builds, ${reports.length * 8} core-compiled synthetic preset encodes/readbacks/full decodes. No fake host or VEGAS.',
+      'B3 REAL FFMPEG PASSED: $checks checks, ${reports.length} supplied builds, $encoded core-compiled synthetic preset encodes/readbacks/full decodes, $refused unavailable-encoder refusals. No fake host or VEGAS.',
     );
     print('Concise result: ${joinPath(root.path, 'summary.json')}');
   } catch (e) {

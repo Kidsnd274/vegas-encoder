@@ -42,6 +42,7 @@ struct Preset {
   DWORD compression;
   const wchar_t* name;
   const wchar_t* notes;
+  const char* builtin = nullptr; // Generated library preset JSON; null for the general template.
 };
 
 // The template id is the preset index. VEGAS 2026 did not list the id-0 preset
@@ -55,6 +56,7 @@ const Preset kPresets[] = {
      MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder recipe (id 0)", L"Recipe candidate; use the visible settings preset."},
     {{0x381851c2, 0x9c94, 0x4bd2, {0x81, 0x76, 0xb4, 0xb8, 0x59, 0x8b, 0xe8, 0x0d}},
      MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder settings", L"Edit settings in the Vegas Encoder popup. Match the Render As filename to the selected container."},
+#include "builtin_presets.generated.inc"
 #else
     {{0x5ac92e42, 0xf7bd, 0x4e84, {0x86, 0xe4, 0xaa, 0x50, 0xe4, 0xce, 0x44, 0x9b}},
      MAKEFOURCC('P', '0', '1', '0'),
@@ -71,7 +73,13 @@ const Preset kPresets[] = {
 #endif
 };
 constexpr LONG kPresetCount = (LONG)(sizeof kPresets / sizeof kPresets[0]);
-LONG PresetCount() { return Cfg().encode ? 2 : kPresetCount; }
+LONG PresetCount() {
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+  return kPresetCount;
+#else
+  return Cfg().encode ? 2 : kPresetCount;
+#endif
+}
 
 #if !defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
 void SetExtra(Tpl& t, DWORD preset) {
@@ -114,7 +122,8 @@ Tpl BuildPreset(LONG index) {
   t.SetF64(tpl::vexPixelAspect, 1.0);
   t.SetU32(tpl::keyFrameEvery, 1);
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-  t = configuration::CreateRecipeTemplate(t, GUID_VegasEncoderType, DefaultRecipeSnapshot());
+  t = configuration::CreateRecipeTemplate(t, GUID_VegasEncoderType,
+      p.builtin ? BuiltinRecipeSnapshot(p.builtin) : DefaultRecipeSnapshot());
 #else
   SetExtra(t, (DWORD)index);
 #endif

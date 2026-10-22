@@ -223,7 +223,7 @@ Future<void> main(List<String> args) async {
     final library = FilePresetLibrary(core: core, paths: paths);
     final initialPresets = await library.list();
     check(
-      initialPresets.length == 6 &&
+      initialPresets.length == 16 &&
           initialPresets.every((p) => p.builtin && p.revision == 1),
       'packaged product built-ins',
     );

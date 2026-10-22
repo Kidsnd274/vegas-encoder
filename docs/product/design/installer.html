@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Installer Integrations Page</title>
+<style>
+/* Page chrome follows Windows; each mock window pins its own Inno appearance. */
+:root{color-scheme:light; --page:#e9ecef; --page-ink:#1f2933; --page-muted:#4a5767}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark; --page:#121518; --page-ink:#e6eaf0; --page-muted:#aeb8c4}}
+:root[data-theme="dark"]{color-scheme:dark; --page:#121518; --page-ink:#e6eaf0; --page-muted:#aeb8c4}
+
+/* Approximation of Inno Setup WizardStyle=modern dynamic polar, not a capture. */
+.light{color-scheme:light; --frame:#c4c4c4; --titlebar:#f3f3f3; --header:#ffffff; --surface:#f9f9f9; --footer:#f3f3f3; --line:#e2e2e2; --text:#1a1a1a; --muted:#5a5a5a; --disabled:#6b6b6b; --list-bg:#ffffff; --list-border:#cdcdcd; --sel:#dce8fc; --accent:#2563c9; --on-accent:#ffffff; --accent-text:#1d4fae; --btn-bg:#fdfdfd; --btn-border:#c2c2c2; --warn:#9a4600; --field-bg:#ffffff; --overlay:rgba(0,0,0,.25); --dialog:#ffffff}
+.dark{color-scheme:dark; --frame:#3c3c3c; --titlebar:#1f1f1f; --header:#2b2b2b; --surface:#232323; --footer:#1f1f1f; --line:#383838; --text:#f2f2f2; --muted:#b8b8b8; --disabled:#9a9a9a; --list-bg:#1b1b1b; --list-border:#474747; --sel:#2d3f5e; --accent:#6ea2ff; --on-accent:#0d1a33; --accent-text:#9cc0ff; --btn-bg:#2f2f2f; --btn-border:#4a4a4a; --warn:#f2a65a; --field-bg:#1b1b1b; --overlay:rgba(0,0,0,.5); --dialog:#2b2b2b}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--page-ink);font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;font-size:14px;line-height:1.5}
+main{max-width:1360px;margin:0 auto;padding:40px 16px 56px}
+h1{font-size:28px;margin:0 0 8px;font-weight:650}
+.lede{margin:0 0 6px;max-width:80ch;color:var(--page-muted)}
+.grid{display:flex;flex-wrap:wrap;gap:40px;margin-top:28px}
+figure{margin:0}
+figcaption{font-size:13px;color:var(--page-muted);margin:0 0 10px;font-weight:600}
+.scroll{max-width:100%;overflow-x:auto}
+
+.win{position:relative;width:640px;height:500px;display:flex;flex-direction:column;overflow:hidden;font-size:13px;line-height:1.35;color:var(--text);background:var(--surface);border:1px solid var(--frame)}
+.win button{font:inherit;color:inherit}
+.title{height:32px;flex:none;display:flex;align-items:center;gap:8px;padding-left:12px;background:var(--titlebar);font-size:12px}
+.title .logo{width:16px;height:16px;border-radius:4px;background:var(--accent)}
+.title span{flex-grow:1}
+.title .wc{display:flex;height:32px}
+.title .wc i{width:46px;display:grid;place-items:center}
+.head{height:68px;flex:none;display:flex;align-items:center;gap:16px;padding:0 20px 0 28px;background:var(--header);border-bottom:1px solid var(--line)}
+.head .txt{flex-grow:1;display:flex;flex-direction:column;gap:3px}
+.head b{font-size:14px;font-weight:600}
+.head small{font-size:13px;color:var(--muted)}
+.head .icon{width:44px;height:44px;border-radius:8px;border:1px dashed var(--list-border);display:grid;place-items:center;font-size:10px;color:var(--muted);text-align:center;line-height:1.1}
+.body{flex-grow:1;display:flex;flex-direction:column;gap:12px;padding:18px 40px 14px}
+.body p{margin:0;line-height:1.45}
+.list{height:132px;border:1px solid var(--list-border);background:var(--list-bg);overflow:auto}
+.row{height:34px;display:flex;align-items:center;gap:10px;padding:0 10px}
+.row[aria-selected="true"]{background:var(--sel)}
+.row input{margin:0;width:15px;height:15px;accent-color:var(--accent)}
+.row .pick{flex-grow:1;height:34px;display:flex;align-items:center;gap:8px;padding:0;border:0;background:transparent;text-align:left;cursor:default}
+.row .name{font-weight:600}
+.row .ver{color:var(--muted)}
+.row .status{margin-left:auto;color:var(--muted)}
+.row.off .pick,.row.off .ver,.row.off .status{color:var(--disabled)}
+.status.remove{color:var(--warn)!important}
+.status.add{color:var(--accent-text)!important}
+.folder{display:flex;flex-direction:column;gap:6px}
+.folder label{color:var(--muted)}
+.folder .line{display:flex;gap:8px;align-items:center}
+.folder output{flex-grow:1;min-width:0;height:28px;display:flex;align-items:center;padding:0 8px;border:1px solid var(--list-border);background:var(--field-bg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.folder output.off{color:var(--disabled)}
+.btn{height:28px;min-width:84px;padding:0 14px;border-radius:4px;border:1px solid var(--btn-border);background:var(--btn-bg)}
+.btn:disabled{color:var(--disabled)}
+.btn.primary{border-color:var(--accent);background:var(--accent);color:var(--on-accent);font-weight:600}
+.foot{height:52px;flex:none;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 16px;background:var(--footer);border-top:1px solid var(--line)}
+.foot .cancel{margin-left:8px}
+.win :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+.veil{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:var(--overlay)}
+.veil.open{display:flex}
+.dlg{width:440px;overflow:hidden;border-radius:8px;border:1px solid var(--list-border);background:var(--dialog);box-shadow:0 12px 32px rgba(0,0,0,.3)}
+.dlg .msg{display:flex;gap:14px;padding:20px 24px}
+.dlg .msg div{display:flex;flex-direction:column;gap:8px}
+.dlg h2{font-size:15px;font-weight:600;margin:0}
+.dlg .msg p{margin:0;line-height:1.45;color:var(--muted)}
+.dlg .acts{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;background:var(--footer);border-top:1px solid var(--line)}
+.dlg svg{flex:none;stroke:var(--warn)}
+
+/* Option B: one block per VEGAS version, each with its own folder and Change button. */
+h2.option{font-size:18px;margin:44px 0 4px;font-weight:650}
+.win.b .body{gap:0}
+.win.b .body p{margin-bottom:6px}
+.win.b .list{height:auto;border:0;background:transparent;overflow:visible}
+.win.b .folder{display:none}
+.block{display:flex;flex-direction:column;gap:4px;padding:10px 0;border-bottom:1px solid var(--line)}
+.block .top{display:flex;align-items:center;gap:10px}
+.block .top input{margin:0;width:15px;height:15px;accent-color:var(--accent)}
+.block .top label{display:flex;gap:8px;align-items:baseline}
+.block .path{display:flex;align-items:center;gap:10px;padding-left:25px}
+.block .path span{flex-grow:1;min-width:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.block .path .btn{height:24px;min-width:76px;padding:0 10px;font-size:12px}
+.block.off label,.block.off .ver,.block.off .status,.block.off .path span{color:var(--disabled)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Installer: VEGAS integrations page</h1>
+  <p class="lede">Two layouts for the VEGAS integrations page. Option A, the chosen one, is what <code>setup/includes/hosts.iss</code> implements: Inno's checklist with one row per VEGAS version, plus the folder of the selected row. Both are shown in Update mode (0.1.7 installed, setup 0.1.8). Setup uses <code>WizardStyle=modern dynamic polar</code>, so it follows the Windows light/dark setting.</p>
+  <p class="lede">The rows are clickable: tick or untick to see each status, select a row to see its folder, and press Next with nothing ticked to see the warning. Colours approximate Inno's Polar style and are not a screenshot. "VEGAS Pro 2027" is an example of a future supported version. Behaviour: <a href="../../INSTALLER.md">docs/INSTALLER.md</a>, VEGAS integrations.</p>
+  <h2 class="option">Option A: checklist and selected folder (chosen)</h2>
+  <div class="grid">
+    <figure><figcaption>Light</figcaption><div class="scroll" data-mock="light" data-variant="a"></div></figure>
+    <figure><figcaption>Dark</figcaption><div class="scroll" data-mock="dark" data-variant="a"></div></figure>
+  </div>
+  <h2 class="option">Option B: one block per VEGAS version (not chosen)</h2>
+  <p class="lede">Every folder is visible with its own Change button. Not chosen: in Inno each row would be separate hand-built controls, and only about four rows fit without a scrolling area.</p>
+  <div class="grid">
+    <figure><figcaption>Light</figcaption><div class="scroll" data-mock="light" data-variant="b"></div></figure>
+    <figure><figcaption>Dark</figcaption><div class="scroll" data-mock="dark" data-variant="b"></div></figure>
+  </div>
+</main>
+<template id="win">
+  <div class="win" role="group">
+    <div class="title"><i class="logo"></i><span>Setup - Vegas Encoder</span>
+      <div class="wc" aria-hidden="true"><i><svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor"/></svg></i><i><svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" stroke="currentColor"/></svg></i></div>
+    </div>
+    <div class="head">
+      <div class="txt"><b>VEGAS integrations</b><small>Choose which VEGAS versions get the Vegas Encoder exporter.</small></div>
+      <div class="icon">app<br>icon</div>
+    </div>
+    <div class="body">
+      <p>Tick each VEGAS version to install the exporter into. Unticking an installed version removes its exporter. The app is always updated.</p>
+      <div class="list" role="listbox" aria-label="VEGAS versions"></div>
+      <div class="folder">
+        <label class="folder-label"></label>
+        <div class="line"><output></output><button type="button" class="btn change">Change…</button></div>
+      </div>
+    </div>
+    <div class="foot">
+      <button type="button" class="btn">&lt; Back</button>
+      <button type="button" class="btn primary next">Next &gt;</button>
+      <button type="button" class="btn cancel">Cancel</button>
+    </div>
+    <div class="veil">
+      <div class="dlg" role="dialog" aria-modal="true">
+        <div class="msg">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5"/><path d="M12 17.5v.01"/></svg>
+          <div><h2></h2><p></p></div>
+        </div>
+        <div class="acts"><button type="button" class="btn primary go"></button><button type="button" class="btn back">Go back</button></div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+const HOSTS = [
+  { id: 'v2026', name: 'VEGAS Pro 2026', ver: '2026.0.3', folder: 'C:\\Program Files\\BorisFX\\Vegas Pro 2026', installed: true, supported: true },
+  { id: 'v2027', name: 'VEGAS Pro 2027', ver: '27.0.1', folder: 'D:\\Apps\\VEGAS Pro 2027', installed: false, supported: true },
+  { id: 'v23', name: 'VEGAS Pro 23', ver: '23.0.278', folder: 'L:\\Program Files\\VEGAS\\VEGAS Pro 23.0', installed: false, supported: false }
+];
+
+function status(host, on) {
+  if (!host.supported) return ['Not supported by this release', ''];
+  if (host.installed) return on ? ['Update 0.1.7 → 0.1.8', ''] : ['Exporter will be removed', 'remove'];
+  return on ? ['Exporter will be added', 'add'] : ['Not installed', ''];
+}
+
+function blockRow(host, on, text, kind, id, toggle) {
+  const block = document.createElement('div');
+  block.className = 'block' + (host.supported ? '' : ' off');
+  const top = document.createElement('div');
+  top.className = 'top';
+  const box = Object.assign(document.createElement('input'), { type: 'checkbox', checked: on, disabled: !host.supported, id });
+  box.addEventListener('change', () => toggle(box.checked));
+  const label = document.createElement('label');
+  label.htmlFor = id;
+  label.append(Object.assign(document.createElement('b'), { textContent: host.name }),
+    Object.assign(document.createElement('span'), { className: 'ver', textContent: host.ver }));
+  const st = Object.assign(document.createElement('span'), { className: 'status ' + kind, textContent: text });
+  st.style.marginLeft = 'auto';
+  top.append(box, label, st);
+  const path = document.createElement('div');
+  path.className = 'path';
+  const change = Object.assign(document.createElement('button'), { type: 'button', className: 'btn', textContent: 'Change…', disabled: !host.supported });
+  change.setAttribute('aria-label', 'Change folder for ' + host.name);
+  path.append(Object.assign(document.createElement('span'), { textContent: host.folder }), change);
+  block.append(top, path);
+  return block;
+}
+
+function mount(slot) {
+  const theme = slot.dataset.mock;
+  const variant = slot.dataset.variant;
+  const win = document.getElementById('win').content.firstElementChild.cloneNode(true);
+  win.classList.add(theme, variant);
+  win.setAttribute('aria-label', 'Setup window, option ' + variant.toUpperCase() + ', ' + theme);
+  slot.append(win);
+  const state = { on: { v2026: true }, sel: 'v2026' };
+  const list = win.querySelector('.list');
+  const out = win.querySelector('output');
+  const label = win.querySelector('.folder-label');
+  const change = win.querySelector('.change');
+  const veil = win.querySelector('.veil');
+  out.id = 'folder-' + theme + '-' + variant;
+  label.htmlFor = out.id;
+  if (variant === 'b') {
+    list.removeAttribute('role');
+    list.removeAttribute('aria-label');
+  }
+
+  function render() {
+    list.replaceChildren(...HOSTS.map((host) => {
+      const on = host.supported && !!state.on[host.id];
+      const [text, kind] = status(host, on);
+      if (variant === 'b') return blockRow(host, on, text, kind, 'b-' + theme + '-' + host.id, (value) => { state.on[host.id] = value; render(); });
+      const row = document.createElement('div');
+      row.className = 'row' + (host.supported ? '' : ' off');
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(host.id === state.sel));
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = on;
+      box.disabled = !host.supported;
+      box.setAttribute('aria-label', host.name);
+      box.addEventListener('change', () => { state.on[host.id] = box.checked; render(); });
+      const pick = document.createElement('button');
+      pick.type = 'button';
+      pick.className = 'pick';
+      pick.addEventListener('click', () => { state.sel = host.id; render(); });
+      const name = Object.assign(document.createElement('span'), { className: 'name', textContent: host.name });
+      const ver = Object.assign(document.createElement('span'), { className: 'ver', textContent: host.ver });
+      const st = Object.assign(document.createElement('span'), { className: 'status ' + kind, textContent: text });
+      pick.append(name, ver, st);
+      row.append(box, pick);
+      return row;
+    }));
+    const sel = HOSTS.find((h) => h.id === state.sel);
+    label.textContent = 'Folder for ' + sel.name;
+    out.textContent = sel.folder;
+    out.classList.toggle('off', !sel.supported);
+    change.disabled = !sel.supported;
+  }
+
+  win.querySelector('.next').addEventListener('click', () => {
+    if (HOSTS.some((h) => h.supported && state.on[h.id])) return;
+    const removing = HOSTS.filter((h) => h.installed).map((h) => h.name);
+    win.querySelector('.dlg h2').textContent = removing.length ? 'Remove the exporter from every VEGAS version?' : 'Install without a VEGAS integration?';
+    win.querySelector('.dlg p').textContent = removing.length
+      ? 'Vegas Encoder will be updated, but its exporter will be removed from ' + removing.join(', ') + ". It won't appear in VEGAS Render As until you run setup again and tick a VEGAS version."
+      : "Vegas Encoder will be installed, but it won't appear in VEGAS Render As. Run setup again to add a VEGAS version later.";
+    win.querySelector('.dlg .go').textContent = removing.length ? 'Remove and continue' : 'Continue without VEGAS';
+    veil.classList.add('open');
+    win.querySelector('.dlg .back').focus();
+  });
+  veil.querySelectorAll('.go, .back').forEach((b) => b.addEventListener('click', () => veil.classList.remove('open')));
+  render();
+}
+
+document.querySelectorAll('[data-mock]').forEach(mount);
+</script>
+</body>
+</html>

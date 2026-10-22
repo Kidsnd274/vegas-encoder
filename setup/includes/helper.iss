@@ -18,8 +18,8 @@ end;
 
 procedure InitAppRequest;
 begin
-  { The app constant is unavailable during InitializeWizard. Detection/validation use
-    InitRequest; only installation and uninstall requests need the final path. }
+  { The app constant is unavailable during InitializeSetup/InitializeWizard. Detection
+    and validation use InitRequest; only lifecycle requests need the final path. }
   InitRequest;
   SetIniString('setup', 'app', ExpandConstant('{app}'), RequestFile);
 end;

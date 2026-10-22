@@ -1,0 +1,1201 @@
+{
+  "builtins": 1,
+  "provenance": "Product built-ins. Original six adopted from schema/fixtures/b0; software HEVC and fixed VEGAS starter templates approved 2026-10-18. Recipe changes require a revision increment; VEGAS entry order and GUIDs are stable identities. No FFmpeg or host qualification is implied. Expanded fixed starter list approved 2026-10-23; all original app recipes and VEGAS identities retained.",
+  "presets": [
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-14T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "yt-h264",
+        "name": "YouTube upload, H.264",
+        "notes": "High-quality H.264 that YouTube re-encodes well. Use for anything up to 4K.",
+        "tags": [
+          "YouTube",
+          "Upload"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mp4",
+          "faststart": true
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "libx264",
+          "mode": "crf",
+          "quality": 18,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "slow",
+          "tune": null,
+          "profile": "high",
+          "depth": 8,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "aac",
+            "mode": "bitrate",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-18T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "hevc-10bit",
+        "name": "H.265 / HEVC, 10-bit",
+        "notes": "Software HEVC with x265, 10-bit video and AAC audio in MP4.",
+        "tags": [
+          "HEVC",
+          "10-bit"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mp4",
+          "faststart": true
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "libx265",
+          "mode": "crf",
+          "quality": 22,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "medium",
+          "tune": null,
+          "profile": null,
+          "depth": 10,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "aac",
+            "mode": "bitrate",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-14T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "yt-hevc-nv",
+        "name": "YouTube upload, HEVC on GPU",
+        "notes": "10-bit HEVC on NVIDIA hardware. Test this encoder on this PC before using it.",
+        "tags": [
+          "YouTube",
+          "NVIDIA"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mp4",
+          "faststart": true
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "hevc_nvenc",
+          "mode": "cq",
+          "quality": 20,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "p5",
+          "tune": "hq",
+          "profile": "main10",
+          "depth": 10,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "aac",
+            "mode": "bitrate",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-14T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "av1-small",
+        "name": "Small web file, AV1",
+        "notes": "",
+        "tags": [
+          "Web",
+          "Small"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mkv",
+          "faststart": false
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "libsvtav1",
+          "mode": "crf",
+          "quality": 32,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "6",
+          "tune": null,
+          "profile": null,
+          "depth": 10,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "libopus",
+            "mode": "bitrate",
+            "bitrateK": 160,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-14T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "prores-hq",
+        "name": "ProRes 422 HQ for editing",
+        "notes": "",
+        "tags": [
+          "Intermediate",
+          "Resolve",
+          "Premiere"
+        ],
+        "category": "edit",
+        "container": {
+          "format": "mov",
+          "faststart": false
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "prores_ks",
+          "mode": "profile",
+          "quality": null,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": null,
+          "tune": null,
+          "profile": "hq",
+          "depth": 10,
+          "gopSec": null,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "pcm_s24le",
+            "mode": "lossless",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-14T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "dnxhr-hq",
+        "name": "DNxHR HQ for Avid",
+        "notes": "",
+        "tags": [
+          "Intermediate",
+          "Avid",
+          "MXF"
+        ],
+        "category": "edit",
+        "container": {
+          "format": "mxf",
+          "faststart": false
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "dnxhd",
+          "mode": "profile",
+          "quality": null,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": null,
+          "tune": null,
+          "profile": "dnxhr_hq",
+          "depth": 8,
+          "gopSec": null,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "pcm_s16le",
+            "mode": "lossless",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-14T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "ffv1-master",
+        "name": "Lossless master, FFV1",
+        "notes": "The fixed profile from the current adapter baseline: FFV1 10-bit and float PCM in MKV.",
+        "tags": [
+          "Archive",
+          "Lossless"
+        ],
+        "category": "master",
+        "container": {
+          "format": "mkv",
+          "faststart": false
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "ffv1",
+          "mode": "lossless",
+          "quality": null,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": null,
+          "tune": null,
+          "profile": null,
+          "depth": 10,
+          "gopSec": null,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "pcm_f32le",
+            "mode": "lossless",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-23T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "h264-review",
+        "name": "H.264 - quick review",
+        "notes": "Fast software review copy: x264 CRF 23, veryfast, with AAC 160 kbps in MP4. Follows project dimensions and frame rate.",
+        "tags": [
+          "Review",
+          "H.264"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mp4",
+          "faststart": true
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "libx264",
+          "mode": "crf",
+          "quality": 23,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "veryfast",
+          "tune": null,
+          "profile": "high",
+          "depth": 8,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "aac",
+            "mode": "bitrate",
+            "bitrateK": 160,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-23T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "h264-nvenc",
+        "name": "H.264 - NVIDIA GPU",
+        "notes": "Everyday GPU delivery: NVENC H.264 CQ 21, p5, with AAC 192 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
+        "tags": [
+          "NVIDIA",
+          "H.264"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mp4",
+          "faststart": true
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "h264_nvenc",
+          "mode": "cq",
+          "quality": 21,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "p5",
+          "tune": "hq",
+          "profile": "high",
+          "depth": 8,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "aac",
+            "mode": "bitrate",
+            "bitrateK": 192,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-23T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "av1-nvenc",
+        "name": "AV1 10-bit - NVIDIA GPU",
+        "notes": "GPU AV1 CQ 28, p5, with Opus 160 kbps in MKV. Requires an AV1-capable NVIDIA GPU and supporting FFmpeg.",
+        "tags": [
+          "NVIDIA",
+          "AV1",
+          "10-bit"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mkv",
+          "faststart": false
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "av1_nvenc",
+          "mode": "cq",
+          "quality": 28,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "p5",
+          "tune": "hq",
+          "profile": null,
+          "depth": 10,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "libopus",
+            "mode": "bitrate",
+            "bitrateK": 160,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-23T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "prores-lt",
+        "name": "ProRes 422 LT for editing",
+        "notes": "Lower-data-rate editing intermediate: prores_ks 422 LT, 10-bit, with 24-bit PCM in MOV. Follows project dimensions and frame rate.",
+        "tags": [
+          "Intermediate",
+          "ProRes",
+          "LT"
+        ],
+        "category": "edit",
+        "container": {
+          "format": "mov",
+          "faststart": false
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "prores_ks",
+          "mode": "profile",
+          "quality": null,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": null,
+          "tune": null,
+          "profile": "lt",
+          "depth": 10,
+          "gopSec": null,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "pcm_s24le",
+            "mode": "lossless",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-23T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "prores-proxy",
+        "name": "ProRes Proxy for offline editing",
+        "notes": "Low-data-rate offline editing copy: prores_ks 422 Proxy with 24-bit PCM in MOV. Retains project dimensions and frame rate; does not downscale.",
+        "tags": [
+          "Intermediate",
+          "ProRes",
+          "Proxy"
+        ],
+        "category": "edit",
+        "container": {
+          "format": "mov",
+          "faststart": false
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "prores_ks",
+          "mode": "profile",
+          "quality": null,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": null,
+          "tune": null,
+          "profile": "proxy",
+          "depth": 10,
+          "gopSec": null,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "pcm_s24le",
+            "mode": "lossless",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-23T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "vp9-webm",
+        "name": "VP9 - WebM",
+        "notes": "Web delivery: software VP9 10-bit CRF 31, good deadline, CPU-used 2, with Opus 192 kbps in WebM.",
+        "tags": [
+          "Web",
+          "VP9",
+          "WebM"
+        ],
+        "category": "web",
+        "container": {
+          "format": "webm",
+          "faststart": false
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "libvpx-vp9",
+          "mode": "crf",
+          "quality": 31,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "2",
+          "tune": null,
+          "profile": null,
+          "depth": 10,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "libopus",
+            "mode": "bitrate",
+            "bitrateK": 192,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-23T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "h264-crf16",
+        "name": "H.264 CRF 16 (x264)",
+        "notes": "High-quality software H.264: x264 CRF 16, slow, 8-bit, with AAC 320 kbps in MP4. Follows project dimensions and frame rate.",
+        "tags": [
+          "H.264",
+          "High quality",
+          "CRF 16"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mp4",
+          "faststart": true
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "libx264",
+          "mode": "crf",
+          "quality": 16,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "slow",
+          "tune": null,
+          "profile": "high",
+          "depth": 8,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "aac",
+            "mode": "bitrate",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-23T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "hevc-crf16",
+        "name": "HEVC CRF 16 (x265)",
+        "notes": "High-quality software HEVC: x265 CRF 16, slow, 10-bit, with AAC 320 kbps in MP4. Follows project dimensions and frame rate.",
+        "tags": [
+          "HEVC",
+          "10-bit",
+          "CRF 16"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mp4",
+          "faststart": true
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "libx265",
+          "mode": "crf",
+          "quality": 16,
+          "bitrateK": 12000,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "slow",
+          "tune": null,
+          "profile": null,
+          "depth": 10,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": ""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "aac",
+            "mode": "bitrate",
+            "bitrateK": 320,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    },
+    {
+      "vepreset": 1,
+      "revision": 1,
+      "favorite": false,
+      "pinned": false,
+      "builtin": true,
+      "updatedAt": "2026-10-23T00:00:00Z",
+      "origin": null,
+      "requires": {
+        "encoders": [],
+        "minFFmpegVersion": null,
+        "known": false
+      },
+      "recipe": {
+        "schema": 1,
+        "id": "h264-nvenc-720p-3500",
+        "name": "H.264 720p 3500kbps (NVENC)",
+        "notes": "NVENC H.264 targeting 3500 kbps video, plus AAC 160 kbps, in MP4. Fits the picture inside 1280x720 with padding, without stretching; retains project frame rate. Requires a working NVIDIA encoder.",
+        "tags": [
+          "NVIDIA",
+          "H.264",
+          "720p"
+        ],
+        "category": "web",
+        "container": {
+          "format": "mp4",
+          "faststart": true
+        },
+        "video": {
+          "enabled": true,
+          "encoder": "h264_nvenc",
+          "mode": "abr",
+          "quality": null,
+          "bitrateK": 3500,
+          "maxrateK": null,
+          "qp": null,
+          "speed": "p5",
+          "tune": "hq",
+          "profile": "high",
+          "depth": 8,
+          "gopSec": 2,
+          "color": "bt709",
+          "extra": "-vf \"scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1\""
+        },
+        "audio": [
+          {
+            "enabled": true,
+            "encoder": "aac",
+            "mode": "bitrate",
+            "bitrateK": 160,
+            "vbr": null,
+            "level": null,
+            "sampleRate": "source",
+            "channels": "source",
+            "extra": ""
+          }
+        ],
+        "command": {
+          "mode": "structured",
+          "template": ""
+        },
+        "vegas": {
+          "frame": "project",
+          "inputFormat": "p010"
+        },
+        "extensions": {}
+      }
+    }
+  ],
+  "vegas": [
+    {
+      "presetId": "yt-h264",
+      "guid": "17481DF0-F0C4-48E7-9115-219B74038DC6",
+      "name": "H.264",
+      "notes": "High-quality H.264 that YouTube re-encodes well. Use for anything up to 4K.",
+      "index": 2
+    },
+    {
+      "presetId": "hevc-10bit",
+      "guid": "D37908B7-8D6C-4B12-931F-693E0CF03E4B",
+      "name": "H.265 (HEVC) - 10-bit",
+      "notes": "Software HEVC with x265, 10-bit video and AAC audio in MP4.",
+      "index": 3
+    },
+    {
+      "presetId": "av1-small",
+      "guid": "ECB37C34-163F-47B4-9EF4-B387A445C634",
+      "name": "AV1 - 10-bit",
+      "notes": "",
+      "index": 4
+    },
+    {
+      "presetId": "prores-hq",
+      "guid": "E9EB829E-34E2-4FF5-A7F5-E4D93B9D5CC8",
+      "name": "ProRes 422 HQ",
+      "notes": "",
+      "index": 5
+    },
+    {
+      "presetId": "dnxhr-hq",
+      "guid": "174C38BD-5E9E-49B3-A315-8207EDAC90C6",
+      "name": "DNxHR HQ",
+      "notes": "",
+      "index": 6
+    },
+    {
+      "presetId": "ffv1-master",
+      "guid": "FC3AFE20-1535-4AE4-BA3F-AC98AC732A2B",
+      "name": "Lossless - FFV1",
+      "notes": "The fixed profile from the current adapter baseline: FFV1 10-bit and float PCM in MKV.",
+      "index": 7
+    },
+    {
+      "presetId": "h264-review",
+      "guid": "ABBD5B84-C99D-4CA7-8B5D-ECBA6AAE26FD",
+      "name": "H.264 - quick review",
+      "notes": "Fast software review copy: x264 CRF 23, veryfast, with AAC 160 kbps in MP4. Follows project dimensions and frame rate.",
+      "index": 8
+    },
+    {
+      "presetId": "h264-nvenc",
+      "guid": "457BB2FE-73BB-4E23-A885-4E6ADC43CB08",
+      "name": "H.264 - NVIDIA GPU",
+      "notes": "Everyday GPU delivery: NVENC H.264 CQ 21, p5, with AAC 192 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
+      "index": 9
+    },
+    {
+      "presetId": "yt-hevc-nv",
+      "guid": "CBF902AD-3E0D-4F0F-AF9A-F595D50166F2",
+      "name": "HEVC 10-bit - NVIDIA GPU",
+      "notes": "10-bit HEVC on NVIDIA hardware. Test this encoder on this PC before using it.",
+      "index": 10
+    },
+    {
+      "presetId": "av1-nvenc",
+      "guid": "BBD15926-36B8-456C-9A04-A3250A99E95B",
+      "name": "AV1 10-bit - NVIDIA GPU",
+      "notes": "GPU AV1 CQ 28, p5, with Opus 160 kbps in MKV. Requires an AV1-capable NVIDIA GPU and supporting FFmpeg.",
+      "index": 11
+    },
+    {
+      "presetId": "prores-lt",
+      "guid": "AA3DB647-BE15-40E1-9096-015DA63DDFB6",
+      "name": "ProRes 422 LT",
+      "notes": "Lower-data-rate editing intermediate: prores_ks 422 LT, 10-bit, with 24-bit PCM in MOV. Follows project dimensions and frame rate.",
+      "index": 12
+    },
+    {
+      "presetId": "prores-proxy",
+      "guid": "43F5AF92-E565-4253-8FCA-E0166BD31BA0",
+      "name": "ProRes Proxy",
+      "notes": "Low-data-rate offline editing copy: prores_ks 422 Proxy with 24-bit PCM in MOV. Retains project dimensions and frame rate; does not downscale.",
+      "index": 13
+    },
+    {
+      "presetId": "vp9-webm",
+      "guid": "AFBB114A-287D-4EFB-9564-B872FCFE9425",
+      "name": "VP9 - WebM",
+      "notes": "Web delivery: software VP9 10-bit CRF 31, good deadline, CPU-used 2, with Opus 192 kbps in WebM.",
+      "index": 14
+    },
+    {
+      "presetId": "h264-crf16",
+      "guid": "88DA6FEC-20B6-41E5-8347-3F1A05373235",
+      "name": "H.264 CRF 16 (x264)",
+      "notes": "High-quality software H.264: x264 CRF 16, slow, 8-bit, with AAC 320 kbps in MP4. Follows project dimensions and frame rate.",
+      "index": 15
+    },
+    {
+      "presetId": "hevc-crf16",
+      "guid": "903C6118-22F1-422A-BA0E-31DE6653C536",
+      "name": "HEVC CRF 16 (x265)",
+      "notes": "High-quality software HEVC: x265 CRF 16, slow, 10-bit, with AAC 320 kbps in MP4. Follows project dimensions and frame rate.",
+      "index": 16
+    },
+    {
+      "presetId": "h264-nvenc-720p-3500",
+      "guid": "E2B75810-06FE-47D4-8F08-BB0811D60F80",
+      "name": "H.264 720p 3500kbps (NVENC)",
+      "notes": "NVENC H.264 targeting 3500 kbps video, plus AAC 160 kbps, in MP4. Fits the picture inside 1280x720 with padding, without stretching; retains project frame rate. Requires a working NVIDIA encoder.",
+      "index": 17
+    }
+  ]
+}

@@ -35,6 +35,15 @@ Priority labels:
 
 ### Current release scope (owner, 2026-10-17)
 
+**Owner addition (2026-10-18, expanded 2026-10-23):** include 16 fixed Render As
+starter templates linked by origin ID/revision to the app's shared built-ins.
+The [starter list](../STARTER_PRESETS.md) includes software/GPU delivery, review,
+editing and lossless recipes, both CRF 16 presets and 720p NVENC at 3500 kbps.
+Keep the general settings template. Defaults ship inside the exporter/app and
+follow project resolution/rate except the explicit 720p fit/pad; saved user templates
+are independent snapshots with explicit Update from library. Arbitrary pinned
+user presets remain skipped. This addition does not qualify the new host list.
+
 Keep the working product. Only two unfinished product features remain in scope:
 
 1. **MP4, MOV, WebM and MXF in VEGAS, alongside MKV.** Finish native extension
@@ -53,6 +62,12 @@ headers, command-to-Basic import, learned size estimates, structured filter/inpu
 override controls, FFmpeg download helpers, update checks/diagnostic bundles,
 additional host/media support and live-edit/prewarm enhancements. There is no
 automatic follow-up commitment for these items.
+
+**Future feature writeup (owner request, 2026-10-23):**
+[Resolution, filters and VEGAS preset summary](FUTURE_FEATURES.md) records the
+requested output-size/upscaling controls in a collapsed Filters section and a
+read-only summary beside the native page's settings button. This is future
+planning only; it does not add implementation to the current release queue.
 
 Preserve existing revision counters/history storage, conflict handling, snapshots,
 base-recipe copies/diff, logs, schema fields and sample/unknown fallbacks. Existing
@@ -116,7 +131,7 @@ anything else goes in Extra arguments or Advanced mode.
 
 | Feature | Priority | Notes |
 | --- | --- | --- |
-| Vegas Encoder in Render As with a default template | Exists | Current fixed FFV1 profile |
+| Vegas Encoder in Render As with fixed starter templates | Implemented offline | 16 shared built-in starters plus general settings; saved snapshots stay independent. New list/restart behavior is not real-host qualified. |
 | Native page in Custom Template: Edit settings and status/suffix guidance | Exists; retain | Richer native summary/origin and direct Load preset shortcut are skipped; Load preset works in the popup |
 | Popup editor (separate owned window): template header, From VEGAS, shared editor, Apply/Cancel | v1, **gated A5/A6** | Session files; crash-safe |
 | Template stores the full recipe snapshot plus origin | v1, **gated A7** | Versioned envelope |

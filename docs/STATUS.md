@@ -1,9 +1,128 @@
 # Vegas Encoder status
 
-Updated: 2026-10-18 (Asia/Singapore). Owner-installed version: 0.1.7-recipe-proof
-(frontend 0.1.7+1; containers/dashboard trial installed on VEGAS 2026.0.3.189).
+Updated: 2026-10-23 (Asia/Singapore). No exporter currently installed: the owner
+requested removal of the development trial and a clean state for installer testing.
 
 ## Current progress
+
+**Expanded starter presets (owner request, 2026-10-23):** the shared catalog now
+provides 16 app built-ins and 16 fixed VEGAS starters, plus the preserved general
+settings template. Added quick-review H.264, H.264/AV1 NVIDIA GPU, ProRes LT/Proxy,
+VP9/WebM, x264 CRF 16, x265 CRF 16 and NVENC H.264 720p at a 3500 kbps video
+target; the existing NVIDIA HEVC app recipe is now also a VEGAS starter. All
+seven previous app recipes and six previous VEGAS GUIDs/slots remain unchanged;
+new VEGAS entries append at slots 8-17. The [settings table](STARTER_PRESETS.md)
+records exact defaults. The 720p starter fits/pads to 1280x720 without stretching
+at the source frame rate, with AAC 160 kbps additional to the video target.
+Other presets, including ProRes Proxy, retain project dimensions/rate.
+
+Focused validation: optimized native release build; **357** actual-DLL fake-host
+enumeration/origin/compile/conformance/naming/allocation checks; **154** real-file
+repository checks; **99** library-watch/cache checks at 500 presets; **39** app
+preset/popup/widget/golden regressions, with eight light/dark images reviewed;
+and app/service analysis. All pass. With user-supplied gyan FFmpeg **5.1.2**,
+**93** runtime checks pass, including **17** core-generated synthetic encodes,
+readbacks and full decodes. The AV1 NVENC encoder is absent from this build:
+the test confirms pre-encode refusal, not an AV1 GPU encode pass. Additional
+direct core-generated encodes verify 1280x720 output from widescreen, 4:3 and
+portrait fixtures; decoded pixels confirm black pillarboxing for the latter two.
+New metadata uses the library's required UTC timestamp format. The watch fixture
+keeps 500 total entries regardless of bundled count; runtime reporting separates
+successful encodes from unavailable-encoder refusals.
+
+This is offline synthetic media/real core/files/GPU plus fake-host/UI validation,
+not new real-VEGAS qualification. Expanded starter visibility/save/restart and
+AV1 GPU encoding remain unqualified. No installation, source commit or new
+installer bundle was performed by the starter expansion; previous bundles and
+rollback backups remain intact. Owner-deferred host trials stay deferred.
+
+**Installer modes and multiple VEGAS versions (owner decisions, 2026-10-23):**
+implemented the behaviour in [INSTALLER.md](INSTALLER.md).
+- **Modes:** the wizard picks install, update, maintenance (Modify / Repair /
+  Uninstall) or blocked from the installed app version, and refuses downgrades.
+- **Integrations page:** the old Components and folder pages are replaced by one
+  checklist row per detected VEGAS version. Only VEGAS Pro 2026 is supported;
+  other versions are listed disabled. All installed exporters always update with
+  the app. A warning dialog appears when nothing is ticked.
+- **Records:** the ProgramData installation records are authoritative.
+- **Lighter ownership:** setup overwrites or removes its own exporter files instead
+  of refusing when they were changed by hand. A hand-deleted DLL counts as removed.
+- **Running programs:** listed by name, with Retry.
+- **Theme:** `WizardStyle=modern dynamic polar` follows Windows light/dark.
+- **Silent installs:** `/VEGAS=` and `/VEGASDIR<version>=` replace `/COMPONENTS`
+  and `/VEGASDIR`.
+- **Unchanged:** the per-VEGAS `install-manifest.json` format the Settings
+  dashboard reads.
+
+Focused checks pass:
+- **38** confined helper fixtures;
+- the unprivileged Inno harness, which uses real read-only detection, builds the
+  page in install, update and maintenance variants, and aborts before installing;
+- an Inno 6.7.1 compile of the product script into a scratch folder against an
+  existing staged bundle.
+
+The production helper's read-only detection on this machine finds VEGAS Pro
+2026.0.3.189 (supported) and VEGAS Pro 23/22/21/13 (listed as unsupported), with
+no installation records.
+
+A full Build-Release run compiled the native code, the helper and the app, then
+stopped at its source-freshness guard. The starter-preset sources were being
+edited concurrently, so no new installer was packaged. Setup was not run, nothing
+was installed and nothing was committed. Real install/update/repair/uninstall,
+page layout and light/dark rendering remain unqualified.
+
+**Shared starter presets (owner approval, 2026-10-18):** the exporter now supplies
+H.264/MP4, software H.265/HEVC 10-bit/MP4, AV1 10-bit/MKV, ProRes 422 HQ/MOV,
+DNxHR HQ/MXF and lossless FFV1/MKV, plus the preserved general settings template.
+A shared `schema/builtin-presets.v1.json` generates app recipes and native rows;
+the original six app recipes retain their exact settings/metadata, with software
+HEVC added as the seventh. Native snapshot recipes are normalized by the C++ core
+and carry matching origin IDs/revisions. Stable GUIDs/indices distinguish supplied
+templates; project dimensions/rate remain inherited. Setup deploys defaults with
+the binaries, without copying `.sft2` files, changing user library presets or
+refreshing saved settings. Explicit popup Update from library adopts new revisions.
+User pinning remains outside this fixed-list implementation.
+
+Focused checks pass: **180** actual-DLL fake-host enumeration/origin/GUID/container/
+conformance/allocation checks, including native-target compilation of all six
+starters; **3,104** native core checks; **154** real-file library repository checks;
+**99** library watch/cache checks at 500 presets; app/service analysis; and **45**
+popup/widget/golden regressions, including five new widget cases and six reviewed
+light/dark images. A newer bundled revision leaves saved local settings unchanged
+until explicit update in the popup. Historical B0 fakes remain unchanged. These
+checks use the real core/files and fake host/UI services, not real VEGAS; new
+starter-list visibility and save/restart remain unqualified. No installer was run
+and no installed files were changed by this implementation. The prior clean-state
+backup remains intact.
+
+The complete native/helper/Windows-app rebuild and Inno **6.7.1** compilation pass
+into `build/release-inputs-default-presets` (**32** file records), with **81**
+packaging/detection checks and **5** frozen-input refusals passing. Installer:
+`dist/VegasEncoder-0.1.7.1-windows-x64-setup-20261018-223603890.exe`
+(12,634,949 bytes), SHA-256
+`CC59797F9C2042777FF4F0155FF6012ABE5EFA334B909D0CCA6CB785B7E54974`.
+Its sidecar records source `8bc962b` plus `sourceDirty:true`, `installed:false`
+and `releaseQualified:false`. The source-freshness guard correctly refused the
+initial build while new golden files were being written; the final run held source
+steady. No commit or installation. Real installer and new-starter host checks
+remain open; owner-deferred trials are not resumed.
+
+**Clean installer-test state (owner request, 2026-10-18):** uninstalled the
+containers/dashboard development exporter from VEGAS 2026.0.3.189 using the
+manifest/hash-checked development uninstaller. Archived all six saved Vegas
+Encoder `.sft2` test templates, normal roaming settings, local cache/sessions
+and legacy diagnostic logs outside their active paths. Exact installed files,
+ownership manifest and discovery config were backed up and hash-verified first.
+Backup and restoration instructions:
+`C:\Users\Samuel Tee\AppData\Local\VegasEncoderInstallerTestBackup\20261018-clean-start\RESTORE.txt`;
+the adjacent `reset-manifest.json` records the original paths. All six active
+installation/data/template paths are confirmed absent; the 12 unrelated VEGAS
+templates/favorites files are hash-verified unchanged. No setup app/uninstaller
+registration or ProgramData product catalog was found. Other four registered
+VEGAS hosts had no Vegas Encoder installation. Existing candidate builds, isolated
+trial profiles and earlier rollback files remain intact. This was real installed
+filesystem cleanup with VEGAS closed; no installer run or render qualification.
+The prepared installer remains in `dist/` for the owner's test. Nothing committed.
 
 **Scripts organization (owner request, 2026-10-18):** the installer/source
 checkpoint was committed and pushed as `392493d`. Routine human entry points
@@ -1240,7 +1359,9 @@ VEGAS test ran**. Gate state is unchanged. See the
 
 Continue in `L:\repos\vegas-encoder` on `master` with one agent
 owning both app and platform. Follow the single ordered queue in
-[NEXT_AGENT.md](NEXT_AGENT.md), starting with selected-file preset import.
+[NEXT_AGENT.md](NEXT_AGENT.md). Preset import and the 16 shared starters are
+implemented; rebuild matched installer inputs after source changes settle,
+then follow the owner-directed real installer and starter qualification gates.
 The owner's deferred trial/recovery checks and recorded qualification limits
-above remain unchanged. Installer implementation/testing and release signoff
+above remain unchanged. Real installer testing and release signoff
 remain; do not reopen deferred tests or duplicate completed core/service work.

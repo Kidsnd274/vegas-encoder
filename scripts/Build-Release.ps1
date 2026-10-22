@@ -30,6 +30,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Version generation failed.' }
     & $PythonPath -I scripts/etc/Generate-CoreData.py
     if ($LASTEXITCODE -ne 0) { throw 'Core data generation failed.' }
+    & $PythonPath -I scripts/etc/Generate-ServiceBuiltins.py
+    if ($LASTEXITCODE -ne 0) { throw 'Built-in preset generation failed.' }
     Push-Location app
     try {
       & $FlutterPath pub get

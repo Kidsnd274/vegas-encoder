@@ -60,8 +60,12 @@ in tests. `FakeFileReveal` captures reveal requests. Unknown data round-trips.
 Writers use revision checks under Windows byte locks and adjacent atomic replace.
 Reads are bounded and validated; future versions preserve source bytes. Watches
 poll, replay per listener, pause reads and finish their read on cancellation.
-Cancel every watch subscription on disposal. The six built-ins contain adopted
-recipe policy only, with runtime facts derived by the native core.
+Cancel every watch subscription on disposal. The 16 built-ins contain product
+recipe policy only, with runtime facts derived by the native core. The shared
+`schema/builtin-presets.v1.json` catalog supplies both the app and the exporter's
+16 fixed starter templates, including explicitly named NVIDIA hardware presets.
+Built-in recipe edits increment their revision; IDs and VEGAS slot/GUID identities
+remain stable. Built-ins are bundled rather than copied into the user's library.
 
 Run `scripts/etc/Test-B3Repositories.ps1` from the repository root for the real Windows
 file/concurrency suite. It builds a native-asset AOT bundle so parent and competing

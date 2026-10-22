@@ -1,7 +1,29 @@
+{ Asks the user to close programs that use the app or a selected VEGAS folder.
+  Returns '' when nothing is open; otherwise the message Setup stops with. }
+function WaitForClosedPrograms: String;
+var
+  Busy: String;
+begin
+  Result := '';
+  repeat
+    InitAppRequest;
+    AddTargets;
+    if not Helper('running') then begin Result := HelperError; Exit; end;
+    Busy := GetIniString('setup', 'busy', '', ResultFile);
+    if Busy = '' then Exit;
+    if SuppressibleTaskDialogMsgBox('Close programs to continue',
+      'Close these programs, then click Retry: ' + Busy, mbError, MB_RETRYCANCEL, [], 0, IDCANCEL) <> IDRETRY then begin
+      Result := 'Close these programs, then run Setup again: ' + Busy;
+      Exit;
+    end;
+  until False;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var PreviousApp: String;
 begin
   Result := '';
+  ReadIntegrationChoices;
   PreviousApp := GetPreviousData('AppDir', '');
   if (PreviousApp <> '') and
      (CompareText(RemoveBackslash(PreviousApp), RemoveBackslash(ExpandConstant('{app}'))) <> 0) then begin
@@ -20,13 +42,14 @@ begin
     Result := 'Install the Microsoft Visual C++ 2015-2022 x64 Redistributable, then run Setup again.';
     Exit;
   end;
+  Result := WaitForClosedPrograms;
+  if Result <> '' then Exit;
   ExtractTemporaryFile('payload.json');
   ExtractTemporaryFile('vegas-encoder.dll');
   ExtractTemporaryFile('vegas-encoder.ini.in');
   ExtractTemporaryFile('VegasEncoder-x64.fio2007-config');
   InitAppRequest;
-  if WizardIsComponentSelected('vegas2026') then
-    SetIniString('setup', 'host', HostPage.Values[0], RequestFile);
+  AddTargets;
   SetIniString('setup', 'payload', ExpandConstant('{tmp}'), RequestFile);
   if Helper('prepare') then
     TransactionDir := GetIniString('setup', 'transaction', '', ResultFile)
