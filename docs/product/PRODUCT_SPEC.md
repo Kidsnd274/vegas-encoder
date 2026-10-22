@@ -185,9 +185,11 @@ anything else goes in Extra arguments or Advanced mode.
 
 1. The installer places the app, exporter DLL and config. It is reversible and
    manifest-based.
-2. The app opens on **FFmpeg** if no default exists. It shows candidates found
-   automatically, with version and license class, and a progress strip as it probes.
-3. The user picks the default. Hardware tests run in the background and badges fill in.
+2. If no default exists, the desktop app opens its **setup wizard** (UI_SPEC §5a). It
+   finds candidates automatically and checks each one, hardware encoders included, with
+   progress as it probes.
+3. The user picks the default from the checked list (one is recommended), or skips;
+   the FFmpeg page's Run setup… opens the wizard again.
 4. **Presets** shows the built-ins, already marked for availability (e.g. NVENC presets
    say "Ready on RTX 4070").
 

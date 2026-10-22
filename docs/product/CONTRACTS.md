@@ -1126,7 +1126,8 @@ MachineSettings {
   verifyOutput:bool,theme:"system"|"light"|"dark",uiState:AppUiState|null
 }
 AppUiState {desktopWindowBounds:DesktopWindowBounds|null,desktopMaximized:bool,
-  lastSizeLengthText:string|null,popupWindowSize:PopupWindowSize|null}
+  lastSizeLengthText:string|null,popupWindowSize:PopupWindowSize|null,
+  setupDismissed:bool}
 DesktopWindowBounds {x,y:int,width,height:positiveInt}
 PopupWindowSize {width,height:int in 1..32768}
 ```
@@ -1150,6 +1151,9 @@ preserves exactly what the user typed in the File node (including empty or incom
 text), null if never typed. It is not a recipe duration or a total-size estimate;
 display parsing stays app-side and numeric duration is passed to core. Popup project
 length never overwrites this remembered desktop input automatically.
+`setupDismissed` (default false; absent in older files) records that the user chose
+Skip for now in the desktop app's first-run setup (UI_SPEC §5a). It only stops that
+wizard offering itself on start; it never affects renders or the default FFmpeg.
 
 `popupWindowSize` is the restored **outer window size in physical pixels**; it
 contains no position or maximized state. Null/absent means default popup size. Both

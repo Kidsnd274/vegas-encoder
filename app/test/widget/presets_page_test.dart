@@ -490,7 +490,7 @@ void main() {
   testWidgets('the size card keeps the length as typed, for next time', (tester) async {
     await pump(
       tester,
-      settings: MachineSettings(uiState: AppUiState(lastSizeLengthText: '1:30')),
+      settings: MachineSettings(uiState: AppUiState(lastSizeLengthText: '1:30', setupDismissed: true)),
     );
     await tester.tap(find.text('Sample project.mp4'));
     await tester.pumpAndSettle();

@@ -102,6 +102,7 @@ MachineSettings decodeMachine(JsonMap data) {
     validatePopupSize(state);
     boolField(state, 'desktopMaximized');
     stringField(state, 'lastSizeLengthText', required: false, nullable: true);
+    boolField(state, 'setupDismissed');
     if (state['desktopWindowBounds'] != null) {
       final bounds = objectField(state, 'desktopWindowBounds');
       validateExtensions(bounds);

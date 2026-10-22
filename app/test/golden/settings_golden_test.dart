@@ -26,10 +26,12 @@ void main() {
         await tester.pumpAndSettle();
       },
     ),
-    // Nothing set up yet: renders need a default FFmpeg.
+    // Nothing set up yet, and the first-run setup skipped: renders need a default FFmpeg.
     'no_ffmpeg': (
       overrides: () => [
-        machineSettingsRepositoryProvider.overrideWithValue(FakeMachineSettingsRepository(settings: MachineSettings())),
+        machineSettingsRepositoryProvider.overrideWithValue(
+          FakeMachineSettingsRepository(settings: MachineSettings(uiState: AppUiState(setupDismissed: true))),
+        ),
       ],
       act: null,
     ),

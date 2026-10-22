@@ -720,12 +720,14 @@ class AppUiState extends JsonModel {
     PopupWindowSize? popupWindowSize,
     bool desktopMaximized = false,
     String? lastSizeLengthText = null,
+    bool setupDismissed = false,
     JsonMap extensions = const {},
   }) : super({
          'desktopWindowBounds': desktopWindowBounds?.toJson(),
          'popupWindowSize': popupWindowSize?.toJson(),
          'desktopMaximized': desktopMaximized,
          'lastSizeLengthText': lastSizeLengthText,
+         'setupDismissed': setupDismissed,
          'extensions': extensions,
        });
   AppUiState.fromJson(super.json);
@@ -738,11 +740,13 @@ class AppUiState extends JsonModel {
       : PopupWindowSize.fromJson(jsonMap(data['popupWindowSize']));
   bool get desktopMaximized => data['desktopMaximized'] as bool? ?? false;
   String? get lastSizeLengthText => data['lastSizeLengthText'] as String?;
+  bool get setupDismissed => data['setupDismissed'] as bool? ?? false;
   AppUiState copyWith({
     Object? desktopWindowBounds = absent,
     Object? popupWindowSize = absent,
     Object? desktopMaximized = absent,
     Object? lastSizeLengthText = absent,
+    Object? setupDismissed = absent,
     Object? extensions = absent,
   }) => AppUiState.fromJson(
     changed({
@@ -755,6 +759,7 @@ class AppUiState extends JsonModel {
         'desktopMaximized': desktopMaximized,
       if (!identical(lastSizeLengthText, absent))
         'lastSizeLengthText': lastSizeLengthText,
+      if (!identical(setupDismissed, absent)) 'setupDismissed': setupDismissed,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );

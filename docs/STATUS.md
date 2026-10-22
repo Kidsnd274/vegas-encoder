@@ -5,6 +5,30 @@ requested removal of the development trial and a clean state for installer testi
 
 ## Current progress
 
+**First-run FFmpeg setup (owner request, 2026-10-23):** the desktop app now opens
+a setup wizard on start while no default FFmpeg is set and the user hasn't skipped
+it. The wizard finds installations, probes each one (including the hardware
+test encodes, plus a test of any hardware encoder still unknown on this PC), then
+asks which one becomes the default, with one recommended. Skip for now is stored as
+the new C7 `uiState.setupDismissed` (app-only; the DLL ignores it); the FFmpeg
+screen's Run setup… reopens the wizard. See [UI_SPEC §5a](product/UI_SPEC.md#5a-first-run-setup).
+Release version is now **0.1.8** (app `0.1.8+1`, file version `0.1.8.1`) through
+`version.json` and the generated outputs. This was built on branch `setup-wizard`
+in the owner-requested worktree `L:\repos\vegas-encoder-setup-wizard`, from
+`707301a`. The main checkout's uncommitted filters work also edits `AppUiState`
+and `decodeMachine`, so merging needs a small manual merge there.
+
+Focused validation: **88** service contract checks and **156** real-file repository
+checks (setupDismissed round trip, missing key defaults false, non-boolean refused);
+version generation `--check` and **8** version tests; app analysis is clean.
+**18** new wizard unit/widget tests and **10** new light/dark goldens pass. **14**
+FFmpeg-screen goldens were refreshed for the added header button, and the images
+were reviewed. The full app suite passes **666** tests. The one failure,
+`services_wiring_test.dart`, predates this change: it still expects the six original
+built-ins after the 16-starter expansion. All validation used fakes and the real
+core/files. No real FFmpeg scan in the app, no VEGAS, no installer build, no
+installation and no commit.
+
 **Expanded starter presets (owner request, 2026-10-23):** the shared catalog now
 provides 16 app built-ins and 16 fixed VEGAS starters, plus the preserved general
 settings template. Added quick-review H.264, H.264/AV1 NVIDIA GPU, ProRes LT/Proxy,

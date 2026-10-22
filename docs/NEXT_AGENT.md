@@ -53,6 +53,16 @@ candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
 
+**First-run FFmpeg setup + 0.1.8 (owner request, 2026-10-23):** implemented on
+branch `setup-wizard` in the owner-requested worktree
+`L:\repos\vegas-encoder-setup-wizard`. Not committed yet. It covers the wizard
+(UI_SPEC §5a), C7 `uiState.setupDismissed` and the release bump to 0.1.8+1. STATUS
+records the checks. Before merging into master, reconcile the main checkout's
+uncommitted filters edits to `AppUiState`/`decodeMachine` (`videoFiltersExpanded`
+alongside `setupDismissed`). The stale `services_wiring_test.dart` built-in list
+predates this work. Remaining check: a manual run against real FFmpeg installs,
+under `VEGAS_ENCODER_DATA_ROOT`.
+
 **Expanded starters (owner request, 2026-10-23):** implemented all seven proposed
 additions and the owner's x264 CRF 16, x265 CRF 16 and 720p/3500 kbps NVENC
 presets. There are now 16 app recipes and 16 VEGAS starters; NVIDIA HEVC reuses
