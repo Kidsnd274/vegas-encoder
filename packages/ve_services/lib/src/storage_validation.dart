@@ -101,6 +101,7 @@ MachineSettings decodeMachine(JsonMap data) {
     validateExtensions(state);
     validatePopupSize(state);
     boolField(state, 'desktopMaximized');
+    boolField(state, 'videoFiltersExpanded');
     stringField(state, 'lastSizeLengthText', required: false, nullable: true);
     if (state['desktopWindowBounds'] != null) {
       final bounds = objectField(state, 'desktopWindowBounds');
@@ -117,7 +118,7 @@ MachineSettings decodeMachine(JsonMap data) {
 }
 
 Recipe decodeRecipe(JsonMap data, VeCore core) {
-  major(data, 'schema');
+  // The portable core owns recipe version support, including schema 2 filters.
   final normalized = core.normalize(data);
   final errors = normalized.issues
       .where((v) => v.level == IssueLevel.error)
@@ -142,6 +143,7 @@ Preset decodePreset(JsonMap data, VeCore core) {
   final requirements = objectField(data, 'requires');
   validateExtensions(requirements);
   strings(requirements, 'encoders');
+  if (requirements.containsKey('filters')) strings(requirements, 'filters');
   boolField(requirements, 'known');
   stringField(
     requirements,
@@ -210,6 +212,24 @@ FFmpegCapabilities decodeCapabilities(JsonMap data) {
     }
   }
   validateAvailability(objectField(data, 'hardware'));
+  if (data.containsKey('filters')) {
+    for (final entry in objectField(data, 'filters').entries) {
+      if (entry.value is! Map) invalid('Filter facts must be objects.');
+      final value = jsonMap(entry.value);
+      boolField(value, 'available');
+      if (value.containsKey('algorithms')) strings(value, 'algorithms');
+      if (value.containsKey('options')) {
+        for (final option in arrayField(value, 'options')) {
+          if (option is! Map) invalid('Filter option must be an object.');
+          final fields = jsonMap(option);
+          stringField(fields, 'name');
+          for (final name in ['type', 'description']) {
+            stringField(fields, name, required: false);
+          }
+        }
+      }
+    }
+  }
   return FFmpegCapabilities.fromJson(data);
 }
 

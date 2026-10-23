@@ -1,10 +1,12 @@
 # Future features: resolution, filters and VEGAS preset summary
 
 Requested by the owner on 2026-10-23 (Asia/Singapore).
-Status: future feature writeup; no implementation or release date is committed.
-These requests refine two previously skipped enhancements in
-[PRODUCT_SPEC.md](PRODUCT_SPEC.md). The current release and qualification queue
-remain unchanged.
+The owner subsequently approved implementation: native preset summary first,
+then structured software resize with Fit and padding. The original proposal below
+also includes later candidates (linked dimensions, Fill/Stretch, more filters and
+backends); those remain deferred. Implementation and actual validation are recorded
+in [STATUS.md](../STATUS.md), with continuation in [NEXT_AGENT.md](../NEXT_AGENT.md).
+No release date or new real-VEGAS qualification is implied.
 
 ## 1. Resolution, upscaling and an optional Filters section
 

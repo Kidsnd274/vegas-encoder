@@ -13,6 +13,7 @@ import '../display.dart';
 import 'bitrate_field.dart';
 import 'extra_field.dart';
 import 'field_anchor.dart';
+import 'filters_panel.dart';
 import 'panel_kit.dart';
 
 /// The Video encoder node's settings (UI_SPEC §2, Basic editor). Controls the
@@ -82,17 +83,26 @@ class VideoPanel extends StatelessWidget {
             _color(s),
           ],
         ),
+        // Filters share the Extra arguments area: both act on the stream as a
+        // whole, after the encoder's own controls.
         PanelMore(
-          child: FieldAnchor(
-            fields: ['video.extra'],
-            child: ExtraArgumentsField(
-              kind: 'video',
-              value: v.extra,
-              modified: s.modified('video.extra'),
-              onReset: s.reset('video.extra'),
-              messages: s.messages(['video.extra']),
-              onChanged: (text) => s.edit((r) => r.withVideo((v) => v.copyWith(extra: text))),
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FiltersPanel(scope: s),
+              const SizedBox(height: 18),
+              FieldAnchor(
+                fields: ['video.extra'],
+                child: ExtraArgumentsField(
+                  kind: 'video',
+                  value: v.extra,
+                  modified: s.modified('video.extra'),
+                  onReset: s.reset('video.extra'),
+                  messages: s.messages(['video.extra']),
+                  onChanged: (text) => s.edit((r) => r.withVideo((v) => v.copyWith(extra: text))),
+                ),
+              ),
+            ],
           ),
         ),
       ],

@@ -62,3 +62,27 @@ owned macro roles stay input/output. An unfinished quote retains prefix display 
 has empty argv/commandLine. summary supplies conservative videoEncoderId/audioEncoderId.
 VeCore.macros(media:..., paths:..., recipe:...) supplies native catalogue/values;
 FakeVeCore takes exact-context macroFixtures rather than expanding in Dart.
+
+Recipe schema 2 adds an ordered `video.filters` collection, initially one software
+Resize / Upscale entry with Fit and black padding. Schema 1 stays readable and
+unchanged; adding structured processing requires schema 2, including its native
+payload discriminator. Disabled filters retain the existing command. `filterControl`
+reports when Extra arguments or the active Advanced command owns processing.
+`videoGeometry` describes encoded dimensions separately from delivered raw frames;
+known resized dimensions/SAR also appear on expected video streams for readback.
+Selected-build `CoreCapabilities.filters` verifies the required filter options and
+algorithm. Without build facts, editing is allowed with an unverified warning;
+the render/test service must require current capabilities before executing resize.
+
+`core.summarizeSnapshot(snapshot, media: realMediaOrNull)` supplies the pure native
+template summary through the optional `VeCoreSnapshotSummaries` interface. Unknown
+source facts never borrow preview dimensions. `FakeVeCore.summaryKey` and
+`summaryFixtures` provide explicit fixture lookups, with no Dart resolver. The
+`{sar}` macro keeps generated Advanced resize seeds tied to delivered sample aspect
+ratio rather than to sample-preview facts.
+
+`CompilePaths.mediaIsSample` marks labelled preview inputs. It leaves preview
+commands and geometry intact, while preventing sample-dependent filter aspect or
+rounding diagnostics from blocking edits for an unknown project. Schema, selected
+FFmpeg capability and canvas alignment checks still run. Actual render/test paths
+leave it false and validate against the real delivered frames.

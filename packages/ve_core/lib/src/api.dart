@@ -34,6 +34,33 @@ abstract interface class VeCore {
   PayloadResult decodePayload(Uint8List bytes);
 }
 
+/// Optional additive interface, keeping injected older core fakes valid.
+abstract interface class VeCoreSnapshotSummaries {
+  SnapshotSummary summarizeSnapshot(
+    TemplateSnapshot snapshot, {
+    MediaDescription? media,
+  });
+}
+
+extension VeCoreSummary on VeCore {
+  SnapshotSummary summarizeSnapshot(
+    TemplateSnapshot snapshot, {
+    MediaDescription? media,
+  }) {
+    final core = this;
+    if (core is VeCoreSnapshotSummaries) {
+      return (core as VeCoreSnapshotSummaries).summarizeSnapshot(
+        snapshot,
+        media: media,
+      );
+    }
+    throw const CoreException(
+      'SUMMARY-UNAVAILABLE',
+      'This core does not supply snapshot summaries.',
+    );
+  }
+}
+
 class CoreException implements Exception {
   const CoreException(this.code, this.message);
   final String code;

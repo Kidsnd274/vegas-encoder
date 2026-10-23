@@ -76,7 +76,8 @@ class CoreFixture {
 
 /// A fixture lookup, never a second implementation of the product rules.
 /// Modified recipes/contexts require injected fixtures; unmatched calls throw.
-class FakeVeCore implements VeCore, VeCoreMacroCatalog {
+class FakeVeCore
+    implements VeCore, VeCoreMacroCatalog, VeCoreSnapshotSummaries {
   FakeVeCore({
     List<CoreFixture>? fixtures,
     Map<String, List<MacroDefinition>> macroFixtures = const {},
@@ -87,7 +88,13 @@ class FakeVeCore implements VeCore, VeCoreMacroCatalog {
     Map<String, SizeEstimate>? estimateFixtures,
     Map<String, Uint8List>? encodedPayloadFixtures,
     Map<String, PayloadResult>? decodedPayloadFixtures,
-  }) : _macros = Map.unmodifiable(
+    Map<String, SnapshotSummary> summaryFixtures = const {},
+  }) : _summaries = Map.unmodifiable(
+         summaryFixtures.map(
+           (key, value) => MapEntry(_key(jsonDecode(key)), value),
+         ),
+       ),
+       _macros = Map.unmodifiable(
          macroFixtures.map(
            (key, value) =>
                MapEntry(key, List<MacroDefinition>.unmodifiable(value)),
@@ -149,6 +156,21 @@ class FakeVeCore implements VeCore, VeCoreMacroCatalog {
        );
 
   final Map<String, List<MacroDefinition>> _macros;
+  final Map<String, SnapshotSummary> _summaries;
+  @override
+  SnapshotSummary summarizeSnapshot(
+    TemplateSnapshot snapshot, {
+    MediaDescription? media,
+  }) {
+    final key = _key({'snapshot': snapshot.data, 'media': media?.data});
+    return _summaries[key] ?? _missing('snapshot summary');
+  }
+
+  static String summaryKey(
+    TemplateSnapshot snapshot, {
+    MediaDescription? media,
+  }) => _key({'snapshot': snapshot.data, 'media': media?.data});
+
   final List<CoreFixture> fixtures;
   final ProfileCatalog _catalog;
   final Map<String, List<Diagnostic>> _lint;

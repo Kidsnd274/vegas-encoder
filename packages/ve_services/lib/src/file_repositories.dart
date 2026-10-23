@@ -162,6 +162,7 @@ class FilePresetLibrary
     return preset.copyWith(
       requires: preset.requires.copyWith(
         encoders: normalized.requiredEncoders ?? <String>[],
+        filters: normalized.requiredFilters ?? <String>[],
         known: normalized.requiredEncoders != null,
       ),
     );

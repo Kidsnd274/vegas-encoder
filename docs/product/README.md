@@ -23,7 +23,7 @@ are historical; current implementation and real-VEGAS evidence/limits are in
 | [WORKSTREAMS.md](WORKSTREAMS.md) | One-agent workflow, original checkout, contracts and retained trial artifacts |
 | [design/index.html](design/index.html) | The round 1 gallery of eight directions, plus the shared VEGAS native page |
 | [PRODUCT_SPEC.md](PRODUCT_SPEC.md) | Features and priorities, key user flows, and the adapter limits shown to users |
-| [FUTURE_FEATURES.md](FUTURE_FEATURES.md) | Future resolution/upscaling and collapsed filter controls, plus the native VEGAS selected-preset summary; writeup only |
+| [FUTURE_FEATURES.md](FUTURE_FEATURES.md) | Resolution/upscaling and native selected-preset summary request; summary and Fit-only resize approved for implementation, later candidates deferred |
 | [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) | Processes, shared C++ core, Flutter app, popup session protocol, payload, testing |
 | [SETTINGS_AND_COMMANDS.md](SETTINGS_AND_COMMANDS.md) | Recipe schema v1, how settings become an FFmpeg command, Advanced mode, validation, size estimate |
 | [FFMPEG_INTEGRATION.md](FFMPEG_INTEGRATION.md) | Which FFmpeg is used, and how the app knows what it can do on this PC |

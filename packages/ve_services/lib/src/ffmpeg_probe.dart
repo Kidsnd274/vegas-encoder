@@ -21,6 +21,7 @@ Future<JsonMap> _parseLists(
   String encoders,
   String muxers,
   String full,
+  String filters,
 ) => Isolate.run(() {
   final parser = WindowsFFmpegHelpParser();
   final start = full.indexOf('AVCodecContext AVOptions:');
@@ -35,6 +36,7 @@ Future<JsonMap> _parseLists(
   return {
     'encoders': parser.parseEncoders(encoders),
     'muxers': parser.parseMuxers(muxers),
+    'filters': parser.parseFilters(filters),
     'genericOptions': parser.parseOptions(generic).map((v) => v.data).toList(),
   };
 });
@@ -95,7 +97,8 @@ class WindowsFFmpegProbe implements FFmpegProbe {
             final checked = await discovery.refresh(installation, op.token);
             emit(
               'lists',
-              message: 'Reading encoder, muxer and generic option lists.',
+              message:
+                  'Reading encoder, muxer, filter and generic option lists.',
             );
             final results = await Future.wait([
               runner.run(checked.path, [
@@ -112,6 +115,10 @@ class WindowsFFmpegProbe implements FFmpegProbe {
                 cancellation: op.token,
                 stdoutLimit: 4 * 1024 * 1024,
               ),
+              runner.run(checked.path, [
+                '-hide_banner',
+                '-filters',
+              ], cancellation: op.token),
             ]);
             for (final result in results) {
               result.requireSuccess('FFmpeg capability lists');
@@ -120,9 +127,25 @@ class WindowsFFmpegProbe implements FFmpegProbe {
               results[0].stdout + results[0].stderr,
               results[1].stdout + results[1].stderr,
               results[2].stdout + results[2].stderr,
+              results[3].stdout + results[3].stderr,
             );
             op.token.check();
             final encoders = jsonMap(parsed['encoders']);
+            final listedFilters = jsonMap(parsed['filters']);
+            final filters = <String, Object?>{};
+            for (final name in ['scale', 'pad', 'setsar']) {
+              if (!listedFilters.containsKey(name)) continue;
+              final help = await runner.run(checked.path, [
+                '-hide_banner',
+                '-h',
+                'filter=$name',
+              ], cancellation: op.token);
+              help.requireSuccess('Filter help');
+              filters[name] = {
+                ...jsonMap(listedFilters[name]),
+                ...parser.parseFilterHelp(help.stdout + help.stderr, name),
+              };
+            }
             final profiles = core.profiles();
             final curated = <String, String>{
               for (final p in profiles.video) p.id: 'video',
@@ -197,6 +220,7 @@ class WindowsFFmpegProbe implements FFmpegProbe {
               libavformatMajor: major,
               encoders: encoders,
               muxers: jsonMap(parsed['muxers']),
+              filters: filters,
               probedAt: DateTime.now().toUtc().toIso8601String(),
               extensions: {
                 'genericOptions': parsed['genericOptions'],

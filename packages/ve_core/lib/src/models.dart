@@ -41,6 +41,54 @@ class ContainerSettings extends JsonModel {
   );
 }
 
+/// Ordered curated video processing entry. Core owns admission and compilation.
+class VideoFilter extends JsonModel {
+  VideoFilter({
+    String type = 'resize',
+    bool enabled = true,
+    required int width,
+    required int height,
+    String backend = 'scale',
+    String algorithm = 'bicubic',
+    String fit = 'pad',
+  }) : super({
+         'type': type,
+         'enabled': enabled,
+         'width': width,
+         'height': height,
+         'backend': backend,
+         'algorithm': algorithm,
+         'fit': fit,
+       });
+  VideoFilter.fromJson(super.json);
+  String get type => data['type'] as String;
+  bool get enabled => data['enabled'] as bool? ?? true;
+  int get width => data['width'] as int;
+  int get height => data['height'] as int;
+  String get backend => data['backend'] as String? ?? 'scale';
+  String get algorithm => data['algorithm'] as String? ?? 'bicubic';
+  String get fit => data['fit'] as String? ?? 'pad';
+  VideoFilter copyWith({
+    Object? type = absent,
+    Object? enabled = absent,
+    Object? width = absent,
+    Object? height = absent,
+    Object? backend = absent,
+    Object? algorithm = absent,
+    Object? fit = absent,
+  }) => VideoFilter.fromJson(
+    changed({
+      if (!identical(type, absent)) 'type': type,
+      if (!identical(enabled, absent)) 'enabled': enabled,
+      if (!identical(width, absent)) 'width': width,
+      if (!identical(height, absent)) 'height': height,
+      if (!identical(backend, absent)) 'backend': backend,
+      if (!identical(algorithm, absent)) 'algorithm': algorithm,
+      if (!identical(fit, absent)) 'fit': fit,
+    }),
+  );
+}
+
 class VideoSettings extends JsonModel {
   VideoSettings({
     bool enabled = true,
@@ -58,6 +106,7 @@ class VideoSettings extends JsonModel {
     double? gopSec = null,
     String color = 'bt709',
     String extra = '',
+    List<VideoFilter>? filters,
     JsonMap extensions = const {},
   }) : super({
          'enabled': enabled,
@@ -75,6 +124,7 @@ class VideoSettings extends JsonModel {
          'gopSec': gopSec,
          'color': color,
          'extra': extra,
+         if (filters != null) 'filters': filters.map((v) => v.data).toList(),
          'extensions': extensions,
        });
   VideoSettings.fromJson(super.json);
@@ -93,6 +143,9 @@ class VideoSettings extends JsonModel {
   double? get gopSec => (data['gopSec'] as num?)?.toDouble();
   String get color => data['color'] as String? ?? 'bt709';
   String get extra => data['extra'] as String? ?? '';
+  List<VideoFilter> get filters => List.unmodifiable(
+    jsonMaps(data['filters'] ?? []).map(VideoFilter.fromJson),
+  );
   VideoSettings copyWith({
     Object? enabled = absent,
     Object? encoder = absent,
@@ -109,6 +162,7 @@ class VideoSettings extends JsonModel {
     Object? gopSec = absent,
     Object? color = absent,
     Object? extra = absent,
+    Object? filters = absent,
     Object? extensions = absent,
   }) => VideoSettings.fromJson(
     changed({
@@ -127,6 +181,8 @@ class VideoSettings extends JsonModel {
       if (!identical(gopSec, absent)) 'gopSec': gopSec,
       if (!identical(color, absent)) 'color': color,
       if (!identical(extra, absent)) 'extra': extra,
+      if (!identical(filters, absent))
+        'filters': (filters as List<VideoFilter>).map((v) => v.data).toList(),
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -467,6 +523,7 @@ class CompilePaths extends JsonModel {
     required String output,
     String project = '',
     JsonMap? target,
+    bool mediaIsSample = false,
     JsonMap extensions = const {},
   }) : super({
          'ffmpeg': ffmpeg,
@@ -475,6 +532,7 @@ class CompilePaths extends JsonModel {
          'output': output,
          'project': project,
          if (target != null) 'target': target,
+         if (mediaIsSample) 'mediaIsSample': true,
          'extensions': extensions,
        });
   CompilePaths.fromJson(super.json);
@@ -483,7 +541,11 @@ class CompilePaths extends JsonModel {
   String? get audioPipe => data['audioPipe'] as String?;
   String get output => data['output'] as String;
   String get project => data['project'] as String? ?? '';
-  JsonMap? get target => data['target'] == null ? null : jsonMap(data['target']);
+  JsonMap? get target =>
+      data['target'] == null ? null : jsonMap(data['target']);
+
+  /// Preview frames are not actual project geometry for filter admission.
+  bool get mediaIsSample => data['mediaIsSample'] as bool? ?? false;
   CompilePaths copyWith({
     Object? ffmpeg = absent,
     Object? videoPipe = absent,
@@ -491,6 +553,7 @@ class CompilePaths extends JsonModel {
     Object? output = absent,
     Object? project = absent,
     Object? target = absent,
+    Object? mediaIsSample = absent,
     Object? extensions = absent,
   }) => CompilePaths.fromJson(
     changed({
@@ -500,8 +563,9 @@ class CompilePaths extends JsonModel {
       if (!identical(output, absent)) 'output': output,
       if (!identical(project, absent)) 'project': project,
       if (!identical(target, absent)) 'target': target,
+      if (!identical(mediaIsSample, absent)) 'mediaIsSample': mediaIsSample,
       if (!identical(extensions, absent)) 'extensions': extensions,
-    }),
+    })..removeWhere((key, value) => key == 'mediaIsSample' && value == false),
   );
 }
 
@@ -937,11 +1001,41 @@ class ExpectedStream extends JsonModel {
     required String kind,
     String? encoder = null,
     String? codec = null,
-  }) : super({'kind': kind, 'encoder': encoder, 'codec': codec});
+    int? width,
+    int? height,
+    String? sar,
+  }) : super({
+         'kind': kind,
+         'encoder': encoder,
+         'codec': codec,
+         if (width != null) 'width': width,
+         if (height != null) 'height': height,
+         if (sar != null) 'sar': sar,
+       });
   ExpectedStream.fromJson(super.json);
   String get kind => data['kind'] as String;
   String? get encoder => data['encoder'] as String?;
   String? get codec => data['codec'] as String?;
+  int? get width => data['width'] as int?;
+  int? get height => data['height'] as int?;
+  String? get sar => data['sar'] as String?;
+}
+
+class VideoGeometry extends JsonModel {
+  VideoGeometry.fromJson(super.json);
+  int? get inputWidth => data['inputWidth'] as int?;
+  int? get inputHeight => data['inputHeight'] as int?;
+  int? get width => data['width'] as int?;
+  int? get height => data['height'] as int?;
+  String? get sar => data['sar'] as String?;
+  int? get contentWidth => data['contentWidth'] as int?;
+  int? get contentHeight => data['contentHeight'] as int?;
+  int? get padLeft => data['padLeft'] as int?;
+  int? get padRight => data['padRight'] as int?;
+  int? get padTop => data['padTop'] as int?;
+  int? get padBottom => data['padBottom'] as int?;
+  String get direction => data['direction'] as String? ?? 'unknown';
+  bool? get rounded => data['rounded'] as bool?;
 }
 
 class CompileResult extends JsonModel {
@@ -959,6 +1053,8 @@ class CompileResult extends JsonModel {
     List<ExpectedStream>? expectedStreams = null,
     String? outputContainerId = null,
     String? outputExtension = null,
+    String filterControl = 'structured',
+    VideoGeometry? videoGeometry,
     JsonMap extensions = const {},
   }) : super({
          'executable': executable,
@@ -974,6 +1070,8 @@ class CompileResult extends JsonModel {
          'expectedStreams': expectedStreams?.map((v) => v.data).toList(),
          'outputContainerId': outputContainerId,
          'outputExtension': outputExtension,
+         'filterControl': filterControl,
+         'videoGeometry': videoGeometry?.data,
          'extensions': extensions,
        });
   CompileResult.fromJson(super.json);
@@ -1000,6 +1098,10 @@ class CompileResult extends JsonModel {
   /// Established output container; unknown in unscoped Advanced commands.
   String? get outputContainerId => data['outputContainerId'] as String?;
   String? get outputExtension => data['outputExtension'] as String?;
+  String get filterControl => data['filterControl'] as String? ?? 'structured';
+  VideoGeometry? get videoGeometry => data['videoGeometry'] == null
+      ? null
+      : VideoGeometry.fromJson(jsonMap(data['videoGeometry']));
   String get advancedTemplate => data['advancedTemplate'] as String? ?? '';
   ResolvedSettings? get resolved => data['resolved'] == null
       ? null
@@ -1028,6 +1130,8 @@ class CompileResult extends JsonModel {
     Object? expectedStreams = absent,
     Object? outputContainerId = absent,
     Object? outputExtension = absent,
+    Object? filterControl = absent,
+    Object? videoGeometry = absent,
     Object? extensions = absent,
   }) => CompileResult.fromJson(
     changed({
@@ -1055,7 +1159,11 @@ class CompileResult extends JsonModel {
             .toList(),
       if (!identical(outputContainerId, absent))
         'outputContainerId': outputContainerId,
-      if (!identical(outputExtension, absent)) 'outputExtension': outputExtension,
+      if (!identical(outputExtension, absent))
+        'outputExtension': outputExtension,
+      if (!identical(filterControl, absent)) 'filterControl': filterControl,
+      if (!identical(videoGeometry, absent))
+        'videoGeometry': (videoGeometry as VideoGeometry?)?.data,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1066,11 +1174,13 @@ class NormalizeResult extends JsonModel {
     required Recipe recipe,
     List<Issue> issues = const [],
     List<String>? requiredEncoders = null,
+    List<String>? requiredFilters = null,
     JsonMap extensions = const {},
   }) : super({
          'recipe': recipe.toJson(),
          'issues': issues.map((v) => v.toJson()).toList(),
          'requiredEncoders': requiredEncoders,
+         'requiredFilters': requiredFilters,
          'extensions': extensions,
        });
   NormalizeResult.fromJson(super.json);
@@ -1082,6 +1192,11 @@ class NormalizeResult extends JsonModel {
       : List<String>.unmodifiable(
           (data['requiredEncoders'] as List).cast<String>(),
         );
+  List<String>? get requiredFilters => data['requiredFilters'] == null
+      ? null
+      : List<String>.unmodifiable(
+          (data['requiredFilters'] as List).cast<String>(),
+        );
   List<Issue> get issues => List<Issue>.unmodifiable(
     jsonMaps(data['issues'] ?? []).map(Issue.fromJson),
   );
@@ -1089,6 +1204,7 @@ class NormalizeResult extends JsonModel {
     Object? recipe = absent,
     Object? issues = absent,
     Object? requiredEncoders = absent,
+    Object? requiredFilters = absent,
     Object? extensions = absent,
   }) => NormalizeResult.fromJson(
     changed({
@@ -1097,6 +1213,8 @@ class NormalizeResult extends JsonModel {
         'issues': (issues as List<Issue>).map((v) => v.toJson()).toList(),
       if (!identical(requiredEncoders, absent))
         'requiredEncoders': requiredEncoders,
+      if (!identical(requiredFilters, absent))
+        'requiredFilters': requiredFilters,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1702,6 +1820,7 @@ class CoreCapabilities extends JsonModel {
     int? libavformatMajor = null,
     JsonMap encoders = const {},
     JsonMap muxers = const {},
+    JsonMap filters = const {},
     JsonMap extensions = const {},
   }) : super({
          'installationId': installationId,
@@ -1711,6 +1830,7 @@ class CoreCapabilities extends JsonModel {
          'libavformatMajor': libavformatMajor,
          'encoders': encoders,
          'muxers': muxers,
+         'filters': filters,
          'extensions': extensions,
        });
   CoreCapabilities.fromJson(super.json);
@@ -1721,6 +1841,7 @@ class CoreCapabilities extends JsonModel {
   int? get libavformatMajor => data['libavformatMajor'] as int?;
   JsonMap get encoders => jsonMap(data['encoders'] ?? <String, Object?>{});
   JsonMap get muxers => jsonMap(data['muxers'] ?? <String, Object?>{});
+  JsonMap get filters => jsonMap(data['filters'] ?? <String, Object?>{});
   CoreCapabilities copyWith({
     Object? installationId = absent,
     Object? label = absent,
@@ -1729,6 +1850,7 @@ class CoreCapabilities extends JsonModel {
     Object? libavformatMajor = absent,
     Object? encoders = absent,
     Object? muxers = absent,
+    Object? filters = absent,
     Object? extensions = absent,
   }) => CoreCapabilities.fromJson(
     changed({
@@ -1740,6 +1862,7 @@ class CoreCapabilities extends JsonModel {
         'libavformatMajor': libavformatMajor,
       if (!identical(encoders, absent)) 'encoders': encoders,
       if (!identical(muxers, absent)) 'muxers': muxers,
+      if (!identical(filters, absent)) 'filters': filters,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
@@ -1784,6 +1907,18 @@ class CoreVersion extends JsonModel {
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );
+}
+
+class SnapshotSummary extends JsonModel {
+  SnapshotSummary.fromJson(super.json);
+  String get preset => data['preset'] as String;
+  String get video => data['video'] as String;
+  String get resolution => data['resolution'] as String;
+  String get filters => data['filters'] as String;
+  String get audio => data['audio'] as String;
+  String get container => data['container'] as String;
+  List<Issue> get issues =>
+      List.unmodifiable(jsonMaps(data['issues'] ?? []).map(Issue.fromJson));
 }
 
 class TemplateSnapshot extends JsonModel {

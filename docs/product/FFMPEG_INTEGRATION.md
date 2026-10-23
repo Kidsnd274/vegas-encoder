@@ -1,5 +1,14 @@
 # FFmpeg integration: which FFmpeg, and what it can do
 
+Structured resize discovery (2026-10-23): production parser generation **3**
+reads `-filters` independently of encoder discovery, then detailed help for listed
+`scale`, `pad`, `setsar`. Filter option names and reported software-scaler constants
+are retained through the service cache and core views. Older caches require
+Refresh; filter help or algorithm support is never guessed from the FFmpeg version
+or selected encoder. Editing can retain unverified settings, but actual structured
+resize rendering requires current capability facts. Discovery listing alone is
+not a real-VEGAS qualification or a claim about every filter configuration.
+
 Updated: 2026-10-14 (Asia/Singapore). Status: B1 facts and B3 Windows system
 services delivered. Distribution is decided:
 user-supplied FFmpeg, with no download offer for now (owner, 2026-10-12).

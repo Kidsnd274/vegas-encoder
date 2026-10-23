@@ -64,6 +64,28 @@ int main(int argc, char** argv) {
         }
         const auto& f = bundle.at("fixtures")[0];
         auto recipe = f.at("recipe");
+        auto summarySnapshot = ve::Json{{"recipe",recipe},{"origin",nullptr},{"vegasPrefs",ve::Json::object()},{"writtenBy","core-summary-test"}};
+        auto selectedSummary = CallJson(ve_snapshot_summary,{{"snapshot",summarySnapshot}});
+        Check(selectedSummary.at("preset") == "Custom settings" && selectedSummary.at("resolution") == "Same as input from VEGAS", "native summary never invents source dimensions");
+        Check(ve::Str(selectedSummary,"video").find("libx264") != std::string::npos && selectedSummary.at("filters") == "None", "native summary reflects active Basic settings");
+        Check(ve::Str(selectedSummary,"audio").find("Channels set by VEGAS") != std::string::npos, "unknown channels do not borrow neutral summary media");
+        summarySnapshot["origin"] = {{"presetId","saved"},{"name","Saved \xE5\x90\x8D"},{"revision",7}};
+        summarySnapshot["recipe"]["video"]["extra"] = "-crf 21 -preset fast -vf scale=1280:720";
+        selectedSummary = CallJson(ve_snapshot_summary,{{"snapshot",summarySnapshot}});
+        Check(ve::Str(selectedSummary,"preset").find("revision 7") != std::string::npos && ve::Str(selectedSummary,"preset").find("Modified") == std::string::npos, "saved origin is identified without invented library comparison");
+        Check(ve::Str(selectedSummary,"video").find("CRF 21") != std::string::npos && ve::Str(selectedSummary,"video").find("fast") != std::string::npos, "summary reflects Extra overrides");
+        Check(selectedSummary.at("resolution") == "Custom / not determined" && selectedSummary.at("filters") == "Filters set in Extra arguments", "handwritten graph is conservative");
+        summarySnapshot["recipe"]["command"] = {{"mode","template"},{"template","{inputs} -c:v libx265 -c:a libopus -f matroska {output}"}};
+        selectedSummary = CallJson(ve_snapshot_summary,{{"snapshot",summarySnapshot}});
+        Check(ve::Str(selectedSummary,"video").find("Advanced command") != std::string::npos && ve::Str(selectedSummary,"video").find("libx264") == std::string::npos && ve::Str(selectedSummary,"video").find("CRF 21") == std::string::npos, "Advanced summary never reports inactive Basic settings");
+        Check(selectedSummary.at("container") == "Matroska (MKV) (.mkv)", "Advanced summary uses the active muxer");
+        auto crossSummarySnapshot = summarySnapshot; crossSummarySnapshot["recipe"] = recipe;
+        crossSummarySnapshot["recipe"]["audio"][0]["extra"] = "-crf:v 25 -preset:v medium";
+        auto crossSummary = CallJson(ve_snapshot_summary,{{"snapshot",crossSummarySnapshot}});
+        Check(ve::Str(crossSummary,"video").find("Custom / not determined") != std::string::npos && ve::Str(crossSummary,"video").find("CRF 18") == std::string::npos && ve::Str(crossSummary,"video").find("slow") == std::string::npos, "cross-stream video overrides cannot display inactive Basic controls");
+        crossSummarySnapshot["recipe"]["video"]["extra"] = "-b:a 160k -ac 1";
+        crossSummary = CallJson(ve_snapshot_summary,{{"snapshot",crossSummarySnapshot}});
+        Check(ve::Str(crossSummary,"audio").find("Custom / not determined") != std::string::npos && ve::Str(crossSummary,"audio").find("Stereo") == std::string::npos, "cross-stream audio overrides keep unsupported reflection unknown");
         auto normalized = CallJson(ve_recipe_normalize,{{"recipe",recipe}});
         Check(normalized.at("requiredEncoders") == ve::Json::array({"libx264","aac"}),"Basic requirements come from core");
         auto requirementRecipe = recipe;
@@ -71,11 +93,86 @@ int main(int argc, char** argv) {
         Check(CallJson(ve_recipe_normalize,{{"recipe",requirementRecipe}}).at("requiredEncoders") == ve::Json::array({"libx264"}),"disabled audio is not a requirement");
         requirementRecipe["command"] = {{"mode","template"},{"template","{inputs} -c:v ffv1 {output}"}};
         Check(CallJson(ve_recipe_normalize,{{"recipe",requirementRecipe}}).at("requiredEncoders").is_null(),"Advanced requirements do not use inactive Basic controls");
-        requirementRecipe["schema"] = 2;
+        requirementRecipe["schema"] = 3;
         Check(CallJson(ve_recipe_normalize,{{"recipe",requirementRecipe}}).at("requiredEncoders").is_null(),"invalid recipe requirements remain unknown");
         const auto original = recipe.dump();
         auto request = ve::Json{{"recipe",recipe},{"media",f.at("media")},{"paths",f.at("paths")}};
         const auto result = CallJson(ve_compile,request);
+        auto resizeRequest = request;
+        resizeRequest["recipe"]["schema"] = 2;
+        resizeRequest["recipe"]["video"]["filters"] = ve::Json::array({{{"type","resize"},{"enabled",true},{"width",1280},{"height",720},{"backend","scale"},{"algorithm","bicubic"},{"fit","pad"}}});
+        const auto options = [](std::initializer_list<const char*> names) { ve::Json values = ve::Json::array(); for (const auto* name : names) values.push_back({{"name",name}}); return values; };
+        const auto filterCapabilities = ve::Json{{"encoders",{{"libx264",ve::Options().at("libx264")},{"aac",ve::Options().at("aac")}}},
+            {"muxers",{{"mp4",ve::Json::object()}}},
+            {"filters",{{"scale",{{"available",true},{"options",options({"w","h","flags"})},{"algorithms",{"bicubic","bilinear","lanczos","neighbor"}}}},
+                        {"pad",{{"available",true},{"options",options({"width","height","x","y","color"})}}},
+                        {"setsar",{{"available",true},{"options",options({"sar"})}}}}}};
+        resizeRequest["capabilities"] = filterCapabilities;
+        auto resizeResult = CallJson(ve_compile,resizeRequest);
+        Check(!ve::HasErrors(resizeResult.at("issues")), "structured resize with selected-build support compiles: " + resizeResult.at("issues").dump());
+        Check(ve_schema_max() == 2 && CallJson(ve_recipe_normalize,{{"recipe",resizeRequest.at("recipe")}}).at("requiredFilters") == ve::Json::array({"scale","pad","setsar"}), "core advertises schema2 and required processing");
+        Check(resizeResult.at("filterControl") == "structured" && resizeResult.at("videoGeometry").at("width") == 1280 && resizeResult.at("expectedStreams")[0].at("height") == 720 && resizeResult.at("expectedStreams")[0].at("sar") == "1:1", "output geometry is separate from delivered raw input");
+        Check(resizeResult.at("argv")[std::find(resizeResult.at("argv").begin(),resizeResult.at("argv").end(),ve::Json("-s")) - resizeResult.at("argv").begin() + 1] == request.at("media").at("video").at("width").dump() + "x" + request.at("media").at("video").at("height").dump(), "raw pipe keeps delivered dimensions");
+        for (const auto* algorithm : {"bicubic","bilinear","lanczos","neighbor"}) {
+            auto current = resizeRequest; current["recipe"]["video"]["filters"][0]["algorithm"] = algorithm;
+            const auto compiledResize = CallJson(ve_compile,current);
+            Check(!ve::HasErrors(compiledResize.at("issues")) && ve::Str(compiledResize,"commandLine").find(std::string("flags=") + algorithm) != std::string::npos, "each curated algorithm is explicit");
+        }
+        for (const auto* manual : {"-vf null","-filter:v null","-filter:v:0 null","-filter:0 null","-filter null"}) {
+            auto current = resizeRequest; current["recipe"]["video"]["extra"] = manual;
+            const auto compiledResize = CallJson(ve_compile,current);
+            Check(compiledResize.at("filterControl") == "extra" && compiledResize.at("videoGeometry").at("width").is_null() && ve::Str(compiledResize,"commandLine").find("scale=w=") == std::string::npos, "manual filter aliases own the single video chain");
+            Check(CallJson(ve_recipe_normalize,{{"recipe",current.at("recipe")}}).at("requiredFilters").empty(), "inactive structured filters are not requirements");
+        }
+        auto resizeDisabled = resizeRequest; resizeDisabled["recipe"]["video"]["filters"][0]["enabled"] = false;
+        Check(CallJson(ve_compile,resizeDisabled).at("argv") == result.at("argv"), "disabled resize preserves existing command bytes");
+        auto oldFilterRecipe = resizeRequest.at("recipe"); oldFilterRecipe["schema"] = 1;
+        Check(ve::HasErrors(CallJson(ve_recipe_normalize,{{"recipe",oldFilterRecipe}}).at("issues")), "structured processing cannot hide under schema1");
+        auto unknownSourceSummary = summarySnapshot; unknownSourceSummary["recipe"] = resizeRequest.at("recipe");
+        Check(ve::Str(CallJson(ve_snapshot_summary,{{"snapshot",unknownSourceSummary}}),"resolution").find("1280") != std::string::npos, "unknown-input summary still gives configured output");
+        unknownSourceSummary["recipe"]["video"]["gopSec"] = 0.1;
+        const auto unknownSummaryIssues = CallJson(ve_snapshot_summary,{{"snapshot",unknownSourceSummary}}).at("issues");
+        Check(std::none_of(unknownSummaryIssues.begin(),unknownSummaryIssues.end(),[](const ve::Json& issue) { const auto id = ve::Str(issue,"id"); return id == "V-GOP-BOUNDS" || id == "V-FILTER-ROUNDING" || id == "V-FILTER-ASPECT"; }), "summary without media never validates against placeholder timing or geometry");
+        auto resizeNoCaps = resizeRequest; resizeNoCaps.erase("capabilities");
+        Check(!ve::HasErrors(CallJson(ve_compile,resizeNoCaps).at("issues")), "no selected-build facts still permits editing with warning");
+        auto narrowCanvas = resizeRequest; narrowCanvas["recipe"]["video"]["filters"][0]["width"] = 2; narrowCanvas["recipe"]["video"]["filters"][0]["height"] = 1000;
+        const auto actualNarrow = CallJson(ve_compile,narrowCanvas);
+        Check(std::any_of(actualNarrow.at("issues").begin(),actualNarrow.at("issues").end(),[](const ve::Json& issue) { return ve::Str(issue,"id") == "V-FILTER-ASPECT"; }), "actual media still rejects an aspect ratio that cannot fit on its chroma grid");
+        narrowCanvas["paths"]["mediaIsSample"] = true;
+        const auto sampleNarrow = CallJson(ve_compile,narrowCanvas);
+        Check(!ve::HasErrors(sampleNarrow.at("issues")) && std::none_of(sampleNarrow.at("issues").begin(),sampleNarrow.at("issues").end(),[](const ve::Json& issue) { const auto id = ve::Str(issue,"id"); return id == "V-FILTER-ASPECT" || id == "V-FILTER-ROUNDING"; }), "labelled sample media cannot block unknown-project filter admission or report project rounding");
+        Check(sampleNarrow.at("videoGeometry") == actualNarrow.at("videoGeometry"), "sample marker leaves command-preview geometry unchanged");
+        auto invalidSampleFilter = narrowCanvas; invalidSampleFilter["recipe"]["video"]["filters"][0]["width"] = 0;
+        Check(ve::HasErrors(CallJson(ve_compile,invalidSampleFilter).at("issues")), "sample marker does not suppress structural filter errors");
+        invalidSampleFilter = narrowCanvas; invalidSampleFilter["recipe"]["video"]["filters"][0]["width"] = 3;
+        Check(ve::HasErrors(CallJson(ve_compile,invalidSampleFilter).at("issues")), "sample marker does not suppress canvas chroma alignment errors");
+        invalidSampleFilter = narrowCanvas; invalidSampleFilter["capabilities"]["filters"].erase("pad");
+        Check(ve::HasErrors(CallJson(ve_compile,invalidSampleFilter).at("issues")), "sample marker does not suppress missing filter capabilities");
+        auto resizeMissing = resizeRequest; resizeMissing["capabilities"]["filters"].erase("pad");
+        Check(ve::HasErrors(CallJson(ve_compile,resizeMissing).at("issues")), "selected FFmpeg missing required filter blocks processing");
+        resizeMissing = resizeRequest; resizeMissing["capabilities"]["filters"]["scale"]["algorithms"] = {"bilinear"};
+        Check(ve::HasErrors(CallJson(ve_compile,resizeMissing).at("issues")), "missing selected algorithm never substitutes another");
+        resizeMissing = resizeRequest; resizeMissing["capabilities"]["filters"]["pad"]["options"] = options({"fake"});
+        Check(ve::HasErrors(CallJson(ve_compile,resizeMissing).at("issues")), "listed filter without emitted option support blocks processing");
+        for (const auto* key : {"width","height"}) for (const auto dimension : {0,65537,1279}) {
+            auto current = resizeRequest; current["recipe"]["video"]["filters"][0][key] = dimension;
+            Check(ve::HasErrors(CallJson(ve_compile,current).at("issues")), "invalid or chroma-unaligned resize dimensions are rejected");
+        }
+        struct GeometryCase { int width,height,contentWidth,contentHeight; const char* sar; };
+        for (const auto& shapeCase : {GeometryCase{1920,1080,1280,720,"1:1"},GeometryCase{640,480,960,720,"1:1"},GeometryCase{480,640,540,720,"1:1"},GeometryCase{640,480,1280,720,"4:3"},GeometryCase{1280,720,1280,720,"1:1"}}) {
+            auto current = resizeRequest; current["media"]["video"]["width"] = shapeCase.width; current["media"]["video"]["height"] = shapeCase.height; current["media"]["video"]["sar"] = shapeCase.sar;
+            auto compiledResize = CallJson(ve_compile,current);
+            Check(!ve::HasErrors(compiledResize.at("issues")) && compiledResize.at("videoGeometry").at("contentWidth") == shapeCase.contentWidth && compiledResize.at("videoGeometry").at("contentHeight") == shapeCase.contentHeight, "fit honors delivered shape and sample aspect");
+            current["recipe"]["command"] = {{"mode","template"},{"template",compiledResize.at("advancedTemplate")}};
+            Check(CallJson(ve_compile,current).at("argv") == compiledResize.at("argv"), "Advanced seed expands source SAR without changing the effective chain");
+        }
+        auto advancedInactive = resizeRequest; advancedInactive["recipe"]["command"] = {{"mode","template"},{"template","{inputs} -c:v libx264 -c:a aac -f mp4 {output}"}};
+        Check(ve::Str(CallJson(ve_compile,advancedInactive),"commandLine").find("scale=w=") == std::string::npos, "inactive Basic resize cannot affect Advanced");
+        auto payloadResize = summarySnapshot; payloadResize["recipe"] = resizeRequest.at("recipe");
+        auto encodedResize = ve::EncodePayload(payloadResize);
+        Check(encodedResize[16] == 2 && ve::Canonical(ve::DecodePayload(encodedResize.data(),encodedResize.size()).at("snapshot")) == ve::Canonical(payloadResize), "schema2 processing roundtrips with a rejecting-old-reader envelope discriminator");
+        encodedResize[16] = 1;
+        Check(ve::HasErrors(ve::DecodePayload(encodedResize.data(),encodedResize.size()).at("issues")), "payload and recipe schema disagreement is rejected");
         // Native admission is a compile target, not a portable preset field.
         auto nativeRequest = request;
         nativeRequest["paths"]["target"] = {{"id","vegas-native-v1"}};
@@ -387,8 +484,8 @@ int main(int argc, char** argv) {
         metadataRequest["recipe"]["command"]["template"] = "{inputs} -map 0:v:0 -c:v libx264 -pix_fmt yuv420p10le -c:a aac -filter format=yuv420p,format=yuv420p10le {output}";
         Check(CallJson(ve_compile,metadataRequest).at("signalPath").at("video").at("conversion").is_null(),"Advanced unscoped filter keeps video conversion unknown after an audio option");
         const auto macroResult = CallJson(ve_macros,{{"media",request.at("media")},{"paths",request.at("paths")}}).at("macros");
-        Check(macroResult.size() == 10 && macroResult[0].at("required") == true && macroResult[1].at("required") == true,"shared catalogue required macros");
-        Check(macroResult[9].at("value") == "60","catalogue GOP expansion matches compile");
+        Check(macroResult.size() == 11 && macroResult[0].at("required") == true && macroResult[1].at("required") == true,"shared catalogue required macros");
+        Check(macroResult[10].at("value") == "60","catalogue GOP expansion matches compile");
         const auto suggestions = CallJson(ve_template_complete,{{"text","{"},{"caret",1}}).at("items");
         Check(suggestions.size() == macroResult.size() && suggestions[2].at("description") == macroResult[2].at("description"),"completion shares catalogue definitions");
         const auto scopes = ve::TokenMetadata(ve::Tokenize("{inputs} -c:v:0 libx264 -c:a aac -b 500k -unknown -g 30 {output}"),capability);

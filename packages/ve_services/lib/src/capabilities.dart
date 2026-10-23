@@ -42,6 +42,7 @@ extension FFmpegCapabilitiesCoreView on FFmpegCapabilities {
         identityKey: identityKey,
         version: version,
         libavformatMajor: libavformatMajor,
+        filters: filters,
         encoders: selected == null
             ? encoders
             : {

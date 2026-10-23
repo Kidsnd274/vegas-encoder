@@ -21,6 +21,7 @@ void main() {
   late NativeVeCore core;
   late List<Preset> builtins;
   late EditSessionRequest request;
+  late FakeCapabilityCache capabilities;
 
   setUpAll(() async {
     core = NativeVeCore();
@@ -34,6 +35,36 @@ void main() {
     expect(File(paths.machine).existsSync(), isFalse);
     expect(Directory(paths.library).existsSync(), isFalse, reason: 'built-ins are bundled, never seeded as user files');
     request = await FakeEditSessionService().readRequest('b0-session');
+    final settings = await FakeMachineSettingsRepository().read();
+    final installation = settings.installations.singleWhere((i) => i.id == settings.defaultFFmpegId);
+    final progress = await FakeFFmpegProbe().probe(installation).last;
+    capabilities = FakeCapabilityCache(
+      capabilities: [
+        progress.capabilities!.copyWith(
+          filters: {
+            'scale': {
+              'available': true,
+              'algorithms': ['bicubic', 'bilinear', 'lanczos', 'neighbor'],
+              'options': [
+                for (final name in ['w', 'h', 'flags']) {'name': name},
+              ],
+            },
+            'pad': {
+              'available': true,
+              'options': [
+                for (final name in ['width', 'height', 'x', 'y', 'color']) {'name': name},
+              ],
+            },
+            'setsar': {
+              'available': true,
+              'options': [
+                {'name': 'sar'},
+              ],
+            },
+          },
+        ),
+      ],
+    );
   });
 
   testWidgets('a newer bundled recipe leaves a saved template unchanged until explicit update', (tester) async {
@@ -86,6 +117,7 @@ void main() {
         overrides: [
           windowControllerProvider.overrideWithValue(FakeWindowController()),
           presetLibraryProvider.overrideWithValue(FakePresetLibrary(presets: [preset])),
+          capabilityCacheProvider.overrideWithValue(capabilities),
         ],
       );
       await tester.tap(find.text('H.264 720p 3500kbps (NVENC)').first);
@@ -96,7 +128,13 @@ void main() {
           .toPlainText();
       expect(command, contains('h264_nvenc'));
       expect(command, contains('3500k'));
-      expect(command, contains('scale=1280:720'));
+      expect(preset.revision, 2);
+      expect(preset.recipe.schema, 2);
+      expect(preset.recipe.video.extra, isEmpty);
+      expect(preset.recipe.video.filters.single.width, 1280);
+      expect(preset.recipe.video.filters.single.height, 720);
+      expect(command, contains('scale='));
+      expect(command, contains('flags=bicubic'));
       expect(command, contains('pad=1280:720'));
       expect(command, contains('160k'));
       await expectGolden('builtins_nvenc_720p_$theme');
@@ -183,7 +221,10 @@ void main() {
       final state = container.read(popupProvider).requireValue;
       expect(state.origin!.presetId, 'h264-nvenc-720p-3500');
       expect(state.recipe.video.bitrateK, 3500);
-      expect(state.recipe.video.extra, contains('scale=1280:720'));
+      expect(state.recipe.video.extra, isEmpty);
+      expect(state.recipe.video.filters.single.width, 1280);
+      expect(state.recipe.video.filters.single.height, 720);
+      expect(state.recipe.schema, 2);
     });
   }
 }

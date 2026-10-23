@@ -18,6 +18,7 @@ std::string Canonical(const Json& value);
 const Json& Profiles();
 const Json& Options();
 const Json& RecipeSchema();
+const Json& RecipeSchema2();
 std::string Str(const Json& object, const std::string& key, const std::string& fallback = "");
 double Num(const Json& object, const std::string& key, double fallback = 0);
 bool Bool(const Json& object, const std::string& key, bool fallback = false);
@@ -28,6 +29,12 @@ Json Structural(const Json& recipe);
 Json Validate(const Json& request, const Json* capabilities = nullptr);
 Json Normalize(const Json& request);
 Json Compile(const Json& request, const Json* capabilities = nullptr);
+// Pure selected-template display; missing media stays unknown.
+Json SnapshotSummary(const Json& request);
+std::string FilterControl(const Json& recipe);
+Json VideoGeometry(const Json& recipe, const Json& media = Json(nullptr));
+std::string ResizeChain(const Json& recipe, const Json& media, bool seed = false);
+void ValidateFilters(const Json& recipe, const Json& media, const Json& capabilities, Json& issues);
 // Conservative runtime diagnostic provenance: argv indexes, executable excluded.
 Json ErrorTokenIndices(const Json& compiled, const std::string& stderrTail);
 Json Estimate(const Json& request);

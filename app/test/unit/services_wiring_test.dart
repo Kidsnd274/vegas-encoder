@@ -67,14 +67,12 @@ void main() {
       expect(container.read(servicesProvider).paths!.roaming, paths.roaming);
 
       final presets = container.read(presetsProvider).value!;
-      expect(presets.where((p) => p.builtin).map((p) => p.recipe.id), [
-        'yt-h264',
-        'yt-hevc-nv',
-        'av1-small',
-        'prores-hq',
-        'dnxhr-hq',
-        'ffv1-master',
-      ]);
+      final catalog = jsonMap(jsonDecode(File('../schema/builtin-presets.v1.json').readAsStringSync()));
+      expect(
+        presets.where((p) => p.builtin).map((p) => p.recipe.id),
+        jsonMaps(catalog['presets']).map((p) => jsonMap(p['recipe'])['id']),
+        reason: 'Windows services expose the complete shared bundled catalog.',
+      );
       expect(await Directory(paths.roaming).exists(), isFalse, reason: 'reading writes nothing');
     });
 

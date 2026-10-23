@@ -165,6 +165,20 @@ ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expected, const std:
       for (size_t i = 0; i < streams.size(); ++i) {
         if (matched[i] || ve::Str(streams[i],"codec_type") != ve::Str(fact,"kind")) continue;
         if (!fact.at("codec").is_null() && ve::Str(streams[i],"codec_name") != fact.at("codec").get<std::string>()) continue;
+        if (ve::Str(fact,"kind") == "video") {
+          for (const auto* dimension : {"width", "height"}) {
+            if (fact.contains(dimension) && !fact.at(dimension).is_null() &&
+                streams[i].value(dimension,ve::Json(nullptr)) != fact.at(dimension)) {
+              result["message"] = "Output dimensions differ from the core's encoded video dimensions.";
+              return result;
+            }
+          }
+          if (fact.contains("sar") && !fact.at("sar").is_null() &&
+              ve::Str(streams[i],"sample_aspect_ratio") != ve::Str(fact,"sar")) {
+            result["message"] = "Output sample aspect ratio differs from the core's encoded video aspect ratio.";
+            return result;
+          }
+        }
         matched[i] = true; found = true; break;
       }
       if (!found) { result["message"] = "Output kind/codec differs from the core's expectedStreams."; return result; }
@@ -245,6 +259,9 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
     const auto probeHash = ext.contains("ffprobeIdentity") ? ve::Str(ext.at("ffprobeIdentity"),"sha256") : std::string();
     if (options.verifyOutput && !SameHash(probeHash,hash(Widen(ve::Str(installation,"ffprobePath")))))
       throw std::runtime_error("Selected FFprobe identity changed or unknown.");
+    const auto requiredFilters = ve::Normalize({{"recipe",recipe}}).value("requiredFilters",ve::Json(nullptr));
+    if (requiredFilters.is_array() && !requiredFilters.empty() && !capabilities.is_object())
+      throw std::runtime_error("Filter support for the selected FFmpeg is not verified. Refresh it on the FFmpeg page before rendering this preset.");
     const bool ok = encoder_.StartCompiled(Widen(ve::Str(installation,"path")), options.output,log,options.pipeTimeoutMs,options.finishTimeoutMs,
       [&](const std::wstring& video, const std::wstring& audio, const std::wstring& temp) {
         ve::Json paths{{"ffmpeg",installation.at("path")},{"videoPipe",Utf8(video.c_str())},{"audioPipe",Utf8(audio.c_str())},
@@ -320,7 +337,7 @@ bool RecipeJob::Verify(const Poll& poll) {
   // exact output frame-count check. Bound decoding to the first 32 packets,
   // retaining all stream metadata for kind/count/known-codec validation.
   const bool ok = ProbeChild(Widen(ve::Str(installation_,"ffprobePath")),
-    {L"-v",L"error",L"-read_intervals",L"%+#32",L"-count_frames",L"-show_entries",L"program_version=version:stream=codec_type,codec_name,width,height,nb_read_frames:format=duration,format_name",
+    {L"-v",L"error",L"-read_intervals",L"%+#32",L"-count_frames",L"-show_entries",L"program_version=version:stream=codec_type,codec_name,width,height,sample_aspect_ratio,nb_read_frames:format=duration,format_name",
      L"-show_program_version",L"-of",L"json",stats.tempPath}, options_.probeTimeoutMs,[&] { return Check(poll); },bytes,failure);
   if (!ok) { verification_ = Verification("failed",failure); return false; }
   try { verification_ = VerifyProbe(ve::Parse(reinterpret_cast<const uint8_t*>(bytes.data()),bytes.size()),compiled_.at("expectedStreams"),ve::Str(compiled_,"outputContainerId")); }

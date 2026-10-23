@@ -8,7 +8,7 @@ import 'models.dart';
 
 class WindowsFFmpegHelpParser implements FFmpegHelpParser {
   @override
-  int get version => 2;
+  int get version => 3;
   static const _flags = r'[EDFVASXRBT.P]{11}';
   final _option = RegExp(
     r'^\s{2,}-([^\s]+)\s+(\[?<[^>]+>\]?)\s*(' + _flags + r')\s*(.*)$',
@@ -139,6 +139,71 @@ class WindowsFFmpegHelpParser implements FFmpegHelpParser {
         merged.add(option);
     }
     return List.unmodifiable(merged.map(EncoderOption.fromJson));
+  }
+
+  @override
+  JsonMap parseFilters(String text) {
+    _bound(text);
+    if (!text.contains('Filters:')) {
+      throw const ServiceException(
+        'HELP-PARSE',
+        'Missing FFmpeg filter-list header.',
+      );
+    }
+    final entries = <String, Object?>{};
+    for (final m in RegExp(
+      r'^\s+([TSC.]{3})\s+(\S+)\s+(\S+->\S+)\s+(.*)$',
+      multiLine: true,
+    ).allMatches(text.replaceAll('\r', ''))) {
+      entries[m[2]!] = {'flags': m[1], 'streams': m[3], 'description': m[4]};
+    }
+    // A custom build can omit all curated filters, but must still have a valid list.
+    if (entries.isEmpty)
+      throw const ServiceException('HELP-PARSE', 'Empty FFmpeg filter list.');
+    return entries;
+  }
+
+  @override
+  JsonMap parseFilterHelp(String text, String name) {
+    _bound(text);
+    final normalized = text.replaceAll('\r', '');
+    if (!RegExp(
+      '^Filter ${RegExp.escape(name)}(?:\\s|\$)',
+      multiLine: true,
+    ).hasMatch(normalized)) {
+      throw const ServiceException(
+        'HELP-PARSE',
+        'Filter help returned a different or missing name.',
+      );
+    }
+    // Filter AVOptions omit the leading '-' used by encoder AVOptions.
+    // Reuse the literal option parser rather than maintaining another AVOption grammar.
+    final optionsText = normalized.replaceAllMapped(
+      RegExp(r'^(\s{2,})([^\s-][^\s]*)\s+(\[?<[^>]+>\]?)', multiLine: true),
+      (m) => '${m[1]}-${m[2]} ${m[3]}',
+    );
+    final options = parseOptions(optionsText);
+    final algorithms = <String>{};
+    for (final option in options) {
+      if (['sws_flags', 'scaler', 'flags'].contains(option.name)) {
+        for (final value in jsonMaps(option.data['constants'] ?? [])) {
+          final algorithm = value['name'];
+          if ([
+            'bicubic',
+            'bilinear',
+            'lanczos',
+            'neighbor',
+          ].contains(algorithm)) {
+            algorithms.add(algorithm as String);
+          }
+        }
+      }
+    }
+    return {
+      'available': true,
+      'options': options.map((o) => o.toJson()).toList(),
+      if (name == 'scale') 'algorithms': algorithms.toList()..sort(),
+    };
   }
 
   @override

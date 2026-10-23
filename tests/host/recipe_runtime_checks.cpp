@@ -47,9 +47,17 @@ int wmain(int argc, wchar_t** argv) {
     }
     Write(machineFile,machine);
     const auto cacheFile = root / L"Local" / L"cache" / (Widen(key) + L".json");
-    Json caps{{"parser",2},{"identityKey",key},{"installationId","selected"},{"encoders",{{"h264_nvenc",{{"availability",{{"state","available"}}}}}}}};
+    Json caps{{"parser",3},{"identityKey",key},{"installationId","selected"},{"encoders",{{"h264_nvenc",{{"availability",{{"state","available"}}}}}}}};
     Write(cacheFile,{{"cache",1},{"capabilities",caps}});
     Check(LoadRecipeRuntime().capabilities.at("encoders").at("h264_nvenc").at("availability").at("state") == "unknown","native reader does not promote stored hardware readiness");
+    caps["filters"] = {{"scale", {{"available", true}, {"algorithms", Json::array({"bicubic", "bilinear", "lanczos", "neighbor"})}}},
+                       {"pad", {{"available", true}}}, {"setsar", {{"available", true}}}};
+    Write(cacheFile,{{"cache",1},{"capabilities",caps}});
+    Check(LoadRecipeRuntime().capabilities.at("filters") == caps.at("filters"),
+          "native runtime preserves selected filter capability facts without probing");
+    caps["parser"] = 2; Write(cacheFile,{{"cache",1},{"capabilities",caps}});
+    Reject([] { LoadRecipeRuntime(); },"old filter-unaware cache requires refresh rather than implicit support");
+    caps["parser"] = 3;
     caps["identityKey"] = std::string(64,'b'); Write(cacheFile,{{"cache",1},{"capabilities",caps}});
     Reject([] { LoadRecipeRuntime(); },"mismatched cache rejected");
     fs::remove(cacheFile);
@@ -59,6 +67,17 @@ int wmain(int argc, wchar_t** argv) {
     Check(!options.coreVersion.empty() && options.context.at("media").is_null() && options.context.at("project").is_null(),"editor core version is owned and unestablished context stays null");
     options.beforeLaunch(); Check(fs::is_directory(options.sessionRoot),"matching real app version accepted; session root prepared");
     const auto recipe = DefaultRecipeSnapshot().at("recipe"); options.validateRecipe(recipe); ++checks;
+    auto resized = recipe; resized["schema"] = 2;
+    resized["video"]["filters"] = Json::array({{{"type", "resize"}, {"enabled", true}, {"width", 1280}, {"height", 720},
+      {"backend", "scale"}, {"algorithm", "bicubic"}, {"fit", "pad"}}});
+    options.validateRecipe(resized); ++checks;
+    auto narrow = resized; narrow["video"]["filters"][0]["width"] = 2; narrow["video"]["filters"][0]["height"] = 1000;
+    options.validateRecipe(narrow); ++checks;
+    auto invalidCanvas = narrow; invalidCanvas["video"]["filters"][0]["width"] = 0;
+    Reject([&] { options.validateRecipe(invalidCanvas); }, "unknown-source editor still rejects invalid canvas dimensions");
+    auto unalignedCanvas = narrow; unalignedCanvas["video"]["filters"][0]["width"] = 3;
+    Reject([&] { options.validateRecipe(unalignedCanvas); }, "unknown-source editor still rejects known chroma-grid misalignment");
+    Check(options.capabilities.is_null(), "editor snapshot acceptance does not invent capability or source facts");
     auto supported = recipe; supported["command"] = {{"mode","template"},{"template","{inputs} -c:v libx264 -c:a aac -f mp4 {output}"}};
     options.validateRecipe(supported); ++checks;
     Check(options.context.at("target").at("id") == "vegas-native-v1","native target reaches popup before Apply");

@@ -31,6 +31,137 @@ String after(List<String> args, String flag) =>
 Future<void> main(List<String> args) async {
   final core = args.isEmpty ? NativeVeCore() : NativeVeCore.open(args.first);
   final fake = FakeVeCore();
+  final summarySnapshot = TemplateSnapshot(
+    recipe: fake.fixtures.first.recipe,
+    vegasPrefs: VegasPreferences(),
+  );
+  final nativeSummary = core.summarizeSnapshot(summarySnapshot);
+  check(
+    nativeSummary.resolution == 'Same as input from VEGAS' &&
+        nativeSummary.filters == 'None',
+    'snapshot summary keeps unknown source facts unknown',
+  );
+  check(
+    nativeSummary.video.contains('libx264') &&
+        nativeSummary.audio.contains('Channels set by VEGAS'),
+    'typed native summary reflects settings without sample channels',
+  );
+  final summaryFake = FakeVeCore(
+    summaryFixtures: {
+      jsonEncode({'media': null, 'snapshot': summarySnapshot.toJson()}):
+          nativeSummary,
+    },
+  );
+  // Summary fakes remain explicit fixture lookups; no second resolver in Dart.
+  check(
+    summaryFake.summarizeSnapshot(summarySnapshot).resolution ==
+        nativeSummary.resolution,
+    'summary fake uses its explicit fixture',
+  );
+  final resizeFixture = fake.fixtures.first;
+  final resizeFilter = VideoFilter(width: 1280, height: 720);
+  final resizeRecipe = resizeFixture.recipe.copyWith(
+    schema: 2,
+    video: resizeFixture.recipe.video.copyWith(filters: [resizeFilter]),
+  );
+  final resizeCompiled = core.compile(
+    resizeRecipe,
+    media: resizeFixture.media,
+    paths: resizeFixture.paths,
+  );
+  check(
+    !errors(resizeCompiled.issues) &&
+        resizeCompiled.filterControl == 'structured' &&
+        resizeCompiled.videoGeometry?.width == 1280 &&
+        resizeCompiled.videoGeometry?.height == 720,
+    'typed structured filter and encoded geometry cross the real ABI',
+  );
+  check(
+    core.normalize(resizeRecipe.data).requiredFilters?.join(',') ==
+        'scale,pad,setsar',
+    'typed required filters come from core',
+  );
+  check(
+    resizeCompiled.expectedStreams?.first.width == 1280 &&
+        resizeCompiled.expectedStreams?.first.sar == '1:1',
+    'typed expected streams carry output geometry',
+  );
+  final disabledResize = core.compile(
+    resizeRecipe.copyWith(
+      video: resizeRecipe.video.copyWith(
+        filters: [resizeFilter.copyWith(enabled: false)],
+      ),
+    ),
+    media: resizeFixture.media,
+    paths: resizeFixture.paths,
+  );
+  check(
+    disabledResize.argv.join('\n') ==
+        core
+            .compile(
+              resizeFixture.recipe,
+              media: resizeFixture.media,
+              paths: resizeFixture.paths,
+            )
+            .argv
+            .join('\n'),
+    'disabled structured filter preserves command through Dart',
+  );
+  final resizePayload = core.encodePayload(
+    summarySnapshot.copyWith(recipe: resizeRecipe),
+  );
+  check(
+    resizePayload[16] == 2 &&
+        core
+                .decodePayload(resizePayload)
+                .snapshot
+                ?.recipe
+                .video
+                .filters
+                .single
+                .width ==
+            1280,
+    'schema2 payload retains filters through real FFI',
+  );
+  final samplePaths = resizeFixture.paths.copyWith(mediaIsSample: true);
+  check(
+    samplePaths.mediaIsSample &&
+        !samplePaths
+            .copyWith(mediaIsSample: false)
+            .data
+            .containsKey('mediaIsSample') &&
+        !CompilePaths(
+          videoPipe: 'video',
+          output: 'output',
+        ).data.containsKey('mediaIsSample'),
+    'sample preview context is additive and default-false paths keep their wire shape',
+  );
+  final narrowRecipe = resizeRecipe.copyWith(
+    video: resizeRecipe.video.copyWith(
+      filters: [resizeFilter.copyWith(width: 2, height: 1000)],
+    ),
+  );
+  final narrowSample = core.compile(
+    narrowRecipe,
+    media: resizeFixture.media,
+    paths: samplePaths,
+  );
+  final narrowActual = core.compile(
+    narrowRecipe,
+    media: resizeFixture.media,
+    paths: resizeFixture.paths,
+  );
+  check(
+    !errors(narrowSample.issues) &&
+        !narrowSample.issues.any(
+          (i) => i.id == 'V-FILTER-ASPECT' || i.id == 'V-FILTER-ROUNDING',
+        ),
+    'typed sample context permits configuring a canvas without treating sample input as project facts',
+  );
+  check(
+    narrowActual.issues.any((i) => i.id == 'V-FILTER-ASPECT'),
+    'actual input geometry is still validated at render admission',
+  );
   check(!core.version.isFake && core.version.abi == 1, 'real native version');
   check(
     core.profiles().video.length == 12 && core.profiles().audio.length == 11,
@@ -527,7 +658,8 @@ Future<void> main(List<String> args) async {
     f.recipe.copyWith(
       command: CommandSettings(
         mode: 'template',
-        template: 'ffmpeg -hide_banner {inputs} -map {v} -map {a} -c:v libx265 -crf 18 -pix_fmt yuv420p10le -g {gop:2s} -c:a aac -f matroska {output}',
+        template:
+            'ffmpeg -hide_banner {inputs} -map {v} -map {a} -c:v libx265 -crf 18 -pix_fmt yuv420p10le -g {gop:2s} -c:a aac -f matroska {output}',
       ),
     ),
     media: f.media,
@@ -622,7 +754,8 @@ Future<void> main(List<String> args) async {
     f.recipe.copyWith(
       command: CommandSettings(
         mode: 'template',
-        template: '{inputs} -i logo.png -map 2:v -c:v libx264 -pix_fmt yuv420p {output}',
+        template:
+            '{inputs} -i logo.png -map 2:v -c:v libx264 -pix_fmt yuv420p {output}',
       ),
     ),
     media: f.media,
@@ -638,7 +771,8 @@ Future<void> main(List<String> args) async {
     f.recipe.copyWith(
       command: CommandSettings(
         mode: 'template',
-        template: '{inputs} -c:v libx265 -pix_fmt yuv420p10le {output} -c:v libx264 -pix_fmt yuv420p another.mp4',
+        template:
+            '{inputs} -c:v libx265 -pix_fmt yuv420p10le {output} -c:v libx264 -pix_fmt yuv420p another.mp4',
       ),
     ),
     media: f.media,
@@ -956,7 +1090,7 @@ Future<void> main(List<String> args) async {
   );
   final macros = core.macros(media: f.media, paths: f.paths);
   check(
-    macros.length == 10 && macros.where((m) => m.required).length == 2,
+    macros.length == 11 && macros.where((m) => m.required).length == 2,
     'typed native macro catalogue',
   );
   check(

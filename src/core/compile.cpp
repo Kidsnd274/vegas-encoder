@@ -173,6 +173,8 @@ Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
         }
         if (Str(v,"color","bt709") == "bt709") for (const auto& flag : {"-color_primaries","-color_trc","-colorspace","-color_range"}) Pair(video,"video","video.color",flag,std::string(flag) == "-color_range" ? "tv" : "bt709");
         if (p.contains("appleTag") && (Str(c,"format") == "mp4" || Str(c,"format") == "mov")) Pair(video,"video","video.encoder","-tag:v",p.at("appleTag"));
+        const auto resize = ResizeChain(r,media);
+        if (!resize.empty()) { Pair(video,"video","video.filters","-vf",resize); res["structuredResize"] = true; }
         Extra(video,Str(v,"extra"),"video.extra",overridden); ReadStream(video,res,true);
     } else Push(video,"video","video.enabled",{"-vn"});
     if (Bool(a,"enabled",true) && media.contains("audio") && !media.at("audio").is_null()) {
@@ -245,6 +247,139 @@ void Reflected(const Json& tokens, Json& res) {
     ReadStream(video,res,true); ReadStream(audio,res,false);
 }
 }
+namespace {
+bool VideoOption(const std::string& option, bool filterOnly) {
+    const auto name = option.rfind("-/",0) == 0 ? "-" + option.substr(2) : option;
+    const auto key = OptionKey(name);
+    if (key == "vf" || key == "filter_complex" || key == "filter_complex_script" || key == "lavfi") return true;
+    if (key == "filter" || key == "filter_script") return name.find(":a") == std::string::npos;
+    return !filterOnly && (key == "s" || key == "aspect" || key == "autoscale") && name.find(":a") == std::string::npos;
+}
+bool ExtraVideoOption(const Json& recipe, bool filterOnly) {
+    for (const auto& settings : {recipe.at("video"),recipe.at("audio")[0]}) {
+        if (!Bool(settings,"enabled",true)) continue;
+        try {
+            const auto words = Tokenize(Str(settings,"extra")); const auto metadata = TokenMetadata(words,Json(nullptr));
+            for (size_t i = 0; i < words.size(); ++i) if (Bool(metadata[i],"isOption") && VideoOption(words[i].text,filterOnly)) return true;
+        } catch (const Error&) {} // Syntax issues independently prevent rendering.
+    }
+    return false;
+}
+const Json* ActiveResize(const Json& recipe) {
+    if (FilterControl(recipe) != "structured" || !Bool(recipe.at("video"),"enabled",true)) return nullptr;
+    const auto filters = recipe.at("video").find("filters");
+    if (filters == recipe.at("video").end() || !filters->is_array()) return nullptr;
+    for (const auto& filter : *filters) if (Str(filter,"type") == "resize" && Bool(filter,"enabled",true)) return &filter;
+    return nullptr;
+}
+std::pair<int,int> ResizeAlignment(const Json& recipe) {
+    auto resolved = Resolve(recipe);
+    for (const auto& settings : {recipe.at("video"),recipe.at("audio")[0]}) if (Bool(settings,"enabled",true)) try {
+        const auto words = Tokenize(Str(settings,"extra"));
+        for (size_t i = 0; i + 1 < words.size(); ++i) if (IsOption(words[i].text)) ReflectVideoFormatOption(resolved,OptionKey(words[i].text),words[i+1].text);
+    } catch (const Error&) {}
+    const auto chroma = Str(VideoFormat(Str(resolved,"pixfmt")),"chroma");
+    // Unknown negotiated formats use the conservative 4:2:0 grid; this is an
+    // alignment policy, never a claim about their color/precision conversion.
+    return chroma == "4:4:4" ? std::pair{1,1} : chroma == "4:2:2" ? std::pair{2,1} : std::pair{2,2};
+}
+std::string SarText(const Json& media) {
+    if (!media.is_object() || !media.contains("video")) return {};
+    auto text = Str(media.at("video"),"sar");
+    const auto divider = text.find_first_of(":/");
+    if (divider == std::string::npos) return {};
+    try {
+        size_t a = 0, b = 0; const auto left = text.substr(0,divider), right = text.substr(divider+1);
+        const auto numerator = std::stoll(left,&a), denominator = std::stoll(right,&b);
+        if (a != left.size() || b != right.size() || numerator <= 0 || denominator <= 0 || numerator > 1000000000 || denominator > 1000000000) return {};
+        return std::to_string(numerator) + "/" + std::to_string(denominator);
+    } catch (const std::exception&) { return {}; }
+}
+std::string AlgorithmLabel(const std::string& algorithm) {
+    return algorithm == "bicubic" ? "Bicubic" : algorithm == "bilinear" ? "Bilinear" : algorithm == "lanczos" ? "Lanczos" : "Nearest neighbour";
+}
+}
+std::string FilterControl(const Json& recipe) {
+    if (Str(recipe.at("command"),"mode") == "template") return "advanced";
+    return ExtraVideoOption(recipe,true) ? "extra" : "structured";
+}
+Json VideoGeometry(const Json& recipe, const Json& media) {
+    const bool known = media.is_object() && media.contains("video");
+    Json geometry{{"inputWidth",known ? media.at("video").at("width") : Json(nullptr)},
+        {"inputHeight",known ? media.at("video").at("height") : Json(nullptr)},
+        {"width",nullptr},{"height",nullptr},{"sar",nullptr},{"contentWidth",nullptr},{"contentHeight",nullptr},
+        {"padLeft",nullptr},{"padTop",nullptr},{"padRight",nullptr},{"padBottom",nullptr},{"direction","unknown"},{"rounded",nullptr}};
+    if (FilterControl(recipe) != "structured" || ExtraVideoOption(recipe,false)) return geometry;
+    const auto resize = ActiveResize(recipe);
+    if (!resize) {
+        if (known) { geometry["width"] = geometry["inputWidth"]; geometry["height"] = geometry["inputHeight"]; geometry["direction"] = "unchanged"; geometry["rounded"] = false; }
+        return geometry;
+    }
+    geometry["width"] = resize->at("width"); geometry["height"] = resize->at("height"); geometry["sar"] = "1:1";
+    const auto sar = SarText(media);
+    if (!known || sar.empty()) return geometry;
+    const auto divider = sar.find('/'); const double aspect = std::stod(sar.substr(0,divider)) / std::stod(sar.substr(divider+1));
+    const double inputWidth = Num(media.at("video"),"width"), inputHeight = Num(media.at("video"),"height");
+    const double dar = inputWidth * aspect / inputHeight;
+    const auto [alignX,alignY] = ResizeAlignment(recipe);
+    const double idealWidth = std::min(Num(*resize,"width"),Num(*resize,"height") * dar);
+    const double idealHeight = std::min(Num(*resize,"height"),Num(*resize,"width") / dar);
+    const auto width = static_cast<int>(std::floor(idealWidth / alignX)) * alignX;
+    const auto height = static_cast<int>(std::floor(idealHeight / alignY)) * alignY;
+    const auto x = static_cast<int>(std::floor((Num(*resize,"width") - width) / (2 * alignX))) * alignX;
+    const auto y = static_cast<int>(std::floor((Num(*resize,"height") - height) / (2 * alignY))) * alignY;
+    geometry["contentWidth"] = width; geometry["contentHeight"] = height;
+    geometry["padLeft"] = x; geometry["padTop"] = y; geometry["padRight"] = static_cast<int>(Num(*resize,"width")) - width - x; geometry["padBottom"] = static_cast<int>(Num(*resize,"height")) - height - y;
+    geometry["rounded"] = std::abs(idealWidth-width) > 1e-8 || std::abs(idealHeight-height) > 1e-8;
+    geometry["direction"] = width == inputWidth && height == inputHeight ? "unchanged" : width >= inputWidth && height >= inputHeight ? "upscale" : width <= inputWidth && height <= inputHeight ? "downscale" : "mixed";
+    return geometry;
+}
+std::string ResizeChain(const Json& recipe, const Json& media, bool seed) {
+    const auto resize = ActiveResize(recipe); if (!resize) return {};
+    const auto [alignX,alignY] = ResizeAlignment(recipe);
+    const auto width = Number(Num(*resize,"width")), height = Number(Num(*resize,"height"));
+    const auto sar = seed ? std::string("{sar}") : SarText(media);
+    const auto prefix = sar.empty() ? std::string() : "setsar=" + sar + ",";
+    return prefix + "scale=w='trunc(min(" + width + "," + height + "*dar)/" + Number(alignX) + ")*" + Number(alignX) +
+        "':h='trunc(min(" + height + "," + width + "/dar)/" + Number(alignY) + ")*" + Number(alignY) + "':flags=" + Str(*resize,"algorithm") +
+        ",setsar=1,pad=" + width + ":" + height + ":'trunc((ow-iw)/" + Number(2*alignX) + ")*" + Number(alignX) +
+        "':'trunc((oh-ih)/" + Number(2*alignY) + ")*" + Number(alignY) + "':color=black";
+}
+void ValidateFilters(const Json& recipe, const Json& media, const Json& capabilities, Json& issues) {
+    const auto resize = ActiveResize(recipe); if (!resize) return;
+    const std::string field = "video.filters[0]";
+    const auto [alignX,alignY] = ResizeAlignment(recipe);
+    if (static_cast<int>(Num(*resize,"width")) % alignX || static_cast<int>(Num(*resize,"height")) % alignY)
+        issues.push_back(Issue("V-FILTER-ALIGNMENT","error",field,"Canvas dimensions must align with the selected pixel format's chroma grid.",{{"horizontal",alignX},{"vertical",alignY}}));
+    if (ExtraVideoOption(recipe,false)) issues.push_back(Issue("V-FILTER-GEOMETRY-CONFLICT","error",field,"Remove the output size/aspect option from Extra arguments before using structured resize."));
+    const auto geometry = VideoGeometry(recipe,media);
+    if (geometry.at("contentWidth").is_number() && (Num(geometry,"contentWidth") < alignX || Num(geometry,"contentHeight") < alignY))
+        issues.push_back(Issue("V-FILTER-ASPECT","error",field,"This aspect ratio cannot fit the canvas on the selected pixel format's chroma grid."));
+    if (geometry.at("rounded") == true) issues.push_back(Issue("V-FILTER-ROUNDING","info",field,"Fitted picture dimensions are rounded down to the pixel format's chroma grid.",geometry));
+    if (media.is_object() && media.contains("video") && media.at("video").contains("sar") && SarText(media).empty())
+        issues.push_back(Issue("V-FILTER-SAR","error",field,"The delivered sample aspect ratio must be a positive rational value."));
+    if (!capabilities.is_object()) { issues.push_back(Issue("V-FILTER-UNVERIFIED","warn",field,"Select and refresh FFmpeg to verify the required scale, pad, setsar filters and scaling algorithm.")); return; }
+    const auto filters = capabilities.value("filters",Json::object());
+    for (const auto* name : {"scale","pad","setsar"}) {
+        if (!filters.is_object() || !filters.contains(name) || !filters.at(name).is_object() || !Bool(filters.at(name),"available") ||
+            !filters.at(name).contains("options") || !filters.at(name).at("options").is_array() || filters.at(name).at("options").empty())
+            issues.push_back(Issue("V-FILTER-MISSING","error",field,std::string("The selected FFmpeg does not provide verified ") + name + " filter help. Refresh FFmpeg or choose a build containing it.",{{"filter",name}}));
+        else {
+            const auto has = [&](const std::vector<std::string>& aliases) {
+                const auto& options = filters.at(name).at("options");
+                return std::any_of(options.begin(),options.end(),[&](const Json& option) { auto key = Str(option,"name"); if (!key.empty() && key[0] == '-') key.erase(0,1); return std::find(aliases.begin(),aliases.end(),key) != aliases.end(); });
+            };
+            const std::vector<std::vector<std::string>> required = std::string(name) == "scale" ? std::vector<std::vector<std::string>>{{"w","width"},{"h","height"},{"flags"}} :
+                std::string(name) == "pad" ? std::vector<std::vector<std::string>>{{"w","width"},{"h","height"},{"x"},{"y"},{"color"}} : std::vector<std::vector<std::string>>{{"sar","ratio","r"}};
+            for (const auto& aliases : required) if (!has(aliases)) issues.push_back(Issue("V-FILTER-OPTION","error",field,std::string("The selected FFmpeg does not report required ") + name + " option " + aliases.front() + ". Refresh FFmpeg or choose a supported build.",{{"filter",name},{"option",aliases.front()}}));
+        }
+    }
+    if (filters.is_object() && filters.contains("scale") && filters.at("scale").is_object()) {
+        const auto algorithms = filters.at("scale").value("algorithms",Json::array());
+        if (!algorithms.is_array() || std::find(algorithms.begin(),algorithms.end(),resize->at("algorithm")) == algorithms.end())
+            issues.push_back(Issue("V-FILTER-ALGORITHM","error",field,"The selected FFmpeg does not report support for this scaling algorithm. Refresh FFmpeg or select a supported algorithm.",{{"algorithm",resize->at("algorithm")}}));
+    }
+}
 Json InputTokens(const Json& r, const Json& media, const Json& paths) {
     const auto& v = media.at("video"); const auto& fps = v.at("fps"); Json result = Json::array();
     Push(result,"input",nullptr,InputColorTags(r));
@@ -266,6 +401,7 @@ const Json& MacroDefinitions() {
         {{"name","{a}"},{"description","First VEGAS audio stream (1:a:0)"},{"required",false}},
         {{"name","{width}"},{"description","Delivered video width in pixels"},{"required",false}},
         {{"name","{height}"},{"description","Delivered video height in pixels"},{"required",false}},
+        {{"name","{sar}"},{"description","Delivered sample aspect ratio; source filter aspect when unknown"},{"required",false}},
         {{"name","{fps}"},{"description","Delivered rational video frame rate"},{"required",false}},
         {{"name","{sample_rate}"},{"description","Delivered audio sample rate; empty without audio"},{"required",false}},
         {{"name","{project}"},{"description","Supplied project name (may be empty)"},{"required",false}},
@@ -282,19 +418,21 @@ Json Macros(const Json& request) {
     for (const auto& token : InputTokens(recipe,media,paths)) { if (!inputs.empty()) inputs += " "; inputs += Quote(Str(token,"text")); }
     const auto frames = std::round(2 * fps[0].get<double>() / fps[1].get<double>());
     const std::vector<Json> values{inputs,Str(paths,"output"),"0:v:0","1:a:0",Number(Num(v,"width")),Number(Num(v,"height")),
+        SarText(media).empty() ? "sar" : SarText(media),
         fps[0].dump() + "/" + fps[1].dump(),a.is_null() ? "" : Number(Num(a,"rate")),Str(paths,"project"),
         frames >= 1 && frames <= 2147483647 ? Json(Number(frames)) : Json(nullptr)};
     auto result = MacroDefinitions();
     for (size_t i = 0; i < result.size(); ++i) result[i]["value"] = values[i];
     return result;
 }
-Json Compile(const Json& request, const Json* capabilities) {
+static Json CompileInternal(const Json& request, const Json* capabilities, Json* effective = nullptr) {
     const auto& r = request.at("recipe"); const auto& media = request.at("media"); const auto& paths = request.at("paths");
     CheckMedia(media);
     if (!paths.is_object() || Str(paths,"ffmpeg","ffmpeg").empty() || Str(paths,"videoPipe").empty() || Str(paths,"output").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Executable, video pipe and output path must be nonempty strings.");
     Json issues = Validate(request,capabilities); const auto exe = Str(paths,"ffmpeg","ffmpeg");
-    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr},{"outputContainerId",nullptr},{"outputExtension",nullptr}};
+    Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr},{"outputContainerId",nullptr},{"outputExtension",nullptr},{"filterControl","structured"},{"videoGeometry",nullptr}};
     if (HasErrors(Structural(r))) return result;
+    result["filterControl"] = FilterControl(r); result["videoGeometry"] = VideoGeometry(r,media);
     const bool audioInput = Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null();
     result["inputStreams"] = audioInput ? Json::array({"video","audio"}) : Json::array({"video"});
     if (audioInput && Str(paths,"audioPipe").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Enabled audio needs a pipe path.");
@@ -314,7 +452,7 @@ Json Compile(const Json& request, const Json* capabilities) {
         seed += "{inputs}\n"; std::string lastRole;
         for (const auto& token : basic) {
             const auto role = Str(token,"role"); if (!lastRole.empty()) seed += lastRole == role ? " " : "\n";
-            seed += Quote(Str(token,"text")); lastRole = role;
+            seed += Quote(Str(token,"field") == "video.filters" && !IsOption(Str(token,"text")) ? ResizeChain(r,media,true) : Str(token,"text")); lastRole = role;
         }
         result["advancedTemplate"] = seed + "\n{output}";
         Push(tokens,"output",nullptr,{Str(paths,"output")});
@@ -468,7 +606,12 @@ Json Compile(const Json& request, const Json* capabilities) {
                 else if (family == "dnxhr") codec = "dnxhd";
                 else if (family != "unknown") codec = family;
             }
-            expected.push_back({{"kind",kind},{"encoder",encoder.empty() ? Json(nullptr) : Json(encoder)},{"codec",codec.empty() ? Json(nullptr) : Json(codec)}});
+            Json stream{{"kind",kind},{"encoder",encoder.empty() ? Json(nullptr) : Json(encoder)},{"codec",codec.empty() ? Json(nullptr) : Json(codec)}};
+            // Existing commands keep their verification contract. Structured
+            // processing adds established encoded geometry; handwritten graphs
+            // remain unknown and never inherit inactive Basic canvas settings.
+            if (kind == "video" && ActiveResize(r)) for (const auto* fact : {"width","height","sar"}) stream[fact] = result.at("videoGeometry").value(fact,Json(nullptr));
+            expected.push_back(std::move(stream));
         }
         result["expectedStreams"] = expected;
         bool explicitScope = true;
@@ -551,6 +694,86 @@ Json Compile(const Json& request, const Json* capabilities) {
                 targetIssues.push_back(Issue("N-OUTPUT-SUFFIX","error","outputPath","Change the Render As filename to end in " + ext + "; Vegas Encoder preserves the exact destination you selected.",{{"extension",ext}}));
         }
     }
+    if (effective) *effective = res;
+    return result;
+}
+Json Compile(const Json& request, const Json* capabilities) { return CompileInternal(request,capabilities); }
+Json SnapshotSummary(const Json& request) {
+    const auto unknown = std::string("Custom / not determined");
+    Json result{{"preset","Custom settings"},{"video",unknown},{"resolution",unknown},{"filters",unknown},
+                {"audio",unknown},{"container",unknown},{"issues",Json::array()}};
+    if (!request.contains("snapshot") || !request.at("snapshot").is_object() || !request.at("snapshot").contains("recipe")) {
+        result["issues"].push_back(Issue("P-SNAPSHOT","error","","A complete template snapshot is required.")); return result;
+    }
+    const auto& snapshot = request.at("snapshot"); const auto& recipe = snapshot.at("recipe");
+    const auto shape = Structural(recipe); result["issues"] = shape;
+    if (HasErrors(shape)) return result;
+    const auto origin = snapshot.value("origin",Json(nullptr));
+    if (origin.is_object() && !Str(origin,"name").empty() && Num(origin,"revision") > 0)
+        result["preset"] = Str(origin,"name") + " \xC2\xB7 revision " + Number(Num(origin,"revision"));
+    const bool knownMedia = request.contains("media") && !request.at("media").is_null();
+    // Compile with neutral context solely to reuse its exact effective option
+    // reflection. None of these placeholder dimensions/rates escape as facts.
+    const Json media = knownMedia ? request.at("media") : Json{{"video",{{"width",2},{"height",2},{"fps",{1,1}},{"pixfmt","p010le"},{"sar","1:1"}}},
+        {"audio",{{"rate",48000},{"channels",2},{"sampleFmt","f32le"}}},{"durationSec",nullptr}};
+    Json resolved;
+    const auto compiled = CompileInternal({{"recipe",recipe},{"media",media},{"paths",{{"ffmpeg","ffmpeg"},{"videoPipe","video"},{"audioPipe","audio"},{"output","output"}}}},nullptr,&resolved);
+    // Neutral media is an internal reflection aid, never validation evidence.
+    // Validate without media so duration/GOP, padding, aspect and source audio
+    // diagnostics cannot be manufactured from that placeholder context.
+    result["issues"] = knownMedia ? compiled.at("issues") : Validate({{"recipe",recipe},{"media",nullptr}});
+    if (!resolved.is_object()) return result;
+    const bool advanced = Str(recipe.at("command"),"mode") == "template";
+    const auto join = [](const std::vector<std::string>& values) {
+        std::string text; for (const auto& value : values) if (!value.empty()) { if (!text.empty()) text += " \xC2\xB7 "; text += value; } return text;
+    };
+    bool customVideoRate = false, customAudioRate = false, customVideoFacts = false, customAudioFacts = false, customGeometry = Bool(resolved,"videoFilter");
+    for (const auto& token : compiled.at("display")) if (Str(token,"role") == "extra" && IsOption(Str(token,"text"))) {
+        const auto key = OptionKey(Str(token,"text"));
+        if (key == "s" || key == "aspect" || key == "autoscale") customGeometry = true;
+        const auto field = Str(token,"field");
+        const auto option = Str(token,"text");
+        // The Basic per-stream reflector intentionally has limited scope. A
+        // cross-stream Extra option must not turn an inactive control into an
+        // effective native-page claim. Keep its codec, but mark these details
+        // unknown until the shared reflector can establish that final scope.
+        if (field == "audio[0].extra" && (option.find(":v") != std::string::npos ||
+            key == "crf" || key == "cq" || key == "qp" || key == "preset" || key == "tune" || key == "profile" || key == "pix_fmt" || key == "g" || key == "vf")) customVideoFacts = true;
+        if (field == "video.extra" && (option.find(":a") != std::string::npos || key == "ar" || key == "ac" || key == "sample_fmt" || key == "af")) customAudioFacts = true;
+        if (field == "video.extra" && key == "b" && option.find(":a") != std::string::npos) customVideoRate = true;
+        if (field == "video.extra" && (key == "rc" || (key == "qp" && Str(resolved,"videoMode") != "cqp") ||
+            (key == "crf" && Str(resolved,"videoMode") != "crf") || (key == "cq" && Str(resolved,"videoMode") != "cq") ||
+            (key == "b" && Str(resolved,"videoMode") != "abr" && Str(resolved,"videoMode") != "cbr"))) customVideoRate = true;
+        if (field == "audio[0].extra" && (key == "q" || key == "vbr") && Str(resolved,"audioMode") == "bitrate") customAudioRate = true;
+    }
+    const auto& summary = compiled.at("summary");
+    const auto videoEncoder = Str(summary,"videoEncoderId");
+    if (!Bool(resolved,"videoEnabled",Bool(recipe.at("video"),"enabled",true))) result["video"] = "No video";
+    else if (!videoEncoder.empty()) result["video"] = join({advanced ? "Advanced command" : "",videoEncoder,customVideoFacts ? "" : Str(resolved,"profile"),
+        advanced || customVideoRate || customVideoFacts ? unknown : Str(summary,"videoQuality"),customVideoFacts ? "" : Str(resolved,"speed")});
+    else if (advanced) result["video"] = "Advanced command \xC2\xB7 " + unknown;
+    if (!advanced && !customGeometry) {
+        result["resolution"] = knownMedia ? Number(Num(media.at("video"),"width")) + " \xC3\x97 " + Number(Num(media.at("video"),"height")) + " (from VEGAS)" : "Same as input from VEGAS";
+        result["filters"] = "None";
+    } else result["filters"] = advanced ? "Advanced command" : "Filters set in Extra arguments";
+    if (const auto resize = ActiveResize(recipe)) {
+        const auto size = Number(Num(*resize,"width")) + " \xC3\x97 " + Number(Num(*resize,"height"));
+        result["resolution"] = knownMedia ? Number(Num(media.at("video"),"width")) + " \xC3\x97 " + Number(Num(media.at("video"),"height")) + " \xE2\x86\x92 " + size : size + " (fit with padding; input set by VEGAS)";
+        result["filters"] = "Resize to " + size + " \xC2\xB7 " + AlgorithmLabel(Str(*resize,"algorithm"));
+    }
+    if (!Bool(resolved,"audioEnabled",Bool(recipe.at("audio")[0],"enabled",true))) result["audio"] = "No audio";
+    else {
+        const auto encoder = Str(summary,"audioEncoderId");
+        if (!encoder.empty()) {
+            const auto& audio = recipe.at("audio")[0];
+            const auto channels = resolved.contains("audioChannels") ? Num(resolved,"audioChannels") :
+                !advanced && Str(audio,"channels","source") == "mono" ? 1 : !advanced && Str(audio,"channels","source") == "stereo" ? 2 :
+                knownMedia && media.contains("audio") && !media.at("audio").is_null() ? Num(media.at("audio"),"channels") : 0;
+            result["audio"] = join({encoder,advanced || customAudioRate || customAudioFacts ? unknown : Str(summary,"audioQuality"),
+                customAudioFacts ? "" : channels == 1 ? "Mono" : channels == 2 ? "Stereo" : channels > 0 ? Number(channels) + " channels" : "Channels set by VEGAS"});
+        }
+    }
+    if (!compiled.at("outputContainerId").is_null()) result["container"] = Str(summary,"container") + " (" + Str(compiled,"outputExtension") + ")";
     return result;
 }
 Json ErrorTokenIndices(const Json& compiled, const std::string& stderrTail) {

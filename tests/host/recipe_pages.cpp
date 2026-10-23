@@ -29,6 +29,10 @@ std::wstring Exe() {
   if (!count || count >= 32768) throw std::runtime_error("Cannot locate fake editor.");
   return {text, count};
 }
+Json ResizeFilter() {
+  return {{"type", "resize"}, {"enabled", true}, {"width", 1280}, {"height", 720},
+          {"backend", "scale"}, {"algorithm", "bicubic"}, {"fit", "pad"}};
+}
 int FakeEditor(const fs::path& root, const std::wstring& mode) {
   const auto request = Read(root / L"request.json");
   if (ve::HasErrors(ve::SessionRequest(request).at("issues"))) return 80;
@@ -38,6 +42,14 @@ int FakeEditor(const fs::path& root, const std::wstring& mode) {
   Json result{{"protocol", 1}, {"sessionId", request.at("sessionId")}, {"action", "apply"},
     {"recipe", request.at("recipe")}, {"origin", request.at("origin")}};
   result["recipe"]["video"]["quality"] = 19;
+  if (mode == L"resize-apply" || mode == L"resize-apply-cancel") {
+    result["recipe"]["schema"] = 2;
+    result["recipe"]["video"]["filters"] = Json::array({ResizeFilter()});
+  }
+  if (mode == L"apply-cancel" && request.at("recipe").at("video").at("quality") == 19)
+    result = {{"protocol", 1}, {"sessionId", request.at("sessionId")}, {"action", "cancel"}};
+  if (mode == L"resize-apply-cancel" && request.at("recipe").at("schema") == 2)
+    result = {{"protocol", 1}, {"sessionId", request.at("sessionId")}, {"action", "cancel"}};
   if (mode == L"cancel") result = {{"protocol", 1}, {"sessionId", request.at("sessionId")}, {"action", "cancel"}};
   if (mode == L"invalid") result["recipe"]["video"]["quality"] = 1000;
   if (mode == L"unsupported") result["recipe"]["container"]["format"] = "mp4";
@@ -108,6 +120,34 @@ void WaitEnabled(HWND button) {
 std::wstring Status(HWND page) {
   wchar_t text[2048]{}; GetDlgItemTextW(page, kRecipeStatusControl, text, 2048); return text;
 }
+std::wstring Summary(HWND page) {
+  const auto control = GetDlgItem(page, kRecipeSummaryControl);
+  const int length = GetWindowTextLengthW(control);
+  std::wstring text(static_cast<size_t>(length) + 1, L'\0');
+  GetWindowTextW(control, text.data(), length + 1); text.resize(static_cast<size_t>(length));
+  return text;
+}
+void CheckSummary(HWND page, const Json& snapshot, const Json& media = Json(nullptr)) {
+  const auto facts = ve::SnapshotSummary({{"snapshot", snapshot}, {"media", media}});
+  const auto text = Summary(page);
+  for (const auto name : {"preset", "video", "resolution", "filters", "audio", "container"})
+    Check(text.find(vegas_encoder::Widen(ve::Str(facts, name))) != std::wstring::npos,
+          "native summary displays selected draft's core-generated fact");
+  Check(text.find(L"Preset:") != std::wstring::npos && text.find(L"Container:") != std::wstring::npos &&
+        text.find(L"Use a ") == std::wstring::npos, "six summary rows remain separate from suffix/session guidance");
+}
+void CheckLayout(HWND dialog) {
+  RECT area{}; GetClientRect(dialog, &area);
+  int previousBottom = 0;
+  for (const auto id : {kRecipeSummaryLabelControl, kRecipeSummaryControl, kEditRecipeControl, kRecipeStatusControl}) {
+    RECT child{}; GetWindowRect(GetDlgItem(dialog, id), &child);
+    MapWindowPoints(nullptr, dialog, reinterpret_cast<POINT*>(&child), 2);
+    Check(child.left >= 0 && child.top >= previousBottom && child.right <= area.right &&
+          child.bottom <= area.bottom && child.right > child.left && child.bottom > child.top,
+          "DPI/layout keeps summary, edit button and status visible without overlap");
+    previousBottom = child.bottom;
+  }
+}
 void Run(const fs::path& root, const Json& recipe, const std::wstring& mode) {
   Allocator allocator; Holder holder(allocator, recipe); Site site;
   RecipePageOptions options;
@@ -123,6 +163,10 @@ void Run(const fs::path& root, const Json& recipe, const std::wstring& mode) {
   Check(CreateNativeRecipePage(nullptr, options, &page) == E_POINTER &&
         CreateNativeRecipePage(&allocator, options, nullptr) == E_POINTER, "page factory rejects missing allocator/output");
   Check(CreateNativeRecipePage(&allocator, options, &page) == S_OK && page, "candidate native recipe page created");
+  PROPPAGEINFO pageInfo{}; pageInfo.cb = sizeof pageInfo;
+  Check(page->GetPageInfo(&pageInfo) == S_OK && pageInfo.size.cy >= 250,
+        "native page requests enough preferred height for a six-row summary");
+  CoTaskMemFree(pageInfo.pszTitle);
   if (mode == L"unnamed") {
     const auto captured = holder.saved;
     holder.saved.SetU32(sfio::tpl::cchAllocText,0);
@@ -140,6 +184,23 @@ void Run(const fs::path& root, const Json& recipe, const std::wstring& mode) {
   Check(parent && page->Activate(parent, &rectangle, FALSE) == S_OK, "page activates on hidden creator-thread owner");
   HWND dialog = GetWindow(parent, GW_CHILD), button = GetDlgItem(dialog, kEditRecipeControl);
   Check(dialog && button && IsWindowEnabled(button), "native edit control starts ready");
+  CheckSummary(dialog, ReadRecipeSnapshot(holder.saved, options.owner));
+  CheckLayout(dialog);
+  const HWND summary = GetDlgItem(dialog, kRecipeSummaryControl);
+  const auto summaryStyle = GetWindowLongPtrW(summary, GWL_STYLE);
+  Check((summaryStyle & (ES_MULTILINE | ES_READONLY | WS_TABSTOP | WS_VSCROLL)) ==
+        (ES_MULTILINE | ES_READONLY | WS_TABSTOP | WS_VSCROLL) && !(summaryStyle & ES_AUTOHSCROLL),
+        "summary supports keyboard selection, vertical scrolling and wrapping while read-only");
+  Check(GetNextDlgTabItem(dialog, summary, FALSE) == button &&
+        GetNextDlgTabItem(dialog, button, FALSE) == GetDlgItem(dialog, kRecipeStatusControl),
+        "keyboard tab order connects selectable summary, settings button and scrollable session text");
+  const auto originalSummary = Summary(dialog);
+  SendMessageW(summary, EM_SETSEL, 0, 6);
+  DWORD selectionStart = 0, selectionEnd = 0;
+  SendMessageW(summary, EM_GETSEL, reinterpret_cast<WPARAM>(&selectionStart), reinterpret_cast<LPARAM>(&selectionEnd));
+  Check(selectionStart == 0 && selectionEnd == 6, "read-only summary text can be selected for copying");
+  SendMessageW(summary, WM_CHAR, L'X', 1);
+  Check(Summary(dialog) == originalSummary, "read-only summary rejects text edits");
   const auto original = holder.saved.b;
   SendMessageW(button, BM_CLICK, 0, 0);
   Check(page->Apply() == E_PENDING && !IsWindowEnabled(button), "queued editor startup prevents host Apply/repeated launches");
@@ -161,19 +222,47 @@ void Run(const fs::path& root, const Json& recipe, const std::wstring& mode) {
       }
     }
     Check(holder.saved.b == original && holder.commits == 0, "editor never directly mutates native template store");
-    if (mode == L"apply" || mode == L"unnamed") {
+    if (mode == L"apply" || mode == L"unnamed" || mode == L"apply-cancel" ||
+        mode == L"resize-apply" || mode == L"resize-apply-cancel") {
       Check(page->IsPageDirty() == S_OK && site.dirty == 1, "valid editor Apply marks only pending page draft dirty");
+      Check(Summary(dialog) != originalSummary && Status(dialog).find(L"VEGAS Apply or OK") != std::wstring::npos,
+            "accepted editor change refreshes summary and separately marks pending host Apply");
+      const auto pendingSummary = Summary(dialog);
+      if (mode == L"apply-cancel" || mode == L"resize-apply-cancel") {
+        SendMessageW(button, BM_CLICK, 0, 0); Pump(); WaitEnabled(button);
+        Check(Summary(dialog) == pendingSummary && page->IsPageDirty() == S_OK &&
+              holder.saved.b == original && holder.commits == 0,
+              "cancel after an accepted draft preserves its summary and pending native transaction");
+        Check(Status(dialog).find(L"VEGAS Apply or OK") != std::wstring::npos,
+              "cancel after accepted draft keeps pending host-Apply guidance");
+      }
+      Check(page->Deactivate() == S_OK && page->Activate(parent, &rectangle, FALSE) == S_OK,
+            "changing tabs preserves the unapplied summary");
+      dialog = GetWindow(parent, GW_CHILD); button = GetDlgItem(dialog, kEditRecipeControl);
+      Check(Summary(dialog) == pendingSummary && page->IsPageDirty() == S_OK,
+            "reactivated page displays the pending draft rather than committed snapshot");
       holder.commitResult = E_FAIL;
       Check(page->Apply() == E_FAIL && holder.saved.b == original && page->IsPageDirty() == S_OK,
             "failed native Apply preserves committed bytes and retryable draft");
+      Check(Summary(dialog) == pendingSummary, "failed host Apply preserves pending summary");
       holder.commitResult = S_OK;
       Check(page->Apply() == S_OK && page->IsPageDirty() == S_FALSE && holder.commits == 1,
             "native Apply retry commits exactly once");
+      Check(Summary(dialog) == pendingSummary && Status(dialog).find(L"VEGAS Apply or OK") == std::wstring::npos,
+            "successful host Apply retains summary and clears pending-Apply indication");
+      if (mode == L"resize-apply" || mode == L"resize-apply-cancel") {
+        const auto saved = ReadRecipeSnapshot(holder.saved, options.owner);
+        Check(saved.at("recipe").at("schema") == 2 &&
+              ve::Canonical(saved.at("recipe").at("video").at("filters")) == ve::Canonical(Json::array({ResizeFilter()})),
+              "accepted structured resize survives schema-2 native payload and host commit");
+        CheckSummary(dialog, saved);
+      }
       const auto committed = holder.saved.b;
       Check(page->SetObjects(0, nullptr) == S_OK && holder.saved.b == committed,
             "disconnect retains prior successfully committed settings");
     } else {
       Check(page->IsPageDirty() == S_FALSE && holder.saved.b == original, "cancel/error/unsupported recipe preserves clean draft and store");
+      if (mode != L"hang") Check(Summary(dialog) == originalSummary, "cancel/crash/rejection/launch failure preserves prior summary");
       if (mode == L"unsupported") Check(Status(dialog).find(L"requires MKV") != std::wstring::npos, "native candidate constraint explains rejected editor result");
     }
   }
@@ -183,6 +272,62 @@ void Run(const fs::path& root, const Json& recipe, const std::wstring& mode) {
   Check(allocator.refs == 1 && holder.refs == 1 && site.refs == 1 && allocator.allocations == allocator.frees &&
         IsWindowEnabled(parent) && !GetWindow(parent, GW_CHILD), "page teardown balances references/allocations and owner state");
   DestroyWindow(parent);
+}
+void SelectionAndLayout(const fs::path& root, const Json& recipe) {
+  Allocator allocator; Holder first(allocator, recipe), second(allocator, recipe); Site site;
+  auto changed = ReadRecipeSnapshot(second.saved, vegas_encoder::GUID_VegasEncoderType);
+  changed["recipe"]["video"]["quality"] = 24;
+  changed["origin"] = {{"presetId", "saved-origin"}, {"revision", 7},
+    {"name", std::string("Saved origin \xe5\xae\xb9\xe9\x87\x8f ") + std::string(220, 'W')}};
+  second.saved = ReplaceRecipeSnapshot(second.saved, vegas_encoder::GUID_VegasEncoderType, changed);
+  RecipePageOptions options;
+  options.owner = vegas_encoder::GUID_VegasEncoderType;
+  options.launch = {Exe(), {L"--fake-page", L"apply"}};
+  options.sessionRoot = root.wstring(); options.dllVersion = "page-test"; options.coreVersion = "core-test";
+  options.beforeLaunch = [] { throw std::runtime_error("Summary must never launch or probe."); };
+  options.context["media"] = {{"video", {{"width", 320}, {"height", 240}, {"fps", {30000, 1001}}, {"pixfmt", "p010le"}, {"sar", "4:3"}}},
+    {"audio", {{"rate", 48000}, {"channels", 2}, {"sampleFmt", "f32le"}}}, {"durationSec", nullptr}};
+  IPropertyPage* page = nullptr;
+  Check(CreateNativeRecipePage(&allocator, options, &page) == S_OK, "selection test creates native summary page");
+  IUnknown* object = &first;
+  Check(page->SetPageSite(&site) == S_OK && page->SetObjects(1, &object) == S_OK, "selection test loads first snapshot");
+  HWND parent = CreateWindowExW(0, L"STATIC", L"Summary layout owner", WS_OVERLAPPED,
+      0, 0, 900, 600, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+  RECT bounds{0, 0, 440, 270};
+  Check(parent && page->Activate(parent, &bounds, FALSE) == S_OK, "selection test activates native page");
+  const HWND dialog = GetWindow(parent, GW_CHILD);
+  const auto initial = Summary(dialog);
+  object = &second;
+  Check(page->SetObjects(1, &object) == S_OK && Summary(dialog) != initial && page->IsPageDirty() == S_FALSE,
+        "selecting another template refreshes embedded settings without launching editor or dirtying template");
+  CheckSummary(dialog, changed, options.context.at("media"));
+  Check(Summary(dialog).find(L"320 × 240") != std::wstring::npos && Summary(dialog).find(L"1920") == std::wstring::npos,
+        "explicit host facts reach summary without substituting preview sample dimensions");
+  Check(Summary(dialog).find(L"Saved origin 容量") != std::wstring::npos && Summary(dialog).find(L"Modified") == std::wstring::npos,
+        "stored Unicode/long origin survives wrapping without invented modified marker");
+  for (const UINT dpi : {96u, 144u, 192u}) {
+    bounds.right = MulDiv(440, static_cast<int>(dpi), 96);
+    bounds.bottom = MulDiv(270, static_cast<int>(dpi), 96);
+    SendMessageW(dialog, WM_DPICHANGED, MAKEWPARAM(dpi, dpi), 0);
+    Check(page->Move(&bounds) == S_OK, "host may resize native page after DPI changes");
+    CheckLayout(dialog);
+    LOGFONTW font{};
+    const auto handle = reinterpret_cast<HFONT>(SendMessageW(GetDlgItem(dialog, kEditRecipeControl), WM_GETFONT, 0, 0));
+    Check(handle && GetObjectW(handle, sizeof font, &font) && -font.lfHeight >= MulDiv(8, static_cast<int>(dpi), 96),
+          "native page updates the system message font for DPI");
+  }
+  bounds = {0, 0, 320, 118};
+  SendMessageW(dialog, WM_DPICHANGED, MAKEWPARAM(96, 96), 0);
+  Check(page->Move(&bounds) == S_OK, "legacy small host allocation remains supported");
+  CheckLayout(dialog);
+  SendMessageW(GetDlgItem(dialog, kRecipeSummaryControl), EM_LINESCROLL, 0, 100);
+  Check(SendMessageW(GetDlgItem(dialog, kRecipeSummaryControl), EM_GETFIRSTVISIBLELINE, 0, 0) > 0,
+        "long summary remains reachable by scrolling in small host allocation");
+  Check(page->SetObjects(0, nullptr) == S_OK && page->SetPageSite(nullptr) == S_OK,
+        "selection test disconnects native summary page");
+  page->Release(); DestroyWindow(parent);
+  Check(allocator.allocations == allocator.frees && allocator.refs == 1 && first.refs == 1 && second.refs == 1 && site.refs == 1,
+        "selection and DPI teardown balance native references and allocations");
 }
 } // namespace
 int wmain(int argc, wchar_t** argv) {
@@ -194,8 +339,12 @@ int wmain(int argc, wchar_t** argv) {
     recipe["container"]["format"] = "mkv";
     const auto root = fs::absolute(fs::path(argv[2])) / vegas_encoder::Widen("page-" + NewEditSessionId());
     fs::create_directory(root);
-    for (const auto mode : {L"apply", L"unnamed", L"cancel", L"crash", L"invalid", L"unsupported", L"hang", L"preflight", L"queued-close"})
+    for (const auto mode : {L"apply", L"unnamed", L"apply-cancel", L"resize-apply", L"resize-apply-cancel",
+        L"cancel", L"crash", L"invalid", L"unsupported", L"hang", L"preflight", L"queued-close"})
       Run(root, recipe, mode);
+    SelectionAndLayout(root, recipe);
+    auto resized = recipe; resized["schema"] = 2; resized["video"]["filters"] = Json::array({ResizeFilter()});
+    Run(root, resized, L"cancel");
     WNDCLASSW returnClass{}; returnClass.lpfnWndProc=DefWindowProcW; returnClass.hInstance=GetModuleHandleW(nullptr);
     returnClass.lpszClassName=L"B6_RETURN_TEST";
     Check(RegisterClassW(&returnClass)!=0,"register real top-level owner regression class");

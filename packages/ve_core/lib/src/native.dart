@@ -10,7 +10,8 @@ import 'native_bindings.dart';
 import 'version.g.dart';
 
 /// Isolate-local facade over the C++ core. No domain rules live in Dart.
-class NativeVeCore implements VeCore, VeCoreMacroCatalog {
+class NativeVeCore
+    implements VeCore, VeCoreMacroCatalog, VeCoreSnapshotSummaries {
   factory NativeVeCore({bool cacheCapabilities = true}) =>
       NativeVeCore._load(NativeBindings.assets, cacheCapabilities);
 
@@ -34,7 +35,8 @@ class NativeVeCore implements VeCore, VeCoreMacroCatalog {
     }
     try {
       final bindings = load();
-      if (sizeOf<NativeBuffer>() != 16 || bindings.abiVersion() != expectedCoreAbi) {
+      if (sizeOf<NativeBuffer>() != 16 ||
+          bindings.abiVersion() != expectedCoreAbi) {
         throw const CoreException(
           'ABI-MISMATCH',
           'Core ABI does not match this app.',
@@ -51,6 +53,13 @@ class NativeVeCore implements VeCore, VeCoreMacroCatalog {
   NativeVeCore._(this._bindings, this._cacheCapabilities);
   final bool _cacheCapabilities;
   final NativeBindings _bindings;
+  @override
+  SnapshotSummary summarizeSnapshot(
+    TemplateSnapshot snapshot, {
+    MediaDescription? media,
+  }) => SnapshotSummary.fromJson(
+    _call('snapshotSummary', {'snapshot': snapshot.data, 'media': media?.data}),
+  );
   static const _jsonLimit = 1048576;
 
   Uint8List _buffer(Uint8List? input, {NativeCall? call, NativeRead? read}) {

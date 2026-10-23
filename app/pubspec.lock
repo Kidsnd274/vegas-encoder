@@ -326,7 +326,7 @@ packages:
       path: "../packages/ve_core"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0"
   ve_services:
     dependency: "direct main"
     description:

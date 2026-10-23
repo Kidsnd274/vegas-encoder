@@ -14,7 +14,7 @@ VEGAS compatibility gate is passed by this handoff.
   (fraction optional). Integers fit signed 64-bit; HWND is a decimal **string**.
 - Sizes are bytes, durations seconds, rates decimal kbit/s (1000 bits), speed is a
   realtime multiplier (2.06 means 2.06×). Null is unknown, never zero by implication.
-- Major discriminator must be 1: `schema`, `vepreset`, `profiles`, `protocol`,
+- Recipe `schema` accepts 1 and 2; the other major discriminators remain 1: `vepreset`, `profiles`, `protocol`,
   `live`, `job`, `index`, or `machine`, depending on the object. A newer major fails
   with an actionable error and leaves source bytes intact.
 - Unknown properties survive at their original positions, at every nesting level;
@@ -34,6 +34,54 @@ VEGAS compatibility gate is passed by this handoff.
   failures use `CoreException(code, message)`. Semantic issues return in results.
   Stable service codes include `REVISION-CONFLICT`, `READ-ONLY`, `NOT-FOUND`,
   `DEFAULT-NOT-FOUND`, `SESSION-MISMATCH`, `SESSION-RESULT`, `SESSION-CLOSED`.
+
+## Structured filters and native summary (2026-10-23)
+
+Recipe schema 2 adds ordered `video.filters`, initially zero or one entry:
+`{type:"resize",enabled:bool,width,height:int,backend:"scale",algorithm:"bicubic"|"bilinear"|"lanczos"|"neighbor",fit:"pad"}`.
+The core accepts schema 1 unchanged and rejects filters labelled as schema 1.
+Adding a structured filter upgrades to schema 2; removing/disabling it does not
+downgrade the recipe. Payload envelope version stays 1; its recipe-schema field
+matches the recipe's schema, so older cores refuse schema 2 instead of ignoring
+processing. Library/session/export consumers delegate recipe support to the core;
+their own envelope majors remain unchanged. Unknown properties remain preserved.
+
+C2 `ve_snapshot_summary` / `VeCore.summarizeSnapshot(snapshot, media: ...)` is pure.
+`SnapshotSummary` contains `preset,video,resolution,filters,audio,container:string`
+and `issues:Issue[]`. Missing media means unknown host facts, never sample input.
+It uses the compiler's effective option reflection, with conservative active
+Advanced facts and no inactive Basic values. Origin name/revision is saved
+provenance; no library modified marker is inferred without a stored comparison.
+
+`CompileResult.filterControl` is `structured`, `extra`, or `advanced`.
+`videoGeometry` holds nullable `inputWidth,inputHeight,width,height,sar,contentWidth,
+contentHeight,padLeft,padTop,padRight,padBottom,direction,rounded` facts. Geometry
+describes the encoded canvas separately from raw input dimensions. Expected video
+streams add nullable `width,height,sar`; native and service output checks compare
+known facts to FFprobe readback. Advanced/manual geometry stays unknown. `{sar}`
+is a delivered-rational macro used by source-relative Advanced resize seeds.
+
+`CompilePaths.mediaIsSample` is optional and defaults false. Preview/edit admission
+marks sample media so source-dependent fit/rounding checks are deferred while
+canvas/capability checks remain active. Actual render paths never set the marker;
+they validate against delivered frames. Sample dimensions remain available for
+the labelled command preview and are never promoted to host facts.
+
+C3 production help parser generation is **3**. Discovery separately reads
+`-filters` and help for listed `scale`, `pad`, `setsar`. `FFmpegCapabilities.filters`
+and `CoreCapabilities.filters` carry named `{available,options}` records;
+`scale.algorithms` comes from reported scaler constants. Both full and compact
+capability views retain these facts. Old caches require Refresh. An absent cache
+permits editing with a warning; actual structured-filter rendering requires
+verified capabilities and refuses unavailable help/options/algorithms. No implicit
+backend/algorithm substitution occurs. `NormalizeResult.requiredFilters` supplies
+library `requires.filters`, empty for inactive/disabled/Extra-controlled processing
+and unknown for unestablished Advanced commands.
+
+C7 `AppUiState.videoFiltersExpanded:bool` defaults false, shared between desktop
+and popup; it is independent of recipe content. The native page refreshes its
+snapshot summary on template load and accepted editor edits. Host Apply/OK alone
+commits the draft; cancel/failure preserves prior settings and any pending guidance.
 
 ## C1 — Recipe and profile data
 
@@ -120,9 +168,10 @@ The app must not implement these rules. Types and signatures are in
 [models.dart](../../packages/ve_core/lib/src/models.dart).
 
 ```text
-version -> CoreVersion {core:string,abi:1,schemaMax:1,contracts:1,isFake:bool}
+version -> CoreVersion {core:string,abi:1,schemaMax:2,contracts:1,isFake:bool}
 profiles() -> ProfileCatalog
-normalize(JsonMap) -> NormalizeResult {recipe:Recipe,issues:Issue[],requiredEncoders:string[]|null}
+normalize(JsonMap) -> NormalizeResult {recipe:Recipe,issues:Issue[],requiredEncoders,requiredFilters:string[]|null}
+summarizeSnapshot(TemplateSnapshot,{MediaDescription? media}) -> SnapshotSummary
 validate(Recipe,{MediaDescription? media,CoreCapabilities? capabilities}) -> Issue[]
 compile(Recipe,{required media,required CompilePaths paths,capabilities?}) -> CompileResult
 lint(String text,{capabilities?}) -> Diagnostic[]
@@ -139,7 +188,7 @@ MediaDescription {video:VideoMedia,audio:AudioMedia|null,durationSec:number|null
 VideoMedia {width,height:int,fps:[positiveInt,positiveInt],pixfmt,sar:string}
 AudioMedia {rate,channels:int,sampleFmt:string}
 CompilePaths {ffmpeg:string,videoPipe:string,audioPipe:string|null,output:string,project:string,
-  target:NativeTarget|null}
+  target:NativeTarget|null,mediaIsSample?:bool}
 NativeTarget {id:"vegas-native-v1",outputPath:string|null}
 CoreCapabilities {installationId,label,identityKey,version:string,
   libavformatMajor:positiveInt|null,

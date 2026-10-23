@@ -74,6 +74,25 @@ VerificationResult verifyOutput(
     if (stream.kind == 'video' &&
         (int.tryParse('${found['nb_read_frames']}') ?? 0) < 1)
       return result('failed', 'Output contains no readable video frames.');
+    if (stream.kind == 'video') {
+      for (final dimension in ['width', 'height']) {
+        final expectedDimension = stream.data[dimension];
+        if (expectedDimension != null &&
+            found[dimension] != expectedDimension) {
+          return result(
+            'failed',
+            'Output dimensions do not match the compiled encoded video dimensions.',
+          );
+        }
+      }
+      if (stream.data['sar'] != null &&
+          found['sample_aspect_ratio'] != stream.data['sar']) {
+        return result(
+          'failed',
+          'Output sample aspect ratio does not match the compiled encoded video aspect ratio.',
+        );
+      }
+    }
   }
   return result(
     'passed',
@@ -162,7 +181,8 @@ class WindowsPresetTests implements PresetTests {
 
           try {
             emit(
-              message: 'Preparing 60 synthetic testsrc2 frames and two seconds of stereo sine.',
+              message:
+                  'Preparing 60 synthetic testsrc2 frames and two seconds of stereo sine.',
             );
             await requireCurrentInstallation(
               installation,
@@ -374,7 +394,8 @@ class WindowsPresetTests implements PresetTests {
             );
             phase = 'done';
             emit(
-              message: 'Synthetic preset test passed; output streams matched and fully decoded.',
+              message:
+                  'Synthetic preset test passed; output streams matched and fully decoded.',
               verification: verified,
             );
           } catch (e) {

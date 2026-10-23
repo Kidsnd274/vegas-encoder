@@ -3,4 +3,4 @@
 #define VeAppVersion "0.1.7+1"
 #define VeFileVersion "0.1.7.1"
 #define VeExporterVersion "0.1.7-recipe-proof"
-#define VeCoreVersion "0.2.0-b2"
+#define VeCoreVersion "0.3.0-filters"

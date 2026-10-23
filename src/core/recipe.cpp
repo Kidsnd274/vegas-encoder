@@ -58,7 +58,7 @@ void SchemaCheck(const Json& value, const Json& schema, const std::string& path,
     }
     if (value.is_number()) {
         const auto number = value.get<double>();
-        if (!std::isfinite(number) || number < Num(schema,"minimum",-std::numeric_limits<double>::max()) ||
+        if (!std::isfinite(number) || number < Num(schema,"minimum",-std::numeric_limits<double>::max()) || number > Num(schema,"maximum",std::numeric_limits<double>::max()) ||
             number <= Num(schema,"exclusiveMinimum",-std::numeric_limits<double>::max())) fail("Number is outside the recipe field's bounds.");
     }
 }
@@ -77,8 +77,10 @@ bool Includes(const Json& array, const Json& value) {
 }
 }
 Json Structural(const Json& recipe) {
-    Json issues = Json::array(); SchemaCheck(recipe,RecipeSchema(),"",issues);
-    if (recipe.is_object() && recipe.contains("schema") && !recipe.at("schema").is_number_integer()) issues.push_back(Issue("V-SCHEMA","error","schema","Recipe schema must be integer 1."));
+    Json issues = Json::array(); SchemaCheck(recipe,Num(recipe,"schema") == 2 ? RecipeSchema2() : RecipeSchema(),"",issues);
+    if (recipe.is_object() && recipe.contains("schema") && !recipe.at("schema").is_number_integer()) issues.push_back(Issue("V-SCHEMA","error","schema","Recipe schema must be integer 1 or 2."));
+    if (Num(recipe,"schema") == 1 && recipe.contains("video") && recipe.at("video").is_object() && recipe.at("video").contains("filters"))
+        issues.push_back(Issue("V-FILTER-SCHEMA","error","schema","Structured filters require recipe schema 2; older cores must not silently drop processing."));
     return issues;
 }
 Json Normalize(const Json& request) {
@@ -94,7 +96,11 @@ Json Normalize(const Json& request) {
         if (Bool(video,"enabled",true)) required.push_back(Str(video,"encoder"));
         if (Bool(audio,"enabled",true) && std::find(required.begin(),required.end(),Json(Str(audio,"encoder"))) == required.end()) required.push_back(Str(audio,"encoder"));
     }
-    return Json{{"recipe",recipe},{"issues",issues},{"requiredEncoders",required}}; // Defaults are resolved at compile time only.
+    Json requiredFilters = required.is_null() ? Json(nullptr) : Json::array();
+    if (!requiredFilters.is_null() && FilterControl(recipe) == "structured" && recipe.at("video").contains("filters"))
+        for (const auto& filter : recipe.at("video").at("filters")) if (Bool(filter,"enabled",true) && Bool(recipe.at("video"),"enabled",true))
+            for (const auto* name : {"scale","pad","setsar"}) requiredFilters.push_back(name);
+    return Json{{"recipe",recipe},{"issues",issues},{"requiredEncoders",required},{"requiredFilters",requiredFilters}}; // Defaults are resolved at compile time only.
 }
 Json Resolve(const Json& recipe) {
     const auto& video = recipe.at("video"); const auto& audio = recipe.at("audio").at(0);
@@ -170,6 +176,12 @@ Json Validate(const Json& request, const Json* capabilities) {
         }
         issues.push_back(Issue("V-UNTESTED","info","","Not tested with VEGAS yet.")); return issues;
     }
+    // Edit-time command previews may use labelled sample frames. They are not
+    // evidence about the project's aspect ratio, fitted size or rounding.
+    // Only filter geometry admission ignores that sample; all existing media,
+    // schema, capability and other stream checks keep their current context.
+    const auto paths = request.value("paths",Json(nullptr));
+    ValidateFilters(r,Bool(paths,"mediaIsSample") ? Json(nullptr) : media,caps,issues);
     if (!withVideo && !withAudio) issues.push_back(Issue("V-STREAMS","error","video.enabled","Turn on video, audio, or both."));
     else if (!withVideo) issues.push_back(Issue("V-AUDIO-ONLY","error","video.enabled","Audio-only renders are not supported by the VEGAS adapter yet."));
     Json res = Resolve(r);

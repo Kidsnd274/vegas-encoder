@@ -345,6 +345,7 @@ class FFmpegCapabilities extends JsonModel {
     int? libavformatMajor = null,
     JsonMap encoders = const {},
     JsonMap muxers = const {},
+    JsonMap filters = const {},
     JsonMap hardware = const {},
     String gpuFingerprint = '',
     required String probedAt,
@@ -357,6 +358,7 @@ class FFmpegCapabilities extends JsonModel {
          'libavformatMajor': libavformatMajor,
          'encoders': encoders,
          'muxers': muxers,
+         'filters': filters,
          'hardware': hardware,
          'gpuFingerprint': gpuFingerprint,
          'probedAt': probedAt,
@@ -370,6 +372,7 @@ class FFmpegCapabilities extends JsonModel {
   int? get libavformatMajor => data['libavformatMajor'] as int?;
   JsonMap get encoders => jsonMap(data['encoders'] ?? <String, Object?>{});
   JsonMap get muxers => jsonMap(data['muxers'] ?? <String, Object?>{});
+  JsonMap get filters => jsonMap(data['filters'] ?? <String, Object?>{});
   JsonMap get hardware => jsonMap(data['hardware'] ?? <String, Object?>{});
   String get gpuFingerprint => data['gpuFingerprint'] as String? ?? '';
   String get probedAt => data['probedAt'] as String;
@@ -381,6 +384,7 @@ class FFmpegCapabilities extends JsonModel {
     Object? libavformatMajor = absent,
     Object? encoders = absent,
     Object? muxers = absent,
+    Object? filters = absent,
     Object? hardware = absent,
     Object? gpuFingerprint = absent,
     Object? probedAt = absent,
@@ -395,6 +399,7 @@ class FFmpegCapabilities extends JsonModel {
         'libavformatMajor': libavformatMajor,
       if (!identical(encoders, absent)) 'encoders': encoders,
       if (!identical(muxers, absent)) 'muxers': muxers,
+      if (!identical(filters, absent)) 'filters': filters,
       if (!identical(hardware, absent)) 'hardware': hardware,
       if (!identical(gpuFingerprint, absent)) 'gpuFingerprint': gpuFingerprint,
       if (!identical(probedAt, absent)) 'probedAt': probedAt,
@@ -561,11 +566,13 @@ class PresetTestProgress extends JsonModel {
 class PresetRequirements extends JsonModel {
   PresetRequirements({
     List<String> encoders = const [],
+    List<String> filters = const [],
     String? minFFmpegVersion = null,
     bool known = true,
     JsonMap extensions = const {},
   }) : super({
          'encoders': encoders,
+         'filters': filters,
          'minFFmpegVersion': minFFmpegVersion,
          'known': known,
          'extensions': extensions,
@@ -574,16 +581,21 @@ class PresetRequirements extends JsonModel {
   List<String> get encoders => List<String>.unmodifiable(
     (data['encoders'] as List? ?? []).cast<String>(),
   );
+  List<String> get filters => List<String>.unmodifiable(
+    (data['filters'] as List? ?? []).cast<String>(),
+  );
   String? get minFFmpegVersion => data['minFFmpegVersion'] as String?;
   bool get known => data['known'] as bool? ?? true;
   PresetRequirements copyWith({
     Object? encoders = absent,
+    Object? filters = absent,
     Object? minFFmpegVersion = absent,
     Object? known = absent,
     Object? extensions = absent,
   }) => PresetRequirements.fromJson(
     changed({
       if (!identical(encoders, absent)) 'encoders': encoders,
+      if (!identical(filters, absent)) 'filters': filters,
       if (!identical(minFFmpegVersion, absent))
         'minFFmpegVersion': minFFmpegVersion,
       if (!identical(known, absent)) 'known': known,
@@ -719,12 +731,14 @@ class AppUiState extends JsonModel {
     DesktopWindowBounds? desktopWindowBounds = null,
     PopupWindowSize? popupWindowSize,
     bool desktopMaximized = false,
+    bool videoFiltersExpanded = false,
     String? lastSizeLengthText = null,
     JsonMap extensions = const {},
   }) : super({
          'desktopWindowBounds': desktopWindowBounds?.toJson(),
          'popupWindowSize': popupWindowSize?.toJson(),
          'desktopMaximized': desktopMaximized,
+         'videoFiltersExpanded': videoFiltersExpanded,
          'lastSizeLengthText': lastSizeLengthText,
          'extensions': extensions,
        });
@@ -737,11 +751,14 @@ class AppUiState extends JsonModel {
       ? null
       : PopupWindowSize.fromJson(jsonMap(data['popupWindowSize']));
   bool get desktopMaximized => data['desktopMaximized'] as bool? ?? false;
+  bool get videoFiltersExpanded =>
+      data['videoFiltersExpanded'] as bool? ?? false;
   String? get lastSizeLengthText => data['lastSizeLengthText'] as String?;
   AppUiState copyWith({
     Object? desktopWindowBounds = absent,
     Object? popupWindowSize = absent,
     Object? desktopMaximized = absent,
+    Object? videoFiltersExpanded = absent,
     Object? lastSizeLengthText = absent,
     Object? extensions = absent,
   }) => AppUiState.fromJson(
@@ -753,6 +770,8 @@ class AppUiState extends JsonModel {
         'popupWindowSize': (popupWindowSize as PopupWindowSize?)?.toJson(),
       if (!identical(desktopMaximized, absent))
         'desktopMaximized': desktopMaximized,
+      if (!identical(videoFiltersExpanded, absent))
+        'videoFiltersExpanded': videoFiltersExpanded,
       if (!identical(lastSizeLengthText, absent))
         'lastSizeLengthText': lastSizeLengthText,
       if (!identical(extensions, absent)) 'extensions': extensions,
@@ -848,7 +867,8 @@ class EditContext extends JsonModel {
   EditContext.fromJson(super.json);
   String? get hostVersion => data['hostVersion'] as String?;
   String? get project => data['project'] as String?;
-  JsonMap? get target => data['target'] == null ? null : jsonMap(data['target']);
+  JsonMap? get target =>
+      data['target'] == null ? null : jsonMap(data['target']);
   MediaDescription? get media => data['media'] == null
       ? null
       : MediaDescription.fromJson(jsonMap(data['media']));

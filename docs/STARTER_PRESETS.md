@@ -24,8 +24,9 @@ VEGAS also retains its general settings template and reserved hidden probe.
 | H.264 720p 3500kbps (NVENC) | NVENC H.264, VBR 3500 kbps target, p5, HQ, 8-bit | AAC 160 kbps / MP4 |
 
 All retain project frame rate. All except the 720p starter retain project
-dimensions, including ProRes Proxy. The 720p starter uses Basic Extra arguments
-to fit square-pixel source video inside 1280x720, preserve aspect ratio and add
+dimensions, including ProRes Proxy. Revision 2 of the 720p starter uses schema-2
+structured Resize / Upscale (Bicubic) to fit delivered video inside 1280x720,
+preserve display aspect ratio and add
 black padding; it neither crops nor stretches. Its audio bitrate is additional
 to the video target; VBR does not promise an exact file size. MP4 starters enable
 faststart. Audio sample rate and channel layout follow the delivered source.

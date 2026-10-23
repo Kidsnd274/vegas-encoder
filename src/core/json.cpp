@@ -50,6 +50,7 @@ std::string Canonical(const Json& value) { return nlohmann::json(value).dump(); 
 const Json& Profiles() { static const Json data = Json::parse(data::Profiles()); return data; }
 const Json& Options() { static const Json data = Json::parse(data::Options()); return data.at("encoders"); }
 const Json& RecipeSchema() { static const Json data = Json::parse(data::RecipeSchema()); return data; }
+const Json& RecipeSchema2() { static const Json data = Json::parse(data::RecipeSchema2()); return data; }
 std::string Str(const Json& o, const std::string& k, const std::string& fallback) {
     const auto i = o.find(k); return i != o.end() && i->is_string() ? i->get<std::string>() : fallback;
 }

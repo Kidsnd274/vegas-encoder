@@ -7,6 +7,30 @@ import 'package:ve_services/src/storage.dart';
 import 'package:ve_services/src/ffmpeg_identity.dart';
 
 int checks = 0;
+const filterList = '''Filters:
+ ... scale V->V Scale video
+ ... pad V->V Pad video
+ ... setsar V->V Set sample aspect ratio
+''';
+String filterHelp(String name) =>
+    '''Filter $name
+$name AVOptions:
+   w <string> ..FV....... Width
+   h <string> ..FV....... Height
+   width <string> ..FV....... Width
+   height <string> ..FV....... Height
+   x <string> ..FV....... X position
+   y <string> ..FV....... Y position
+   color <color> ..FV....... Padding color
+   sar <string> ..FV....... Sample aspect ratio
+   flags <string> ..FV....... Scaler flags
+SWScaler AVOptions:
+  -sws_flags <flags> E..V....... scaler flags (default bicubic)
+     bicubic E..V....... Bicubic
+     bilinear E..V....... Bilinear
+     lanczos E..V....... Lanczos
+     neighbor E..V....... Nearest neighbour
+''';
 void check(bool ok, String message) {
   checks++;
   if (!ok) throw StateError(message);
@@ -45,6 +69,25 @@ Future<void> main(List<String> args) async {
     );
   }
   final parser = WindowsFFmpegHelpParser();
+  check(parser.version == 3, 'filter discovery invalidates parser-2 caches');
+  check(
+    parser.parseFilters(filterList).keys.join(',') == 'scale,pad,setsar',
+    'filter list parsed independently of encoders',
+  );
+  final scale = parser.parseFilterHelp(filterHelp('scale'), 'scale');
+  check(
+    jsonMaps(scale['options']).any((o) => o['name'] == 'flags'),
+    'filter AVOptions parsed without dash',
+  );
+  check(
+    (scale['algorithms'] as List).length == 4,
+    'algorithm support comes from scaler constants',
+  );
+  await rejects(
+    () async => parser.parseFilterHelp(filterHelp('pad'), 'scale'),
+    'HELP-PARSE',
+  );
+  await rejects(() async => parser.parseFilters('invalid'), 'HELP-PARSE');
   final catalog = jsonMap(
     jsonDecode(
       await File('../../schema/ffmpeg/windows-builds.v1.json').readAsString(),
@@ -259,6 +302,16 @@ Future<void> main(List<String> args) async {
         return ProcessOutput(exitCode: 0, stdout: encoderText);
       if (arguments.contains('-muxers'))
         return ProcessOutput(exitCode: 0, stdout: muxerText);
+      if (arguments.contains('-filters'))
+        return const ProcessOutput(exitCode: 0, stdout: filterList);
+      final filter = arguments
+          .where((a) => a.startsWith('filter='))
+          .firstOrNull;
+      if (filter != null)
+        return ProcessOutput(
+          exitCode: 0,
+          stdout: filterHelp(filter.substring(7)),
+        );
       if (arguments.contains('full'))
         return ProcessOutput(
           exitCode: 0,
@@ -368,6 +421,15 @@ Future<void> main(List<String> args) async {
       'probe phases stream',
     );
     final capabilities = progress.last.capabilities!;
+    check(
+      capabilities.filters.length == 3 && capabilities.parser == 3,
+      'filter facts use current capability cache generation',
+    );
+    check(
+      jsonEncode(capabilities.toCoreCapabilities().filters) ==
+          jsonEncode(capabilities.filters),
+      'service capability projection preserves filter help and algorithms',
+    );
     check(
       capabilities.libavformatMajor == 59 &&
           capabilities.encoders.length == 214,
@@ -621,6 +683,42 @@ Future<void> main(List<String> args) async {
       'empty video refused',
     );
     final fakeTests = FakePresetTests();
+    final sizedStream = ExpectedStream.fromJson({
+      'kind': 'video',
+      'encoder': 'libx264',
+      'codec': 'h264',
+      'width': 1280,
+      'height': 720,
+      'sar': '1:1',
+    });
+    final sizedProbe = <String, Object?>{
+      'streams': [
+        <String, Object?>{
+          'codec_type': 'video',
+          'codec_name': 'h264',
+          'nb_read_frames': '2',
+          'width': 1280,
+          'height': 720,
+          'sample_aspect_ratio': '1:1',
+        },
+      ],
+    };
+    check(
+      verifyOutput(sizedProbe, [sizedStream]).state == 'passed',
+      'preset test verifies encoded geometry',
+    );
+    final wrongSize = jsonMap(jsonDecode(jsonEncode(sizedProbe)));
+    (wrongSize['streams'] as List).first['width'] = 1920;
+    check(
+      verifyOutput(wrongSize, [sizedStream]).state == 'failed',
+      'preset test rejects input-sized output after resize',
+    );
+    final wrongSar = jsonMap(jsonDecode(jsonEncode(sizedProbe)));
+    (wrongSar['streams'] as List).first['sample_aspect_ratio'] = '4:3';
+    check(
+      verifyOutput(wrongSar, [sizedStream]).state == 'failed',
+      'preset test rejects unexpected output SAR',
+    );
     final fixturePreset = (await services.library.list()).first.recipe;
     check(
       (await fakeTests.test(fixturePreset, installation).toList())

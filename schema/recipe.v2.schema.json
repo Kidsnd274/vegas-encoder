@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:vegas-encoder:recipe:2",
+  "title": "Vegas Encoder recipe v2",
+  "$comment": "Structural contract only. Encoder-specific validation belongs to C++ core. Unknown properties survive. This does not qualify native template persistence.",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "name",
+    "container",
+    "video",
+    "audio",
+    "command",
+    "vegas"
+  ],
+  "properties": {
+    "schema": {
+      "const": 2
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "notes": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "category": {
+      "type": "string"
+    },
+    "container": {
+      "type": "object",
+      "required": [
+        "format"
+      ],
+      "properties": {
+        "format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "faststart": {
+          "type": "boolean"
+        },
+        "extensions": {
+          "type": "object"
+        }
+      }
+    },
+    "video": {
+      "type": "object",
+      "required": [
+        "encoder"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "encoder": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "quality": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "bitrateK": {
+          "$ref": "#/$defs/positiveIntegerOrNull"
+        },
+        "maxrateK": {
+          "$ref": "#/$defs/positiveIntegerOrNull"
+        },
+        "qp": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "speed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tune": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "multipass": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "depth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "gopSec": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "color": {
+          "type": "string"
+        },
+        "extra": {
+          "type": "string"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "filters": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "type",
+              "enabled",
+              "width",
+              "height",
+              "backend",
+              "algorithm",
+              "fit"
+            ],
+            "properties": {
+              "type": {
+                "const": "resize"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65536
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65536
+              },
+              "backend": {
+                "const": "scale"
+              },
+              "algorithm": {
+                "enum": [
+                  "bicubic",
+                  "bilinear",
+                  "lanczos",
+                  "neighbor"
+                ]
+              },
+              "fit": {
+                "const": "pad"
+              }
+            }
+          }
+        }
+      }
+    },
+    "audio": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "encoder"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "encoder": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bitrateK": {
+            "$ref": "#/$defs/positiveIntegerOrNull"
+          },
+          "vbr": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "level": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sampleRate": {
+            "oneOf": [
+              {
+                "const": "source"
+              },
+              {
+                "type": "integer",
+                "minimum": 1
+              }
+            ]
+          },
+          "channels": {
+            "enum": [
+              "source",
+              "stereo",
+              "mono"
+            ]
+          },
+          "extra": {
+            "type": "string"
+          },
+          "extensions": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "required": [
+        "mode",
+        "template"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "structured",
+            "template"
+          ]
+        },
+        "template": {
+          "type": "string"
+        },
+        "extensions": {
+          "type": "object"
+        }
+      }
+    },
+    "vegas": {
+      "type": "object",
+      "properties": {
+        "frame": {
+          "type": "string"
+        },
+        "inputFormat": {
+          "type": "string"
+        },
+        "extensions": {
+          "type": "object"
+        }
+      }
+    },
+    "extensions": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "positiveIntegerOrNull": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    }
+  }
+}

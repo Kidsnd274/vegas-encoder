@@ -53,6 +53,21 @@ candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
 
+**Native summary and structured resize (owner request, 2026-10-23):** implemented,
+validated and committed; see STATUS for exact checks. The Filters disclosure was
+then restyled to sit with Extra arguments under one divider (UI_SPEC Filters).
+Default ownership is one agent in this checkout. The native summary was checked independently
+before schema-2 Fit-only resize integration. Preserve the new 720p starter revision
+2 and all saved revision-1 snapshots. Old capability caches require FFmpeg Refresh
+for structured filters. Later filter types, Fill/Stretch, linked dimensions and
+alternative backends remain deferred; no new feature queue is implied.
+
+After the source checkpoint, rebuild matched product inputs before deployment.
+Real-VEGAS summary selection/edit/refresh and resized output/template persistence
+remain separately owner-directed qualification gates. Do not resume earlier
+deferred trials, install or replace the exporter automatically. The installer
+queue below remains separate; no installer was packaged by this feature task.
+
 **Expanded starters (owner request, 2026-10-23):** implemented all seven proposed
 additions and the owner's x264 CRF 16, x265 CRF 16 and 720p/3500 kbps NVENC
 presets. There are now 16 app recipes and 16 VEGAS starters; NVIDIA HEVC reuses

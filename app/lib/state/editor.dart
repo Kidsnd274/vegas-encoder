@@ -51,14 +51,17 @@ final _sampleCompiles =
   String? basicExtension,
   CoreCapabilities? capabilities,
   JsonMap? target,
+  bool mediaIsSample = false,
 }) {
   final extension = recipe.command.mode == 'template' ? null : basicExtension;
   var paths = SamplePreview.paths(extension);
+  if (mediaIsSample && recipe.schema >= 2) paths = paths.copyWith(mediaIsSample: true);
   if (target != null) paths = paths.copyWith(target: target);
   var result = CoreResult.run(() => core.compile(recipe, media: media, paths: paths, capabilities: capabilities));
   final activeExtension = result.value?.outputExtension;
   if (activeExtension != null && activeExtension != extension) {
     paths = SamplePreview.paths(activeExtension);
+    if (mediaIsSample && recipe.schema >= 2) paths = paths.copyWith(mediaIsSample: true);
     if (target != null) paths = paths.copyWith(target: target);
     result = CoreResult.run(() => core.compile(recipe, media: media, paths: paths, capabilities: capabilities));
   }
@@ -78,6 +81,7 @@ CoreResult<CompileResult> compileSample(VeCore core, Recipe recipe, {String? ext
     media: SamplePreview.media,
     basicExtension: ext,
     capabilities: capabilities,
+    mediaIsSample: true,
   ).result;
   _sampleCompiles[recipe] = (core: core, capabilities: capabilities, ext: ext, result: result);
   return result;
@@ -231,7 +235,8 @@ final editorProvider = Provider<EditorData?>((ref) {
   final length = ref.watch(sizeLengthSecProvider);
   final advanced = recipe.command.mode == 'template';
   final compiled = compileSample(core, recipe, ext: ext, capabilities: capabilities);
-  final paths = SamplePreview.paths(compiled.value?.outputExtension ?? (advanced ? null : ext));
+  var paths = SamplePreview.paths(compiled.value?.outputExtension ?? (advanced ? null : ext));
+  if (recipe.schema >= 2) paths = paths.copyWith(mediaIsSample: true);
   final asBasic = advanced ? recipe.copyWith(command: recipe.command.copyWith(mode: 'structured')) : recipe;
 
   return EditorData(

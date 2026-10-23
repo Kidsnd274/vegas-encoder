@@ -345,6 +345,7 @@ void main() {
         '{a}': '1:a:0',
         '{width}': '1920',
         '{height}': '1080',
+        '{sar}': '1/1',
         '{fps}': '30000/1001',
         '{sample_rate}': '48000',
         '{project}': 'Sample project',

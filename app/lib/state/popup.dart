@@ -427,7 +427,15 @@ final popupEditorProvider = Provider<EditorData?>((ref) {
   final projectMedia = s.request.context.media;
   final media = projectMedia ?? SamplePreview.media;
   final ext = catalog.containers.where((c) => c.id == recipe.container.format).firstOrNull?.ext;
-  final preview = compilePreview(core, recipe, media: media, basicExtension: ext, capabilities: capabilities, target: s.request.context.target);
+  final preview = compilePreview(
+    core,
+    recipe,
+    media: media,
+    basicExtension: ext,
+    capabilities: capabilities,
+    target: s.request.context.target,
+    mediaIsSample: projectMedia == null,
+  );
   final paths = preview.paths;
   final length = VeFormat.parseLength(s.lengthText);
   final advanced = recipe.command.mode == 'template';

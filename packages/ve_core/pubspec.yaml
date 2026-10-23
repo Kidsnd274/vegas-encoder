@@ -1,6 +1,6 @@
 name: ve_core
 description: Vegas Encoder portable native core, Dart FFI and test fixtures for Windows x64.
-version: 0.2.0
+version: 0.3.0
 publish_to: none
 environment:
   sdk: '>=3.10.0 <4.0.0'

@@ -46,7 +46,7 @@ std::vector<uint8_t> EncodePayload(const Json& snapshot) {
     if (body.size() > VE_CORE_PAYLOAD_LIMIT - 32) throw Error(VE_LIMIT_EXCEEDED,"PAYLOAD-LIMIT","Template payload exceeds the draft 16 KiB envelope limit.");
     std::vector<uint8_t> bytes(32 + body.size(),0);
     std::memcpy(bytes.data(),"VEnc",4); bytes[4] = 1;
-    Put32(bytes,8,static_cast<uint32_t>(body.size())); Put32(bytes,12,Crc(reinterpret_cast<const uint8_t*>(body.data()),body.size())); Put32(bytes,16,1);
+    Put32(bytes,8,static_cast<uint32_t>(body.size())); Put32(bytes,12,Crc(reinterpret_cast<const uint8_t*>(body.data()),body.size())); Put32(bytes,16,static_cast<uint32_t>(Num(snapshot.at("recipe"),"schema")));
     std::memcpy(bytes.data()+32,body.data(),body.size()); return bytes;
 }
 Json DecodePayload(const uint8_t* bytes, size_t length) {
@@ -54,12 +54,13 @@ Json DecodePayload(const uint8_t* bytes, size_t length) {
     if (length > VE_CORE_PAYLOAD_LIMIT) return PayloadFailure("P-LIMIT","Template payload exceeds the draft 16 KiB limit.");
     if (std::memcmp(bytes,"VEnc",4) != 0) return PayloadFailure("P-LEGACY","Not a Vegas Encoder product payload. Proof templates are not migrated.");
     if (bytes[4] != 1 || bytes[5] != 0) return PayloadFailure("P-VERSION","This template needs a different Vegas Encoder payload version.");
-    if (bytes[6] != 0 || bytes[7] != 0 || Get32(bytes,16) != 1) return PayloadFailure("P-SCHEMA","Unsupported payload flags or recipe schema.");
+    if (bytes[6] != 0 || bytes[7] != 0 || (Get32(bytes,16) != 1 && Get32(bytes,16) != 2)) return PayloadFailure("P-SCHEMA","Unsupported payload flags or recipe schema.");
     for (size_t i = 20; i < 32; ++i) if (bytes[i]) return PayloadFailure("P-RESERVED","Reserved payload bytes are not zero.");
     if (Get32(bytes,8) != length - 32) return PayloadFailure("P-LENGTH","Payload length does not match its envelope.");
     if (Get32(bytes,12) != Crc(bytes+32,length-32)) return PayloadFailure("P-CRC","Template settings checksum failed; original bytes are preserved.");
     try {
-        const auto snapshot = Parse(bytes+32,length-32); const auto issues = SnapshotIssues(snapshot);
+        const auto snapshot = Parse(bytes+32,length-32); auto issues = SnapshotIssues(snapshot);
+        if (snapshot.is_object() && snapshot.contains("recipe") && Num(snapshot.at("recipe"),"schema") != Get32(bytes,16)) issues.push_back(Issue("P-SCHEMA","error","schema","Payload recipe schema does not match its envelope."));
         return Json{{"snapshot",HasErrors(issues) ? Json(nullptr) : snapshot},{"migrated",false},{"issues",issues}};
     } catch (const Error&) { return PayloadFailure("P-JSON","Template settings contain invalid UTF-8 or JSON; original bytes are preserved."); }
 }

@@ -75,6 +75,7 @@ ve_status ve_profiles(ve_buffer* out) { return Guard(out,[&] { return JsonBytes(
 ve_status ve_recipe_normalize(const uint8_t* json, uint32_t length, ve_buffer* out) { return Call(json,length,out,ve::Normalize); }
 ve_status ve_recipe_validate(const uint8_t* json, uint32_t length, ve_buffer* out) { return Call(json,length,out,[](const ve::Json& r) { const auto caps = Acquire(r); return ve::Json{{"issues",ve::Validate(r,caps.get())}}; }); }
 ve_status ve_compile(const uint8_t* json, uint32_t length, ve_buffer* out) { return Call(json,length,out,[](const ve::Json& r) { const auto caps = Acquire(r); return ve::Compile(r,caps.get()); }); }
+ve_status ve_snapshot_summary(const uint8_t* json, uint32_t length, ve_buffer* out) { return Call(json,length,out,ve::SnapshotSummary); }
 ve_status ve_template_lint(const uint8_t* json, uint32_t length, ve_buffer* out) { return Call(json,length,out,[](const ve::Json& r) { const auto caps = Acquire(r); return ve::Json{{"diagnostics",ve::Lint(r,caps.get())}}; }); }
 ve_status ve_template_complete(const uint8_t* json, uint32_t length, ve_buffer* out) { return Call(json,length,out,[](const ve::Json& r) { const auto caps = Acquire(r); return ve::Complete(r,caps.get()); }); }
 ve_status ve_estimate(const uint8_t* json, uint32_t length, ve_buffer* out) { return Call(json,length,out,ve::Estimate); }

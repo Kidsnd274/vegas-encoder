@@ -1,6 +1,6 @@
 # Recipes and FFmpeg command compilation
 
-Updated: 2026-10-17 (Asia/Singapore). Schema v1 and current implementation rules. Basic and
+Updated: 2026-10-23 (Asia/Singapore). Schema v1/v2 and current implementation rules. Basic and
 Advanced are the round 1 Guided and Command modes, renamed by the owner.
 
 B1/B2 implementation note (2026-10-13): the portable C++ core and Dart FFI implement
@@ -22,6 +22,34 @@ This document specifies:
 The executable prototype is [design/shared/model.js](design/shared/model.js). Every
 mockup uses it, so the commands shown in the designs follow these rules. The product
 implementation is the C++ core ([TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) §4).
+
+## Structured resize (schema 2)
+
+Schema 1 keeps its existing behavior. Schema 2 adds the ordered `video.filters`
+collection described in CONTRACTS. The first curated entry is Resize / Upscale:
+software scale, Bicubic by default, with Bilinear, Lanczos and Nearest neighbour.
+It fits inside a common/custom canvas, preserves display aspect ratio, pads with
+black, and emits square-pixel output. Input dimensions/SAR come from delivered
+frames; unknown dimensions do not prevent configuring the target canvas.
+
+The compiler emits one source-relative simple chain. It accounts for delivered
+SAR, aligns the fitted picture and padding to the effective chroma grid, and
+reports known rounding/padding before Apply. It validates dimensions, reported
+filter options/algorithms and known encoder constraints. Hardware encoding never
+selects a GPU scaler. Color/precision facts remain conservative where negotiation
+is not established; scaling does not promise recovered detail.
+
+Video filter options in either Extra field own the effective chain. Structured
+values remain stored but inactive; they are never concatenated with handwritten
+filters. Advanced uses only the active command, seeded with source-relative
+resize expressions and the delivered `{sar}` macro. Output-size/aspect overrides
+conflicting with structured resize must be resolved explicitly.
+
+Raw pipe dimensions and existing `{width}`/`{height}` retain delivered meanings.
+Encoded geometry feeds summaries, supported size estimates and output readback.
+Disabled filters preserve the old command behavior. Adding filters upgrades the
+recipe to schema 2; save/export/template snapshots keep it thereafter. No automatic
+rewrite of existing user recipes or saved templates is performed.
 
 ## 1. Recipe schema v1
 

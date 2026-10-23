@@ -182,13 +182,42 @@ class FakeFFmpegHelpParser implements FFmpegHelpParser {
     Map<String, EncoderDetails> encoderHelp = const {},
     Map<String, JsonMap> encoders = const {},
     Map<String, JsonMap> muxers = const {},
+    Map<String, JsonMap> filters = const {},
+    Map<String, JsonMap> filterHelp = const {},
   }) : _help = Map.unmodifiable(encoderHelp),
        _encoders = Map.unmodifiable(encoders),
-       _muxers = Map.unmodifiable(muxers);
+       _muxers = Map.unmodifiable(muxers),
+       _filters = Map.unmodifiable(filters),
+       _filterHelp = Map.unmodifiable(filterHelp);
   @override
   final int version;
   final Map<String, EncoderDetails> _help;
   final Map<String, JsonMap> _encoders, _muxers;
+  final Map<String, JsonMap> _filters, _filterHelp;
+  @override
+  JsonMap parseFilters(String text) => jsonMap(
+    jsonDecode(
+      jsonEncode(
+        _filters[text] ??
+            (throw const ServiceException(
+              'B0-FIXTURE-MISSING',
+              'No filter-list fixture.',
+            )),
+      ),
+    ),
+  );
+  @override
+  JsonMap parseFilterHelp(String text, String name) => jsonMap(
+    jsonDecode(
+      jsonEncode(
+        _filterHelp['$name:$text'] ??
+            (throw const ServiceException(
+              'B0-FIXTURE-MISSING',
+              'No filter-help fixture.',
+            )),
+      ),
+    ),
+  );
   @override
   EncoderDetails parseEncoderHelp(String text) =>
       _help[text] ??

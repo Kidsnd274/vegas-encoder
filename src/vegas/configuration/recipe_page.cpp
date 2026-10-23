@@ -4,9 +4,11 @@
 #include "../../support/native_boundary.h"
 
 #include <array>
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <utility>
 
 namespace vegas_encoder::configuration {
 void ReturnRecipeOwner(HWND owner, HWND focus, bool returnForeground) noexcept {
@@ -96,6 +98,7 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
       next->AddRef();
       if (store_) store_->Release();
       store_ = next; draft_ = std::move(draft);
+      RefreshSummary();
       Status(L"Settings are stored in this VEGAS template.");
       SyncButton();
       return S_OK;
@@ -109,7 +112,7 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
       auto* text = static_cast<wchar_t*>(CoTaskMemAlloc(sizeof title));
       if (!text) return E_OUTOFMEMORY;
       memcpy(text, title, sizeof title);
-      *info = {}; info->cb = sizeof *info; info->pszTitle = text; info->size = {440, 118};
+      *info = {}; info->cb = sizeof *info; info->pszTitle = text; info->size = {440, 270};
       return S_OK;
     });
   }
@@ -125,14 +128,24 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
       window_ = CreateDialogIndirectParamW(GetModuleHandleW(nullptr), &layout.dialog, parent,
                                           Dialog, reinterpret_cast<LPARAM>(this));
       if (!window_) return WindowFailure();
+      summaryLabel_ = CreateWindowExW(0, L"STATIC", L"Selected preset settings", WS_CHILD | WS_VISIBLE | SS_LEFT,
+          0, 0, 1, 1, window_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kRecipeSummaryLabelControl)),
+          GetModuleHandleW(nullptr), nullptr);
+      // Standard read-only edit controls keep wrapping, selection/copy, keyboard
+      // scrolling and native accessibility without embedding another UI runtime.
+      summary_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", summaryText_.c_str(), WS_CHILD | WS_VISIBLE |
+          WS_TABSTOP | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
+          0, 0, 1, 1, window_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kRecipeSummaryControl)),
+          GetModuleHandleW(nullptr), nullptr);
       button_ = CreateWindowExW(0, L"BUTTON", L"Edit settings...", WS_CHILD | WS_VISIBLE | WS_TABSTOP |
           BS_PUSHBUTTON, 12, 12, 148, 28, window_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kEditRecipeControl)),
           GetModuleHandleW(nullptr), nullptr);
-      status_ = CreateWindowExW(0, L"STATIC", statusText_.c_str(), WS_CHILD | WS_VISIBLE | SS_LEFT,
+      status_ = CreateWindowExW(0, L"EDIT", statusText_.c_str(), WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL |
+          ES_LEFT | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
           12, 50, 410, 52, window_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kRecipeStatusControl)), GetModuleHandleW(nullptr), nullptr);
-      if (!button_ || !status_) { const auto failure = WindowFailure(); (void)DestroyPageWindow(); return failure; }
-      for (const auto control : {button_, status_})
-        SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)), TRUE);
+      if (!summaryLabel_ || !summary_ || !button_ || !status_) { const auto failure = WindowFailure(); (void)DestroyPageWindow(); return failure; }
+      SendMessageW(summary_, EM_SETLIMITTEXT, VE_CORE_JSON_LIMIT, 0);
+      UpdateDpi(GetDpiForWindow(window_));
       SyncButton();
       const auto moved = Move(rect);
       if (FAILED(moved)) { (void)DestroyPageWindow(); return moved; }
@@ -208,9 +221,58 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
     return width > 0 && height > 0 && width <= (std::numeric_limits<int>::max)() &&
            height <= (std::numeric_limits<int>::max)();
   }
+  void RefreshSummary() {
+    if (!draft_) return;
+    // C4 context media contains established host facts or null. The current
+    // adapter supplies null; never replace it with editor preview/sample media.
+    const auto values = ve::SnapshotSummary({{"snapshot", draft_->Snapshot()},
+        {"media", options_.context.value("media", ve::Json(nullptr))}});
+    std::wstring text;
+    for (const auto& row : std::array<std::pair<const wchar_t*, const char*>, 6>{{
+        {L"Preset", "preset"}, {L"Video", "video"}, {L"Resolution", "resolution"},
+        {L"Filters", "filters"}, {L"Audio", "audio"}, {L"Container", "container"}}}) {
+      if (!text.empty()) text += L"\r\n";
+      text += row.first; text += L":  "; text += Widen(ve::Str(values, row.second));
+    }
+    summaryText_ = std::move(text);
+    if (summary_) SetWindowTextW(summary_, summaryText_.c_str());
+  }
+  int Scale(int value) const noexcept { return MulDiv(value, static_cast<int>(dpi_), 96); }
+  void Layout() noexcept {
+    if (!window_ || !summary_ || !button_ || !status_ || !summaryLabel_) return;
+    RECT client{};
+    if (!GetClientRect(window_, &client)) return;
+    const int margin = Scale(8), gap = Scale(6);
+    const int width = (std::max)(1, static_cast<int>(client.right) - margin * 2);
+    const int usable = (std::max)(4, static_cast<int>(client.bottom) - margin * 2 - gap * 3);
+    const int labelHeight = (std::min)(Scale(16), usable / 5);
+    const int buttonHeight = (std::min)(Scale(28), usable / 3);
+    const int statusHeight = (std::min)(Scale(48), usable / 4);
+    const int summaryHeight = (std::max)(1, usable - labelHeight - buttonHeight - statusHeight);
+    int top = margin;
+    MoveWindow(summaryLabel_, margin, top, width, labelHeight, TRUE); top += labelHeight + gap;
+    MoveWindow(summary_, margin, top, width, summaryHeight, TRUE); top += summaryHeight + gap;
+    MoveWindow(button_, margin, top, (std::min)(width, Scale(148)), buttonHeight, TRUE); top += buttonHeight + gap;
+    MoveWindow(status_, margin, top, width, statusHeight, TRUE);
+  }
+  void UpdateDpi(UINT dpi) noexcept {
+    dpi_ = dpi ? dpi : 96;
+    NONCLIENTMETRICSW metrics{}; metrics.cbSize = sizeof metrics;
+    HFONT next = nullptr;
+    if (SystemParametersInfoForDpi(SPI_GETNONCLIENTMETRICS, sizeof metrics, &metrics, 0, dpi_))
+      next = CreateFontIndirectW(&metrics.lfMessageFont);
+    const auto selected = next ? next : static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+    for (const auto control : {summaryLabel_, summary_, button_, status_})
+      if (control) SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(selected), TRUE);
+    if (font_) DeleteObject(font_);
+    font_ = next;
+    Layout();
+  }
   void Status(const std::wstring& text) {
     statusText_ = text;
     if (draft_) try {
+      if (draft_->Dirty() && text.find(L"VEGAS Apply or OK") == std::wstring::npos)
+        statusText_ += L" Click VEGAS Apply or OK to keep the pending changes.";
       const auto ext = RecipeOutputExtension(draft_->Snapshot().at("recipe"));
       if (!ext.empty()) statusText_ += L" Use a " + ext + L" filename in Render As.";
     } catch (...) { /* Preserve the useful status when malformed drafts cannot compile. */ }
@@ -238,7 +300,8 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
   HRESULT DestroyPageWindow() noexcept {
     SetWindowLongPtrW(window_, DWLP_USER, 0);
     if (!DestroyWindow(window_)) return WindowFailure();
-    window_ = button_ = status_ = nullptr;
+    window_ = summaryLabel_ = summary_ = button_ = status_ = nullptr;
+    if (font_) { DeleteObject(font_); font_ = nullptr; }
     return S_OK;
   }
   void LaunchEditor() {
@@ -301,6 +364,7 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
           (editorForeground || editorHadForeground_ || foregroundProcess == GetCurrentProcessId());
       editor_.reset(); RestoreOwner(returnForeground); SyncButton();
       if (outcome.disposition == EditDisposition::applied) {
+        RefreshSummary();
         Status(draft_->Dirty() ? L"Settings changed. Click VEGAS Apply or OK to keep them." : L"Settings are unchanged.");
         if (draft_->Dirty() && site_) BestEffortDiagnostic([&] { site_->OnStatusChange(PROPPAGESTATUS_DIRTY); });
       } else if (outcome.disposition == EditDisposition::rejected) {
@@ -318,10 +382,14 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
     auto* page = reinterpret_cast<RecipePage*>(GetWindowLongPtrW(dialog, DWLP_USER));
     if (!page) return FALSE;
     if (message == WM_NCDESTROY) {
-      page->EndEditor(); page->window_ = page->button_ = page->status_ = nullptr;
+      page->EndEditor(); page->window_ = page->summaryLabel_ = page->summary_ = page->button_ = page->status_ = nullptr;
+      if (page->font_) { DeleteObject(page->font_); page->font_ = nullptr; }
       SetWindowLongPtrW(dialog, DWLP_USER, 0); return FALSE;
     }
     // Window callbacks are exception boundaries, just like the COM methods.
+    if (message == WM_SIZE) { page->Layout(); return TRUE; }
+    if (message == WM_DPICHANGED) { page->UpdateDpi(LOWORD(wparam)); return TRUE; }
+    if (message == WM_DPICHANGED_AFTERPARENT) { page->UpdateDpi(GetDpiForWindow(dialog)); return TRUE; }
     if (message == WM_COMMAND && LOWORD(wparam) == kEditRecipeControl && HIWORD(wparam) == BN_CLICKED) {
       (void)page->Call([&]() -> HRESULT {
         if (!page->draft_ || page->editor_ || page->launching_) return E_PENDING;
@@ -352,9 +420,12 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
   std::unique_ptr<EditorSessionTask> editor_;
   bool editorStarted_ = false;
   bool editorHadForeground_ = false;
-  HWND window_ = nullptr, button_ = nullptr, status_ = nullptr, owner_ = nullptr;
+  HWND window_ = nullptr, summaryLabel_ = nullptr, summary_ = nullptr, button_ = nullptr, status_ = nullptr, owner_ = nullptr;
+  HFONT font_ = nullptr;
+  UINT dpi_ = 96;
   bool ownerDisabled_ = false, launching_ = false;
   std::wstring statusText_ = L"Settings are stored in this VEGAS template.";
+  std::wstring summaryText_;
 };
 } // namespace
 

@@ -5,6 +5,48 @@ requested removal of the development trial and a clean state for installer testi
 
 ## Current progress
 
+**Native preset summary and structured resize (owner implementation request,
+2026-10-23):** implemented and committed in this checkout; parallel agents were
+owner-authorized for this task only. Stage 1 passed independently before resize:
+3,112 core checks, 216 native template checks, 95 editor-transport checks and
+361 native-page checks. The native page shows effective settings from its saved
+snapshot, with selectable wrapping/scrolling text, separate pending Apply/error
+status, and checked 96/144/192 DPI layout. It does not inspect the library or probe
+FFmpeg. Library modified state is not inferred without comparison evidence.
+
+Stage 2 adds the shared collapsed Filters disclosure (beside Extra arguments under
+one divider) and Fit-only software Resize /
+Upscale. Bicubic, Bilinear, Lanczos and Nearest neighbour operate on the delivered
+frames; source-relative expressions preserve display aspect ratio and add black
+padding. Unknown input facts do not block configuration. Fill, Stretch, linked
+dimensions, other filter types/backends and new native source extraction remain
+deferred. C++ owns compilation, conflict/capability checks and output geometry;
+services carry parser-generation-3 filter help; preview and render use the same
+core. Actual structured-filter renders require verified capabilities. Users with
+old capability caches must Refresh FFmpeg; no algorithm is silently substituted.
+
+Recipes with structured filters use schema 2 and matching payload schema fields;
+schema 1 remains supported without automatic migration. The 720p NVENC starter
+is now revision 2, with the same ID/GUID/slot and structured resize. Existing
+saved templates/user presets retain their snapshots until explicit update.
+Contracts, UI/specification details and future-feature disposition are updated.
+
+Final checks on the committed source: 3,165 native/static core checks; ve_core 177
+contract and 244 FFI checks; ve_services 87 contract checks; 4,467 service checks;
+158 real-file repository checks; 93 real-FFmpeg runtime checks with 17 bundled
+synthetic encodes/readbacks/full decodes and one unavailable AV1-NVENC refusal;
+B6 template 216, transport 97 and native-page 485 checks; B4 28,631 engine checks
+across 27 fake-host cases (including real FFmpeg portrait/anamorphic resized
+outputs, full decode and missing-cache refusal) plus 369 job-record checks;
+Flutter analyze clean and 658 app tests including light/dark goldens; and a
+successful `Build-Release.ps1 -Action Build`. The earlier runtime25 adapter check
+was not re-run.
+
+These checks do not establish real-VEGAS selection/edit/refresh, resized renders
+or schema-2 template save/restart. No installation, installer package or
+owner-deferred trial was performed by this feature task. Existing installed-trial
+rollback/data/candidate files remain intact.
+
 **Expanded starter presets (owner request, 2026-10-23):** the shared catalog now
 provides 16 app built-ins and 16 fixed VEGAS starters, plus the preserved general
 settings template. Added quick-review H.264, H.264/AV1 NVIDIA GPU, ProRes LT/Proxy,

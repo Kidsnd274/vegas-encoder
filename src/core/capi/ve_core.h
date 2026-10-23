@@ -61,6 +61,7 @@ VE_CORE_API ve_status ve_capabilities_release(const uint8_t* json, uint32_t leng
 VE_CORE_API ve_status ve_recipe_normalize(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_recipe_validate(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_compile(const uint8_t* json, uint32_t length, ve_buffer* result);
+VE_CORE_API ve_status ve_snapshot_summary(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_macros(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_template_lint(const uint8_t* json, uint32_t length, ve_buffer* result);
 VE_CORE_API ve_status ve_template_complete(const uint8_t* json, uint32_t length, ve_buffer* result);

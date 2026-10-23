@@ -75,6 +75,9 @@ void ValidateCandidateRecipe(const ve::Json& recipe) {
                        {"audio",{{"rate",48000},{"channels",2},{"sampleFmt","f32le"}}},{"durationSec",nullptr}};
   const ve::Json paths{{"ffmpeg","ffmpeg.exe"},{"videoPipe","candidate-video"},{"audioPipe","candidate-audio"},{"output","candidate.mkv"},{"project",""}};
   auto targetPaths = paths; targetPaths["target"] = {{"id","vegas-native-v1"}};
+  // The page has no delivered source facts. This sample supports command/target
+  // admission only; it must not reject a filter for an invented source aspect.
+  targetPaths["mediaIsSample"] = true;
   const auto compiled = ve::Compile({{"recipe",recipe},{"media",media},{"paths",targetPaths}});
   for (const auto& issue : compiled.at("issues")) if (ve::Str(issue,"level") == "error")
     throw std::runtime_error(ve::Str(issue,"message"));
@@ -121,7 +124,7 @@ RecipeRuntime LoadRecipeRuntime() {
     if (!cache.is_object() || cache.value("cache",ve::Json(nullptr)) != 1 || !cache.at("cache").is_number_integer() ||
         !cache.contains("capabilities") || !cache.at("capabilities").is_object()) throw std::runtime_error("Invalid FFmpeg capability cache.");
     const auto& capabilities = cache.at("capabilities");
-    if (capabilities.value("parser",ve::Json(nullptr)) != 2 || ve::Str(capabilities,"identityKey") != key ||
+    if (capabilities.value("parser",ve::Json(nullptr)) != 3 || ve::Str(capabilities,"identityKey") != key ||
         ve::Str(capabilities,"installationId") != selected) throw std::runtime_error("FFmpeg capability cache does not match the selected installation; probe it again in the app.");
     result.capabilities = capabilities;
     // Hardware readiness includes GPU/driver/age checks in the app. Do not label

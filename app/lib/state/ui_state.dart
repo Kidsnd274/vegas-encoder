@@ -51,3 +51,22 @@ final sizeLengthTextProvider = Provider<String>((ref) {
 /// The typed length in seconds, or null when the text isn't a length. The
 /// core gets this number; the text is display only.
 final sizeLengthSecProvider = Provider<int?>((ref) => VeFormat.parseLength(ref.watch(sizeLengthTextProvider)));
+
+/// Filters are a recipe setting; opening their disclosure is a shared UI
+/// preference only. Changing it must never dirty a preset or a VEGAS template.
+final videoFiltersExpandedProvider = NotifierProvider<VideoFiltersExpanded, bool>(VideoFiltersExpanded.new);
+
+class VideoFiltersExpanded extends Notifier<bool> {
+  @override
+  bool build() => ref.watch(machineSettingsProvider).value?.uiState?.videoFiltersExpanded ?? false;
+
+  Future<void> set(bool expanded) async {
+    state = expanded;
+    try {
+      await ref.read(uiStateWriterProvider).update((ui) => ui.copyWith(videoFiltersExpanded: expanded));
+    } on ServiceException {
+      // A lost UI preference does not invalidate the settings being edited.
+      // Keep the session's choice, and retry on the next explicit toggle.
+    }
+  }
+}

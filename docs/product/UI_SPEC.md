@@ -145,6 +145,40 @@ and authored once in the core catalog. Profile IDs, encoding and input precision
 are unchanged; format descriptions do not promise additional source color detail
 or alpha. Keyboard selection, modified state and Reset use the existing controls.
 
+### Filters (owner request, 2026-10-23)
+
+The shared Basic Video panel has a **Filters** disclosure, initially collapsed.
+It sits with Extra arguments under the panel's single divider, as a field-style
+row (chevron, **Filters** label, muted summary), not a section of its own.
+Its expansion preference is shared by desktop and popup and saved in C7 UI state,
+never in the recipe. The collapsed summary reads **None** when there is no enabled
+structured processing; disabled retained entries show their count. An enabled
+resize shows its canvas and algorithm. Expanded, the entries replace the summary;
+the row's accessible label always carries it. Collapsing never disables processing.
+
+Initially the ordered list supports one **Resize / Upscale** entry, shown as one
+bordered row: its switch and name, details indented beneath, Edit and Remove on
+the right. **Add filter**
+opens a menu; each entry has Enable/Disable, Edit and Remove. The editor keeps a
+local draft until Apply, with Cancel preserving settings. Reset / Same as input
+removes the entry. Common sizes are 1280×720, 1920×1080, 2560×1440 and UHD
+3840×2160; Custom accepts width/height. No DCI size is labelled UHD.
+
+The initial aspect policy is Fit with centered black padding. FFmpeg preserves
+the delivered display aspect ratio and produces square pixels, regardless of
+input dimensions/SAR. Bicubic is the default; Bilinear, Lanczos and Nearest
+neighbour are the other curated algorithms. Software scaling is independent of
+hardware encoding. Linked dimensions, Fill, Stretch and other filter types are
+deferred. The output is encoded after VEGAS supplies frames; this does not change
+the project render size or recover source detail.
+
+Show the configured target even when input size is unknown. Source/output size,
+scaling direction, rounding and padding use core facts only. Unknown source says
+**Set by VEGAS**; command-preview sample dimensions stay labelled as samples.
+When Extra arguments own a video filter, the summary reads **Set in Extra
+arguments**, the open section explains **Filters set in Extra arguments**, and it disables structured controls while retaining their values. Never merge chains
+implicitly. Advanced uses only the active command.
+
 ### Extra arguments
 
 - One field per stream, in a monospace font. It is the place for any option without a

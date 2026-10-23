@@ -1017,7 +1017,7 @@
     },
     {
       "vepreset": 1,
-      "revision": 1,
+      "revision": 2,
       "favorite": false,
       "pinned": false,
       "builtin": true,
@@ -1029,7 +1029,7 @@
         "known": false
       },
       "recipe": {
-        "schema": 1,
+        "schema": 2,
         "id": "h264-nvenc-720p-3500",
         "name": "H.264 720p 3500kbps (NVENC)",
         "notes": "NVENC H.264 targeting 3500 kbps video, plus AAC 160 kbps, in MP4. Fits the picture inside 1280x720 with padding, without stretching; retains project frame rate. Requires a working NVIDIA encoder.",
@@ -1057,7 +1057,18 @@
           "depth": 8,
           "gopSec": 2,
           "color": "bt709",
-          "extra": "-vf \"scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1\""
+          "extra": "",
+          "filters": [
+            {
+              "type": "resize",
+              "enabled": true,
+              "width": 1280,
+              "height": 720,
+              "backend": "scale",
+              "algorithm": "bicubic",
+              "fit": "pad"
+            }
+          ]
         },
         "audio": [
           {

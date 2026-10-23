@@ -33,6 +33,8 @@ abstract interface class FFmpegHelpParser {
   EncoderDetails parseEncoderHelp(String text);
   JsonMap parseEncoders(String text);
   JsonMap parseMuxers(String text);
+  JsonMap parseFilters(String text);
+  JsonMap parseFilterHelp(String text, String name);
 }
 
 abstract interface class HardwareTests {

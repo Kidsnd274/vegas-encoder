@@ -224,7 +224,11 @@ Future<void> main(List<String> args) async {
     final initialPresets = await library.list();
     check(
       initialPresets.length == 16 &&
-          initialPresets.every((p) => p.builtin && p.revision == 1),
+          initialPresets.every(
+            (p) =>
+                p.builtin &&
+                p.revision == (p.recipe.id == 'h264-nvenc-720p-3500' ? 2 : 1),
+          ),
       'packaged product built-ins',
     );
     final builtin = initialPresets.first;
@@ -932,6 +936,57 @@ Future<void> main(List<String> args) async {
     check(
       await lockedData.readAsString() == 'new',
       'write recovers after reader closes',
+    );
+    final resizeBuiltin = (await library.get('h264-nvenc-720p-3500'))!;
+    check(
+      resizeBuiltin.revision == 2 &&
+          resizeBuiltin.recipe.schema == 2 &&
+          resizeBuiltin.recipe.video.filters.single.width == 1280,
+      '720p bundled revision uses structured resize',
+    );
+    final resizeCopy = await transfers.duplicate(
+      resizeBuiltin.recipe.id,
+      newId: 'structured-resize-copy',
+      name: 'Structured resize copy',
+    );
+    final resizeExport = await library.exportPreset(resizeCopy.recipe.id);
+    final resizeImport = await library.importPreset(
+      resizeExport,
+      newId: 'structured-resize-import',
+    );
+    check(
+      resizeImport.recipe.schema == 2 &&
+          resizeImport.recipe.video.filters.single.height == 720 &&
+          resizeImport.requires.filters.join(',') == 'scale,pad,setsar',
+      'schema-2 export/import retains resize and core-derived requirements',
+    );
+    final restartedResize = await FilePresetLibrary(
+      core: core,
+      paths: paths,
+    ).get(resizeImport.recipe.id);
+    check(
+      restartedResize!.recipe.video.filters.single.algorithm == 'bicubic',
+      'structured resize persists through library restart',
+    );
+    final legacyMap = resizeCopy.recipe.toJson();
+    legacyMap['schema'] = 1;
+    final legacyVideo = jsonMap(legacyMap['video'])..remove('filters');
+    legacyVideo['extra'] =
+        '-vf "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1"';
+    legacyMap['video'] = legacyVideo;
+    legacyMap['id'] = 'legacy-resize-copy';
+    final legacySaved = await library.save(
+      resizeCopy.copyWith(
+        recipe: Recipe.fromJson(legacyMap),
+        revision: 1,
+        builtin: false,
+      ),
+    );
+    check(
+      legacySaved.recipe.schema == 1 &&
+          legacySaved.recipe.video.filters.isEmpty &&
+          legacySaved.recipe.video.extra == legacyVideo['extra'],
+      'existing handwritten resize recipes keep schema and exact Extra arguments',
     );
     final leftovers = await root
         .list(recursive: true, followLinks: false)

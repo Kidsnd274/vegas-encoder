@@ -91,7 +91,7 @@ class _VeDialog<T> extends StatelessWidget {
                         Text(message!, style: t.text.body.copyWith(color: c.text2)),
                       ],
                       if (content != null) ...[const SizedBox(height: 12), content!],
-                      const SizedBox(height: 18),
+                      if (actions.isNotEmpty) const SizedBox(height: 18),
                       // Long labels wrap to a second row, still right-aligned.
                       Wrap(
                         alignment: WrapAlignment.end,

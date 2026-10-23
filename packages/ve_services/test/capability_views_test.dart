@@ -14,7 +14,10 @@ Future<void> main(List<String> args) async {
   final core = NativeVeCore();
   final uncached = NativeVeCore(cacheCapabilities: false);
   final settings = await FileMachineSettingsRepository(paths: paths).read();
-  final cache = FileCapabilityCache(paths: paths, parserVersion: 2);
+  final cache = FileCapabilityCache(
+    paths: paths,
+    parserVersion: WindowsFFmpegHelpParser().version,
+  );
   final recipes = (await FilePresetLibrary(
     core: core,
     paths: paths,

@@ -75,7 +75,7 @@ Json Signal(const Json& r, const Json& media, const Json& res, const Json& caps)
     const auto container = Str(res,"container",Str(r.at("container"),"format"));
     if (Bool(res,"videoEnabled",Bool(r.at("video"),"enabled",true))) {
         signal["video"] = StreamFacts(Bool(res,"unknownInputSource") ? VideoFormat("") : sourceVideo,VideoFormat(Str(res,"pixfmt")),ContainerSupport("video",res.at("videoProfile"),container,caps));
-        if (Bool(res,"videoFilter")) signal["video"]["conversion"] = nullptr;
+        if (Bool(res,"videoFilter")) signal["video"]["conversion"] = Bool(res,"structuredResize") ? Json(true) : Json(nullptr);
     }
     if (audioInput && Bool(res,"audioEnabled",Bool(a,"enabled",true))) {
         const bool advanced = Str(r.at("command"),"mode") == "template";
@@ -136,7 +136,8 @@ Json Estimate(const Json& request) {
     if ((videoMode == "abr" || videoMode == "cbr") && res.contains("videoBitrateK") && Num(res,"videoBitrateK") <= 0) return result;
     const auto& v = r.at("video"); const auto& a = r.at("audio")[0]; const auto& p = base.at("videoProfile"); const auto& ap = base.at("audioProfile");
     const auto mode = Str(res,"videoMode"), amode = Str(res,"audioMode");
-    const double pixels = Num(media.at("video"),"width") * Num(media.at("video"),"height");
+    const auto geometry = compiled.value("videoGeometry",Json(nullptr));
+    const double pixels = geometry.is_object() && geometry.at("width").is_number() && geometry.at("height").is_number() ? Num(geometry,"width") * Num(geometry,"height") : Num(media.at("video"),"width") * Num(media.at("video"),"height");
     const auto& fpsRatio = media.at("video").at("fps"); const double fps = fpsRatio[0].get<double>() / fpsRatio[1].get<double>();
     double videoRate = 0, audioRate = 0; bool approximate = false;
     if (Bool(v,"enabled",true)) {

@@ -40,6 +40,12 @@ external int nativeCompile(
   int length,
   Pointer<NativeBuffer> result,
 );
+@Native<NativeSignature>(symbol: 've_snapshot_summary')
+external int nativeSnapshotSummary(
+  Pointer<Uint8> json,
+  int length,
+  Pointer<NativeBuffer> result,
+);
 @Native<NativeSignature>(symbol: 've_template_lint')
 external int nativeLint(
   Pointer<Uint8> json,
@@ -121,6 +127,7 @@ class NativeBindings {
         'normalize': nativeNormalize,
         'validate': nativeValidate,
         'compile': nativeCompile,
+        'snapshotSummary': nativeSnapshotSummary,
         'lint': nativeLint,
         'complete': nativeComplete,
         'estimate': nativeEstimate,
@@ -153,6 +160,7 @@ class NativeBindings {
           'normalize': 've_recipe_normalize',
           'validate': 've_recipe_validate',
           'compile': 've_compile',
+          'snapshotSummary': 've_snapshot_summary',
           'lint': 've_template_lint',
           'complete': 've_template_complete',
           'estimate': 've_estimate',

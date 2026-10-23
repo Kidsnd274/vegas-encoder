@@ -105,7 +105,11 @@ int wmain(int argc, wchar_t** argv) {
       }
       if (presetId == "h264-nvenc-720p-3500") {
         Check(hasOption("-c:v","h264_nvenc") && hasOption("-rc","vbr") && hasOption("-b:v","3500k"),"720p NVENC uses 3500 kbps video target");
-        Check(hasOption("-vf","scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1"),"720p fit and padding survive Basic Extra tokenization");
+        Check(snapshot.at("recipe").at("schema") == 2 && snapshot.at("recipe").at("video").at("filters")[0].at("width") == 1280 &&
+              snapshot.at("recipe").at("video").at("filters")[0].at("height") == 720 && ve::Str(snapshot.at("recipe").at("video"),"extra").empty(),
+              "720p starter uses schema-2 structured fit with retained dimensions");
+        Check(compiled.contains("videoGeometry") && compiled.at("videoGeometry").at("width") == 1280 && compiled.at("videoGeometry").at("height") == 720,
+              "720p fit has separate encoded geometry");
         Check(hasOption("-c:a","aac") && hasOption("-b:a","160k"),"720p audio bitrate is additional to video");
       }
       GUID expected{};

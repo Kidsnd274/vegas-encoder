@@ -28,6 +28,8 @@ HRESULT CreateNativeRecipePage(sfio::ISfHostAllocator* allocator,
 
 inline constexpr int kEditRecipeControl = 101;
 inline constexpr int kRecipeStatusControl = 102;
+inline constexpr int kRecipeSummaryControl = 103;
+inline constexpr int kRecipeSummaryLabelControl = 104;
 
 // Internal UI-thread return policy. Restore an iconic host only when returning
 // from its foreground editor; background completion must not steal activation.

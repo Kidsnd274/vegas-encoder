@@ -72,6 +72,17 @@ void PureChecks() {
   Json expected = Json::array({{{"kind","video"},{"codec","ffv1"}},{{"kind","audio"},{"codec","pcm_f32le"}}});
   Json probe{{"streams",Json::array({{{"codec_type","video"},{"codec_name","ffv1"},{"width",320},{"height",180},{"nb_read_frames","60"}},{{"codec_type","audio"},{"codec_name","pcm_f32le"}}})}};
   Require(VerifyProbe(probe,expected)["state"] == "passed","probe matches core facts");
+  auto sized = expected;
+  sized[0]["width"] = 1280; sized[0]["height"] = 720; sized[0]["sar"] = "1:1";
+  auto resized = probe;
+  resized["streams"][0]["width"] = 1280; resized["streams"][0]["height"] = 720;
+  resized["streams"][0]["sample_aspect_ratio"] = "1:1";
+  Require(VerifyProbe(resized,sized)["state"] == "passed","resized video checks encoded geometry rather than input size");
+  Require(VerifyProbe(probe,sized)["state"] == "failed","unresized output refuses resized expected geometry");
+  resized["streams"][0]["sample_aspect_ratio"] = "4:3";
+  Require(VerifyProbe(resized,sized)["state"] == "failed","wrong output sample aspect ratio refuses publication");
+  sized[0]["width"] = nullptr; sized[0]["height"] = nullptr; sized[0]["sar"] = nullptr;
+  Require(VerifyProbe(resized,sized)["state"] == "passed","unknown geometry remains unchecked for handwritten commands");
   auto containerProbe = probe; containerProbe["format"] = {{"format_name","mov,mp4,m4a,3gp,3g2,mj2"}};
   for (const auto* id : {"mp4","mov"}) Require(VerifyProbe(containerProbe,expected,id)["state"] == "passed","shared MOV/MP4 demuxer family accepted explicitly as family evidence");
   Require(VerifyProbe(containerProbe,expected,"mkv")["state"] == "failed","wrong container family refuses publication");
@@ -196,6 +207,9 @@ void LiveFactChecks(const Json& fixtures) {
 struct Case {
   std::string name;
   Json recipe, installation;
+  Json capabilities = nullptr;
+  std::string sar = "1:1";
+  int outputWidth = 0, outputHeight = 0;
   int width = 320,height = 180,frames = 60;
   EncodeRate rate{30000,1001};
   LONGLONG cancelAt = -1; int failureSlot = 0;
@@ -215,7 +229,7 @@ Json Run(const Case& test, const std::wstring& root) {
   options.finishTimeoutMs = instrumented ? 30000 : 5000;
   std::filesystem::create_directories(options.jobsRoot);
   if (test.invalidRoot) { options.jobsRoot = path + L"\\root-is-file"; std::ofstream file(std::filesystem::path(options.jobsRoot)); file << "blocked"; }
-  Json media{{"video",{{"width",test.width},{"height",test.height},{"fps",Json::array({test.rate.num,test.rate.den})},{"pixfmt","p010le"},{"sar","1:1"},{"frames",test.frames}}},
+  Json media{{"video",{{"width",test.width},{"height",test.height},{"fps",Json::array({test.rate.num,test.rate.den})},{"pixfmt","p010le"},{"sar",test.sar},{"frames",test.frames}}},
     {"audio",{{"rate",48000},{"channels",2},{"sampleFmt","f32le"}}},{"durationSec",double(test.frames)*test.rate.den/test.rate.num}};
   const bool withAudio = test.recipe["audio"][0]["enabled"].get<bool>();
   if (!withAudio) media["audio"] = nullptr;
@@ -266,7 +280,7 @@ Json Run(const Case& test, const std::wstring& root) {
       for (int row = 0; row < test.height/2; ++row) memcpy(frame.data()+size_t(test.width)*test.height*2+size_t(row)*test.width*2,source+planes[1]+size_t(row)*planes[2],size_t(test.width)*2);
       Require(SUCCEEDED(lease.Release()) && held == 0,"release copied host frame before Start/Submit");
       if (position == 0) {
-        if (!job.Start(test.recipe,media,test.installation,nullptr,nullptr,options,poll)) return job.Error();
+        if (!job.Start(test.recipe,media,test.installation,test.capabilities,nullptr,options,poll)) return job.Error();
         if (test.blockedLive) {
           const auto live = options.jobsRoot+L"\\"+Widen(job.Id())+L".live.json";
           const auto until = GetTickCount64()+1000;
@@ -319,6 +333,13 @@ Json Run(const Case& test, const std::wstring& root) {
     Require(stats.published && stats.exitCode == 0 && job.Record()["sizeBytes"] > 0,"success means exit/output publication");
     Require(!withAudio || samples == endpoint,"cumulative fractional samples exact");
     Require(stats.videoBytes == uint64_t(test.frames)*test.width*test.height*3 && stats.audioBytes == uint64_t(samples)*8,"every owned frame/sample byte reaches input EOF");
+    if (test.outputWidth > 0) {
+      const auto& expected = job.Compiled().at("expectedStreams").at(0);
+      Require(expected.at("width") == test.outputWidth && expected.at("height") == test.outputHeight && expected.at("sar") == "1:1",
+              "resize core facts describe encoded geometry independently of raw pipe dimensions");
+      Require(job.Record().at("verification").at("state") == "passed",
+              "real FFprobe accepts resized output geometry and square pixels through RecipeJob publication");
+    }
     if (test.name == "probe-sampled")
       Require(job.Record()["verification"]["state"] == "passed" &&
               job.Record()["verification"]["ffprobeVersion"] == "B4 bounded sample fixture","actual probe child accepted bounded readback args and one decoded frame");
@@ -328,6 +349,9 @@ Json Run(const Case& test, const std::wstring& root) {
     if (test.failureSlot) Require(job.Record()["status"] == "failed" && job.Error() == E_ACCESSDENIED,"host failure HRESULT preserved");
     if (test.collision) { std::ifstream file(std::filesystem::path(options.output)); std::string text; file>>text; Require(text=="sentinel","destination created during render preserved"); }
     if (test.name == "child-exit") Require(!job.Record()["errorTokenIndices"].empty(),"native runtime error provenance recorded");
+    if (test.name == "resize-unverified")
+      Require(job.Reason().find("Refresh") != std::string::npos && stats.videoBytes == 0 && stats.audioBytes == 0,
+              "unverified filter capability cache refuses actual rendering before pipe payloads are sent");
     if (test.name == "probe-mismatch" || test.name == "probe-malformed" || test.name == "probe-limit" || test.name == "probe-timeout")
       Require(!job.Record()["retainedPartialPath"].is_null(),"failed verification retains explicit unique partial");
   }
@@ -348,6 +372,17 @@ Json Run(const Case& test, const std::wstring& root) {
     {"videoBytes",stats.videoBytes},{"audioBytes",stats.audioBytes},{"samples",samples},{"rate",Json::array({test.rate.num,test.rate.den})}};
   Save(path+L"\\summary.json",summary); printf("PASS %s: %llu ms, video queue %llu, audio queue %llu\n",test.name.c_str(),duration,stats.videoHighWater,stats.audioHighWater);
   return summary;
+}
+Json ResizeCapabilities() {
+  // Authored capability fixture for this engine integration test. The actual
+  // supplied FFmpeg must still execute the chain and pass output readback.
+  return {{"encoders", {{"ffv1", {{"availability", {{"state", "ok"}}}, {"options", Json::array()}}},
+                         {"pcm_f32le", {{"availability", {{"state", "ok"}}}, {"options", Json::array()}}}}},
+          {"muxers", {{"matroska", Json::object()}}},
+          {"filters", {{"scale", {{"available", true}, {"algorithms", Json::array({"bicubic", "bilinear", "lanczos", "neighbor"})},
+                                   {"options", Json::array({{{"name", "w"}}, {{"name", "h"}}, {{"name", "flags"}}})}}},
+                        {"pad", {{"available", true}, {"options", Json::array({{{"name", "width"}}, {{"name", "height"}}, {{"name", "x"}}, {{"name", "y"}}, {{"name", "color"}}})}}},
+                        {"setsar", {{"available", true}, {"options", Json::array({{{"name", "sar"}}})}}}}}};
 }
 int Child(int argc, wchar_t** argv) {
   std::wstring mode, output; std::vector<std::wstring> inputs;
@@ -413,6 +448,21 @@ int wmain(int argc, wchar_t** argv) {
       test.name="video-only"+suffix; test.recipe=base; test.recipe["audio"][0]["enabled"]=false; summaries.push_back(Run(test,root));
       test.name="advanced"+suffix; test.recipe=base; test.recipe["command"]={{"mode","template"},{"template","{inputs} -map 0:v:0 -map 1:a:0 -c:v ffv1 -pix_fmt yuv420p10le -c:a pcm_f32le -f matroska {output}"}};
       summaries.push_back(Run(test,root));
+    }
+    {
+      Case resized; resized.recipe = base; resized.recipe["schema"] = 2;
+      resized.recipe["video"]["filters"] = Json::array({{{"type", "resize"}, {"enabled", true}, {"width", 640}, {"height", 360},
+        {"backend", "scale"}, {"algorithm", "lanczos"}, {"fit", "pad"}}});
+      resized.installation = Installation(argv[firstBuild]); resized.capabilities = ResizeCapabilities();
+      resized.width = 180; resized.height = 320; resized.outputWidth = 640; resized.outputHeight = 360;
+      resized.name = "resize-portrait"; summaries.push_back(Run(resized, root));
+      resized.width = 320; resized.height = 240; resized.sar = "4:3";
+      resized.name = "resize-anamorphic"; summaries.push_back(Run(resized, root));
+      resized.name = "resize-unverified"; resized.capabilities = nullptr; resized.success = false;
+      summaries.push_back(Run(resized, root));
+      resized.name = "resize-disabled"; resized.success = true; resized.width = 320; resized.height = 180; resized.sar = "1:1";
+      resized.outputWidth = resized.outputHeight = 0; resized.recipe["video"]["filters"][0]["enabled"] = false;
+      summaries.push_back(Run(resized, root));
     }
     Case test; test.recipe=base; test.installation=Installation(argv[firstBuild]);
     test.name="cancel-mid"; test.cancelAt=15; test.success=false; summaries.push_back(Run(test,root));

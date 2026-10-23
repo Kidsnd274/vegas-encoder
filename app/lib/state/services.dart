@@ -161,7 +161,8 @@ final class WindowsAppServices implements AppServices {
 /// `VEGAS_ENCODER_DATA_ROOT=<folder>` keeps settings, library, cache and jobs
 /// under `<folder>\Roaming` and `<folder>\Local` instead of the user's
 /// `%APPDATA%` and `%LOCALAPPDATA%`. For development, spikes and fake-host
-/// runs only; the VEGAS exporter doesn't read it.
+/// runs only. The VEGAS exporter reads the same variable (`Root` in
+/// `src/vegas/adapter/recipe_runtime.cpp`), so VEGAS must see it too.
 ServicePaths? dataRootOverride() {
   final root = Platform.environment['VEGAS_ENCODER_DATA_ROOT'];
   if (root == null || root.trim().isEmpty) return null;
