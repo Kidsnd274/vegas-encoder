@@ -125,9 +125,25 @@ Uninstall from Windows removes the app and every recorded core, because a core
 cannot work without the app. It checks running programs first, saves another
 rollback transaction, removes setup's own file names from each recorded VEGAS
 folder, then lets Inno remove its registered app files. Unknown files are kept.
-User settings, libraries, jobs, caches, VEGAS templates and user-supplied FFmpeg
-are kept. To remove a single integration, run setup again and untick it under
-Modify, or delete its DLL by hand.
+To remove a single integration, run setup again and untick it under Modify, or
+delete its DLL by hand.
+
+After Windows' "Are you sure?" prompt, a dialog asks whether to also remove the
+user's data. Both tickboxes start unticked, and closing the dialog keeps everything:
+
+- **Settings, caches, render logs and setup backups.** This also deletes the
+  rollback backups, so that uninstall can no longer be undone with `restore`; a
+  pending backup is kept.
+- **Preset library (N presets).**
+
+The helper deletes the ticked data after the uninstall has committed. It works
+only for the Windows account running the uninstaller, never enters a junction or
+symbolic link, and refuses a data root that is one. Anything it cannot delete is
+reported and left in place. Silent uninstalls keep all data unless given
+`/REMOVEDATA` (the first tickbox) and/or `/REMOVEPRESETS` (the second). VEGAS
+templates, render outputs, exported presets and the user's FFmpeg are never
+removed. [USER_DATA.md](USER_DATA.md) lists every data location and exactly what
+each choice deletes.
 
 ## How setup tracks installations
 
@@ -287,7 +303,10 @@ rollback folders as installer cleanup.
 under `build/test-results`; its fake app/DLL/host bytes are never loaded. It
 covers install, update, repair-style replacement, moving and removing cores,
 pre-catalog migration, detection rows and version relations, downgrade refusal,
-running programs, rollback/restore and uninstall. The production helper has no
+running programs, rollback/restore, uninstall and optional data removal (settings
+only, presets only, both, a junction inside the data, a junction as the data root
+and a pending backup). The uninstall data dialog itself is not exercised by any
+harness; it needs the real uninstall trial. The production helper has no
 test-root, version-bypass or failure-injection switch. Junction creation requires
 running the test outside a restricted sandbox.
 
@@ -295,7 +314,10 @@ running the test outside a restricted sandbox.
 harness using the actual helper, hosts and wizard scripts and the production
 helper's read-only detection. It builds the integrations page from real detection
 and the update and maintenance variants of the wizard, then aborts in
-`InitializeWizard`, before any install lifecycle or file deployment.
+`InitializeWizard`, before any install lifecycle or file deployment. A second
+fixture with no files, no app folder and a hidden `cmd /c exit 0` run entry shows
+the real Finished page, checks that the ticked "Launch Vegas Encoder" checkbox is
+visible below the restart note, unticks it and closes itself.
 
 Compiler checks, the harness and helper fixtures do not qualify real Inno install/
 update/uninstall behavior, page layout at different DPI settings, or the real

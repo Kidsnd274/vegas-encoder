@@ -86,6 +86,81 @@ end;
     if not marker.exists() or marker.read_text(encoding='ascii') != 'PASS':
         raise SystemExit(f'Wizard initialization failed (exit {result.returncode}); see {fixture / "setup.log"}')
     print('Wizard initialization PASS: actual scripts, read-only host detection; no installation.')
+    finished_page(args, fixture)
+
+
+EVENTS = ('function InitializeSetup', 'procedure InitializeWizard', 'function ShouldSkipPage', 'function NextButtonClick',
+          'procedure CancelButtonClick', 'function UpdateReadyMemo', 'procedure CurPageChanged', 'procedure RegisterPreviousData')
+
+
+def finished_page(args, fixture):
+    """Show the real Finished page from a setup with no files and no app folder.
+
+    The fixture's only [Run] entry is a hidden `cmd /c exit 0`. The script clicks through
+    the Ready page, records the label and launch-checkbox layout, unticks the checkbox and
+    closes the wizard itself. A stuck window is closed when the run times out.
+    """
+    wizard = (REPO / 'setup/includes/wizard.iss').read_text(encoding='utf-8')
+    for event in EVENTS:
+        kind, name = event.split()
+        wizard = wizard.replace(f'{event}', f'{kind} Product{name}')
+    (fixture / 'finished-wizard.iss').write_text(wizard, encoding='utf-8-sig')
+    marker = fixture / 'finished.txt'
+    script = fr'''#include "{REPO / 'setup/version.generated.iss'}"
+#define VeAppId "{{0CF24E60-C0F5-4242-96AD-13FF2F9BF313}}"
+[Setup]
+AppName=Vegas Encoder finished-page fixture
+AppVersion=0
+PrivilegesRequired=lowest
+CreateAppDir=no
+Uninstallable=no
+DisableWelcomePage=yes
+DisableReadyPage=yes
+WizardStyle=modern dynamic polar
+OutputDir={fixture}
+OutputBaseFilename=finished-test
+[Run]
+Filename: "{{cmd}}"; Parameters: "/c exit 0"; Description: "Launch Vegas Encoder"; Flags: postinstall nowait runhidden
+[Code]
+#include "{REPO / 'setup/includes/helper.iss'}"
+#include "{REPO / 'setup/includes/hosts.iss'}"
+#include "finished-wizard.iss"
+procedure CurPageChanged(CurPageID: Integer);
+var
+  Before: Integer;
+begin
+  (* Inno still shows the Ready page when it would be the only page; click Install. *)
+  if CurPageID = wpReady then PostMessage(WizardForm.NextButton.Handle, $00F5, 0, 0);
+  if CurPageID <> wpFinished then Exit;
+  HostCount := 1;
+  SetArrayLength(HostLabel, 1); SetArrayLength(HostWanted, 1);
+  HostLabel[0] := 'VEGAS Pro 2026'; HostWanted[0] := True;
+  Before := WizardForm.RunList.Top;
+  ProductCurPageChanged(wpFinished);
+  SaveStringToFile('{marker}', Format('%d %d %d %d %d', [Before,
+    WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height, WizardForm.RunList.Top,
+    Ord(WizardForm.RunList.Visible), Ord(WizardForm.RunList.Checked[0])]), False);
+  WizardForm.RunList.Checked[0] := False;
+  PostMessage(WizardForm.NextButton.Handle, $00F5, 0, 0);
+end;
+'''
+    source = fixture / 'finished-test.iss'
+    source.write_text(script, encoding='utf-8-sig')
+    subprocess.run([args.iscc, '/Q', str(source)], check=True, timeout=60)
+    try:
+        result = subprocess.run([str(fixture / 'finished-test.exe'), f'/LOG={fixture / "finished.log"}'], timeout=60)
+    except subprocess.TimeoutExpired:
+        # Inno runs the wizard in a copied finished-test.tmp; close only that fixture.
+        subprocess.run(['taskkill', '/F', '/IM', 'finished-test.tmp'], capture_output=True)
+        raise SystemExit(f'Finished-page fixture did not close itself; see {fixture / "finished.log"}')
+    if not marker.exists():
+        raise SystemExit(f'Finished page did not run (exit {result.returncode}); see {fixture / "finished.log"}')
+    before, label_bottom, top, visible, checked = map(int, marker.read_text(encoding='ascii').split())
+    if not (visible and checked and top >= label_bottom):
+        raise SystemExit(f'Launch checkbox hidden, unticked or covered: label ends {label_bottom}, checkbox at {top} '
+                         f'(Inno placed it at {before}), visible {visible}, ticked {checked}')
+    print(f'Finished page PASS: launch checkbox visible and ticked below the text (label ends {label_bottom}, '
+          f'checkbox at {top}; Inno placed it at {before}).')
 
 
 if __name__ == '__main__':

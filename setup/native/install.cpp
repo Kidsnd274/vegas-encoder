@@ -470,6 +470,45 @@ static void uninstall(const fs::path& folder) {
   fs::remove(recordPath(t["registrations"].at(0)));
   fs::remove(appManifest(app));
 }
+// Deletes a tree without following junctions or symbolic links: a reparse point is
+// removed itself and never entered, so nothing outside the named folder is touched.
+static void erase(const fs::path& p) {
+  DWORD attr = GetFileAttributesW(p.c_str()); if (attr == INVALID_FILE_ATTRIBUTES) return;
+  if (attr & FILE_ATTRIBUTE_READONLY) SetFileAttributesW(p.c_str(), attr & ~FILE_ATTRIBUTE_READONLY);
+  bool folder = (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
+  if (folder && !(attr & FILE_ATTRIBUTE_REPARSE_POINT)) {
+    std::vector<fs::path> children; for (const auto& e : fs::directory_iterator(p)) children.push_back(e.path());
+    for (auto& c : children) erase(c);
+  }
+  need((folder ? RemoveDirectoryW(p.c_str()) : DeleteFileW(p.c_str())) != 0, "Cannot remove " + utf(p));
+}
+// Uninstall's optional data removal for the current Windows account. Settings covers
+// everything in the roaming folder except the preset library, the local folder, the
+// exporter logs and finished setup backups. A pending transaction is kept for recovery.
+static void removeData(const fs::path& request) {
+  bool settings = ini(request, L"settings") == L"1", library = ini(request, L"library") == L"1";
+  auto roaming = plain(fs::path(ini(request, L"appdata")) / "VegasEncoder");
+  auto local = plain(fs::path(ini(request, L"localappdata")) / "VegasEncoder"), logs = plain(fs::path(ini(request, L"localappdata")) / "vegas-encoder");
+  std::vector<std::wstring> failed;
+  auto attempt = [&](const fs::path& p) { try { erase(p); } catch (const std::exception&) { failed.push_back(p.wstring()); } };
+  if (library) attempt(roaming / "library");
+  if (settings) {
+    if (fs::is_directory(roaming)) for (const auto& e : fs::directory_iterator(roaming)) if (lower(e.path().filename().wstring()) != L"library") attempt(e.path());
+    attempt(local); attempt(logs);
+    auto backups = rootData();
+    if (fs::is_directory(backups)) {
+      for (const auto& e : fs::directory_iterator(backups)) {
+        auto journal = e.path() / "transaction.json";
+        bool pending = false; try { pending = fs::exists(journal) && json(journal).value("status", "") == "pending"; } catch (...) { pending = true; }
+        if (!pending) attempt(e.path());
+      }
+      for (auto dir : {backups, catalogRoot(), backups.parent_path()})
+        if (fs::is_directory(dir) && fs::is_empty(dir) && (dir != backups.parent_path() || dir.filename() == "VegasEncoder")) attempt(dir);
+    }
+  }
+  if (fs::is_directory(roaming) && fs::is_empty(roaming)) attempt(roaming);
+  need(failed.empty(), "Some data could not be removed; close any program using it and delete it by hand: " + utf(fs::path(joined(failed))));
+}
 // Read-only. Lists every VEGAS family found (one folder each, recorded folders first) and the installed app.
 static void inspect(const fs::path& request, const fs::path& output) {
   J records = J::array(); bool readable = true;
@@ -581,6 +620,7 @@ int wmain(int argc, wchar_t** argv) {
     else if (op == L"uninstall-check") uninstallCheck(plain(ini(request, L"app")));
     else if (op == L"uninstall-prepare") { auto folder = prepare(plain(ini(request, L"app")), {}, {}, true); put(result, L"transaction", folder.wstring()); }
     else if (op == L"uninstall") uninstall(plain(ini(request, L"transaction")));
+    else if (op == L"remove-data") removeData(request);
     else if (op == L"finish-removal") {
       auto folder = plain(ini(request, L"transaction")); auto t = transaction(folder); need(t["status"] == "pending", "Removal transaction is not pending.");
       for (auto& f : t["files"]) { auto p = fs::u8path(f["path"].get<std::string>()); f["new"] = fs::exists(p) ? J(hash(p)) : J(); }

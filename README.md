@@ -136,6 +136,11 @@ VEGAS version you integrate with are kept under
 to find and update every integration together. See the
 [installer guide](docs/INSTALLER.md#how-setup-tracks-installations) for details.
 
+Uninstalling from Windows removes the app and the exporter from every VEGAS
+version. Your settings and presets are kept unless you tick them in the
+uninstall dialog. [Where Vegas Encoder keeps data](docs/USER_DATA.md) lists every
+location.
+
 To build or contribute to the project, see [For developers](#for-developers) below.
 
 ## Quick start

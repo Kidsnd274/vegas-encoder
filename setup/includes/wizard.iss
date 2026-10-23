@@ -119,8 +119,13 @@ begin
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
+var
+  Gap: Integer;
 begin
   if CurPageID = wpFinished then begin
+    { Inno has already placed the ticked "Launch Vegas Encoder" checkbox under the
+      label. Keep the same gap after the label grows, or the text covers it. }
+    Gap := WizardForm.RunList.Top - (WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height);
     if AnyWanted then
       WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
         'Restart ' + WantedLabels + ' to load the exporter.'
@@ -128,6 +133,7 @@ begin
       WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
         'No VEGAS integration is installed. Run setup again to add one.';
     WizardForm.AdjustLabelHeight(WizardForm.FinishedLabel);
+    WizardForm.RunList.Top := WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height + Gap;
   end;
 end;
 

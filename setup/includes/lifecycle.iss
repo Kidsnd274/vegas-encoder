@@ -74,6 +74,124 @@ begin
   end;
 end;
 
+var
+  RemoveSettings, RemoveLibrary: Boolean;
+
+function CommandLineFlag(const Name: String): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), Name) = 0 then Result := True;
+end;
+
+function PresetCount: Integer;
+var
+  Found: TFindRec;
+begin
+  Result := 0;
+  if FindFirst(ExpandConstant('{userappdata}\VegasEncoder\library\*.vepreset'), Found) then
+    try
+      repeat Result := Result + 1; until not FindNext(Found);
+    finally
+      FindClose(Found);
+    end;
+end;
+
+function AddText(const Form: TSetupForm; const Top: Integer; const Caption: String): TNewStaticText;
+begin
+  Result := TNewStaticText.Create(Form);
+  Result.Parent := Form;
+  Result.Left := ScaleX(16);
+  Result.Top := Top;
+  Result.Width := Form.ClientWidth - ScaleX(32);
+  Result.WordWrap := True;
+  Result.Caption := Caption;
+  Result.AdjustHeight;
+end;
+
+function AddChoice(const Form: TSetupForm; const Top: Integer; const Caption: String; const Checked: Boolean): TNewCheckBox;
+begin
+  Result := TNewCheckBox.Create(Form);
+  Result.Parent := Form;
+  Result.Left := ScaleX(16);
+  Result.Top := Top;
+  Result.Width := Form.ClientWidth - ScaleX(32);
+  Result.Height := ScaleY(20);
+  Result.Caption := Caption;
+  Result.Checked := Checked;
+end;
+
+{ Data stays by default. Silent uninstalls remove it only with /REMOVEDATA
+  (settings, caches, logs, setup backups) and /REMOVEPRESETS (preset library). }
+procedure AskAboutUserData;
+var
+  Form: TSetupForm;
+  Title, Note: TNewStaticText;
+  SettingsBox, LibraryBox: TNewCheckBox;
+  ContinueButton: TNewButton;
+  Count: Integer;
+begin
+  RemoveSettings := CommandLineFlag('/REMOVEDATA');
+  RemoveLibrary := CommandLineFlag('/REMOVEPRESETS');
+  if UninstallSilent then Exit;
+  Count := PresetCount;
+  Form := CreateCustomForm(ScaleX(440), ScaleY(240), False, False);
+  try
+    Form.Caption := 'Uninstall Vegas Encoder';
+    Title := AddText(Form, ScaleY(16), 'Also remove your Vegas Encoder data?');
+    Title.Font.Style := [fsBold];
+    Title.AdjustHeight;
+    Note := AddText(Form, Title.Top + Title.Height + ScaleY(8),
+      'Your data is kept unless you tick it here, so reinstalling picks up where you left off. ' +
+      'Ticked items are deleted for this Windows account and can''t be restored.');
+    SettingsBox := AddChoice(Form, Note.Top + Note.Height + ScaleY(14),
+      'Settings, caches, render logs and setup backups', RemoveSettings);
+    LibraryBox := AddChoice(Form, SettingsBox.Top + SettingsBox.Height + ScaleY(6),
+      'Preset library (' + IntToStr(Count) + ' presets)', RemoveLibrary);
+    ContinueButton := TNewButton.Create(Form);
+    ContinueButton.Parent := Form;
+    ContinueButton.Caption := 'Continue';
+    ContinueButton.Width := Form.CalculateButtonWidth([ContinueButton.Caption]);
+    ContinueButton.Height := ScaleY(23);
+    ContinueButton.Left := Form.ClientWidth - ContinueButton.Width - ScaleX(16);
+    ContinueButton.Top := LibraryBox.Top + LibraryBox.Height + ScaleY(18);
+    ContinueButton.ModalResult := mrOk;
+    ContinueButton.Default := True;
+    Form.ClientHeight := ContinueButton.Top + ContinueButton.Height + ScaleY(16);
+    Form.ActiveControl := ContinueButton;
+    { Closing the window keeps everything. }
+    if Form.ShowModal = mrOk then begin
+      RemoveSettings := SettingsBox.Checked;
+      RemoveLibrary := LibraryBox.Checked;
+    end else begin
+      RemoveSettings := False;
+      RemoveLibrary := False;
+    end;
+  finally
+    Form.Free;
+  end;
+end;
+
+procedure RemoveUserData;
+var
+  Flag: String;
+begin
+  if not RemoveSettings and not RemoveLibrary then Exit;
+  InitRequest;
+  SetIniString('setup', 'appdata', ExpandConstant('{userappdata}'), RequestFile);
+  SetIniString('setup', 'localappdata', ExpandConstant('{localappdata}'), RequestFile);
+  if RemoveSettings then Flag := '1' else Flag := '0';
+  SetIniString('setup', 'settings', Flag, RequestFile);
+  if RemoveLibrary then Flag := '1' else Flag := '0';
+  SetIniString('setup', 'library', Flag, RequestFile);
+  { Vegas Encoder is already uninstalled here; a leftover folder is only reported. }
+  if not Helper('remove-data') then
+    SuppressibleMsgBox('Vegas Encoder was uninstalled, but some of your data was not removed.' + #13#10#13#10 +
+      GetIniString('setup', 'message', 'The setup helper could not complete.', ResultFile), mbInformation, MB_OK, IDOK);
+end;
+
 function InitializeUninstall: Boolean;
 begin
   HelperExe := ExpandConstant('{tmp}\ve-install.exe');
@@ -90,6 +208,7 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then begin
+    AskAboutUserData;
     InitAppRequest;
     if not Helper('uninstall-prepare') then RaiseException(HelperError);
     TransactionDir := GetIniString('setup', 'transaction', '', ResultFile);
@@ -100,6 +219,7 @@ begin
     InitAppRequest;
     if not Helper('finish-removal') then RaiseException(HelperError);
     RemovalCommitted := True;
+    RemoveUserData;
   end;
 end;
 

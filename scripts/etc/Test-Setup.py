@@ -474,6 +474,81 @@ class SetupTests(unittest.TestCase):
         self.install(targets=[])
         self.assertEqual([r['componentId'] for r in self.records().values()], [APP])
 
+    def junction(self, link, target):
+        env = dict(os.environ, VE_SETUP_TEST_LINK=str(link), VE_SETUP_TEST_TARGET=str(target))
+        subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+                        'New-Item -ItemType Junction -Path $env:VE_SETUP_TEST_LINK -Target $env:VE_SETUP_TEST_TARGET | Out-Null'],
+                       env=env, check=True, capture_output=True)
+
+    def user_data(self):
+        """Fake per-user data in the layout the app and exporter use, plus a junction to protected bytes."""
+        appdata, local = self.root / 'Roaming', self.root / 'Local'
+        files = ['VegasEncoder/machine.json', 'VegasEncoder/machine.json.lock', 'VegasEncoder/library/a.vepreset',
+                 'VegasEncoder/library/.history/a/1.json', 'VegasEncoder/library/preferences.json']
+        for name in files:
+            (appdata / name).parent.mkdir(parents=True, exist_ok=True)
+            (appdata / name).write_text('user data')
+        for name in ['VegasEncoder/cache/ffmpeg.json', 'VegasEncoder/jobs/jobs.jsonl', 'VegasEncoder/sessions/s/request.json', 'vegas-encoder/exporter.log']:
+            (local / name).parent.mkdir(parents=True, exist_ok=True)
+            (local / name).write_text('user data')
+        outside = self.root / 'Not ours'
+        outside.mkdir()
+        (outside / 'keep.txt').write_text('keep')
+        self.junction(local / 'VegasEncoder/cache/link', outside)
+        return appdata, local, outside
+
+    def remove_data(self, appdata, local, settings, library, success=True):
+        return self.call('remove-data', success=success, targets=[], appdata=str(appdata), localappdata=str(local),
+                         settings=int(settings), library=int(library))
+
+    def test_remove_settings_keeps_presets(self):
+        self.install()
+        appdata, local, outside = self.user_data()
+        self.remove_data(appdata, local, True, False)
+        self.assertEqual(sorted(p.name for p in (appdata / 'VegasEncoder').iterdir()), ['library'])
+        self.assertTrue((appdata / 'VegasEncoder/library/a.vepreset').is_file())
+        self.assertFalse((local / 'VegasEncoder').exists())
+        self.assertFalse((local / 'vegas-encoder').exists())
+        self.assertEqual((outside / 'keep.txt').read_text(), 'keep')
+        self.assertFalse(Path(self.transaction).exists())
+        self.assertEqual(len(self.records()), 2)
+
+    def test_remove_presets_only(self):
+        appdata, local, _ = self.user_data()
+        self.remove_data(appdata, local, False, True)
+        self.assertFalse((appdata / 'VegasEncoder/library').exists())
+        self.assertTrue((appdata / 'VegasEncoder/machine.json').is_file())
+        self.assertTrue((local / 'VegasEncoder/jobs/jobs.jsonl').is_file())
+
+    def test_remove_everything_after_uninstall(self):
+        self.install()
+        appdata, local, outside = self.user_data()
+        self.transaction = self.call('uninstall-prepare')['transaction']
+        self.call('uninstall')
+        for name in self.files:
+            (self.app / name).unlink()
+        self.call('finish-removal')
+        self.remove_data(appdata, local, True, True)
+        for path in (appdata / 'VegasEncoder', local / 'VegasEncoder', local / 'vegas-encoder', self.root / 'transactions', self.root / 'Installations'):
+            self.assertFalse(path.exists(), path)
+        self.assertEqual((outside / 'keep.txt').read_text(), 'keep')
+        self.assertTrue(self.root.is_dir())
+
+    def test_remove_data_keeps_pending_setup_backup(self):
+        self.prepare()
+        appdata, local, _ = self.user_data()
+        self.remove_data(appdata, local, True, False)
+        self.assertTrue((Path(self.transaction) / 'transaction.json').is_file())
+        self.call('rollback')
+
+    def test_remove_data_refuses_junction_root(self):
+        appdata, local, outside = self.user_data()
+        moved = self.root / 'Roaming elsewhere'
+        moved.mkdir()
+        self.junction(moved / 'VegasEncoder', outside)
+        self.remove_data(moved, local, True, True, success=False)
+        self.assertEqual((outside / 'keep.txt').read_text(), 'keep')
+
     def test_inno_uninstaller_ancestor_does_not_block_removal(self):
         self.install()
         parent = self.app / 'unins000.exe'
