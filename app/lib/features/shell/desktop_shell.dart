@@ -17,6 +17,7 @@ import '../../state/desktop_interaction.dart';
 import '../../state/desktop_routes.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
+import '../../state/setup_wizard.dart';
 import '../../state/ui_state.dart';
 import '../ffmpeg/ffmpeg_page.dart';
 import '../gallery/gallery_page.dart';
@@ -24,6 +25,7 @@ import '../history/history_page.dart';
 import '../presets/presets_page.dart';
 import '../presets/save_check.dart';
 import '../settings/settings_page.dart';
+import '../setup/setup_wizard.dart';
 import 'core_unavailable.dart';
 
 /// The desktop window: title bar with Presets, FFmpeg, History and Settings.
@@ -63,7 +65,10 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
   void initState() {
     super.initState();
     _lifecycle;
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_startRoutes()));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_startRoutes());
+      unawaited(_offerSetup());
+    });
   }
 
   @override
@@ -110,6 +115,21 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
         unawaited(ref.read(windowControllerProvider).trace('desktop_route_applied ${route.kind} ${route.id}'));
       }
     });
+  }
+
+  /// The first-run setup (UI_SPEC §5a), once per window, when renders have
+  /// no default FFmpeg and the user hasn't skipped it. A requested preset or
+  /// job waits until it closes.
+  Future<void> _offerSetup() async {
+    try {
+      await ref.read(machineSettingsProvider.future);
+    } on Object {
+      return; // Settings shows why they can't be read.
+    }
+    if (!mounted || !ref.read(shouldOfferSetupProvider)) return;
+    if (!await ref.read(desktopInteractionProvider).waitUntilIdle(cancelled: _routeStop.future) || !mounted) return;
+    if (!ref.read(shouldOfferSetupProvider)) return;
+    await showSetupWizard(context);
   }
 
   Future<void> _routeError(String message) async {

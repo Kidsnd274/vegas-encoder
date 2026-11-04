@@ -103,6 +103,7 @@ MachineSettings decodeMachine(JsonMap data) {
     boolField(state, 'desktopMaximized');
     boolField(state, 'videoFiltersExpanded');
     stringField(state, 'lastSizeLengthText', required: false, nullable: true);
+    boolField(state, 'setupDismissed');
     if (state['desktopWindowBounds'] != null) {
       final bounds = objectField(state, 'desktopWindowBounds');
       validateExtensions(bounds);

@@ -1,6 +1,6 @@
 # Continue the unified Vegas Encoder implementation
 
-Updated: 2026-10-23 (Asia/Singapore).
+Updated: 2026-11-04 (Asia/Singapore).
 
 Work in **`L:\repos\vegas-encoder`**, currently on **`master`**.
 The original folder remains the only development checkout. The earlier explicitly
@@ -53,6 +53,18 @@ candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
 
+**First-run FFmpeg setup + 0.1.8 (merged at owner request, 2026-11-04):**
+branch `setup-wizard` commit `3758d5c` is integrated into this checkout with the
+native summary/resize and uninstall changes. Release is `0.1.8+1`; retain core
+`0.3.0-filters`, schema maximum 2 and both C7 `videoFiltersExpanded` and
+`setupDismissed`. The earlier built-in-list test failure is fixed on master.
+Remaining wizard check: a manual run against real FFmpeg installations under
+`VEGAS_ENCODER_DATA_ROOT`. Rebuild matched inputs before deployment.
+
+The owner confirmed the optional uninstall-data prompt works on 2026-11-04.
+This closes that prompt check only; it does not qualify the entire installer
+matrix below. No installed version or complete data-deletion matrix was supplied.
+
 **Native summary and structured resize (owner request, 2026-10-23):** implemented,
 validated and committed; see STATUS for exact checks. The Filters disclosure was
 then restyled to sit with Extra arguments under one divider (UI_SPEC Filters).
@@ -88,8 +100,8 @@ qualification remain open; do not resume owner-deferred trials automatically.
 [INSTALLER.md](INSTALLER.md) for the behaviour and STATUS for the checks.
 
 Next:
-1. Once the concurrent starter-preset edits settle, run `scripts/Build-Release.ps1`
-   to package an installer.
+1. Run `scripts/Build-Release.ps1` to package fresh matched 0.1.8 inputs and
+   an installer after the setup-wizard integration checks.
 2. The owner runs the real Setup trial:
    - fresh install with and without VEGAS 2026 ticked;
    - update over an older build;

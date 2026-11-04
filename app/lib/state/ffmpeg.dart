@@ -124,12 +124,14 @@ class FFmpegController extends Notifier<FFmpegState> {
   void selectEncoder(String id) => state = state.copyWith(selectedEncoder: id);
 
   /// Looks for installations again (discovery records them) and checks each
-  /// one that has no cached capabilities. Returns what was found.
-  Future<List<FFmpegInstallation>> scan() async {
+  /// one that has no cached capabilities. Returns what was found; [onFound]
+  /// hears it before the checks start (the setup wizard moves on then).
+  Future<List<FFmpegInstallation>> scan({ValueChanged<List<FFmpegInstallation>>? onFound}) async {
     state = state.copyWith(scanning: true);
     try {
       final found = await _discovery.scan();
       if (!ref.mounted) return found;
+      onFound?.call(found);
       final cache = ref.read(capabilityCacheProvider);
       for (final installation in found) {
         if (!ref.mounted) break;

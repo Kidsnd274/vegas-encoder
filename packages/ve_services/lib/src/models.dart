@@ -733,6 +733,7 @@ class AppUiState extends JsonModel {
     bool desktopMaximized = false,
     bool videoFiltersExpanded = false,
     String? lastSizeLengthText = null,
+    bool setupDismissed = false,
     JsonMap extensions = const {},
   }) : super({
          'desktopWindowBounds': desktopWindowBounds?.toJson(),
@@ -740,6 +741,7 @@ class AppUiState extends JsonModel {
          'desktopMaximized': desktopMaximized,
          'videoFiltersExpanded': videoFiltersExpanded,
          'lastSizeLengthText': lastSizeLengthText,
+         'setupDismissed': setupDismissed,
          'extensions': extensions,
        });
   AppUiState.fromJson(super.json);
@@ -754,12 +756,14 @@ class AppUiState extends JsonModel {
   bool get videoFiltersExpanded =>
       data['videoFiltersExpanded'] as bool? ?? false;
   String? get lastSizeLengthText => data['lastSizeLengthText'] as String?;
+  bool get setupDismissed => data['setupDismissed'] as bool? ?? false;
   AppUiState copyWith({
     Object? desktopWindowBounds = absent,
     Object? popupWindowSize = absent,
     Object? desktopMaximized = absent,
     Object? videoFiltersExpanded = absent,
     Object? lastSizeLengthText = absent,
+    Object? setupDismissed = absent,
     Object? extensions = absent,
   }) => AppUiState.fromJson(
     changed({
@@ -774,6 +778,7 @@ class AppUiState extends JsonModel {
         'videoFiltersExpanded': videoFiltersExpanded,
       if (!identical(lastSizeLengthText, absent))
         'lastSizeLengthText': lastSizeLengthText,
+      if (!identical(setupDismissed, absent)) 'setupDismissed': setupDismissed,
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );

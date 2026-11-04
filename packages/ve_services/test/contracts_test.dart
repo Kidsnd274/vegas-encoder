@@ -331,6 +331,24 @@ Future<void> main() async {
     'missing UI maximize defaults false',
   );
   check(
+    !AppUiState.fromJson({}).setupDismissed &&
+        !uiState.setupDismissed &&
+        uiState.copyWith(setupDismissed: true).setupDismissed &&
+        uiState.copyWith(setupDismissed: true).lastSizeLengthText ==
+            uiState.lastSizeLengthText,
+    'setup dismissal defaults false and changes only itself',
+  );
+  final filtersAndSetup = AppUiState(videoFiltersExpanded: true)
+      .copyWith(setupDismissed: true);
+  final mergedUi = AppUiState.fromJson(filtersAndSetup.toJson());
+  check(
+    mergedUi.videoFiltersExpanded &&
+        mergedUi.setupDismissed &&
+        mergedUi.copyWith(setupDismissed: false).videoFiltersExpanded &&
+        mergedUi.copyWith(videoFiltersExpanded: false).setupDismissed,
+    'filter disclosure and setup dismissal coexist and update independently',
+  );
+  check(
     uiSaved.uiState!.popupWindowSize!.width == 1100 &&
         (uiSaved.uiState!.popupWindowSize!.data['future'] as Map)['dpi'] == 144,
     'popup size fake save/watch and unknown fields',

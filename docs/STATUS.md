@@ -1,9 +1,53 @@
 # Vegas Encoder status
 
-Updated: 2026-10-23 (Asia/Singapore). No exporter currently installed: the owner
-requested removal of the development trial and a clean state for installer testing.
+Updated: 2026-11-04 (Asia/Singapore). The owner confirms the optional uninstall-data
+prompt works. The development trial was removed on 2026-10-18 for clean installer
+testing; current installed files/version have not been re-inspected.
 
 ## Current progress
+
+**First-run FFmpeg setup (owner request, 2026-10-23):** the desktop app now opens
+a setup wizard on start while no default FFmpeg is set and the user hasn't skipped
+it. The wizard finds installations, probes each one (including the hardware
+test encodes, plus a test of any hardware encoder still unknown on this PC), then
+asks which one becomes the default, with one recommended. Skip for now is stored as
+the new C7 `uiState.setupDismissed` (app-only; the DLL ignores it); the FFmpeg
+screen's Run setup… reopens the wizard. See [UI_SPEC §5a](product/UI_SPEC.md#5a-first-run-setup).
+Release version is now **0.1.8** (app `0.1.8+1`, file version `0.1.8.1`) through
+`version.json` and the generated outputs. This was built on branch `setup-wizard`
+in the owner-requested worktree `L:\repos\vegas-encoder-setup-wizard`, from
+`707301a`, committed as `3758d5c` and merged into master at owner request on
+2026-11-04. Integration retains core `0.3.0-filters`, schema maximum 2 and both
+`AppUiState.videoFiltersExpanded` and `setupDismissed`.
+
+Original branch validation: **88** service contract checks and **156** real-file repository
+checks (setupDismissed round trip, missing key defaults false, non-boolean refused);
+version generation `--check` and **8** version tests; app analysis is clean.
+**18** new wizard unit/widget tests and **10** new light/dark goldens pass. **14**
+FFmpeg-screen goldens were refreshed for the added header button, and the images
+were reviewed. The full app suite passes **666** tests. The one failure,
+`services_wiring_test.dart`, predates this change: it still expects the six original
+built-ins after the 16-starter expansion. All validation used fakes and the real
+core/files. No real FFmpeg scan in the app, no VEGAS, no installer build, no
+installation at that point. Master already fixes the stale preset-list assertion.
+The manual wizard run against real FFmpeg remains open.
+
+**Merge validation (2026-11-04):** app and services analysis clean; version
+projection freshness and all 8 version tests pass; 89 fake service contract checks
+and 160 real-Windows-file/lock/native-core repository checks pass. The repository
+round trip includes both filter disclosure and setup dismissal, and the contract
+check verifies independent updates. The app suite passed 676 tests with only the
+10 new wizard goldens failing: every difference was confined to the existing
+Filters disclosure at the bottom of the background editor (x 278–825, y 835–860).
+Reviewed light/dark images, refreshed those 10 baselines, then all 10 passed a
+comparison-only rerun. No application logic changed during that refresh. Validation
+used fakes and real core/files, not real FFmpeg discovery or VEGAS. No installer
+was built or run, and no worktree/candidate/rollback files were moved or removed.
+
+**Owner uninstall confirmation (2026-11-04):** the owner reports that the optional
+uninstall-data prompt works. This is an owner-confirmed real-use prompt check,
+not qualification of all removal choices, other accounts or the full installer
+lifecycle; no tested installer version was provided.
 
 **Native preset summary and structured resize (owner implementation request,
 2026-10-23):** implemented and committed in this checkout; parallel agents were

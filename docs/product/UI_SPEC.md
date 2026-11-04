@@ -523,7 +523,8 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
 
 **Built in F3** (`app/lib/features/ffmpeg/`, on the platform fakes):
 
-- **Header:** Add FFmpeg… (the Windows Open dialog through the runner's `pickFile`; the
+- **Header:** Run setup… (the first-run setup, §5a, whatever was chosen before), Add
+  FFmpeg… (the Windows Open dialog through the runner's `pickFile`; the
   path goes to `FFmpegDiscovery.add`), Scan again (`scan`, then a probe of each
   installation with no cached capabilities), Test hardware encoders (the selected
   installation, `force: true`). A refusal shows as a toast with discovery's message.
@@ -559,6 +560,40 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
   (changed, no ffprobe) or Locate… (missing: the Open dialog, then discovery adds the file
   chosen; a missing default hands its role to it). A missing default says "Renders fail
   until you locate it or choose another default." `unknown` and `unchanged` show nothing.
+
+## 5a. First-run setup
+
+Built 2026-10-23 (`app/lib/features/setup/`, on the platform fakes). Implements F1's
+steps 2–3 (PRODUCT_SPEC) as a modal over the desktop window.
+
+- **When:** a desktop start (not the popup or progress window, and not without the core)
+  whose machine settings have no `defaultFFmpegId` and no C7 `uiState.setupDismissed`.
+  It opens once the settings load and the window is idle; a requested preset or job
+  (`--open-preset`, `--open-job`, a forwarded start) waits until it closes. The FFmpeg
+  screen's **Run setup…** opens it at any time.
+- **Look:** 660 px wide, at most 720 px tall (the list scrolls), the dialog's surface,
+  border and shadow. "Set up Vegas Encoder", one sentence, and three steps: Find FFmpeg,
+  Check this PC, Choose the default (done steps show a check).
+- **Find:** starts `scan` at once ("Looking on PATH and in winget, Scoop and
+  Chocolatey…"). Nothing found: the FFmpeg screen's empty text, **Add FFmpeg…** and
+  **Scan again**. A scan failure: "Couldn’t look for FFmpeg: …" and **Try again**.
+  No download offer (decision 11).
+- **Check:** one row per installation: name, build/licence/source line, path, and the
+  probe's phase and bar while it runs. The probe tests the listed hardware encoders; after
+  the probes, hardware encoders still unknown on this PC (an expired or changed GPU
+  record) are test-encoded too. The work runs in `FFmpegController`, so the FFmpeg screen
+  shows the same progress. **Choose without waiting** goes on while the checks run.
+- **Choose:** the same rows as radio choices, each with a hardware line ("Hardware ready:
+  NVENC H.264, NVENC HEVC, NVENC AV1. 2 failed their test on this PC.", or none works,
+  not checked yet, none in this FFmpeg) and the health notes of §5. A missing ffmpeg.exe
+  can't be chosen. **Recommended** marks the installation whose files are as checked with
+  the most video encoders ready here (ties keep discovery's order); it is preselected
+  unless a default exists. **Add FFmpeg…** stays available. **Use this FFmpeg** saves
+  `defaultFFmpegId` (`save(expectedRevision)`); a failure shows inline and keeps it open.
+- **Leaving:** **Skip for now** (and Esc) saves `setupDismissed: true` and closes; once a
+  default exists the button is **Cancel** and saves nothing. A click outside does
+  nothing. "You can change this any time on the FFmpeg page." sits in the footer. After
+  Run setup…, the FFmpeg screen confirms "<name> is now the default. The next render uses it."
 
 ## 6. History screen (S5)
 

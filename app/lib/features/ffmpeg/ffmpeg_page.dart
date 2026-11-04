@@ -18,6 +18,7 @@ import '../../state/app_state.dart';
 import '../../state/ffmpeg.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
+import '../setup/setup_wizard.dart';
 import 'capability_table.dart';
 import 'display.dart';
 import 'encoder_detail.dart';
@@ -156,6 +157,12 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
     showToast('Path copied');
   }
 
+  /// Run setup…: the first-run wizard again, whatever the user chose before.
+  Future<void> _setup() async {
+    final chosen = await showSetupWizard(context);
+    if (chosen != null && mounted) showToast('${chosen.label} is now the default. The next render uses it.');
+  }
+
   void _openPreset(String id) {
     ref.read(presetsControllerProvider.notifier).select(id);
     ref.read(desktopSectionProvider.notifier).go(DesktopSection.presets);
@@ -190,6 +197,7 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
                     'Vegas Encoder renders with the default FFmpeg. Each installation is checked once: its own '
                     'encoder list, then a short test encode on this PC for each hardware encoder.',
                 actions: [
+                  VeButton(label: 'Run setup…', onPressed: state.scanning ? null : _setup),
                   VeButton(label: 'Add FFmpeg…', icon: VeIcons.plus, onPressed: _add),
                   VeButton(
                     label: state.scanning ? 'Scanning…' : 'Scan again',

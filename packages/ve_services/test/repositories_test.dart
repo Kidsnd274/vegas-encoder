@@ -91,6 +91,8 @@ Future<void> main(List<String> args) async {
         uiState: AppUiState(
           lastSizeLengthText: '1:02.5',
           popupWindowSize: PopupWindowSize(width: 1152, height: 864),
+          videoFiltersExpanded: true,
+          setupDismissed: true,
         ),
         extensions: {
           'future': {'mode': 9},
@@ -105,6 +107,8 @@ Future<void> main(List<String> args) async {
       restarted.theme == 'dark' &&
           restarted.uiState!.lastSizeLengthText == '1:02.5' &&
           restarted.uiState!.popupWindowSize!.height == 864 &&
+          restarted.uiState!.videoFiltersExpanded &&
+          restarted.uiState!.setupDismissed &&
           jsonMap(restarted.extensions['future'])['mode'] == 9,
       'settings survive repository restart with extensions',
     );
@@ -163,6 +167,7 @@ Future<void> main(List<String> args) async {
       '{"machine":1,"revision":0,"revision":2}',
       '{"machine":1,"revision":9223372036854775808}',
       '{"machine":1,"revision":0,"theme":null}',
+      '{"machine":1,"revision":0,"uiState":{"setupDismissed":"yes"}}',
     ]) {
       await File(paths.machine).writeAsString(bad);
       await rejects(
