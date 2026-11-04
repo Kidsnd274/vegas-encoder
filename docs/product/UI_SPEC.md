@@ -50,6 +50,10 @@ bottom as a collapsible "Library and command" strip, collapsed, with a one-line 
 - **Groups:** Built-in, then Mine, each sorted by category then name. Favorites
   float to the top of their group. Search matches name, tags, encoder and codec
   (e.g. "nvenc", "prores", "youtube").
+- **Bundled defaults (2026-11-05):** Web Upload has H.264, HEVC and AV1 each as
+  `(CPU)` and `(NVENC)`, plus `VP9 (CPU)`. Editing/lossless names are codec/profile
+  only (ProRes 422 HQ/LT, ProRes Proxy, DNxHR HQ, FFV1). App and VEGAS names match;
+  review, CRF 16 and 720p/3500 kbps variants belong in personal presets.
 - **Each item:** name, a one-line summary (codec and quality, audio, container) and
   marks for favorite, built-in, Advanced mode, a small wire glyph for 10-bit or
   8-bit output, and **availability** (an

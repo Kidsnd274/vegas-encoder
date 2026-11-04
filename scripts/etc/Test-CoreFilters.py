@@ -46,7 +46,7 @@ def main():
     checks = 0
     if args.legacy_core:
         legacy = Core(args.legacy_core.resolve(strict=True))
-        recipe = next(p['recipe'] for p in catalog['presets'] if p['recipe']['id'] == 'h264-nvenc-720p-3500')
+        recipe = json.loads((ROOT / 'schema/fixtures/retired-presets/h264-nvenc-720p-3500.v2.json').read_text(encoding='utf-8'))['recipe']
         rejected = legacy.call('ve_recipe_normalize', {'recipe': recipe})
         assert any(i['level'] == 'error' for i in rejected['issues']), 'old core must reject schema-2 recipe'
         snapshot = {'recipe': recipe, 'origin': None, 'vegasPrefs': {}, 'writtenBy': 'filter-compatibility-test'}

@@ -132,7 +132,11 @@ ID/revision; saved VEGAS templates keep their snapshots through Setup updates.
 Arbitrary Render As pinning remains outside this release. On 2026-10-23 the owner
 expanded this to [16 shared starters](../STARTER_PRESETS.md), adding review/GPU,
 ProRes LT/Proxy, VP9/WebM, CRF 16 software presets and 720p NVENC at 3500 kbps.
-The explicit 720p preset fits/pads to 1280x720; the others retain project dimensions.
+The owner simplified this on 2026-11-05 to 12 shared starters: seven Web Upload
+presets (H.264, HEVC and AV1 each on CPU/NVENC, plus CPU VP9) and five editing/
+lossless presets. Names match between app and VEGAS. Review, CRF 16 and 720p/3500
+kbps variants are personal choices rather than built-ins; saved/exported copies
+retain their snapshots. All current starters retain project dimensions.
 
 All eight round 1 directions are built and screenshotted. Strengths, weaknesses, known
 issues, the original recommendation and the owner's decision are in

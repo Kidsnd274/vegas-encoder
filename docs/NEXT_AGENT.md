@@ -1,6 +1,6 @@
 # Continue the unified Vegas Encoder implementation
 
-Updated: 2026-11-04 (Asia/Singapore).
+Updated: 2026-11-05 (Asia/Singapore).
 
 Work in **`L:\repos\vegas-encoder`**, currently on **`master`**.
 The original folder remains the only development checkout. The earlier explicitly
@@ -53,6 +53,20 @@ candidate was replaced; push and installation remain separate authorizations.
 
 ## Implementation queue
 
+**Built-in preset simplification (2026-11-05):** implemented in this checkout
+and not installed. The shared app/native catalog has 12 presets:
+seven Web Upload choices (H.264/HEVC/AV1, each CPU and NVENC, plus CPU VP9) and
+five editing/lossless presets. App/native names match; retained encoding settings,
+IDs/GUIDs/template IDs are unchanged, with metadata revisions advanced to 2.
+Review, CRF 16 and 720p/3500 kbps defaults are retired; preserve their personal
+exports and saved snapshots. `retiredVegas` reserves removed identities, and a
+720p revision-2 export under `schema/fixtures/retired-presets/` keeps compatibility
+checks independent of the current catalog. Native enumeration positions now differ
+from persistent template IDs after removed rows. STATUS records the focused
+native/file/UI checks; real-VEGAS reduced-list/save/restart qualification is open.
+Rebuild matched app/native inputs before any separately authorized deployment;
+no installer or installed files were changed and no new manual trial is requested.
+
 **First-run FFmpeg setup + 0.1.8 (merged at owner request, 2026-11-04):**
 branch `setup-wizard` commit `3758d5c` is integrated into this checkout with the
 native summary/resize and uninstall changes. Release is `0.1.8+1`; retain core
@@ -69,8 +83,9 @@ matrix below. No installed version or complete data-deletion matrix was supplied
 validated and committed; see STATUS for exact checks. The Filters disclosure was
 then restyled to sit with Extra arguments under one divider (UI_SPEC Filters).
 Default ownership is one agent in this checkout. The native summary was checked independently
-before schema-2 Fit-only resize integration. Preserve the new 720p starter revision
-2 and all saved revision-1 snapshots. Old capability caches require FFmpeg Refresh
+before schema-2 Fit-only resize integration. Preserve saved 720p revision-1/revision-2
+snapshots and exports; the later built-in simplification above removes only the
+bundled default. Old capability caches require FFmpeg Refresh
 for structured filters. Later filter types, Fill/Stretch, linked dimensions and
 alternative backends remain deferred; no new feature queue is implied.
 
@@ -80,12 +95,12 @@ remain separately owner-directed qualification gates. Do not resume earlier
 deferred trials, install or replace the exporter automatically. The installer
 queue below remains separate; no installer was packaged by this feature task.
 
-**Expanded starters (owner request, 2026-10-23):** implemented all seven proposed
+**Historical expanded starters (2026-10-23; catalog superseded by the simplification above):** implemented all seven proposed
 additions and the owner's x264 CRF 16, x265 CRF 16 and 720p/3500 kbps NVENC
-presets. There are now 16 app recipes and 16 VEGAS starters; NVIDIA HEVC reuses
-its prior app recipe. [STARTER_PRESETS.md](STARTER_PRESETS.md) records settings.
-Preserve all prior recipes/revisions and slot/GUID identities. New entries append
-at slots 8-17. Only the explicit 720p starter fits/pads to 1280x720; all retain
+presets. That expansion provided 16 app recipes and 16 VEGAS starters; NVIDIA HEVC reused
+its prior app recipe. [STARTER_PRESETS.md](STARTER_PRESETS.md) now records the reduced catalog.
+The expansion preserved prior recipes/revisions and slot/GUID identities. New entries appended
+at slots 8-17. Only the former explicit 720p starter fits/pads to 1280x720; all retain
 source frame rate and the others retain project dimensions. ProRes remains
 `prores_ks`. STATUS records native build, 357 fake-host checks, 154 repository,
 99 watch/cache, 39 widget/golden regressions, clean analysis, and 93 real FFmpeg

@@ -64,7 +64,7 @@ int wmain(int argc, wchar_t** argv) {
       SFTEMPLATE* returned = nullptr;
       Check(writer->GetPreset(&returned,index) == S_OK && returned,"exporter creates starter through host allocator without app/user files");
       const auto value = Tpl::Copy(returned); allocator.Free(returned);
-      Check(value.U32(tpl::id) == static_cast<DWORD>(index) && value.Guid(tpl::iidOwner) == GUID_VegasEncoderType,"stable index and owned type");
+      Check(value.Guid(tpl::iidOwner) == GUID_VegasEncoderType,"owned type");
       const auto guid = value.Guid(tpl::guidPreset);
       Check(std::none_of(presetGuids.begin(),presetGuids.end(),[&](const GUID& prior) { return prior == guid; }),"unique preset GUID");
       presetGuids.push_back(guid);
@@ -72,6 +72,7 @@ int wmain(int argc, wchar_t** argv) {
       Check(writer->GetPresetIndexFromGuid(&guid,&roundtrip) == S_OK && roundtrip == index,"GUID/index roundtrip");
       const auto snapshot = configuration::ReadRecipeSnapshot(value,GUID_VegasEncoderType);
       if (index < 2) {
+        Check(value.U32(tpl::id) == static_cast<DWORD>(index),"preserved probe/general template ID");
         Check(snapshot.at("origin").is_null(),"general/probe template has no library origin");
         if (index == 1) {
           const GUID original = {0x381851c2,0x9c94,0x4bd2,{0x81,0x76,0xb4,0xb8,0x59,0x8b,0xe8,0x0d}};
@@ -80,7 +81,7 @@ int wmain(int argc, wchar_t** argv) {
         continue;
       }
       const auto& entry = catalog.at("vegas").at(index-2);
-      Check(entry.at("index") == index,"stable catalog slot");
+      Check(entry.at("index") == value.U32(tpl::id),"stable template ID despite retired enumeration entries");
       const auto& presets = catalog.at("presets");
       const auto source = std::find_if(presets.begin(),presets.end(),[&](const Json& p) { return p.at("recipe").at("id") == entry.at("presetId"); });
       Check(source != presets.end(),"starter resolves a shared app recipe");
@@ -93,25 +94,6 @@ int wmain(int argc, wchar_t** argv) {
       paths["output"] = "starter." + source->at("recipe").at("container").at("format").get<std::string>();
       const auto compiled = ve::Compile({{"recipe",snapshot.at("recipe")},{"media",media},{"paths",paths}});
       Check(!ve::HasErrors(compiled.at("issues")),"starter compiles for native target with project media");
-      const auto& args = compiled.at("argv");
-      const auto hasOption = [&](const char* flag, const char* expected) {
-        const auto found = std::find(args.begin(),args.end(),Json(flag));
-        return found != args.end() && std::next(found) != args.end() && *std::next(found) == expected;
-      };
-      const auto presetId = entry.at("presetId").get<std::string>();
-      if (presetId == "h264-crf16" || presetId == "hevc-crf16") {
-        Check(hasOption("-crf","16"),"owner CRF 16 survives native snapshot compilation");
-        Check(hasOption("-c:v",presetId == "h264-crf16" ? "libx264" : "libx265"),"owner software encoder retained");
-      }
-      if (presetId == "h264-nvenc-720p-3500") {
-        Check(hasOption("-c:v","h264_nvenc") && hasOption("-rc","vbr") && hasOption("-b:v","3500k"),"720p NVENC uses 3500 kbps video target");
-        Check(snapshot.at("recipe").at("schema") == 2 && snapshot.at("recipe").at("video").at("filters")[0].at("width") == 1280 &&
-              snapshot.at("recipe").at("video").at("filters")[0].at("height") == 720 && ve::Str(snapshot.at("recipe").at("video"),"extra").empty(),
-              "720p starter uses schema-2 structured fit with retained dimensions");
-        Check(compiled.contains("videoGeometry") && compiled.at("videoGeometry").at("width") == 1280 && compiled.at("videoGeometry").at("height") == 720,
-              "720p fit has separate encoded geometry");
-        Check(hasOption("-c:a","aac") && hasOption("-b:a","160k"),"720p audio bitrate is additional to video");
-      }
       GUID expected{};
       Check(SUCCEEDED(CLSIDFromString((L"{" + Widen(entry.at("guid").get<std::string>()) + L"}").c_str(),&expected)) && guid == expected,"committed catalog GUID retained");
       Check(Utf8(value.Name().c_str()) == entry.at("name"),"starter has catalog display name");
@@ -135,6 +117,26 @@ int wmain(int argc, wchar_t** argv) {
       Check(writer->GetPreset(&returned,index) == S_OK && returned,"fresh starter remains available");
       Check(configuration::ReadRecipeSnapshot(Tpl::Copy(returned),GUID_VegasEncoderType) == snapshot,"customizing one template leaves supplied default unchanged");
       allocator.Free(returned);
+    }
+    for (const auto& retired : catalog.at("retiredVegas")) {
+      GUID guid{};
+      Check(SUCCEEDED(CLSIDFromString((L"{" + Widen(retired.at("guid").get<std::string>()) + L"}").c_str(),&guid)),"retired catalog GUID parses");
+      LONG index = -1;
+      Check(writer->GetPresetIndexFromGuid(&guid,&index) == E_INVALIDARG,"retired preset is no longer enumerated");
+      auto old = Tpl::Make(L"My saved personal preset",L"",0);
+      old.SetGuid(tpl::iidOwner,GUID_VegasEncoderType);
+      old.SetGuid(tpl::guidPreset,guid);
+      old.SetU32(tpl::id,retired.at("index").get<DWORD>());
+      const auto saved = configuration::CreateRecipeTemplate(old,GUID_VegasEncoderType,
+          {{"recipe",bundle.at("fixtures")[0].at("recipe")},
+           {"origin",{{"presetId",retired.at("presetId")},{"revision",1},{"name","Personal settings"}}},
+           {"vegasPrefs",Json::object()},{"writtenBy","retired-preset-test"}});
+      SFTEMPLATE* conformed = nullptr;
+      Check(writer->ConformTemplate(&conformed,saved.Ptr(),2) == S_OK && conformed,"retired starter snapshot still conforms");
+      const auto restored = Tpl::Copy(conformed); allocator.Free(conformed);
+      Check(restored.U32(tpl::id) == old.U32(tpl::id) &&
+            configuration::ReadRecipeSnapshot(restored,GUID_VegasEncoderType) == configuration::ReadRecipeSnapshot(saved,GUID_VegasEncoderType),
+            "retired starter retains saved recipe, origin and ID without catalog lookup");
     }
     auto recipe = bundle.at("fixtures")[0].at("recipe");
     auto empty = Tpl::Make(L"Naming",L"",0); empty.SetGuid(tpl::iidOwner,GUID_VegasEncoderType);

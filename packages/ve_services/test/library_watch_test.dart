@@ -145,7 +145,7 @@ Future<void> main() async {
     metadataBounds(root.path);
     final builtins = await library.list();
     check(
-      builtins.length == 16 && !Directory(paths.library).existsSync(),
+      builtins.length == 12 && !Directory(paths.library).existsSync(),
       'missing root is read-only and supplies built-ins',
     );
     final userPresetCount = 500 - builtins.length;

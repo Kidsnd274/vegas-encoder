@@ -1,10 +1,42 @@
 # Vegas Encoder status
 
-Updated: 2026-11-04 (Asia/Singapore). The owner confirms the optional uninstall-data
+Updated: 2026-11-05 (Asia/Singapore). The owner confirms the optional uninstall-data
 prompt works. The development trial was removed on 2026-10-18 for clean installer
 testing; current installed files/version have not been re-inspected.
 
 ## Current progress
+
+**Simplified built-in presets (owner request, 2026-11-05):** the shared app/VEGAS
+catalog now has **12** starters: seven Web Upload presets (H.264, HEVC and AV1,
+each CPU/NVENC, plus CPU VP9) and the five retained editing/lossless presets.
+App and native names match: `H.264 (CPU)`, `H.264 (NVENC)`, `HEVC (CPU)`,
+`HEVC (NVENC)`, `AV1 (CPU)`, `AV1 (NVENC)`, `VP9 (CPU)`; the other names are
+ProRes 422 HQ/LT, ProRes Proxy, DNxHR HQ and FFV1. Review, CRF 16 and 720p/3500
+kbps variants are removed from defaults. The previous YouTube-named recipes are
+renamed to generic H.264 CPU / HEVC NVENC with encoding settings unchanged.
+All retained presets advance to revision 2 for metadata changes. User files,
+exports and saved snapshots are untouched. A frozen previous 720p export remains
+only as test data for import/restart and schema-2 compatibility.
+
+Retained preset IDs, native GUIDs and numeric template IDs are preserved. Native
+enumeration closes removed rows while explicit template IDs retain their original
+values; `retiredVegas` reserves removed IDs/GUIDs. See [current starter settings](STARTER_PRESETS.md).
+Focused validation: native release build; **300** actual-DLL fake-host
+naming/enumeration/origin/compile/conformance/allocation checks, including retired
+origin snapshots; **162** real-Windows-file/lock/native-core repository checks,
+including the exact seven Web Upload codec/backend choices and personal 720p
+import/export/restart; app/services analysis clean; **80** focused app
+preset/popup/service/widget/golden checks and **99** real-Windows-file/native-FFI
+library-watch/cache checks at 500 presets pass. Eight light/dark images were
+refreshed, visually reviewed and passed comparison-only verification. Generator
+freshness and changed-Python parsing/retired-fixture equality checks pass. All
+retained encoding settings and native IDs/GUIDs were compared with prior source.
+
+This is real core/files with fake UI/host validation, not real VEGAS or new
+FFmpeg encode qualification. The reduced native list and sparse template IDs
+remain unqualified in real VEGAS. No installed exporter, user preset/template,
+installer bundle or rollback was changed; no installation. Existing
+owner-deferred trials remain deferred.
 
 **First-run FFmpeg setup (owner request, 2026-10-23):** the desktop app now opens
 a setup wizard on start while no default FFmpeg is set and the user hasn't skipped

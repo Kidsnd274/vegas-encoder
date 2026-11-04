@@ -228,13 +228,25 @@ Future<void> main(List<String> args) async {
     final library = FilePresetLibrary(core: core, paths: paths);
     final initialPresets = await library.list();
     check(
-      initialPresets.length == 16 &&
-          initialPresets.every(
-            (p) =>
-                p.builtin &&
-                p.revision == (p.recipe.id == 'h264-nvenc-720p-3500' ? 2 : 1),
-          ),
+      initialPresets.length == 12 &&
+          initialPresets.every((p) => p.builtin && p.revision == 2),
       'packaged product built-ins',
+    );
+    final web = initialPresets.where((p) => p.recipe.category == 'web');
+    check(
+      jsonEncode({
+            for (final p in web) p.recipe.name: p.recipe.video.encoder,
+          }) ==
+          jsonEncode({
+            'H.264 (CPU)': 'libx264',
+            'HEVC (CPU)': 'libx265',
+            'HEVC (NVENC)': 'hevc_nvenc',
+            'AV1 (CPU)': 'libsvtav1',
+            'H.264 (NVENC)': 'h264_nvenc',
+            'AV1 (NVENC)': 'av1_nvenc',
+            'VP9 (CPU)': 'libvpx-vp9',
+          }),
+      'seven generic Web Upload presets, one per requested codec/backend',
     );
     final builtin = initialPresets.first;
     check(
@@ -942,12 +954,21 @@ Future<void> main(List<String> args) async {
       await lockedData.readAsString() == 'new',
       'write recovers after reader closes',
     );
-    final resizeBuiltin = (await library.get('h264-nvenc-720p-3500'))!;
     check(
-      resizeBuiltin.revision == 2 &&
+      await library.get('h264-nvenc-720p-3500') == null,
+      'personal 720p recipe is absent from bundled presets',
+    );
+    final resizeBuiltin = await library.importPreset(
+      await File(
+        '../../schema/fixtures/retired-presets/h264-nvenc-720p-3500.v2.json',
+      ).readAsString(),
+      newId: 'personal-720p',
+    );
+    check(
+      !resizeBuiltin.builtin &&
           resizeBuiltin.recipe.schema == 2 &&
           resizeBuiltin.recipe.video.filters.single.width == 1280,
-      '720p bundled revision uses structured resize',
+      'retired 720p export imports as a personal preset with structured resize',
     );
     final resizeCopy = await transfers.duplicate(
       resizeBuiltin.recipe.id,

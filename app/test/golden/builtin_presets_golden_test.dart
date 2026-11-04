@@ -1,5 +1,6 @@
 // Product built-ins with the real core and file library, then fake UI services.
 // No user profile, FFmpeg or real VEGAS is accessed.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -20,6 +21,7 @@ import '../helpers.dart';
 void main() {
   late NativeVeCore core;
   late List<Preset> builtins;
+  late Preset personal720p;
   late EditSessionRequest request;
   late FakeCapabilityCache capabilities;
 
@@ -30,7 +32,10 @@ void main() {
     final root = await boundary.createTemp('builtin-presets-');
     final paths = ServicePaths(roaming: '${root.path}/roaming', local: '${root.path}/local');
     builtins = await FilePresetLibrary(core: core, paths: paths).list();
-    expect(builtins, hasLength(16));
+    personal720p = Preset.fromJson(
+      jsonMap(jsonDecode(await File('../schema/fixtures/retired-presets/h264-nvenc-720p-3500.v2.json').readAsString())),
+    ).copyWith(builtin: false);
+    expect(builtins, hasLength(12));
     expect(builtins.every((p) => p.builtin && p.requires.known), isTrue);
     expect(File(paths.machine).existsSync(), isFalse);
     expect(Directory(paths.library).existsSync(), isFalse, reason: 'built-ins are bundled, never seeded as user files');
@@ -70,7 +75,7 @@ void main() {
   testWidgets('a newer bundled recipe leaves a saved template unchanged until explicit update', (tester) async {
     final hevc = builtins.firstWhere((p) => p.recipe.id == 'hevc-10bit');
     final newer = hevc.copyWith(
-      revision: 2,
+      revision: hevc.revision + 1,
       recipe: hevc.recipe.copyWith(video: hevc.recipe.video.copyWith(quality: 20)),
     );
     final saved = EditSessionRequest.fromJson({
@@ -93,24 +98,25 @@ void main() {
     );
     final container = ProviderScope.containerOf(tester.element(find.widgetWithText(VeButton, 'Load preset')));
     expect(container.read(popupProvider).requireValue.recipe.video.quality, 29);
-    expect(find.text('Library has revision 2'), findsOneWidget);
+    expect(find.text('Library has revision 3'), findsOneWidget);
     await tester.tap(find.text('Update from library'));
     await tester.pumpAndSettle();
     expect(container.read(popupProvider).requireValue.recipe.video.quality, 29);
-    await tester.tap(find.text('Replace with revision 2'));
+    await tester.tap(find.text('Replace with revision 3'));
     await tester.pumpAndSettle();
     final updated = container.read(popupProvider).requireValue;
     expect(updated.recipe.video.quality, 20);
-    expect(updated.origin!.revision, 2);
+    expect(updated.origin!.revision, 3);
     expect(updated.recipe.name, 'My saved HEVC');
   });
 
   for (final brightness in themes) {
     final theme = themeName(brightness);
-    testWidgets('product 720p NVENC starter $theme', (tester) async {
+    testWidgets('personal 720p NVENC export remains editable $theme', (tester) async {
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       tester.platformDispatcher.platformBrightnessTestValue = brightness;
-      final preset = builtins.firstWhere((p) => p.recipe.id == 'h264-nvenc-720p-3500');
+      final preset = personal720p;
+      expect(builtins.any((p) => p.recipe.id == preset.recipe.id), isFalse);
       await pumpApp(
         tester,
         core: core,
@@ -151,7 +157,7 @@ void main() {
           presetLibraryProvider.overrideWithValue(FakePresetLibrary(presets: builtins)),
         ],
       );
-      await tester.tap(find.text('H.265 / HEVC, 10-bit').first);
+      await tester.tap(find.text('HEVC (CPU)').first);
       await tester.pumpAndSettle();
       final command = tester
           .widget<RichText>(find.descendant(of: find.byType(CommandView), matching: find.byType(RichText)))
@@ -181,7 +187,7 @@ void main() {
       await tester.tap(find.widgetWithText(VeButton, 'Load preset'));
       await tester.pumpAndSettle();
       await expectGolden('builtins_popup_load_$theme');
-      await tester.tap(find.text('H.265 / HEVC, 10-bit'));
+      await tester.tap(find.text('HEVC (CPU)'));
       await tester.pumpAndSettle();
       final container = ProviderScope.containerOf(tester.element(find.widgetWithText(VeButton, 'Load preset')));
       final state = container.read(popupProvider).requireValue;
@@ -189,7 +195,7 @@ void main() {
       expect(state.recipe.video.depth, 10);
       expect(state.recipe.container.format, 'mp4');
       expect(state.origin!.presetId, 'hevc-10bit');
-      expect(state.origin!.revision, 1);
+      expect(state.origin!.revision, 2);
       expect(state.libraryPreset!.builtin, isTrue);
       expect(state.recipe.name, request.recipe.name, reason: 'the VEGAS template keeps its own name');
       await expectGolden('builtins_popup_origin_$theme');
@@ -212,19 +218,20 @@ void main() {
       );
       await tester.tap(find.widgetWithText(VeButton, 'Load preset'));
       await tester.pumpAndSettle();
-      final last = find.text('H.264 720p 3500kbps (NVENC)');
+      final last = find.text('VP9 (CPU)');
       await tester.ensureVisible(last);
       await tester.pumpAndSettle();
       await tester.tap(last);
       await tester.pumpAndSettle();
       final container = ProviderScope.containerOf(tester.element(find.widgetWithText(VeButton, 'Load preset')));
       final state = container.read(popupProvider).requireValue;
-      expect(state.origin!.presetId, 'h264-nvenc-720p-3500');
-      expect(state.recipe.video.bitrateK, 3500);
+      expect(state.origin!.presetId, 'vp9-webm');
+      expect(state.recipe.video.encoder, 'libvpx-vp9');
+      expect(state.recipe.video.quality, 31);
+      expect(state.recipe.container.format, 'webm');
       expect(state.recipe.video.extra, isEmpty);
-      expect(state.recipe.video.filters.single.width, 1280);
-      expect(state.recipe.video.filters.single.height, 720);
-      expect(state.recipe.schema, 2);
+      expect(state.recipe.video.filters, isEmpty);
+      expect(state.recipe.schema, 1);
     });
   }
 }

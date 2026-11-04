@@ -78,13 +78,14 @@ void main() {
 
     test('a star on a built-in survives a restart', () async {
       var container = await start();
+      final original = container.read(presetsProvider).value!.firstWhere((p) => p.recipe.id == 'av1-small');
       await container.read(presetsControllerProvider.notifier).toggleFavorite('av1-small');
       container.dispose();
 
       container = await start();
       final av1 = container.read(presetsProvider).value!.firstWhere((p) => p.recipe.id == 'av1-small');
       expect(av1.favorite, isTrue);
-      expect(av1.revision, 1, reason: 'a built-in\'s revision never moves');
+      expect(av1.revision, original.revision, reason: 'starring preserves the bundled revision');
       expect(await File(paths.preferences).exists(), isTrue);
     });
 

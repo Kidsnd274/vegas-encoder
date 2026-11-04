@@ -43,9 +43,12 @@ struct Preset {
   const wchar_t* name;
   const wchar_t* notes;
   const char* builtin = nullptr; // Generated library preset JSON; null for the general template.
+  DWORD templateId = 0xFFFFFFFF; // Stable built-in identity, independent of enumeration position.
 };
 
-// The template id is the preset index. VEGAS 2026 did not list the id-0 preset
+// Template IDs originally matched enumeration indices. Retiring a built-in leaves
+// its ID unused; remaining GUIDs/IDs stay stable as enumeration becomes shorter.
+// VEGAS 2026 did not list the id-0 preset
 // in Render As (F-041); Voukoder Pro also fills id 0 with a duplicate (F-033).
 // Index 0 is therefore a probe that should stay hidden; the real presets
 // start at id 1. P010 was delivered to Voukoder (F-031, F-036); BI_RGB 32 was
@@ -102,7 +105,7 @@ Tpl BuildPreset(LONG index) {
 #endif
   // Byte pattern mirrors Voukoder Pro's presets (F-033): zero audio records
   // and zero size/fps mean "use the project".
-  t.SetU32(tpl::id, (DWORD)index);
+  t.SetU32(tpl::id, p.templateId == 0xFFFFFFFF ? (DWORD)index : p.templateId);
   t.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
   t.SetGuid(tpl::guidPreset, p.guid);
   t.SetU32(tpl::audioCb, tpl::sectionCb);

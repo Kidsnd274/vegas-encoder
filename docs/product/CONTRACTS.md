@@ -626,15 +626,18 @@ Library root: `%APPDATA%\VegasEncoder\library\<id>.vepreset`. Save checks the
 expected revision atomically, increments it and preserves the last 20 old versions
 under `.history\<id>\<revision>.vepreset`. expectedRevision=null creates only;
 conflicting saves fail. get(id) means current; get(id,revision:N) may return history.
-The 16 product built-ins are bundled from `schema/builtin-presets.v1.json`.
-The same catalog generates 16 fixed VEGAS starter definitions with stable slots
-2-17 and GUIDs, after the reserved probe (0) and existing general template (1).
-The 2026-10-23 additions append without changing the previous recipes/identities;
-see [starter settings](../STARTER_PRESETS.md). Dimensions/rate follow the project,
-except the explicit 720p starter fits/pads to 1280x720 at the project frame rate.
+The 12 product built-ins are bundled from `schema/builtin-presets.v1.json`.
+The same catalog generates 12 fixed VEGAS starters after the reserved probe (0)
+and existing general template (1). The 2026-11-05 simplification retains seven
+Web Upload presets (H.264/HEVC/AV1 on CPU and NVENC, plus CPU VP9) and five
+editing/lossless presets; app/native display names match. Dimensions/rate follow
+the project; see [starter settings](../STARTER_PRESETS.md).
 Each starter carries a core-normalized recipe and origin `{presetId, revision,
-name}` matching its app built-in. Built-in setting changes increment revision;
-existing IDs and slot/GUID identities stay stable. Installed binaries supply
+name}` matching its app built-in. Built-in settings/metadata changes increment revision;
+existing IDs and template IDs/GUIDs stay stable. Catalog `vegas[].index` is the
+persistent template ID, independent of the now-contiguous enumeration position;
+`retiredVegas` reserves removed IDs/GUIDs. Saved snapshots and personal exports of
+retired presets remain usable without a library lookup. Installed binaries supply
 defaults; Setup never copies `.sft2` templates or replaces saved user snapshots.
 Explicit popup Update from library adopts newer settings. User pin metadata has
 no native enumeration effect. This is distinct from historical B0 fake fixtures.
