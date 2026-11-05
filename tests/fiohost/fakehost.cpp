@@ -95,6 +95,15 @@ class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
   HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override {
     return Qi(riid, ppv, {IID_IUnknown, __uuidof(ISfReadStream), __uuidof(ISfReadVideoRenderStream)});
   }
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  HRESULT STDMETHODCALLTYPE GetReadStreamClass(IUnknown** out) override {
+    if (out) *out = nullptr;
+    return E_NOTIMPL;
+  }
+#endif
+#if VEGAS_ENCODER_LEGACY_HOST == 21 || VEGAS_ENCODER_LEGACY_HOST == 13
+  HRESULT STDMETHODCALLTYPE LegacyStreamControl(LONG) override { return E_NOTIMPL; }
+#endif
   HRESULT STDMETHODCALLTYPE GetFile(IUnknown** p) override {
     if (p) *p = nullptr;
     return E_NOTIMPL;
@@ -118,7 +127,11 @@ class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
   }
   HRESULT STDMETHODCALLTYPE GetFormat10(void*) override { return E_NOTIMPL; }
   HRESULT STDMETHODCALLTYPE GetReadVideoFormat(void*) override { return E_NOTIMPL; }
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  HRESULT STDMETHODCALLTYPE SetRenderFrameFormat(void*) override {
+#else
   HRESULT STDMETHODCALLTYPE SetRenderFrameFormat(void*, const void*) override {
+#endif
     unexpected++;
     return E_NOTIMPL;
   }
@@ -235,6 +248,15 @@ class FakeAudio final : public Counted<ISfReadAudioStream> {
   HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override {
     return Qi(riid, ppv, {IID_IUnknown, __uuidof(ISfReadStream), __uuidof(ISfReadAudioStream)});
   }
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  HRESULT STDMETHODCALLTYPE GetReadStreamClass(IUnknown** out) override {
+    if (out) *out = nullptr;
+    return E_NOTIMPL;
+  }
+#endif
+#if VEGAS_ENCODER_LEGACY_HOST == 21 || VEGAS_ENCODER_LEGACY_HOST == 13
+  HRESULT STDMETHODCALLTYPE LegacyStreamControl(LONG) override { return E_NOTIMPL; }
+#endif
   HRESULT STDMETHODCALLTYPE GetFile(IUnknown** p) override {
     if (p) *p = nullptr;
     return E_NOTIMPL;

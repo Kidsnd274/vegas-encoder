@@ -6,6 +6,9 @@
 // Audio is read per frame up to round((i + 1) * rate / fps) so it does not
 // drift (Voukoder's fixed 1601-sample reads lose ~0.6 samples per frame).
 #include "vegas_encoder.h"
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+#include "recipe_destination.h"
+#endif
 #include "../../engine/encode.h"
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
 #include "../../engine/recipe_job.h"
@@ -196,7 +199,7 @@ struct Report {
   WORD bitCount = 0;
   double fps = 0, pixelAspect = 0;
   DWORD planeFields[6] = {};
-  BYTE firstInfo[frameinfo::size] = {};
+  alignas(8) BYTE firstInfo[frameinfo::size] = {};
   bool haveInfo = false;
   LONGLONG infoChanges = 0, sizeChanges = 0;
   LONG tokenMode = -1;
@@ -221,15 +224,23 @@ struct Report {
 
 class RenderFile final : public ISfRenderFile {
  public:
-  explicit RenderFile(Tpl t) : tpl_(std::move(t)) {
+  explicit RenderFile(Tpl t, const GUID& owner, ISfRenderFileClass* renderClass) : tpl_(std::move(t)) {
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
     // Own the decoded recipe at Create. Later native-page or library edits must
     // never change the settings of this render object.
-    recipeSnapshot_ = configuration::ReadRecipeSnapshot(tpl_, GUID_VegasEncoderType);
+    recipeSnapshot_ = configuration::ReadRecipeSnapshot(tpl_, owner);
+#else
+    (void)owner;
 #endif
 #if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
     // Snapshot the one proof value at Create; later page edits cannot change it.
     proofExtraReport_ = configuration::ReadProofSettings(tpl_).extraReport;
+#endif
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+    if (renderClass) renderClass->AddRef();
+    renderClass_.reset(renderClass);
+#else
+    (void)renderClass;
 #endif
   }
   ~RenderFile() {
@@ -260,6 +271,15 @@ class RenderFile final : public ISfRenderFile {
     return (ULONG)n;
   }
 
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  HRESULT STDMETHODCALLTYPE GetRenderClass(ISfRenderFileClass** out) override {
+    if (!out) return E_POINTER;
+    *out = renderClass_.get();
+    if (!*out) return E_UNEXPECTED;
+    (*out)->AddRef();
+    return S_OK;
+  }
+#endif
   HRESULT STDMETHODCALLTYPE CloseFile() override {
     return NativeBoundary([&]() -> HRESULT {
       BestEffortDiagnostic([&] { Log("CloseFile (file %p)", (void*)this); });
@@ -279,7 +299,16 @@ class RenderFile final : public ISfRenderFile {
   }
   HRESULT STDMETHODCALLTYPE SetFile(LPCWSTR path) override {
     return NativeBoundary([&]() -> HRESULT {
-      path_ = path ? path : L"";
+      std::wstring resolved = path ? path : L"";
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      if (Cfg().encode && Cfg().legacyAutoNames) {
+        try { resolved = ResolveRecipeDestination(recipeSnapshot_.at("recipe"),resolved); }
+        catch (const std::invalid_argument&) { return E_INVALIDARG; }
+        catch (const ve::Error&) { return E_INVALIDARG; }
+        BestEffortDiagnostic([&] { Log("Legacy destination: requested=%s actual=%s", Utf8(path ? path : L"").c_str(), Utf8(resolved.c_str()).c_str()); });
+      }
+#endif
+      path_ = std::move(resolved);
       BestEffortDiagnostic([&] { Log("SetFile(%s)", Utf8(path_.c_str()).c_str()); });
       return S_OK;
     });
@@ -287,7 +316,9 @@ class RenderFile final : public ISfRenderFile {
   HRESULT STDMETHODCALLTYPE GetFileName(LPWSTR path, LONG cch) override {
     return NativeBoundary([&]() -> HRESULT {
       if (!path || cch <= 0) return E_POINTER;
-      wcsncpy_s(path, (size_t)cch, path_.c_str(), _TRUNCATE);
+      path[0] = L'\0';
+      if (static_cast<size_t>(cch) <= path_.size()) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+      std::copy_n(path_.c_str(),path_.size() + 1,path);
       BestEffortDiagnostic([&] { Log("GetFileName(cch=%ld) -> %s", cch, Utf8(path).c_str()); });
       return S_OK;
     });
@@ -589,7 +620,7 @@ class RenderFile final : public ISfRenderFile {
       if (!poll(frame)) break;
       SFMEMORYTOKEN tok{};
       LONG_PTR lock = 0;
-      BYTE info[frameinfo::size]{};
+      alignas(8) BYTE info[frameinfo::size]{};
       LONG count = 0;
       double t = NowMs();
       HRESULT hr = video->GetRenderFrame(frame, &tok, &lock, info, &count);
@@ -934,7 +965,7 @@ class RenderFile final : public ISfRenderFile {
       if (video) {
         SFMEMORYTOKEN tok{};
         LONG_PTR lock = 0;
-        BYTE info[frameinfo::size] = {};
+        alignas(8) BYTE info[frameinfo::size] = {};
         LONG cb = 0;
         double t = NowMs();
         hr = video->GetRenderFrame(i, &tok, &lock, info, &cb);
@@ -1197,6 +1228,9 @@ class RenderFile final : public ISfRenderFile {
       BestEffortDiagnostic([&] { Log("manifest write failed: %lu", f.Error()); });
   }
 
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  std::unique_ptr<ISfRenderFileClass, ComRelease> renderClass_;
+#endif
   LONG ref_ = 1;
   Tpl tpl_;
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
@@ -1213,19 +1247,19 @@ class RenderFile final : public ISfRenderFile {
 
 }  // namespace
 
-HRESULT CreateRenderFile(const SFTEMPLATE* t, ISfRenderFile** out) {
+HRESULT CreateRenderFile(const SFTEMPLATE* t, ISfRenderFile** out, const GUID& owner, ISfRenderFileClass* renderClass) {
   if (!out) return E_POINTER;
   *out = nullptr;
   return NativeBoundary([&]() -> HRESULT {
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-    try { *out = new RenderFile(Tpl::Copy(t)); }
+    try { *out = new RenderFile(Tpl::Copy(t), owner, renderClass); }
     catch (const std::invalid_argument&) { return E_INVALIDARG; }
     catch (const ve::Error&) { return E_INVALIDARG; }
 #elif defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
-    try { *out = new RenderFile(Tpl::Copy(t)); }
+    try { *out = new RenderFile(Tpl::Copy(t), owner, renderClass); }
     catch (const std::invalid_argument&) { return E_INVALIDARG; }
 #else
-    *out = new RenderFile(Tpl::Copy(t));
+    *out = new RenderFile(Tpl::Copy(t), owner, renderClass);
 #endif
     BestEffortDiagnostic([&] { Log("RenderFile %p created", (void*)*out); });
     return S_OK;

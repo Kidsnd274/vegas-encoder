@@ -11,6 +11,112 @@ No separate worktree or permanent ownership split was introduced. Read [AGENTS.m
 [status](STATUS.md) and relevant contracts/specs. Former workstream handoffs are
 history; their old locations, ownership splits and queues do not apply.
 
+## Current queue: experimental VEGAS 22 trial
+
+The VEGAS 22 build 248 trial has its updated exporter and popup app. Use the
+[updated 22 launcher and rollback](OLDER_VEGAS_TRIALS.md#vegas-22-popup-update).
+In the isolated profile, check the Container note and footer, then perform
+the first short render with the supplied clip. Continue to 21 and 13 after
+reviewing the 22 result. The VEGAS 23 trial record below remains separate.
+
+## Separate owner-operated VEGAS 23 compatibility trial
+
+**VEGAS 23 direction (owner, 2026-11-05): Voukoder-style placeholder on legacy
+hosts; 2026 unchanged.** The five-format trial never displayed in 23: VEGAS reused
+a stale one-class plug-in cache (research F-070). The owner then had it uninstalled
+from 23, so no Vegas Encoder exporter is installed there now. `LegacyAutoNames=1`
+now advertises `*.vencoder`, like Voukoder Pro's `*.voukoderpro` (F-071), and still
+writes and reports the preset's real container. Candidate
+`build/test-results/vegas23-vencoder-checked/` (DLL `16EC5B2C…64B90FBD`) passes the
+full isolated native suite and fake-host real-FFmpeg renders. Installed in 23 at
+16:20 +08:00; **owner confirmed in real VEGAS 23.0.0.278 (18:39 +08:00) that it works
+well.** The new DLL write time alone forced rediscovery (no cache edit). Setup now
+installs the same DLL for 2026 and 23 with a per-version INI.
+
+**Next for 2026/23:** with owner approval, install a build containing the
+[template name alignment](LEGACY_NAMING.md#template-name-alignment) fix in 2026
+and 23. Confirm every starter shows its full name ("H.264 (CPU)", "HEVC (CPU)",
+"FFV1", "H.264 (NVENC)", "ProRes 422 LT") and that Apply keeps names. Then
+qualify a real setup.exe install/update/uninstall for both versions.
+
+**Container-specific VEGAS 23 trial installed with owner approval at 15:16:32
++08:00 on 2026-11-05 (F-069 follow-up).** Same DLL `6BC38FEC…F8B694F0`, new INI
+`C56280BC…34D80C`. Installed manifest and discovery hashes verified. Earlier
+single-format automatic trial is the exact rollback. Next owner check: verify
+File and Name for MKV, MP4 and MOV, then verify output and completion Open.
+See [trial and rollback](LEGACY_NAMING.md).
+
+**Owner-operated VEGAS 23 MKV render verified (F-068):** automatic trial
+`6BC38FEC…F8B694F0` on build 278 published Matroska (AV1/Opus, 300 frames and
+480,480 audio sample frames) and returned the `.mkv` path from GetFileName.
+The 100% completion screenshot still shows `.mp4` and disables Open. The host
+copies the actual getter result into native records. The post-success query leads
+to an input-only notification, separate from the mutable slot-3 callback. Trace
+the completion label/Open path consumer next. MP4/MOV, persistence and independent
+output decode remain pending. [Evidence](../../vegas-ffmpeg-frameserver/docs/experiments/2026-11-05-vegas23-completion-path.md).
+
+**Current next task:** owner-operated VEGAS 23 render/filename verification of the
+**automatic** naming trial, installed with explicit approval at 2026-11-05
+**12:04:43 +08:00**. The owner asked to use Classic's method for older
+connectors; the opt-in implementation is complete and offline-tested. Read
+[LEGACY_NAMING.md](LEGACY_NAMING.md) for behavior, exact bytes and rollback.
+
+`LegacyAutoNames=1` keeps one original format/all 12 starters and nominal MP4
+advertising. SetFile resolves the active immutable recipe's core-derived suffix
+before admission/reservation. The actual path feeds strict suffix/collision/
+no-overwrite/publication checks, progress/history and GetFileName. Native page
+suffix guidance is automatic. It wins over both retained experimental flags.
+No guessed host ABI, copied GPL implementation, portable recipe/C4 change or
+modern default behavior change. Actual old-host discovery/frame ABI is a separate
+qualification question; do not claim support for all old versions from naming.
+
+Installed trial source: `build/test-results/vegas23-auto-names-v2/trial-plugin/`, DLL
+`6BC38FEC61FAB1D0EEDA7FA1042E7CBFC0FFCF822272BA790BF15D23F8B694F0`.
+The matched F-061 staged app is reused. `rollback-five-format/` preserves the prior
+fallback DLL/INI/manifest/discovery; frozen updater and manifest are alongside.
+Installed DLL/INI/new manifest verify. Original Release/Voukoder and product
+discovery hashes are unchanged; reused app/core hashes verify. Installation
+verification and elevation transcript are beside the prepared bundle.
+Earlier F-062 manual candidate `7C14A677…33D0BAB5` stays held/unapproved. Preserve
+all bundles/rollbacks. Approval covered this exact automatic candidate's 23-only
+replacement and has been used; do not request that approval again. A different
+replacement still needs approval. No automatic computer takeover or extra 2026 qualification.
+
+Focused results: 3,182 core, 321 modern, 417 fallback, 170 manual, **429 automatic**
+actual-DLL/core, 379 snapshot, 32 runtime checks; exact trial INI also 429. Prior
+DLL fails automatic regression at check 16. Actual adapter/fake-host/real FFmpeg
+across five containers: 120 modern and 178 automatic checks, including path/record,
+cancel/recovery and collision handling. All 11 automatic C5/C6 paths agree. Confined
+update/exact DLL-INI restore/remove passes. No app code/core policy change or app
+build/widget/golden rerun. The real MKV result and remaining gates are above.
+
+Next owner check: reopen 23, verify one format and intact names, small MP4 plus another
+container under fresh basenames, actual suffix/container and post-success filename
+reporting. Nominal File column remaining MP4 is expected. Check actual collision
+refusal and saved-template restart only after basic render succeeds. Then map/
+qualify 22/21 and 13 separately; keep general Setup limited to qualified hosts.
+
+Earlier F-059 confirms a filename blocker (MP4 recipe given `.mkv`; rejected before
+frames) and fixes the separate missing-first-letter bug in source with DWORD native
+text placement. See STATUS for 379 template/314 actual-DLL fake-host checks and
+the uninstalled 12-starter candidate. Resolve/verify how 23 chooses a correct suffix
+before another updated trial (now prepared in F-061); keep the destination guard. Computer Use was stopped
+by owner Escape; do not resume UI input without new direction. Offline source work
+does not need computer control. Saved snapshots stay readable; no guessed repairs
+to already-truncated saved names or changes to the streamlined profile identities.
+
+The unchanged working-2026 0.1.8 DLL was installed in 23 build 278 with approval
+on 2026-11-05. Discovery/starter listing/native summary and editor launch work;
+owner reports success after reinstalling the main app. Remaining small checks:
+short A/V render with correct suffix and saved-template restart. The owner is
+operating VEGAS; do not take over just to inspect the bundled preset list. The
+[trial record](../../vegas-ffmpeg-frameserver/docs/VEGAS23_VALIDATION.md) and F-058
+hold exact bytes, scope and removal. This frozen DLL still has 16 starters; the
+12-starter source simplification is a separate change. Preserve both records and
+do not enable general 23 installer support or resume deferred 2026 trials from
+these limited results. Older-interface research continues in the investigation;
+production work retains this single checkout/queue.
+
 ## Selected app icon
 
 The owner selected option A. Source: `app/assets/icon/app_icon.svg`; regenerate
@@ -56,8 +162,9 @@ candidate was replaced; push and installation remain separate authorizations.
 **Built-in preset simplification (2026-11-05):** implemented in this checkout
 and not installed. The shared app/native catalog has 12 presets:
 seven Web Upload choices (H.264/HEVC/AV1, each CPU and NVENC, plus CPU VP9) and
-five editing/lossless presets. App/native names match; retained encoding settings,
-IDs/GUIDs/template IDs are unchanged, with metadata revisions advanced to 2.
+five editing/lossless presets. App/native names match, and retained IDs, GUIDs
+and template IDs are stable. Six delivery starters are now revision 3 with
+WebM for AV1, 192 kbps for Opus and 256 kbps for AAC. See [starter presets](STARTER_PRESETS.md).
 Review, CRF 16 and 720p/3500 kbps defaults are retired; preserve their personal
 exports and saved snapshots. `retiredVegas` reserves removed identities, and a
 720p revision-2 export under `schema/fixtures/retired-presets/` keeps compatibility

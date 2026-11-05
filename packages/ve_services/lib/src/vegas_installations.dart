@@ -35,8 +35,10 @@ class VegasHostStatus {
   final VegasInstallationState state;
   final List<String> details;
 
-  // This identifies the recorded target version, never a support guarantee.
-  bool get selectedHostVersion => x64 && version == '2026.0.3.189';
+  // This identifies the recorded target versions, never a support guarantee.
+  // 23.0.0.278 is the owner-tested legacy host (docs/LEGACY_NAMING.md).
+  bool get selectedHostVersion =>
+      x64 && (version == '2026.0.3.189' || version == '23.0.0.278');
 
   factory VegasHostStatus.fromJson(Map<String, dynamic> json) =>
       VegasHostStatus(

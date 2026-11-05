@@ -185,13 +185,28 @@ int main(int argc, char** argv) {
             if (id == "mov" || id == "mxf") { current["recipe"]["video"]["encoder"] = "prores_ks"; current["recipe"]["video"]["mode"] = "profile"; current["recipe"]["video"]["profile"] = "hq"; current["recipe"]["video"]["depth"] = 10; current["recipe"]["video"]["speed"] = nullptr; current["recipe"]["audio"][0]["encoder"] = "pcm_s16le"; current["recipe"]["audio"][0]["mode"] = "lossless"; }
             const auto basicContainer = CallJson(ve_compile,current);
             Check(!ve::HasErrors(basicContainer.at("issues")) && basicContainer.at("outputExtension") == ext,"Basic native target " + id + ": " + basicContainer.at("issues").dump());
+            current["paths"]["target"]["containerId"] = id;
+            Check(!ve::HasErrors(CallJson(ve_compile,current).at("issues")),"bound legacy format accepts its Basic container");
+            current["paths"]["target"]["containerId"] = id == "mkv" ? "mp4" : "mkv";
+            auto mismatch = CallJson(ve_compile,current);
+            Check(std::any_of(mismatch.at("issues").begin(),mismatch.at("issues").end(),[](const ve::Json& issue) { return ve::Str(issue,"id") == "N-FORMAT-CONTAINER"; }),"legacy Basic mismatch rejected before a filename is known");
+            current["paths"]["target"]["containerId"] = id;
             current["recipe"]["command"] = {{"mode","template"},{"template","{inputs} -c:v " + ve::Str(current["recipe"]["video"],"encoder") + " -c:a " + ve::Str(current["recipe"]["audio"][0],"encoder") + " -f " + muxer + " {output}"}};
             const auto compiledContainer = CallJson(ve_compile,current);
             Check(!ve::HasErrors(compiledContainer.at("issues")) && compiledContainer.at("outputContainerId") == id && compiledContainer.at("outputExtension") == ext,"Advanced explicit muxer establishes native container independently of inactive Basic controls");
+            current["paths"]["target"]["containerId"] = id == "mkv" ? "mp4" : "mkv";
+            mismatch = CallJson(ve_compile,current);
+            Check(std::any_of(mismatch.at("issues").begin(),mismatch.at("issues").end(),[](const ve::Json& issue) { return ve::Str(issue,"id") == "N-FORMAT-CONTAINER"; }),"legacy Advanced constraint follows active muxer, not inactive Basic controls");
+            current["paths"]["target"]["containerId"] = id;
             current["paths"]["target"]["outputPath"] = "D:\\Renders\\exact" + ext;
             Check(!ve::HasErrors(CallJson(ve_compile,current).at("issues")),"matching destination accepted");
             current["paths"]["target"]["outputPath"] = "D:\\Renders\\wrong.bin";
             Check(ve::HasErrors(CallJson(ve_compile,current).at("issues")),"native destination suffix mismatch rejected");
+        }
+        for (const auto& badContainer : {ve::Json(3),ve::Json("unknown")}) {
+            auto badTarget = nativeRequest;
+            badTarget["paths"]["target"]["containerId"] = badContainer;
+            Reject(ve_compile,badTarget,"TARGET");
         }
         for (const auto* command : {"{inputs} -c:v ffv1 -c:a pcm_f32le {output}", "-f matroska {inputs} -c:v ffv1 -c:a pcm_f32le {output}",
             "{inputs} -c:v ffv1 -c:a pcm_f32le -f tee {output}", "{inputs} -c:v ffv1 -c:a pcm_f32le -f matroska {output} -f mov",

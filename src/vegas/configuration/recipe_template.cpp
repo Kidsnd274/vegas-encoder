@@ -19,14 +19,15 @@ void RequireTemplate(const host::Tpl& value, const GUID& owner) {
     throw std::invalid_argument("Invalid or foreign owned product template.");
 }
 host::Tpl Place(const host::Tpl& value, const std::vector<uint8_t>& payload) {
-  const size_t oldExtra = value.U32(sfio::tpl::cbExtra);
-  const size_t suffix = sfio::tpl::abExtra + oldExtra;
-  // VEGAS accesses the following strings as UTF-16. Odd VEnc envelopes made
-  // names/notes appear byte-shifted in the first real B6 trial (cbExtra=559).
-  // The native allocation includes one zero pad when needed; the core envelope
-  // remains exact and does not include that pad in its length or checksum.
-  const size_t privateBytes = payload.size() + payload.size() % sizeof(wchar_t);
-  const size_t size = value.b.size() - oldExtra + privateBytes;
+  // The host text starts where VEGAS reads it: after cbExtra rounded up to four
+  // bytes, or directly after private bytes written by older builds (Tpl::TextOffset).
+  const size_t suffix = value.TextOffset();
+  // VEGAS 2026, 23 and 22 all round cbExtra up to four bytes before reading
+  // name/notes (23.0.0.278 RVA 0x2DCC80, F-059; 2026.0.3.189 runtime-observed).
+  // WORD alignment alone made names with cbExtra % 4 == 2 lose their first
+  // character. Padding is outside the exact core envelope/checksum.
+  const size_t privateBytes = payload.size() + (4 - payload.size() % 4) % 4;
+  const size_t size = sfio::tpl::abExtra + privateBytes + (value.b.size() - suffix);
   if (size > host::Tpl::kMaxBytes) throw std::length_error("Template allocation exceeds the owned byte limit.");
   host::Tpl result;
   result.b.resize(size);
@@ -55,13 +56,20 @@ ve::Json ReadRecipeSnapshot(const host::Tpl& value, const GUID& owner) {
   RequireTemplate(value, owner);
   size_t length = value.U32(sfio::tpl::cbExtra);
   const auto* payload = value.b.data() + sfio::tpl::abExtra;
-  // Accept only the native alignment byte above, not arbitrary envelope suffixes.
-  // Existing unpadded odd B6 envelopes remain readable without modifying them.
-  if (length >= 32 && length % sizeof(wchar_t) == 0) {
+  // Accept only exact zero-filled DWORD padding, or the previous single-byte
+  // WORD padding. Legacy unpadded envelopes remain readable without rewriting.
+  if (length >= 32) {
     DWORD bodyBytes = 0;
     std::memcpy(&bodyBytes, payload + 8, sizeof bodyBytes);
     const uint64_t envelopeBytes = uint64_t{32} + bodyBytes;
-    if (envelopeBytes + 1 == length && payload[length - 1] == 0) --length;
+    if (envelopeBytes < length) {
+      const uint64_t padding = length - envelopeBytes;
+      const bool native = (padding <= 3 && length % 4 == 0) ||
+                          (padding == 1 && length % sizeof(wchar_t) == 0);
+      if (native && std::all_of(payload + static_cast<size_t>(envelopeBytes), payload + length,
+                                [](uint8_t byte) { return byte == 0; }))
+        length = static_cast<size_t>(envelopeBytes);
+    }
   }
   const auto decoded = ve::DecodePayload(payload, length);
   if (ve::HasErrors(decoded.at("issues")))

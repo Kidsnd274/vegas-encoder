@@ -1,5 +1,22 @@
 # Native configuration foundation
 
+**Automatic legacy naming, 2026-11-05:** `LegacyAutoNames=1` keeps one original
+format and resolves the actual suffix from the selected immutable recipe before
+admission. Native page guidance says the suffix is set automatically; modern mode
+retains its manual suffix guidance. No C4 schema/popup UI change. The approved
+23 trial is installed; focused fake-host results, visual/real-host gates and rollback are in
+[LEGACY_NAMING.md](LEGACY_NAMING.md). Historical proof-build scope below remains.
+
+**Template text compatibility update, 2026-11-05:** current recipe placement
+DWORD-aligns the private allocation before name/notes. Exact VEGAS 23 build-278
+host bytes in investigation F-059 show `0x218 + round_up(cbExtra, 4)` readers
+(EXE RVA `0x2DCC80`), which skip one UTF-16 character for old WORD-only placements
+with cbExtra=2 mod 4. The native boundary accepts exact 0–3 zero DWORD padding and
+legacy unpadded/one-byte WORD padding; the core envelope/checksum is unchanged.
+379 native snapshot/holder and 314 actual-DLL fake-host checks pass. The new DLL
+is uninstalled; visual/restart qualification is pending. The historical foundation
+record below retains its original proof-build scope.
+
 The measured native bridge and one-checkbox page are wired into a **separate,
 opt-in development build**. Installed version is `0.1.2-config-proof`; this current
 candidate adds progress-failure handling and awaits real recovery checks.

@@ -125,7 +125,13 @@ inline constexpr DWORD SFAUDIO_FORMAT_FLOAT32 = 0x20;
 
 // 176-byte frame info filled by GetRenderFrame (F-030, F-031, F-036).
 namespace frameinfo {
+#if VEGAS_ENCODER_LEGACY_HOST == 21
+inline constexpr size_t size = 208;
+#elif VEGAS_ENCODER_LEGACY_HOST == 13
+inline constexpr size_t size = 168;
+#else
 inline constexpr size_t size = 176;
+#endif
 inline constexpr size_t frame = 0x00;        // hyper, equals the requested frame
 inline constexpr size_t dataSize = 0x18;     // hyper, payload bytes
 inline constexpr size_t vex = 0x20;          // same 64-byte block as template +0x130
@@ -182,12 +188,18 @@ struct __declspec(uuid("60FD1C41-7825-11D3-A483-00105A24AA37"))
 ISfReadStream : IUnknown {
   // F-041 values are from one VEGAS 2026 render: 182 frames at 30000/1001,
   // 291,491 samples at 48 kHz.
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  virtual HRESULT STDMETHODCALLTYPE GetReadStreamClass(IUnknown** out) = 0;
+#endif
   virtual HRESULT STDMETHODCALLTYPE GetFile(IUnknown** ppFile) = 0;          // 3
   virtual HRESULT STDMETHODCALLTYPE Slot4(LONG* p) = 0;                       // 4 [rt] 0
   virtual HRESULT STDMETHODCALLTYPE Slot5(LONG* p, LONG* a, LONG* b) = 0;     // 5
   // Returned 60727333 for both streams: duration in 100 ns units (6.0727333 s).
   virtual HRESULT STDMETHODCALLTYPE GetStreamLength(LONGLONG* p) = 0;         // 6 [rt]
   virtual HRESULT STDMETHODCALLTYPE Slot7(LONGLONG* p) = 0;                   // 7 [rt] 0
+#if VEGAS_ENCODER_LEGACY_HOST == 21 || VEGAS_ENCODER_LEGACY_HOST == 13
+  virtual HRESULT STDMETHODCALLTYPE LegacyStreamControl(LONG value) = 0;
+#endif
   virtual HRESULT STDMETHODCALLTYPE Slot8() = 0;                              // 8
 };
 
@@ -212,7 +224,11 @@ ISfReadVideoRenderStream : ISfReadStream {
   virtual HRESULT STDMETHODCALLTYPE GetFormat10(void* fmt184) = 0;            // 10 [rt] streamfmt
   virtual HRESULT STDMETHODCALLTYPE GetReadVideoFormat(void* fmt184) = 0;     // 11 [rt] streamfmt
   // 2026 adds the second argument (F-027); VEGAS 23 has only the first.
-  virtual HRESULT STDMETHODCALLTYPE SetRenderFrameFormat(void* fmt184, const void* ext128) = 0;  // 12 ?
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  virtual HRESULT STDMETHODCALLTYPE SetRenderFrameFormat(void* fmt184) = 0;
+#else
+  virtual HRESULT STDMETHODCALLTYPE SetRenderFrameFormat(void* fmt184, const void* ext128) = 0;
+#endif
   virtual HRESULT STDMETHODCALLTYPE Slot13(void* fmt184, LONG v) = 0;         // 13
   virtual HRESULT STDMETHODCALLTYPE GetRenderFrame(LONGLONG frame, SFMEMORYTOKEN* token,
                                                    LONG_PTR* lock, void* frameInfo176,
@@ -242,8 +258,16 @@ struct __declspec(uuid("001420E1-938C-11D3-A483-00105A24AA37")) ISfReadMeta : IU
 
 // --- Render file / class ----------------------------------------------------
 
+struct ISfRenderFileClass;
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+struct __declspec(uuid("A69223F6-6701-4B79-95E5-864C2B24DCD7"))
+#else
 struct __declspec(uuid("02589F93-A1D1-4550-9CBF-861026600F21"))
+#endif
 ISfRenderFile : IUnknown {
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  virtual HRESULT STDMETHODCALLTYPE GetRenderClass(ISfRenderFileClass** out) = 0;
+#endif
   virtual HRESULT STDMETHODCALLTYPE CloseFile() = 0;                          // 3 [rt]
   virtual HRESULT STDMETHODCALLTYPE IsFileOpen() = 0;                         // 4
   virtual HRESULT STDMETHODCALLTYPE OpenFile(LONG createFlags, LONG shareFlags) = 0;  // 5
@@ -260,9 +284,22 @@ ISfRenderFile : IUnknown {
   virtual HRESULT STDMETHODCALLTYPE UpdateMetaData(LONG sampleRate, LONG encode) = 0;  // 16
 };
 
+// Older layouts are separate build profiles (F-065–F-067).
+// Slot comments on shared methods refer to the modern layout.
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+struct __declspec(uuid("5F351064-46AD-47EE-8999-548769E73639"))
+#else
 struct __declspec(uuid("2F0205B1-7103-4E87-9F03-17A481FB8F28"))
+#endif
 ISfRenderFileClass : IUnknown {
-  virtual HRESULT STDMETHODCALLTYPE SetHostInterface(IUnknown* host) = 0;     // 3 [rt]
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  virtual HRESULT STDMETHODCALLTYPE SetTypeIndex(LONG index) = 0;
+  virtual HRESULT STDMETHODCALLTYPE GetTypeIndex(LONG* index) = 0;
+  virtual HRESULT STDMETHODCALLTYPE SetIOManager(IUnknown* manager) = 0;
+  virtual HRESULT STDMETHODCALLTYPE GetIOManager(IUnknown** manager) = 0;
+#else
+  virtual HRESULT STDMETHODCALLTYPE SetHostInterface(IUnknown* host) = 0;
+#endif
   // Slots 4-7 (F-038): Voukoder Pro's render slot 4 equals its read class's
   // slot 7 and vice versa, so 4 = own type ID, 7 = counterpart class (FrameServer:
   // GetReadClassGuid returns GUID_NULL). Slot 5 equals GetFilterInfo's stream
@@ -270,10 +307,18 @@ ISfRenderFileClass : IUnknown {
   virtual HRESULT STDMETHODCALLTYPE GetTypeID(GUID* g) = 0;                   // 4 [rt]
   virtual HRESULT STDMETHODCALLTYPE GetAllowedStreamTypes(DWORD* v) = 0;      // 5 [rt]
   virtual HRESULT STDMETHODCALLTYPE GetCaps(DWORD* v) = 0;                    // 6 [rt] ?
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  virtual HRESULT STDMETHODCALLTYPE GetReadClass(IUnknown** out) = 0;
+#else
   virtual HRESULT STDMETHODCALLTYPE GetReadClassGuid(GUID* g) = 0;            // 7 [rt]
+#endif
   virtual HRESULT STDMETHODCALLTYPE GetStrings(const LONG* ids, LONG count,
                                                BSTR* strings) = 0;            // 8 [rt]
-  virtual HRESULT STDMETHODCALLTYPE Open(ISfRenderFile** file, LONG h, LPCWSTR path) = 0;  // 9
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  virtual HRESULT STDMETHODCALLTYPE Open(ISfRenderFile* file, LONG h, LPCWSTR path) = 0;
+#else
+  virtual HRESULT STDMETHODCALLTYPE Open(ISfRenderFile** file, LONG h, LPCWSTR path) = 0;
+#endif
   virtual HRESULT STDMETHODCALLTYPE Create(ISfRenderFile** file, LPCWSTR path, LONG cStreams,
                                            ISfReadStream** streams,
                                            const SFTEMPLATE* tpl) = 0;        // 10 [rt]
@@ -292,6 +337,9 @@ ISfRenderFileClass : IUnknown {
   // 2026.0.3.189 host and mp4plug3 writer; see NATIVE_CONTAINER_PLAN.md.
   virtual HRESULT STDMETHODCALLTYPE GetTemplateInfo(const SFTEMPLATE* tpl, BYTE* info, LONG cch,
                                                     LONG type) = 0;           // 17 [rt]
+#if defined(VEGAS_ENCODER_LEGACY_HOST) && VEGAS_ENCODER_LEGACY_HOST != 13
+  virtual HRESULT STDMETHODCALLTYPE GetLegacyTemplateInfoText(const SFTEMPLATE*, wchar_t*, LONG, LONG) = 0;
+#endif
   virtual HRESULT STDMETHODCALLTYPE GetPropertyPageCount(LONG* a, LONG* b, LONG* c) = 0;  // 18 [rt]
   virtual HRESULT STDMETHODCALLTYPE GetPropertyPage(LONG index, IPropertyPage** page) = 0;  // 19 [rt]
   virtual HRESULT STDMETHODCALLTYPE BuyPropertyPages(HWND parent) = 0;        // 20

@@ -66,6 +66,9 @@ Config LoadConfig() {
   c.detailCalls = (int)IniNumber(c.iniPath, L"DetailCalls", (DWORD)c.detailCalls);
   std::wstring mode = IniString(c.iniPath, L"OutputMode", L"ffmpeg");
   c.encode = mode == L"ffmpeg";
+  c.legacyContainers = IniNumber(c.iniPath, L"LegacyContainers", 0) == 1;
+  c.legacyManualNames = IniNumber(c.iniPath, L"LegacyManualNames", 0) == 1;
+  c.legacyAutoNames = IniNumber(c.iniPath, L"LegacyAutoNames", 0) == 1;
   c.validMode = c.encode || mode == L"raw";
   c.ffmpegPath = IniString(c.iniPath, L"FFmpegPath", c.ffmpegPath.c_str());
   c.showEncoderErrors = IniNumber(c.iniPath, L"ShowEncoderErrors", 1) != 0;
@@ -110,8 +113,8 @@ void OpenLogLocked() {
           Utf8(c.iniPath.c_str()).c_str(), c.access, c.streamTypes, c.caps, c.pluginFlags,
           c.writeVideo, c.writeAudio, c.probeGetters, c.detailCalls);
   fflush(g_log);
-  fprintf(g_log, "output mode=%s FFmpegPath=%s pipeTimeoutMs=%lu finishTimeoutMs=%lu\n",
-          c.encode ? "ffmpeg" : "raw", Utf8(c.ffmpegPath.c_str()).c_str(), c.pipeTimeoutMs, c.finishTimeoutMs);
+  fprintf(g_log, "output mode=%s legacyContainers=%d legacyManualNames=%d legacyAutoNames=%d FFmpegPath=%s pipeTimeoutMs=%lu finishTimeoutMs=%lu\n",
+          c.encode ? "ffmpeg" : "raw", c.legacyContainers, c.legacyManualNames, c.legacyAutoNames, Utf8(c.ffmpegPath.c_str()).c_str(), c.pipeTimeoutMs, c.finishTimeoutMs);
   fflush(g_log);
 }
 

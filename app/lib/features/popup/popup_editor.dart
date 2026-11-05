@@ -174,7 +174,10 @@ class _PopupEditorState extends ConsumerState<PopupEditor> {
                                   SignalNode.source => SourcePanel(scope: scope),
                                   SignalNode.video => VideoPanel(scope: scope),
                                   SignalNode.audio => AudioPanel(scope: scope),
-                                  SignalNode.container => ContainerPanel(scope: scope),
+                                  SignalNode.container => ContainerPanel(
+                                    scope: scope,
+                                    usesVencoderPlaceholder: usesVencoderPlaceholder(widget.state.request.context),
+                                  ),
                                   SignalNode.file => FilePanel(
                                     scope: scope,
                                     lengthSec: length,

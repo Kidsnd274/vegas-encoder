@@ -228,8 +228,7 @@ Future<void> main(List<String> args) async {
     final library = FilePresetLibrary(core: core, paths: paths);
     final initialPresets = await library.list();
     check(
-      initialPresets.length == 12 &&
-          initialPresets.every((p) => p.builtin && p.revision == 2),
+      initialPresets.length == 12 && initialPresets.every((p) => p.builtin),
       'packaged product built-ins',
     );
     final web = initialPresets.where((p) => p.recipe.category == 'web');
@@ -247,6 +246,27 @@ Future<void> main(List<String> args) async {
             'VP9 (CPU)': 'libvpx-vp9',
           }),
       'seven generic Web Upload presets, one per requested codec/backend',
+    );
+    for (final preset in web) {
+      final recipe = preset.recipe;
+      final usesOpus =
+          recipe.name.startsWith('AV1') || recipe.name == 'VP9 (CPU)';
+      final audio = recipe.audio.single;
+      check(
+        recipe.container.format == (usesOpus ? 'webm' : 'mp4') &&
+            audio.encoder == (usesOpus ? 'libopus' : 'aac') &&
+            audio.mode == 'bitrate' &&
+            audio.bitrateK == (usesOpus ? 192 : 256),
+        '${recipe.name} has the expected bundled audio and container defaults',
+      );
+    }
+    check(
+      initialPresets.every((p) {
+        final recipe = p.recipe;
+        return p.revision ==
+            (recipe.category == 'web' && recipe.id != 'vp9-webm' ? 3 : 2);
+      }),
+      'only changed presets advance to revision 3',
     );
     final builtin = initialPresets.first;
     check(

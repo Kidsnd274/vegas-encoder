@@ -70,11 +70,12 @@ void EnsureDirectory(const fs::path& path) {
   }
   fs::create_directories(path);
 }
-void ValidateCandidateRecipe(const ve::Json& recipe) {
+void ValidateCandidateRecipe(const ve::Json& recipe, const char* container) {
   const ve::Json media{{"video",{{"width",1920},{"height",1080},{"fps",{30000,1001}},{"pixfmt","p010le"},{"sar","1:1"}}},
                        {"audio",{{"rate",48000},{"channels",2},{"sampleFmt","f32le"}}},{"durationSec",nullptr}};
   const ve::Json paths{{"ffmpeg","ffmpeg.exe"},{"videoPipe","candidate-video"},{"audioPipe","candidate-audio"},{"output","candidate.mkv"},{"project",""}};
   auto targetPaths = paths; targetPaths["target"] = {{"id","vegas-native-v1"}};
+  if (container) targetPaths["target"]["containerId"] = container;
   // The page has no delivered source facts. This sample supports command/target
   // admission only; it must not reject a filter for an invented source aspect.
   targetPaths["mediaIsSample"] = true;
@@ -144,9 +145,10 @@ RecipeRuntime LoadRecipeRuntime() {
   }
   return result;
 }
-configuration::RecipePageOptions RecipeEditorOptions() {
+configuration::RecipePageOptions RecipeEditorOptions(const GUID& owner, const char* container) {
   configuration::RecipePageOptions options;
-  options.owner = GUID_VegasEncoderType;
+  options.owner = owner;
+  options.automaticOutputExtension = Cfg().encode && Cfg().legacyAutoNames;
   options.launch.application = Cfg().appPath;
   options.sessionRoot = (fs::path(Root(true)) / L"sessions").wstring();
   options.dllVersion = kVersion;
@@ -156,9 +158,14 @@ configuration::RecipePageOptions RecipeEditorOptions() {
   catch (...) { ve_free(version.data); throw; }
   ve_free(version.data);
   options.context["hostVersion"] = FileVersion(ModulePath(nullptr));
+  options.context["extensions"] = {{"renderAsExtension",
+      options.automaticOutputExtension ? ve::Json(".vencoder") : ve::Json(nullptr)}};
   options.context["target"] = {{"id","vegas-native-v1"}};
+  if (container) options.context["target"]["containerId"] = container;
   options.beforeLaunch = [root = options.sessionRoot] { AppReady(); EnsureDirectory(root); };
-  options.validateRecipe = ValidateCandidateRecipe;
+  options.validateRecipe = [containerId = std::string(container ? container : "")](const ve::Json& recipe) {
+    ValidateCandidateRecipe(recipe,containerId.empty() ? nullptr : containerId.c_str());
+  };
   return options;
 }
 } // namespace vegas_encoder

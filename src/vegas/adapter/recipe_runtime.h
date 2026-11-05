@@ -11,7 +11,7 @@ struct RecipeRuntime {
 };
 // Owned C7/C3 snapshots only. No discovery, probes or executable hashing here.
 RecipeRuntime LoadRecipeRuntime();
-configuration::RecipePageOptions RecipeEditorOptions();
+configuration::RecipePageOptions RecipeEditorOptions(const GUID& owner, const char* container);
 ve::Json DefaultRecipeSnapshot();
 ve::Json BuiltinRecipeSnapshot(const char* presetJson);
 } // namespace vegas_encoder

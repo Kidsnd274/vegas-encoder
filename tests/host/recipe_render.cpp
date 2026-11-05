@@ -3,6 +3,7 @@
 #include "../../src/vegas/adapter/vegas_encoder.h"
 #include "../../src/vegas/adapter/recipe_runtime.h"
 #include "../../src/vegas/configuration/recipe_template.h"
+#include "../../src/vegas/adapter/recipe_destination.h"
 #include "../fiohost/fakehost.h"
 #include <cstdio>
 #include <filesystem>
@@ -16,6 +17,7 @@ using ve::Json;
 namespace {
 RecipeRuntime selected;
 int checks = 0;
+bool legacyAutomaticNames = false;
 void Check(bool ok, const char* message) { ++checks; if (!ok) throw std::runtime_error(message); }
 // Bound each tiny fake-host render even if a modal dialog blocks its return.
 // On regression only this isolated test process exits; its kill-on-close job
@@ -86,15 +88,19 @@ Json Record(const std::wstring& root) {
 }
 Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT expected,
          LONGLONG cancelAt = -1, int failureSlot = 0, bool mutateAfterCreate = false, bool existing = false,
-         bool encoderFailure = false, const wchar_t* pathExtension = nullptr, bool suffixOnlyName = false) {
+         bool encoderFailure = false, const wchar_t* pathExtension = nullptr, bool suffixOnlyName = false,
+         bool nominalExisting = false) {
   const auto folder = root + L"\\" + name;
   std::filesystem::create_directories(folder);
   selected.jobsRoot = folder + L"\\jobs";
   const auto container = ve::FindContainer(ve::Str(recipe.at("container"),"format"));
-  const auto extension = pathExtension ? std::wstring(pathExtension) : container ? Widen(ve::Str(*container,"ext")) : L".mkv";
-  const auto output = folder + L"\\" + (suffixOnlyName ? L"" : L"render") + extension;
+  const auto extension = legacyAutomaticNames ? configuration::RecipeOutputExtension(recipe) :
+    pathExtension ? std::wstring(pathExtension) : container ? Widen(ve::Str(*container,"ext")) : L".mkv";
+  const auto requested = folder + L"\\" + (suffixOnlyName ? L"" : L"render") + (pathExtension ? pathExtension : extension);
+  const auto output = legacyAutomaticNames ? ResolveRecipeDestination(recipe,requested) : requested;
   const bool success = expected == S_OK;
   if (existing) { std::ofstream file{std::filesystem::path(output)}; file << "preserve destination"; }
+  if (nominalExisting) { Check(requested != output,"nominal-collision fixture must use a different actual path"); std::ofstream file{std::filesystem::path(requested)}; file << "preserve nominal"; }
   auto value = Template(recipe);
   ISfRenderFile* raw = nullptr;
   Check(CreateRenderFile(value.Ptr(), &raw) == S_OK && raw, "recipe Create accepts owned snapshot");
@@ -103,6 +109,7 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
     auto changed = configuration::ReadRecipeSnapshot(value, GUID_VegasEncoderType);
     changed["recipe"]["name"] = "Later page edit";
     changed["recipe"]["video"]["encoder"] = "unknown_later_edit";
+    changed["recipe"]["container"]["format"] = "mp4";
     value = configuration::ReplaceRecipeSnapshot(value, GUID_VegasEncoderType, changed);
   }
   RenderTestOptions options; options.width = 320; options.height = 180; options.frames = 24;
@@ -112,10 +119,10 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
   const auto began = GetTickCount64();
   const auto host = ExerciseRecipeHost(options, [&](ISfReadVideoRenderStream* video, ISfReadAudioStream* audio, ISfProgress* progress) {
     Check(render->SetStreamReader(video, 0) == S_OK && render->SetStreamReader(audio, 1) == S_OK, "adapter retains readers");
-    Check(render->SetFile(output.c_str()) == S_OK, "adapter accepts output path");
+    Check(render->SetFile(requested.c_str()) == S_OK, "adapter accepts nominal or exact output path");
     const auto result = render->Render(progress);
     wchar_t returnedPath[32768]{};
-    Check(render->GetFileName(returnedPath,32768) == S_OK && output == returnedPath,"GetFileName preserves exact SetFile destination");
+    Check(render->GetFileName(returnedPath,32768) == S_OK && output == returnedPath,"GetFileName reports actual destination after Render");
     Check(render->CloseFile() == S_OK, "adapter CloseFile after render");
     Check(render->SetStreamReader(nullptr, 0) == S_OK && render->SetStreamReader(nullptr, 1) == S_OK,
           "adapter releases reader references before host audit");
@@ -148,6 +155,12 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
     Check(bytes == "preserve destination", "failed/cancelled recipe preserves existing output");
   } else Check(!std::filesystem::exists(output), "failed/cancelled recipe does not publish a destination");
   if (!recipe.at("audio")[0].at("enabled").get<bool>()) Check(host.reads == 0, "core inputStreams omits unused audio reads");
+  if (requested != output) {
+    if (nominalExisting) {
+      std::ifstream file{std::filesystem::path(requested)}; const std::string bytes((std::istreambuf_iterator<char>(file)),{});
+      Check(bytes == "preserve nominal","nominal path remains untouched when actual path differs");
+    } else Check(!std::filesystem::exists(requested),"encoding never publishes to the wrong nominal extension");
+  }
   return record;
 }
 } // namespace
@@ -155,7 +168,8 @@ namespace vegas_encoder { RecipeRuntime LoadRecipeRuntime() { return selected; }
 
 int wmain(int argc, wchar_t** argv) {
   try {
-    Check(argc == 4 || (argc == 5 && std::wstring(argv[4]) == L"--containers-only"), "usage: recipe-render <fixtures> <fresh-output-root> <ffmpeg> [--containers-only]");
+    legacyAutomaticNames = argc == 5 && std::wstring(argv[4]) == L"--legacy-auto-names";
+    Check(argc == 4 || (argc == 5 && (legacyAutomaticNames || std::wstring(argv[4]) == L"--containers-only")), "usage: recipe-render <fixtures> <fresh-output-root> <ffmpeg> [--containers-only|--legacy-auto-names]");
     const auto root = std::filesystem::absolute(argv[2]).wstring();
     Check(!std::filesystem::exists(root), "fresh test output root required");
     std::filesystem::create_directories(root);
@@ -163,6 +177,7 @@ int wmain(int argc, wchar_t** argv) {
     const auto ini = (std::filesystem::path(self).parent_path() / L"vegas-encoder.ini").wstring();
     WritePrivateProfileStringW(L"vegas-encoder", L"ShowEncoderErrors", L"1", ini.c_str());
     WritePrivateProfileStringW(L"vegas-encoder", L"LogDir", root.c_str(), ini.c_str());
+    WritePrivateProfileStringW(L"vegas-encoder", L"LegacyAutoNames", legacyAutomaticNames ? L"1" : L"0", ini.c_str());
     selected.installation = Installation(std::filesystem::absolute(argv[3]).wstring());
     selected.capabilities = nullptr; selected.verifyOutput = true; selected.hostHwnd = "123456";
     auto recipe = Read(argv[1]).at("fixtures")[0].at("recipe");
@@ -171,7 +186,7 @@ int wmain(int argc, wchar_t** argv) {
     recipe["video"]["depth"] = 10; recipe["video"]["profile"] = nullptr; recipe["video"]["speed"] = nullptr;
     recipe["audio"][0]["encoder"] = "pcm_f32le"; recipe["audio"][0]["mode"] = "lossless";
     if (argc == 5) {
-      Run(root,L"mkv-regression",recipe,S_OK);
+      Run(root,L"mkv-regression",recipe,S_OK,-1,0,true,false,false,legacyAutomaticNames ? L".vencoder" : nullptr);
       for (const auto* id : {"mp4","mov","webm","mxf"}) {
         auto current = recipe; current["container"]["format"] = id;
         if (std::string(id) == "mp4") {
@@ -187,13 +202,18 @@ int wmain(int argc, wchar_t** argv) {
           current["video"]["encoder"] = "dnxhd"; current["video"]["mode"] = "profile"; current["video"]["profile"] = "dnxhr_hq"; current["video"]["depth"] = 8;
           current["audio"][0]["encoder"] = "pcm_s16le";
         }
-        const auto record = Run(root,Widen(id).c_str(),current,S_OK);
+        const auto record = Run(root,Widen(id).c_str(),current,S_OK,-1,0,false,false,false,legacyAutomaticNames ? L".vencoder" : nullptr);
         Check(record.at("verification").at("state") == "passed" && record.at("verification").at("containerEvidenceScope") == "demuxer-family","new container receives sampled readback and explicit family evidence");
       }
-      Run(root,L"mismatched-suffix",recipe,E_INVALIDARG,-1,0,false,false,false,L".mp4");
+      if (legacyAutomaticNames) {
+        Run(root,L"nominal-existing",recipe,S_OK,-1,0,false,false,false,L".vencoder",false,true);
+        Run(root,L"cancel",recipe,SF_E_RENDER_STOPPED,8,0,false,false,false,L".vencoder");
+        Run(root,L"host-error",recipe,E_ACCESSDENIED,-1,7,false,false,false,L".vencoder");
+        Run(root,L"recovery",recipe,S_OK,-1,0,false,false,false,L".vencoder");
+      } else Run(root,L"mismatched-suffix",recipe,E_INVALIDARG,-1,0,false,false,false,L".mp4");
       Run(root,L"suffix-only-name",recipe,S_OK,-1,0,false,false,false,L".mkv",true);
-      Run(root,L"existing-destination",recipe,HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),-1,0,false,true);
-      printf("Native containers PASS: %d checks / five short fake-host real-FFmpeg renders, suffix preflight and existing destination. No VEGAS.\n",checks);
+      Run(root,L"existing-destination",recipe,HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),-1,0,false,true,false,legacyAutomaticNames ? L".vencoder" : nullptr);
+      printf("Native %s PASS: %d checks / short fake-host real-FFmpeg renders across five containers, output paths and existing destination. No VEGAS.\n",legacyAutomaticNames ? "automatic names" : "containers",checks);
       return 0;
     }
     Run(root, L"immutable", recipe, S_OK, -1, 0, true);

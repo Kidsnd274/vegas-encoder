@@ -57,8 +57,7 @@ bool PreservesHost(const Tpl& before, const Tpl& after) {
 size_t WordTextStart(const Tpl& value) {
   return sfio::tpl::abExtra + sizeof(wchar_t) * (value.U32(sfio::tpl::cbExtra) / sizeof(wchar_t));
 }
-std::wstring WordText(const Tpl& value, unsigned field) {
-  size_t at = WordTextStart(value);
+std::wstring TextAt(const Tpl& value, unsigned field, size_t at) {
   size_t remaining = value.U32(sfio::tpl::cchAllocText);
   std::wstring result;
   while (remaining--) {
@@ -68,6 +67,15 @@ std::wstring WordText(const Tpl& value, unsigned field) {
     else if (!field) result += unit;
   }
   throw std::runtime_error("Missing host-style text terminator.");
+}
+std::wstring WordText(const Tpl& value, unsigned field) {
+  return TextAt(value,field,WordTextStart(value));
+}
+// VEGAS 23.0.0.278 name readers round cbExtra up to DWORD alignment, rather
+// than merely requiring UTF-16 alignment (host RVA 0x2DCC80, F-059).
+std::wstring DwordText(const Tpl& value, unsigned field) {
+  const size_t extra = value.U32(sfio::tpl::cbExtra);
+  return TextAt(value,field,sfio::tpl::abExtra + (extra + 3) / 4 * 4);
 }
 void WordRename(Tpl& value, const wchar_t* name, const wchar_t* notes) {
   const size_t nameChars = std::wcslen(name) + 1, notesChars = std::wcslen(notes) + 1;
@@ -83,6 +91,15 @@ Tpl Unpadded(const Tpl& empty, const std::vector<uint8_t>& payload) {
   value.b.insert(value.b.begin() + sfio::tpl::abExtra, payload.begin(), payload.end());
   value.SetU32(sfio::tpl::cbStruct, static_cast<DWORD>(value.b.size()));
   value.SetU32(sfio::tpl::cbExtra, static_cast<DWORD>(payload.size()));
+  return value;
+}
+// A template VEGAS saved itself: the text follows cbExtra rounded up to four
+// bytes, after zero padding (real 23/2026 .sft2 with cbExtra=870 has text at 872).
+Tpl HostSaved(const Tpl& empty, const std::vector<uint8_t>& payload) {
+  auto value = Unpadded(empty,payload);
+  const size_t gap = (4 - payload.size() % 4) % 4;
+  value.b.insert(value.b.begin() + sfio::tpl::abExtra + payload.size(), gap, 0);
+  value.SetU32(sfio::tpl::cbStruct, static_cast<DWORD>(value.b.size()));
   return value;
 }
 Json Request(const char* id = "session-one") {
@@ -153,26 +170,47 @@ void Placement(const Json& bundle) {
     auto shrunk = ReplaceRecipeSnapshot(grown,owner,snapshot);
     Check(shrunk.b == value.b, "shrinking restores exact canonical/native bytes");
     auto odd = snapshot;
-    // Force each parity rather than relying on a fixture's serialized length.
-    for (int parity = 0; parity < 2; ++parity) {
+    // Force all native alignment cases independently of fixture JSON length.
+    for (size_t residue = 0; residue < 4; ++residue) {
       odd["extensions"]["parity"] = "x";
-      if (ve::EncodePayload(odd).size()%2 != static_cast<size_t>(parity)) odd["extensions"]["parity"] = "xx";
+      for (size_t n = 0; n < 3 && ve::EncodePayload(odd).size()%4 != residue; ++n)
+        odd["extensions"]["parity"] = odd["extensions"]["parity"].get<std::string>() + "x";
       const auto placed = ReplaceRecipeSnapshot(value,owner,odd);
       const auto encoded = ve::EncodePayload(odd);
-      Check(placed.U32(sfio::tpl::cbExtra) == encoded.size() + encoded.size()%2 && PreservesHost(value,placed) &&
-            placed.Name() == empty.Name() && WordText(placed,0) == empty.Name() && WordText(placed,1) == empty.Notes(),
-            "odd/even envelopes align UTF-16 for both byte and wchar-indexed readers");
-      Check(Same(ReadRecipeSnapshot(placed,owner),odd), "native alignment byte is outside strict core envelope");
-      if (parity) {
-        auto badPad = placed; badPad.b[sfio::tpl::abExtra+encoded.size()] = 1;
-        Check(Rejects([&] { ReadRecipeSnapshot(badPad,owner); }), "nonzero native alignment byte rejected");
+      Check(encoded.size()%4 == residue, "fixture covers requested envelope alignment");
+      Check(placed.U32(sfio::tpl::cbExtra)%4 == 0 && PreservesHost(value,placed) &&
+            placed.Name() == empty.Name() && WordText(placed,0) == empty.Name() && WordText(placed,1) == empty.Notes() &&
+            DwordText(placed,0) == empty.Name() && DwordText(placed,1) == empty.Notes(),
+            "all envelope alignments preserve names/notes for byte, WORD and VEGAS-23 DWORD readers");
+      Check(Same(ReadRecipeSnapshot(placed,owner),odd), "native alignment bytes are outside strict core envelope");
+      if (residue) {
+        for (size_t offset = encoded.size(); offset < placed.U32(sfio::tpl::cbExtra); ++offset) {
+          auto badPad = placed; badPad.b[sfio::tpl::abExtra+offset] = 1;
+          Check(Rejects([&] { ReadRecipeSnapshot(badPad,owner); }), "every nonzero native alignment byte is rejected");
+        }
         Check(ve::HasErrors(ve::DecodePayload(placed.b.data()+sfio::tpl::abExtra,placed.U32(sfio::tpl::cbExtra)).at("issues")),
               "core envelope decoder still rejects native padding directly");
-        const auto legacy = Unpadded(empty,encoded);
-        Check(Same(ReadRecipeSnapshot(legacy,owner),odd) && legacy.Name() == empty.Name() && WordText(legacy,0) != empty.Name(),
-              "old odd B6 bytes remain readable while reproducing a wchar-offset text mismatch");
-        const auto repaired = ReplaceRecipeSnapshot(legacy,owner,odd);
-        Check(repaired.b == placed.b, "replacement safely aligns legacy private allocation without interpreting text");
+      }
+      const auto legacy = Unpadded(empty,encoded);
+      Check(Same(ReadRecipeSnapshot(legacy,owner),odd) && legacy.Name() == empty.Name(), "old unpadded envelopes remain readable");
+      auto wordBytes = encoded;
+      if (wordBytes.size()%2) wordBytes.push_back(0);
+      const auto wordAligned = Unpadded(empty,wordBytes);
+      Check(Same(ReadRecipeSnapshot(wordAligned,owner),odd) && WordText(wordAligned,0) == empty.Name(),
+            "previous WORD-aligned snapshots remain readable");
+      if (residue == 1 || residue == 2)
+        Check(DwordText(wordAligned,0) == empty.Name().substr(1), "old WORD placement reproduces VEGAS-23 missing first letter");
+      Check(ReplaceRecipeSnapshot(legacy,owner,odd).b == placed.b && ReplaceRecipeSnapshot(wordAligned,owner,odd).b == placed.b,
+            "explicit replacement aligns legacy private allocation and preserves its raw host suffix");
+      const std::vector<uint8_t>* layouts[] = {&encoded,&wordBytes};
+      for (const auto* source : layouts) {
+        const auto saved = HostSaved(empty,*source);
+        Check(saved.Name() == empty.Name() && saved.Notes() == empty.Notes() && DwordText(saved,0) == empty.Name(),
+              "VEGAS-saved layout reads names at the rounded offset, as VEGAS does");
+        Check(Same(ReadRecipeSnapshot(saved,owner),odd), "VEGAS-saved padding is outside the private envelope");
+        const auto replaced = ReplaceRecipeSnapshot(saved,owner,odd);
+        Check(replaced.b == placed.b && DwordText(replaced,0) == empty.Name(),
+              "Apply on a VEGAS-saved template keeps the name intact, not shifted by its old padding");
       }
     }
   }
@@ -202,7 +240,7 @@ void Placement(const Json& bundle) {
   Check(Rejects([&] { CreateRecipeTemplate(huge,owner,snapshot); }), "host allocation growth limit enforced");
   auto tooLarge = snapshot; tooLarge["extensions"]["huge"] = std::string(VE_CORE_PAYLOAD_LIMIT,'x');
   Check(Rejects([&] { ReplaceRecipeSnapshot(value,owner,tooLarge); }), "core 16 KiB envelope limit retained at native boundary");
-  for (const auto suffix : {std::vector<uint8_t>{0,0},std::vector<uint8_t>{1},std::vector<uint8_t>{0,0,0}}) {
+  for (const auto suffix : {std::vector<uint8_t>{0,0,0,0},std::vector<uint8_t>{1},std::vector<uint8_t>{0,1},std::vector<uint8_t>{0,0,1}}) {
     auto raw = ve::EncodePayload(snapshot); raw.insert(raw.end(),suffix.begin(),suffix.end());
     const auto invalid = Unpadded(Empty(),raw);
     Check(Rejects([&] { ReadRecipeSnapshot(invalid,owner); }), "arbitrary private suffix never becomes permitted alignment padding");

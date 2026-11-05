@@ -34,6 +34,7 @@ foreach ($license in 've_core.txt','ve_services.txt','InstrumentSans-OFL.txt','J
 }
 Check ($actual.Count -eq $manifest.files.Count) 'Manifest must cover every packaged file'
 Check ((Get-Content -LiteralPath "$bundle\installer\vegas-encoder.ini.in" -Raw) -match 'AppPath=\{app\}\\VegasEncoder.exe' ) 'Installer must render its selected application path'
+Check ([regex]::Matches((Get-Content -LiteralPath "$bundle\installer\vegas-encoder.ini.in" -Raw), '(?m)^LegacyAutoNames=\{legacyAutoNames\}\r?$').Count -eq 1) 'Installer must choose LegacyAutoNames per VEGAS version'
 $payload = Get-Content -LiteralPath "$bundle\installer\payload.json" -Raw | ConvertFrom-Json
 Check ($payload.version -eq $version.app -and $payload.coreVersion -eq $version.exporter) 'App and host-core versions must be recorded independently'
 Check ((Get-Content -LiteralPath "$bundle\plugin\vegas-encoder.ini" -Raw).Contains("AppPath=$bundle\app\VegasEncoder.exe")) 'Trial must use its own app'

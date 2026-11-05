@@ -53,6 +53,12 @@ struct Config {
   bool probeGetters = true;  // call out-only stream getters once per render
   int detailCalls = 12;      // full template dumps per method
   bool encode = true;
+  // Explicit older-host trial mode; the normal 2026 exporter stays one class.
+  bool legacyContainers = false;
+  // One-format trial: omit the class extension so 23 preserves the typed suffix.
+  bool legacyManualNames = false;
+  // One-format legacy policy: nominal MP4 display, actual core-derived suffix.
+  bool legacyAutoNames = false;
   bool validMode = true;
   bool showEncoderErrors = true;
   std::wstring ffmpegPath = L"C:\\ffmpeg\\bin\\ffmpeg.exe";
@@ -76,6 +82,8 @@ using host::ComRelease;
 void LogTemplate(const char* label, const sfio::SFTEMPLATE* t, bool dump) noexcept;
 
 // Render file object created by ISfRenderFileClass::Create.
-HRESULT CreateRenderFile(const sfio::SFTEMPLATE* tpl, sfio::ISfRenderFile** out);
+HRESULT CreateRenderFile(const sfio::SFTEMPLATE* tpl, sfio::ISfRenderFile** out,
+                         const GUID& owner = GUID_VegasEncoderType,
+                         sfio::ISfRenderFileClass* renderClass = nullptr);
 
 }  // namespace vegas_encoder

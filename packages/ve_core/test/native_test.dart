@@ -688,6 +688,23 @@ Future<void> main(List<String> args) async {
     !errors(targetResult.issues),
     'native context crosses FFI and suffix matching is case insensitive',
   );
+  final boundPaths = f.paths.copyWith(
+    target: {'id': 'vegas-native-v1', 'containerId': 'mkv'},
+  );
+  check(
+    boundPaths.copyWith().target?['containerId'] == 'mkv' &&
+        CompilePaths.fromJson(boundPaths.toJson()).target?['containerId'] == 'mkv',
+    'legacy container context survives typed copy and JSON exchange',
+  );
+  final boundResult = core.compile(
+    f.recipe,
+    media: f.media,
+    paths: boundPaths,
+  );
+  check(
+    boundResult.issues.any((issue) => issue.id == 'N-FORMAT-CONTAINER'),
+    'legacy class mismatch crosses the real native ABI before a path is known',
+  );
   check(
     targetPaths.copyWith().target?['id'] == 'vegas-native-v1' &&
         targetPaths.copyWith(target: null).target == null,

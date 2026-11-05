@@ -26,8 +26,12 @@ or FFmpeg. The behaviour below was agreed with the owner on 2026-10-23.
 - **App**: exactly one per machine, always installed. It owns the Windows
   uninstall entry and the existing Inno `AppId`.
 - **Core**: the VEGAS exporter. At most **one per VEGAS version**, installed in
-  that VEGAS folder. Each supported VEGAS version has its own core binary in the
-  bundle; today only VEGAS Pro 2026 is supported.
+  that VEGAS folder. Supported today: VEGAS Pro 2026 and VEGAS Pro 23. They
+  share one exporter DLL; only its INI differs. Setup fills the template's
+  `LegacyAutoNames={legacyAutoNames}` with 0 for 2026 (per-template extension)
+  and 1 for 23 (Render As shows `.vencoder`, the recipe picks the real extension;
+  [LEGACY_NAMING.md](LEGACY_NAMING.md)). Every install or repair rewrites the DLL,
+  which gives it a new write time; VEGAS 23 caches its format list by that time.
 - **Everything moves together.** The exporter refuses to render with any app build
   other than its own (`AppReady` in `src/vegas/adapter/recipe_runtime.cpp`). After
   every successful run, every installed core has the app's version: updating the
@@ -202,8 +206,11 @@ Keep **one bundled setup**. Its Inno `AppId`
 uninstaller identity; do not change it for a new release or VEGAS version.
 
 **Adding a VEGAS version:** build its exporter, ship it in the bundle, and mark the
-family supported in the helper (`supported()` in `setup/native/install.cpp`, which
-today maps every supported family to `vegas-encoder.dll`). Detection, records and
+family supported in the helper (`supportedFamilies` in `setup/native/install.cpp`,
+which today maps every supported family to `vegas-encoder.dll`; `automaticNames()`
+chooses its INI policy). VEGAS 22, 21 and 13 need their own DLL builds
+([OLDER_VEGAS_TRIALS.md](OLDER_VEGAS_TRIALS.md)), so supporting them also needs a
+per-family payload. Detection, records and
 the wizard already handle several versions. Split installers are not implemented;
 a future split must migrate uninstaller ownership and protect app dependencies
 rather than assigning new AppIds that leave two uninstallers owning the same files.
@@ -215,7 +222,8 @@ C++ runtime already installed (`vcruntime140`, `vcruntime140_1`, `msvcp140`).
 It reports a missing prerequisite rather than downloading or installing tools.
 Setup does not kill processes or schedule partial file replacement on reboot.
 Updates keep the existing app directory; uninstall first to relocate it.
-Detection does not qualify a new build: the tested host remains 2026.0.3.189.
+Detection does not qualify a new build: the tested hosts remain 2026.0.3.189 and
+23.0.0.278 (owner-tested on 2026-11-05 with the `.vencoder` trial).
 
 The installed exporter goes under `{vegasDir}\FileIO Plug-Ins\vegas-encoder`, with
 its discovery file at the VEGAS root. Setup renders a UTF-16 INI with the final app

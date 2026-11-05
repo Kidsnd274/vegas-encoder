@@ -132,6 +132,15 @@ Rendering does not consult the preset library or wait for the app/monitor.
 
 ## Naming recommendation and alternatives
 
+**Older-host opt-in update, 2026-11-05:** the owner's Classic-method continuation
+adds `LegacyAutoNames=1`, described in [legacy naming](../LEGACY_NAMING.md). It
+resolves a nominal host suffix to the active recipe's core-derived extension in
+SetFile, before admission/reservation. All existing guards and publication checks
+then operate on that actual path, which GetFileName reports. One nominal MP4 class
+keeps all starters; its UI suffix can remain misleading. This is an explicit
+legacy exception to item 3 below, not a change to default modern behavior. Real
+VEGAS qualification and installation approval are still required.
+
 1. Keep the current exporter/type/preset identities and existing MKV templates.
 2. Resolve the container from the active compiled command, never from its filename.
 3. Require canonical suffix agreement, case-insensitively: `.mp4`, `.mkv`, `.mov`,

@@ -25,6 +25,7 @@ import '../presets/display.dart' show nodeForField;
 import '../presets/panels/field_anchor.dart';
 import '../presets/preset_header.dart' show EditorMode;
 import '../presets/save_check.dart';
+import 'display.dart' show usesVencoderPlaceholder;
 import 'popup_dialogs.dart';
 import 'popup_editor.dart';
 import 'popup_version.dart';
@@ -447,7 +448,9 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
               ),
               _Footer(
                 blocked: s == null ? null : blocked,
-                outputExtension: s?.request.context.target == null ? null : data?.compiled.value?.outputExtension,
+                outputExtension: data?.compiled.value?.outputExtension,
+                hasNativeTarget: s?.request.context.target != null,
+                usesPlaceholder: s != null && usesVencoderPlaceholder(s.request.context),
                 canApply: s != null && data != null && blocked == null && s.finished == null,
                 onCancel: () => unawaited(_cancel()),
                 onApply: () => unawaited(_apply()),
@@ -476,11 +479,15 @@ class _Footer extends StatelessWidget {
     required this.onCancel,
     required this.onApply,
     this.outputExtension,
+    required this.hasNativeTarget,
+    required this.usesPlaceholder,
   });
 
   /// Why Apply is off, said beside it.
   final String? blocked;
   final String? outputExtension;
+  final bool hasNativeTarget;
+  final bool usesPlaceholder;
   final bool canApply;
   final VoidCallback onCancel;
   final VoidCallback onApply;
@@ -491,9 +498,16 @@ class _Footer extends StatelessWidget {
     final c = t.colors;
     final why = blocked;
     final extension = outputExtension;
-    final guidance = extension == null
-        ? 'Apply updates this render template. Save it in VEGAS to keep it for next time.'
-        : 'Use $extension for the Render As filename. Apply updates this template; save it in VEGAS to keep it.';
+    final String guidance;
+    if (usesPlaceholder) {
+      guidance = extension == null || extension.isEmpty
+          ? 'Render As shows .vencoder; the file gets the container’s extension. Apply updates this template.'
+          : 'Saved as $extension (Render As shows .vencoder). Apply updates this template; save it in VEGAS to keep it.';
+    } else if (!hasNativeTarget || extension == null || extension.isEmpty) {
+      guidance = 'Apply updates this render template. Save it in VEGAS to keep it for next time.';
+    } else {
+      guidance = 'Use $extension for the Render As filename. Apply updates this template; save it in VEGAS to keep it.';
+    }
     return Container(
       height: 58,
       padding: const EdgeInsets.only(left: 20, right: 16),

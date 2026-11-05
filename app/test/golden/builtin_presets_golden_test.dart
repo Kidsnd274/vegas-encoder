@@ -74,15 +74,12 @@ void main() {
 
   testWidgets('a newer bundled recipe leaves a saved template unchanged until explicit update', (tester) async {
     final hevc = builtins.firstWhere((p) => p.recipe.id == 'hevc-10bit');
-    final newer = hevc.copyWith(
-      revision: hevc.revision + 1,
-      recipe: hevc.recipe.copyWith(video: hevc.recipe.video.copyWith(quality: 20)),
-    );
+    final previous = hevc.recipe.copyWith(audio: [hevc.recipe.audio.single.copyWith(bitrateK: 320)]);
     final saved = EditSessionRequest.fromJson({
       ...request.toJson(),
-      'recipe': hevc.recipe.copyWith(name: 'My saved HEVC', video: hevc.recipe.video.copyWith(quality: 29)).toJson(),
-      'origin': Origin(presetId: hevc.recipe.id, revision: 1, name: hevc.recipe.name).toJson(),
-      'baseRecipe': hevc.recipe.toJson(),
+      'recipe': previous.copyWith(name: 'My saved HEVC', video: previous.video.copyWith(quality: 29)).toJson(),
+      'origin': Origin(presetId: hevc.recipe.id, revision: 2, name: hevc.recipe.name).toJson(),
+      'baseRecipe': previous.toJson(),
     });
     await pumpApp(
       tester,
@@ -91,13 +88,14 @@ void main() {
       overrides: [
         launchModeProvider.overrideWithValue(const EditSessionLaunch('session')),
         windowControllerProvider.overrideWithValue(FakeWindowController()),
-        presetLibraryProvider.overrideWithValue(FakePresetLibrary(presets: [newer])),
+        presetLibraryProvider.overrideWithValue(FakePresetLibrary(presets: [hevc])),
         editSessionServiceProvider.overrideWithValue(FakeEditSessionService(requests: {'session': saved})),
         popupVersionsProvider.overrideWith((ref) async => matchingPopupVersions),
       ],
     );
     final container = ProviderScope.containerOf(tester.element(find.widgetWithText(VeButton, 'Load preset')));
     expect(container.read(popupProvider).requireValue.recipe.video.quality, 29);
+    expect(container.read(popupProvider).requireValue.recipe.audio.single.bitrateK, 320);
     expect(find.text('Library has revision 3'), findsOneWidget);
     await tester.tap(find.text('Update from library'));
     await tester.pumpAndSettle();
@@ -105,7 +103,8 @@ void main() {
     await tester.tap(find.text('Replace with revision 3'));
     await tester.pumpAndSettle();
     final updated = container.read(popupProvider).requireValue;
-    expect(updated.recipe.video.quality, 20);
+    expect(updated.recipe.video.quality, hevc.recipe.video.quality);
+    expect(updated.recipe.audio.single.bitrateK, 256);
     expect(updated.origin!.revision, 3);
     expect(updated.recipe.name, 'My saved HEVC');
   });
@@ -165,6 +164,7 @@ void main() {
           .toPlainText();
       expect(command, contains('libx265'));
       expect(command, contains('aac'));
+      expect(command, contains('256k'));
       expect(command, contains('yuv420p10le'));
       await expectGolden('builtins_hevc_$theme');
     });
@@ -195,7 +195,8 @@ void main() {
       expect(state.recipe.video.depth, 10);
       expect(state.recipe.container.format, 'mp4');
       expect(state.origin!.presetId, 'hevc-10bit');
-      expect(state.origin!.revision, 2);
+      expect(state.recipe.audio.single.bitrateK, 256);
+      expect(state.origin!.revision, 3);
       expect(state.libraryPreset!.builtin, isTrue);
       expect(state.recipe.name, request.recipe.name, reason: 'the VEGAS template keeps its own name');
       await expectGolden('builtins_popup_origin_$theme');

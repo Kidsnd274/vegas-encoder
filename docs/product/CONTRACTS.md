@@ -189,7 +189,7 @@ VideoMedia {width,height:int,fps:[positiveInt,positiveInt],pixfmt,sar:string}
 AudioMedia {rate,channels:int,sampleFmt:string}
 CompilePaths {ffmpeg:string,videoPipe:string,audioPipe:string|null,output:string,project:string,
   target:NativeTarget|null,mediaIsSample?:bool}
-NativeTarget {id:"vegas-native-v1",outputPath:string|null}
+NativeTarget {id:"vegas-native-v1",outputPath:string|null,containerId?:string|null}
 CoreCapabilities {installationId,label,identityKey,version:string,
   libavformatMajor:positiveInt|null,
   encoders:{name:{kind:"video"|"audio",options:EncoderOption[],availability:EncoderAvailability,...}},
@@ -266,6 +266,14 @@ options (`-filter_complex`, `-lavfi`, script/file forms) are refused in both Bas
 Extra and Advanced native context; simple stream filters stay supported.
 Unknown target IDs are rejected.
 
+The opt-in container-specific older-host fallback additionally supplies `target.containerId`
+(`mp4`, `mkv`, `mov`, `webm` or `mxf`). This binds the selected native format;
+`N-FORMAT-CONTAINER` blocks a different active output muxer in Basic or Advanced
+before a destination is known. Invalid non-null IDs/types fail with `TARGET`.
+Omitted/null keeps modern per-template behavior. This transport constraint is
+never persisted into portable recipes; the existing typed target map preserves
+it across C4/FFI. Both the popup and native Apply use the same core rule.
+
 `target.outputPath` is the actual final destination when known. Its suffix must
 match `.mp4`, `.mkv`, `.mov`, `.webm` or `.mxf` case-insensitively. This check does
 not infer the muxer from that path. Omit/null when the destination is unknown;
@@ -305,10 +313,12 @@ The initial trial required MKV video. Current source uses the native target abov
 for five known containers, while retaining square pixels and the established
 P010/48 kHz stereo float input path. New-container real-VEGAS qualification is
 pending; this does not activate arbitrary native formats or output scopes.
-The native private allocation rounds odd VEnc lengths up by one zero byte before
-the host's UTF-16 suffix. That byte is outside the core's strict envelope/checksum;
-only this exact padding is accepted. Earlier intact unpadded B6 envelopes still
-read. No proof migration or reconstruction of corrupted native names is performed.
+The native private allocation rounds VEnc lengths up to four bytes with 0–3 zeros
+before the host's UTF-16 suffix. VEGAS 23 DWORD-rounds this offset; WORD alignment
+alone can skip a character (F-059). Padding stays outside the core envelope/checksum.
+Only exact zero-filled DWORD padding or the earlier single WORD pad is accepted;
+intact unpadded/WORD-padded snapshots remain readable. Only explicit replacement
+changes their allocation. No proof migration or guessed name reconstruction occurs.
 
 `minTotalBytes` / `maxTotalBytes` are the range for the user-entered length, null if
 there is no length, estimate or range. They are not figures the app scales itself.
@@ -955,7 +965,7 @@ EditSessionRequest {
   protocol:1,sessionId:string,templateName:string,recipe:Recipe,origin:Origin|null,
   baseRecipe:Recipe|null,
   context:{hostVersion:string|null,project:string|null,media:MediaDescription|null,
-    target:NativeTarget|null},
+    target:NativeTarget|null,extensions?:{renderAsExtension?:".vencoder"|null}},
   ownerHwnd:decimalString,dllVersion:string,coreVersion:string
 }
 EditSessionResult {protocol:1,sessionId:string,action:"apply"|"cancel",
@@ -975,6 +985,31 @@ popup shares core admission checks before Apply. Old requests omit it and keep
 their prior behavior. Actual Render As destination remains unavailable at edit
 time; do not populate `outputPath` from the sample path. Native admission and
 actual-media compilation recheck the recipe independently of the app.
+
+`context.extensions.renderAsExtension` describes the active Render As
+placeholder. Native automatic naming sends `".vencoder"` and other modes send
+`null`. The popup uses the core's actual output suffix in its Container warning
+and footer. Requests from the installed 23/22/21/13 trials that predate the
+field fall back to their exact host builds. An explicit value takes precedence.
+In container-specific fallback mode the same target also includes the selected format's
+`containerId`; native page ownership uses that format's own type GUID. Factory
+Create and conformance reject a mismatching/foreign product snapshot. Native
+render objects decode an immutable snapshot using the selected owner, and retain
+the existing exact-destination suffix guard. Matching app/core inputs are required;
+an old same-stamp development core can silently ignore an additive context field.
+The separate `LegacyManualNames=1` trial retains one original class and the normal
+unbound target. It omits the class-wide extension so 23's measured Render button
+does not replace the full typed filename; real GUI/discovery behavior remains
+unqualified. It does not add C4 fields or alter exact-path/suffix admission.
+
+The subsequent `LegacyAutoNames=1` candidate keeps one unbound C4 target and all
+starter identities, advertising nominal MP4. Native SetFile resolves the actual
+suffix through the selected immutable recipe's existing core compile fact before
+admission/reservation. That actual path is used for strict suffix validation,
+collision/no-overwrite publication, C5/C6 records and GetFileName. No new C2/C4
+field, recipe change or app-side validation is added. Default modern behavior is
+unchanged. See [legacy naming](../LEGACY_NAMING.md) for the explicit opt-in
+policy, File-column tradeoff, trial/rollback and remaining host gates.
 
 The popup compares C4 `dllVersion`/`coreVersion` with the runner's `appVersion`
 channel and its loaded core. Plug-in/app numeric release triplets must match;

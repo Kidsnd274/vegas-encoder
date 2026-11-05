@@ -3,6 +3,7 @@ import 'package:ve_services/ve_services.dart' hide SizeEstimate;
 
 import '../../../design/components/field.dart';
 import '../../../design/components/interactive.dart';
+import '../../../design/components/message.dart';
 import '../../../design/components/size_card.dart';
 import '../../../design/components/switch.dart';
 import '../../../design/format.dart';
@@ -65,8 +66,9 @@ class SourcePanel extends StatelessWidget {
 /// Container: where the streams are joined. Each choice says whether it can
 /// hold the chosen codecs, from the core's codec-to-container table.
 class ContainerPanel extends StatelessWidget {
-  const ContainerPanel({super.key, required this.scope});
+  const ContainerPanel({super.key, required this.scope, this.usesVencoderPlaceholder = false});
   final PanelScope scope;
+  final bool usesVencoderPlaceholder;
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +77,7 @@ class ContainerPanel extends StatelessWidget {
     final vp = s.data.videoProfile;
     final ap = s.data.audioProfile;
     final current = r.container.format;
+    final extension = s.data.compiled.value?.outputExtension;
     return PanelColumns(
       left: [
         FieldAnchor(
@@ -128,7 +131,18 @@ class ContainerPanel extends StatelessWidget {
           ),
         if (vp?.appleTag != null && (current == 'mp4' || current == 'mov'))
           PanelBlurb('Adds -tag:v ${vp!.appleTag} so Apple players open ${vp.codec}.'),
-        const PanelBlurb('VEGAS chooses the folder and name in Render As. The extension follows the container.'),
+        // Highlighted so the mismatch with Render As is noticed (owner, 2026-11-05).
+        // Nothing needs fixing: the exporter replaces whatever suffix is typed.
+        if (usesVencoderPlaceholder)
+          VeMessage(
+            level: VeLevel.warning,
+            text: 'Render As shows .vencoder on this version of VEGAS.',
+            fix: extension == null || extension.isEmpty
+                ? 'Vegas Encoder gives the file the container’s extension. No need to change it in Render As.'
+                : 'Vegas Encoder saves the file as $extension. No need to change it in Render As.',
+          )
+        else
+          const PanelBlurb('VEGAS chooses the folder and name in Render As. The extension follows the container.'),
       ],
     );
   }

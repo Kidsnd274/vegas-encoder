@@ -1,10 +1,10 @@
 {
   "builtins": 1,
-  "provenance": "Product built-ins. Original six adopted from schema/fixtures/b0; software HEVC and fixed VEGAS starter templates approved 2026-10-18. Recipe changes require a revision increment; VEGAS entry order and GUIDs are stable identities. No FFmpeg or host qualification is implied. Expanded fixed starter list approved 2026-10-23; all original app recipes and VEGAS identities retained. Built-ins simplified and names standardized 2026-11-05: seven Web Upload presets plus editing/lossless presets. Retained IDs/GUIDs/template IDs and encoder settings are unchanged; removed entries do not renumber template IDs. User exports and saved snapshots are independent.",
+  "provenance": "Product built-ins. Original six adopted from schema/fixtures/b0; software HEVC and fixed VEGAS starter templates approved 2026-10-18. Recipe changes require a revision increment; VEGAS entry order and GUIDs are stable identities. No FFmpeg or host qualification is implied. Expanded fixed starter list approved 2026-10-23; all original app recipes and VEGAS identities retained. Built-ins simplified and names standardized 2026-11-05: seven Web Upload presets plus editing/lossless presets. Retained IDs/GUIDs/template IDs stay stable; removed entries do not renumber template IDs. Updated defaults: AV1 in WebM, Opus at 192 kbps and AAC at 256 kbps. User exports and saved snapshots are independent.",
   "presets": [
     {
       "vepreset": 1,
-      "revision": 2,
+      "revision": 3,
       "favorite": false,
       "pinned": false,
       "builtin": true,
@@ -19,7 +19,7 @@
         "schema": 1,
         "id": "yt-h264",
         "name": "H.264 (CPU)",
-        "notes": "Software H.264: x264 CRF 18, slow, 8-bit, with AAC 320 kbps in MP4. Follows project dimensions and frame rate.",
+        "notes": "Software H.264: x264 CRF 18, slow, 8-bit, with AAC 256 kbps in MP4. Follows project dimensions and frame rate.",
         "tags": [],
         "category": "web",
         "container": {
@@ -47,7 +47,7 @@
             "enabled": true,
             "encoder": "aac",
             "mode": "bitrate",
-            "bitrateK": 320,
+            "bitrateK": 256,
             "vbr": null,
             "level": null,
             "sampleRate": "source",
@@ -68,7 +68,7 @@
     },
     {
       "vepreset": 1,
-      "revision": 2,
+      "revision": 3,
       "favorite": false,
       "pinned": false,
       "builtin": true,
@@ -114,7 +114,7 @@
             "enabled": true,
             "encoder": "aac",
             "mode": "bitrate",
-            "bitrateK": 320,
+            "bitrateK": 256,
             "vbr": null,
             "level": null,
             "sampleRate": "source",
@@ -135,7 +135,7 @@
     },
     {
       "vepreset": 1,
-      "revision": 2,
+      "revision": 3,
       "favorite": false,
       "pinned": false,
       "builtin": true,
@@ -150,7 +150,7 @@
         "schema": 1,
         "id": "yt-hevc-nv",
         "name": "HEVC (NVENC)",
-        "notes": "GPU HEVC: NVENC CQ 20, p5, HQ, 10-bit, with AAC 320 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
+        "notes": "GPU HEVC: NVENC CQ 20, p5, HQ, 10-bit, with AAC 256 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
         "tags": [
           "NVIDIA"
         ],
@@ -180,7 +180,7 @@
             "enabled": true,
             "encoder": "aac",
             "mode": "bitrate",
-            "bitrateK": 320,
+            "bitrateK": 256,
             "vbr": null,
             "level": null,
             "sampleRate": "source",
@@ -201,7 +201,7 @@
     },
     {
       "vepreset": 1,
-      "revision": 2,
+      "revision": 3,
       "favorite": false,
       "pinned": false,
       "builtin": true,
@@ -223,7 +223,7 @@
         ],
         "category": "web",
         "container": {
-          "format": "mkv",
+          "format": "webm",
           "faststart": false
         },
         "video": {
@@ -247,7 +247,7 @@
             "enabled": true,
             "encoder": "libopus",
             "mode": "bitrate",
-            "bitrateK": 160,
+            "bitrateK": 192,
             "vbr": null,
             "level": null,
             "sampleRate": "source",
@@ -471,7 +471,7 @@
     },
     {
       "vepreset": 1,
-      "revision": 2,
+      "revision": 3,
       "favorite": false,
       "pinned": false,
       "builtin": true,
@@ -486,7 +486,7 @@
         "schema": 1,
         "id": "h264-nvenc",
         "name": "H.264 (NVENC)",
-        "notes": "Everyday GPU delivery: NVENC H.264 CQ 21, p5, with AAC 192 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
+        "notes": "Everyday GPU delivery: NVENC H.264 CQ 21, p5, with AAC 256 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
         "tags": [
           "NVIDIA",
           "H.264"
@@ -517,7 +517,7 @@
             "enabled": true,
             "encoder": "aac",
             "mode": "bitrate",
-            "bitrateK": 192,
+            "bitrateK": 256,
             "vbr": null,
             "level": null,
             "sampleRate": "source",
@@ -538,7 +538,7 @@
     },
     {
       "vepreset": 1,
-      "revision": 2,
+      "revision": 3,
       "favorite": false,
       "pinned": false,
       "builtin": true,
@@ -553,7 +553,7 @@
         "schema": 1,
         "id": "av1-nvenc",
         "name": "AV1 (NVENC)",
-        "notes": "GPU AV1 CQ 28, p5, with Opus 160 kbps in MKV. Requires an AV1-capable NVIDIA GPU and supporting FFmpeg.",
+        "notes": "GPU AV1 CQ 28, p5, with Opus 192 kbps in WebM. Requires an AV1-capable NVIDIA GPU and supporting FFmpeg.",
         "tags": [
           "NVIDIA",
           "AV1",
@@ -561,7 +561,7 @@
         ],
         "category": "web",
         "container": {
-          "format": "mkv",
+          "format": "webm",
           "faststart": false
         },
         "video": {
@@ -585,7 +585,7 @@
             "enabled": true,
             "encoder": "libopus",
             "mode": "bitrate",
-            "bitrateK": 160,
+            "bitrateK": 192,
             "vbr": null,
             "level": null,
             "sampleRate": "source",
@@ -814,7 +814,7 @@
       "presetId": "yt-h264",
       "guid": "17481DF0-F0C4-48E7-9115-219B74038DC6",
       "name": "H.264 (CPU)",
-      "notes": "Software H.264: x264 CRF 18, slow, 8-bit, with AAC 320 kbps in MP4. Follows project dimensions and frame rate.",
+      "notes": "Software H.264: x264 CRF 18, slow, 8-bit, with AAC 256 kbps in MP4. Follows project dimensions and frame rate.",
       "index": 2
     },
     {
@@ -856,21 +856,21 @@
       "presetId": "h264-nvenc",
       "guid": "457BB2FE-73BB-4E23-A885-4E6ADC43CB08",
       "name": "H.264 (NVENC)",
-      "notes": "Everyday GPU delivery: NVENC H.264 CQ 21, p5, with AAC 192 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
+      "notes": "Everyday GPU delivery: NVENC H.264 CQ 21, p5, with AAC 256 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
       "index": 9
     },
     {
       "presetId": "yt-hevc-nv",
       "guid": "CBF902AD-3E0D-4F0F-AF9A-F595D50166F2",
       "name": "HEVC (NVENC)",
-      "notes": "GPU HEVC: NVENC CQ 20, p5, HQ, 10-bit, with AAC 320 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
+      "notes": "GPU HEVC: NVENC CQ 20, p5, HQ, 10-bit, with AAC 256 kbps in MP4. Requires a working NVIDIA encoder in the selected FFmpeg.",
       "index": 10
     },
     {
       "presetId": "av1-nvenc",
       "guid": "BBD15926-36B8-456C-9A04-A3250A99E95B",
       "name": "AV1 (NVENC)",
-      "notes": "GPU AV1 CQ 28, p5, with Opus 160 kbps in MKV. Requires an AV1-capable NVIDIA GPU and supporting FFmpeg.",
+      "notes": "GPU AV1 CQ 28, p5, with Opus 192 kbps in WebM. Requires an AV1-capable NVIDIA GPU and supporting FFmpeg.",
       "index": 11
     },
     {

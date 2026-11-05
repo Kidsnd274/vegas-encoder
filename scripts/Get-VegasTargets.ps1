@@ -48,6 +48,8 @@ foreach ($dir in ($dirs | Sort-Object)) {
       fileVersion = $exe.VersionInfo.FileVersion; x64 = $x64
       qualification = if ($x64 -and $exe.VersionInfo.FileVersion -eq '2026.0.3.189') {
         'Selected host version; B6 qualification still pending'
+      } elseif ($x64 -and $exe.VersionInfo.FileVersion -eq '23.0.0.278') {
+        'Owner-tested legacy host (.vencoder placeholder names); release qualification pending'
       } else { 'Detected only; unsupported until separately qualified' }
       pluginDir = Join-Path $dir 'FileIO Plug-Ins\vegas-encoder'
       discovery = Join-Path $dir 'VegasEncoder-x64.fio2007-config'

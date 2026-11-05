@@ -634,6 +634,17 @@ static Json CompileInternal(const Json& request, const Json* capabilities, Json*
     if (!target.is_null()) {
         if (!target.is_object() || Str(target,"id") != "vegas-native-v1") throw Error(VE_INVALID_ARGUMENT,"TARGET","Unknown compile target.");
         auto& targetIssues = result["issues"];
+        // Older hosts choose filenames by exporter class rather than template.
+        // This is transport context, shared by popup and native preflight; it
+        // must not change the portable recipe or infer identity from a suffix.
+        if (target.contains("containerId") && !target.at("containerId").is_null()) {
+            if (!target.at("containerId").is_string() || !FindContainer(target.at("containerId").get<std::string>()))
+                throw Error(VE_INVALID_ARGUMENT,"TARGET","Unknown target containerId.");
+            const auto required = target.at("containerId").get<std::string>();
+            if (container && Str(*container,"id") != required) targetIssues.push_back(Issue("N-FORMAT-CONTAINER","error",advanced ? "command.template" : "container.format",
+                "This VEGAS format requires " + required + ". Choose the matching Vegas Encoder format in Render As to use " + Str(*container,"id") + ".",
+                {{"requiredContainerId",required},{"outputContainerId",Str(*container,"id")}}));
+        }
         // Complex graphs can create arbitrary output streams, including through
         // FFmpeg's -lavfi alias or its legacy script option. Apply native
         // admission in both modes; portable desktop commands remain permissive.

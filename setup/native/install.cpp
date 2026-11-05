@@ -180,7 +180,15 @@ static std::vector<Host> hostsIn(const fs::path& dir) {
   return result;
 }
 // This bundle carries a core only for these families; other detected versions are listed as unsupported.
-static bool supported(const std::string& family) { return family == "vegas2026"; }
+// VEGAS 2026 and 23 share one exporter DLL; only its INI differs (see automaticNames).
+static constexpr const char* supportedFamilies[] = {"vegas2026", "vegas23"};
+static bool supported(const std::string& family) {
+  return std::any_of(std::begin(supportedFamilies), std::end(supportedFamilies), [&](const char* f) { return family == f; });
+}
+// VEGAS 2026 asks the exporter for each template's extension. Older hosts show one
+// fixed suffix per format, so they get the .vencoder placeholder and the selected
+// recipe picks the real file extension (docs/LEGACY_NAMING.md).
+static bool automaticNames(const std::string& family) { return family != "vegas2026"; }
 static Host hostFor(const fs::path& dir, const std::string& family) {
   need(supported(family), label(family) + " is not supported by this release.");
   for (auto& h : hostsIn(plain(dir))) if (h.family == family) return h;
@@ -408,6 +416,11 @@ static void rollback(const fs::path& folder, bool allowCommitted) {
   t["status"] = "rolled-back"; saveJournal(folder, t);
 }
 // Setup only removes its own file names; anything else in the folder stays.
+// Each INI template token must appear exactly once.
+static void fill(std::string& text, const std::string& token, const std::string& value) {
+  auto at = text.find(token); need(at != text.npos && text.find(token, at + token.size()) == text.npos, "Invalid INI template: " + token);
+  text.replace(at, token.size(), value);
+}
 static void removeCore(const fs::path& host) {
   for (auto name : pluginFiles) fs::remove(plugin(host) / name);
   fs::remove(config(host)); if (fs::exists(plugin(host)) && fs::is_empty(plugin(host))) fs::remove(plugin(host));
@@ -421,14 +434,16 @@ static void commit(const fs::path& folder) {
     auto host = plain(fs::u8path(h.get<std::string>())); J target;
     for (const auto& w : t["targets"]) if (same(fs::u8path(w["dir"].get<std::string>()), host)) target = w;
     if (target.is_null()) { removeCore(host); continue; }
-    auto vegas = hostFor(host, target["family"].get<std::string>());
+    auto family = target["family"].get<std::string>(); auto vegas = hostFor(host, family);
     matches(payload / "vegas-encoder.dll", package["pluginSha256"]);
+    // Always a fresh write: VEGAS 23 keys its cached format list on the DLL's write
+    // time, so every install or repair makes it rediscover the exporter's classes.
     write(plugin(host) / "vegas-encoder.dll", read(payload / "vegas-encoder.dll"));
 #ifdef VE_SETUP_TESTING
     if (fs::exists(testRoot / "fail-commit")) throw std::runtime_error("Injected commit failure.");
 #endif
-    auto text = read(payload / "vegas-encoder.ini.in"); auto token = text.find("{app}"); need(token != text.npos && text.find("{app}", token + 5) == text.npos, "Invalid app path template.");
-    text.replace(token, 5, utf(app));
+    auto text = read(payload / "vegas-encoder.ini.in");
+    fill(text, "{app}", utf(app)); fill(text, "{legacyAutoNames}", automaticNames(family) ? "1" : "0");
     // The exporter's Windows INI reader needs UTF-16 for non-ASCII app paths.
     auto unicode = wide(text); std::string iniBytes("\xff\xfe", 2);
     iniBytes.append(reinterpret_cast<const char*>(unicode.data()), unicode.size() * sizeof(wchar_t));
@@ -557,7 +572,7 @@ static void inspect(const fs::path& request, const fs::path& output) {
       RegCloseKey(key);
     }
   }
-  for (auto p : {L"C:\\Program Files\\BorisFX\\Vegas Pro 2026", L"C:\\Program Files\\VEGAS\\VEGAS Pro 2026"}) candidates.push_back(p);
+  for (auto p : {L"C:\\Program Files\\BorisFX\\Vegas Pro 2026", L"C:\\Program Files\\VEGAS\\VEGAS Pro 2026", L"C:\\Program Files\\VEGAS\\VEGAS Pro 23.0"}) candidates.push_back(p);
 #endif
   std::map<std::string, Host> found;
   for (auto& c : candidates) try { for (auto& h : hostsIn(plain(c))) found.emplace(h.family, h); } catch (...) {}
@@ -566,7 +581,7 @@ static void inspect(const fs::path& request, const fs::path& output) {
   for (auto& [family, h] : found) rows.push_back({family, utf(h.dir), h.version});
   for (const auto& r : records) if (isCore(r) && cores.count(r.at("hostFamily").get<std::string>()) && !found.count(r.at("hostFamily").get<std::string>()) && r.value("appInstanceId", "") == appRecord.value("instanceId", ""))
     rows.push_back({r.at("hostFamily").get<std::string>(), r.at("hostDir").get<std::string>(), ""});
-  for (auto family : {"vegas2026"}) if (std::none_of(rows.begin(), rows.end(), [&](const Row& r) { return r.family == family; })) rows.push_back({family, "", ""});
+  for (auto family : supportedFamilies) if (std::none_of(rows.begin(), rows.end(), [&](const Row& r) { return r.family == family; })) rows.push_back({family, "", ""});
   // Supported versions first, newest first.
   std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
     if (supported(a.family) != supported(b.family)) return supported(a.family);

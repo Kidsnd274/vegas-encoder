@@ -27,7 +27,19 @@ can still invoke them explicitly; they are not routine entry points. For example
 python -I scripts/etc/Test-Versions.py
 .\scripts\etc\Test-ReleaseInputs.ps1
 python -I scripts/etc/Test-Setup.py
+.\scripts\etc\Test-LegacyContainers.ps1
 ```
+
+The legacy-container runner builds into a fresh ignored directory, then checks
+the portable core, actual DLL in modern/container-fallback/manual/automatic-name modes, native snapshots and popup
+context/Apply. It reads a compiled matching app's version resource; it does not
+launch the app/VEGAS, install anything or qualify an older host. Its output and
+optional `-AppPath` are documented in the script parameters. With an explicit
+`-FFmpegPath`, it additionally runs the actual adapter over fake host streams and
+that supplied FFmpeg across five containers in modern/automatic modes, including
+actual-path records, cancellation, recovery and collision checks. It does not
+launch VEGAS or the app. General Setup still
+supports only the already-qualified target.
 
 See [building](../docs/BUILDING.md) and [installer/recovery](../docs/INSTALLER.md)
 for requirements, options and qualification limits. Historical experiment and

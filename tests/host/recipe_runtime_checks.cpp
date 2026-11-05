@@ -1,6 +1,7 @@
 // C7 runtime reader bounds/selection and native editor preflight, isolated files.
 #include "../../src/vegas/adapter/recipe_runtime.h"
 #include "../../src/vegas/adapter/vegas_encoder.h"
+#include "../../src/vegas/adapter/render_formats.h"
 #include <filesystem>
 #include <fstream>
 #include <cstdio>
@@ -20,12 +21,15 @@ void Write(const fs::path& path, const Json& value) {
 }
 int wmain(int argc, wchar_t** argv) {
   try {
-    Check(argc == 3, "usage: recipe-runtime <fresh-root> <candidate-app>");
+    const bool legacyNames = argc == 4 && std::wstring(argv[3]) == L"--legacy-auto-names";
+    Check(argc == 3 || legacyNames, "usage: recipe-runtime <fresh-root> <candidate-app> [--legacy-auto-names]");
     const auto root = fs::absolute(argv[1]); Check(!fs::exists(root),"fresh root required"); fs::create_directories(root);
     Check(SetEnvironmentVariableW(L"VEGAS_ENCODER_DATA_ROOT",root.c_str()),"set isolated data root");
     wchar_t self[32768]{}; GetModuleFileNameW(nullptr,self,32768);
     const auto ini = fs::path(self).parent_path() / L"vegas-encoder.ini";
     WritePrivateProfileStringW(L"vegas-encoder",L"AppPath",argv[2],ini.c_str());
+    Check(WritePrivateProfileStringW(L"vegas-encoder",L"LegacyAutoNames",legacyNames ? L"1" : L"0",ini.c_str()),
+          "configure test naming policy");
     const auto machineFile = root / L"Roaming" / L"machine.json";
     Reject([] { LoadRecipeRuntime(); },"absent C7 rejected without proof fallback");
     const std::string key(64,'a');
@@ -63,7 +67,7 @@ int wmain(int argc, wchar_t** argv) {
     fs::remove(cacheFile);
     { std::ofstream file(machineFile,std::ios::binary); file << std::string(VE_CORE_JSON_LIMIT + 1,'x'); }
     Reject([] { LoadRecipeRuntime(); },"oversize C7 refused"); Write(machineFile,machine);
-    auto options = RecipeEditorOptions();
+    auto options = RecipeEditorOptions(GUID_VegasEncoderType,nullptr);
     Check(!options.coreVersion.empty() && options.context.at("media").is_null() && options.context.at("project").is_null(),"editor core version is owned and unestablished context stays null");
     options.beforeLaunch(); Check(fs::is_directory(options.sessionRoot),"matching real app version accepted; session root prepared");
     const auto recipe = DefaultRecipeSnapshot().at("recipe"); options.validateRecipe(recipe); ++checks;
@@ -81,6 +85,15 @@ int wmain(int argc, wchar_t** argv) {
     auto supported = recipe; supported["command"] = {{"mode","template"},{"template","{inputs} -c:v libx264 -c:a aac -f mp4 {output}"}};
     options.validateRecipe(supported); ++checks;
     Check(options.context.at("target").at("id") == "vegas-native-v1","native target reaches popup before Apply");
+    Check(options.context.at("extensions").at("renderAsExtension") ==
+          (legacyNames ? Json(".vencoder") : Json(nullptr)),
+          "popup context reports the active Render As placeholder policy");
+    const auto bound = RecipeEditorOptions(kLegacyFormats[1].owner,"mp4");
+    Check(bound.owner == kLegacyFormats[1].owner && bound.context.at("target").at("containerId") == "mp4",
+          "legacy class ownership and container reach popup together");
+    bound.validateRecipe(supported); ++checks;
+    Reject([&] { bound.validateRecipe(recipe); },"legacy native Apply refuses MKV recipe in MP4 class");
+    Check(options.context.at("target").size() == 1,"modern popup target has no fixed container");
     auto unsupported = recipe; unsupported["command"] = {{"mode","template"},{"template","{inputs} -c:v ffv1 -c:a pcm_f32le {output}"}};
     Reject([&] { options.validateRecipe(unsupported); },"unknown output muxer rejected before native draft Apply");
     machine["progressWindow"] = true; Write(machineFile,machine);

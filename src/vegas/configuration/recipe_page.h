@@ -19,6 +19,7 @@ struct RecipePageOptions {
   std::function<void()> beforeLaunch;
   // Shared native-target preflight. Throw to preserve the previous draft.
   std::function<void(const ve::Json&)> validateRecipe;
+  bool automaticOutputExtension = false;
 };
 
 // Creator UI thread only, including final Release. Native bridge ownership is

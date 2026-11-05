@@ -10,6 +10,7 @@ import 'package:vegas_encoder/app/app.dart' show VeApp;
 import 'package:vegas_encoder/app/launch.dart';
 import 'package:vegas_encoder/design/components/button.dart';
 import 'package:vegas_encoder/design/components/command_editor.dart' show CommandEditor;
+import 'package:vegas_encoder/design/components/message.dart' show VeMessage;
 import 'package:vegas_encoder/design/components/signal_path/signal_path.dart';
 import 'package:vegas_encoder/features/popup/popup_editor.dart' show LibrarySection;
 import 'package:vegas_encoder/features/presets/panels/extra_field.dart';
@@ -91,6 +92,51 @@ void main() {
       EditSessionRequest.fromJson({...b0.toJson(), ...changes});
 
   group('opening', () {
+    testWidgets('legacy Container and footer distinguish the placeholder from the output', (tester) async {
+      await pump(
+        tester,
+        request: withRequest({
+          'context': b0.context.copyWith(
+            hostVersion: '23.0.0.278',
+            target: {'id': 'vegas-native-v1'},
+            extensions: {'renderAsExtension': '.vencoder'},
+          ).toJson(),
+        }),
+      );
+      expect(find.textContaining('Saved as .mp4 (Render As shows .vencoder).'), findsOneWidget);
+      await tap(tester, find.text('Container').first);
+      // Highlighted, with the real extension and no instruction to edit the name.
+      expect(find.text('Render As shows .vencoder on this version of VEGAS.'), findsOneWidget);
+      expect(find.text('Vegas Encoder saves the file as .mp4. No need to change it in Render As.'), findsOneWidget);
+      expect(find.byType(VeMessage), findsWidgets);
+      await tap(tester, find.text('Matroska (MKV)'));
+      expect(find.text('Vegas Encoder saves the file as .mkv. No need to change it in Render As.'), findsOneWidget);
+      expect(find.textContaining('Saved as .mkv (Render As shows .vencoder).'), findsOneWidget);
+      expect(find.textContaining('Keep .vencoder'), findsNothing);
+      expect(find.textContaining('Use .mkv for the Render As filename'), findsNothing);
+    });
+
+    for (final policy in <Map<String, Object?>>[
+      {'renderAsExtension': null},
+      {},
+    ]) {
+      testWidgets('VEGAS 23 without the placeholder policy ($policy) keeps the 2026 wording', (tester) async {
+        await pump(
+          tester,
+          request: withRequest({
+            'context': b0.context.copyWith(
+              hostVersion: '23.0.0.278',
+              target: {'id': 'vegas-native-v1'},
+              extensions: policy,
+            ).toJson(),
+          }),
+        );
+        await tap(tester, find.text('Container').first);
+        expect(find.textContaining('.vencoder'), findsNothing);
+        expect(find.textContaining('Use .mp4 for the Render As filename.'), findsOneWidget);
+      });
+    }
+
     testWidgets('a version mismatch warns without blocking Apply', (tester) async {
       await pump(
         tester,
@@ -116,6 +162,34 @@ void main() {
       );
       expect(rich('Use .mp4 for the Render As filename.'), findsOneWidget);
       expect(button(tester, 'Apply to template').onPressed, isNotNull);
+    });
+
+    testWidgets('a legacy format binding crosses C4 and blocks a different output container', (tester) async {
+      await pump(
+        tester,
+        request: withRequest({
+          'context': b0.context.copyWith(target: {'id': 'vegas-native-v1', 'containerId': 'mkv'}).toJson(),
+        }),
+      );
+      final compiled = container(tester).read(popupEditorProvider)!.compiled.value!;
+      expect(compiled.issues.any((issue) => issue.id == 'N-FORMAT-CONTAINER'), isTrue);
+      expect(button(tester, 'Apply to template').onPressed, isNull);
+      await keys(tester, LogicalKeyboardKey.enter, control: true);
+      expect(result(), isNull, reason: 'a mismatching recipe cannot be sent to the native format');
+      await tap(tester, find.text('File').first);
+      expect(rich('This VEGAS format requires mkv.'), findsOneWidget);
+    });
+
+    testWidgets('a matching legacy format can apply through the same popup', (tester) async {
+      await pump(
+        tester,
+        request: withRequest({
+          'context': b0.context.copyWith(target: {'id': 'vegas-native-v1', 'containerId': 'mp4'}).toJson(),
+        }),
+      );
+      expect(button(tester, 'Apply to template').onPressed, isNotNull);
+      await keys(tester, LogicalKeyboardKey.enter, control: true);
+      expect(result()!.action, 'apply');
     });
 
     testWidgets('the template, its origin and the VEGAS facts in the strip', (tester) async {

@@ -89,7 +89,11 @@ if (Test-Path -LiteralPath "$pluginSource\vegas-encoder.pdb") {
   Copy-Item -LiteralPath $pdb -Destination "$output\plugin\vegas-encoder.pdb"
 }
 [IO.File]::WriteAllText("$output\plugin\vegas-encoder.ini", "$ini`r`nAppPath=$output\app\VegasEncoder.exe`r`nLogDir=$output\logs`r`n")
-[IO.File]::WriteAllText("$output\installer\vegas-encoder.ini.in", "$ini`r`nAppPath={app}\VegasEncoder.exe`r`n")
+# One DLL serves every supported VEGAS version. Setup fills LegacyAutoNames per
+# host: 0 for 2026, 1 (the .vencoder placeholder) for 23. See docs/LEGACY_NAMING.md.
+$template = [regex]::Replace($ini, '(?m)^LegacyAutoNames=[^\r\n]*', 'LegacyAutoNames={legacyAutoNames}')
+if ([regex]::Matches($template, '\{legacyAutoNames\}').Count -ne 1) { throw 'Plugin INI must set LegacyAutoNames exactly once.' }
+[IO.File]::WriteAllText("$output\installer\vegas-encoder.ini.in", "$template`r`nAppPath={app}\VegasEncoder.exe`r`n")
 [IO.File]::WriteAllText("$output\installer\VegasEncoder-x64.fio2007-config", "[FileIO Plug-Ins]`r`nvegas-encoder=FileIO Plug-Ins\vegas-encoder\vegas-encoder.dll`r`n")
 Copy-Item -LiteralPath (Assert-PlainPath "$repo\build\release\vegas-encoder\setup\ve-install.exe") -Destination "$output\installer\ve-install.exe"
 foreach ($file in Get-ChildItem -LiteralPath "$repo\setup" -Recurse -File -Filter '*.iss') {

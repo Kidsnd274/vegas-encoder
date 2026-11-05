@@ -1,0 +1,4 @@
+EXPORTS
+    ?SfFio_CopyTemplate@@YAJPEAPEAUtagSFTEMPLATExV2@@PEBU1@@Z=CopyTemplate
+    ?SfFio_ReleaseTemplate@@YAXPEAUtagSFTEMPLATExV2@@@Z=ReleaseTemplate
+    OutstandingTemplates

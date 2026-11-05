@@ -4,6 +4,7 @@
 // F-038); unobserved methods return E_NOTIMPL and are logged so a capture
 // shows whether the host relies on them.
 #include "vegas_encoder.h"
+#include "render_formats.h"
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
 #include "recipe_runtime.h"
 #include "../configuration/recipe_template.h"
@@ -13,6 +14,9 @@
 #endif
 
 #include <new>
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+#include <filesystem>
+#endif
 
 using namespace sfio;
 
@@ -23,6 +27,8 @@ namespace {
 const wchar_t kDisplayName[] = L"Vegas Encoder";
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
 const wchar_t kEncodeExtensions[] = L"*.mkv;*.mp4;*.mov;*.webm;*.mxf";
+// Nominal class suffix for LegacyAutoNames; never written to disk.
+const wchar_t kLegacyPlaceholderExtensions[] = L"*.vencoder";
 #else
 const wchar_t kEncodeExtensions[] = L"*.mkv"; // Historical fixed-profile proof.
 #endif
@@ -58,7 +64,7 @@ const Preset kPresets[] = {
     {{0x8f4af392, 0x31b0, 0x48c1, {0xa2, 0xa0, 0x4b, 0x40, 0xdf, 0x3f, 0x9c, 0x20}},
      MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder recipe (id 0)", L"Recipe candidate; use the visible settings preset."},
     {{0x381851c2, 0x9c94, 0x4bd2, {0x81, 0x76, 0xb4, 0xb8, 0x59, 0x8b, 0xe8, 0x0d}},
-     MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder settings", L"Edit settings in the Vegas Encoder popup. Match the Render As filename to the selected container."},
+     MAKEFOURCC('P', '0', '1', '0'), L"Vegas Encoder settings", L"Edit settings in the Vegas Encoder popup. The output file uses the container chosen there."},
 #include "builtin_presets.generated.inc"
 #else
     {{0x5ac92e42, 0xf7bd, 0x4e84, {0x86, 0xe4, 0xaa, 0x50, 0xe4, 0xce, 0x44, 0x9b}},
@@ -94,7 +100,53 @@ void SetExtra(Tpl& t, DWORD preset) {
 }
 #endif
 
-Tpl BuildPreset(LONG index) {
+// The catalog remains the single source of starter settings and identities.
+// Older-host formats select entries; they never rewrite a starter's container.
+std::vector<LONG> ClassPresets(const RenderFormat& format) {
+  std::vector<LONG> indices;
+  for (LONG index = 0; index < PresetCount(); ++index) {
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    if (format.container && index >= 2 &&
+        configuration::RecipeOutputExtension(BuiltinRecipeSnapshot(kPresets[index].builtin).at("recipe")) !=
+          std::wstring(L".") + Widen(format.container)) continue;
+#else
+    (void)format;
+#endif
+    indices.push_back(index);
+  }
+  return indices;
+}
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+ve::Json ClassDefault(const RenderFormat& format) {
+  if (!format.container || std::string(format.container) == "mkv") return DefaultRecipeSnapshot();
+  const auto indices = ClassPresets(format);
+  if (indices.size() <= 2) throw std::runtime_error("No default recipe for this VEGAS container format.");
+  auto snapshot = BuiltinRecipeSnapshot(kPresets[indices[2]].builtin);
+  snapshot["origin"] = nullptr;
+  snapshot["recipe"]["id"] = std::string("vegas-") + format.container;
+  snapshot["recipe"]["name"] = "VEGAS render";
+  return snapshot;
+}
+HRESULT CheckClassTemplate(const Tpl& value, const RenderFormat& format) {
+  try {
+    const auto snapshot = configuration::ReadRecipeSnapshot(value,format.owner);
+    if (format.container && configuration::RecipeOutputExtension(snapshot.at("recipe")) !=
+          std::wstring(L".") + Widen(format.container)) return E_INVALIDARG;
+    return S_OK;
+  } catch (const std::invalid_argument&) { return E_INVALIDARG; }
+    catch (const ve::Error&) { return E_INVALIDARG; }
+}
+#endif
+GUID ClassPresetGuid(LONG index, const RenderFormat& format) {
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+  if (index == 0) return format.probe;
+  if (index == 1) return format.general;
+#else
+  (void)format;
+#endif
+  return kPresets[index].guid;
+}
+Tpl BuildPreset(LONG index, const RenderFormat& format) {
   const Preset& p = kPresets[index];
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
   Tpl t = Tpl::Make(p.name, p.notes, 0);
@@ -106,8 +158,8 @@ Tpl BuildPreset(LONG index) {
   // Byte pattern mirrors Voukoder Pro's presets (F-033): zero audio records
   // and zero size/fps mean "use the project".
   t.SetU32(tpl::id, p.templateId == 0xFFFFFFFF ? (DWORD)index : p.templateId);
-  t.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
-  t.SetGuid(tpl::guidPreset, p.guid);
+  t.SetGuid(tpl::iidOwner, format.owner);
+  t.SetGuid(tpl::guidPreset, ClassPresetGuid(index,format));
   t.SetU32(tpl::audioCb, tpl::sectionCb);
   t.SetU32(tpl::audioStreams, 1);
   t.SetU32(tpl::videoCb, tpl::sectionCb);
@@ -125,18 +177,95 @@ Tpl BuildPreset(LONG index) {
   t.SetF64(tpl::vexPixelAspect, 1.0);
   t.SetU32(tpl::keyFrameEvery, 1);
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-  t = configuration::CreateRecipeTemplate(t, GUID_VegasEncoderType,
-      p.builtin ? BuiltinRecipeSnapshot(p.builtin) : DefaultRecipeSnapshot());
+  t = configuration::CreateRecipeTemplate(t, format.owner,
+      p.builtin ? BuiltinRecipeSnapshot(p.builtin) : ClassDefault(format));
 #else
   SetExtra(t, (DWORD)index);
 #endif
   return t;
 }
 
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+#if VEGAS_ENCODER_LEGACY_HOST == 22
+constexpr wchar_t kHostExe[] = L"vegas220.exe";
+constexpr wchar_t kHostKernel[] = L"sharedk.dll";
+constexpr char kHostVersion[] = "22.0.0.248";
+#elif VEGAS_ENCODER_LEGACY_HOST == 21
+constexpr wchar_t kHostExe[] = L"vegas210.exe";
+constexpr wchar_t kHostKernel[] = L"vegas210k.dll";
+constexpr char kHostVersion[] = "21.0.0.108";
+#elif VEGAS_ENCODER_LEGACY_HOST == 13
+constexpr wchar_t kHostExe[] = L"vegas130.exe";
+constexpr wchar_t kHostKernel[] = L"vegas130k.dll";
+constexpr char kHostVersion[] = "13.0.0.453";
+#else
+#error Unmeasured legacy host profile.
+#endif
+
+bool IsLegacyHost() {
+  static const bool matches = [] {
+    const auto path = ModulePath(nullptr);
+    return _wcsicmp(std::filesystem::path(Widen(path)).filename().c_str(), kHostExe) == 0
+        && FileVersion(path) == kHostVersion;
+  }();
+  return matches;
+}
+
+// This local allocator facade keeps configuration and template ownership on
+// the same host heap. The paired exports are measured in F-066.
+class LegacyTemplateAllocator final : public ISfHostAllocator {
+ public:
+  using Copy = HRESULT (WINAPI*)(SFTEMPLATE**, const SFTEMPLATE*);
+  using FreeTemplate = void (WINAPI*)(SFTEMPLATE*);
+  static LegacyTemplateAllocator* Acquire() {
+    const auto host = std::filesystem::path(Widen(ModulePath(nullptr)));
+    const auto path = host.parent_path() / kHostKernel;
+    const HMODULE module = GetModuleHandleW(path.c_str());
+    if (!module || FileVersion(ModulePath(module)) != kHostVersion) return nullptr;
+    const auto copy = reinterpret_cast<Copy>(GetProcAddress(module,
+        "?SfFio_CopyTemplate@@YAJPEAPEAUtagSFTEMPLATExV2@@PEBU1@@Z"));
+    const auto release = reinterpret_cast<FreeTemplate>(GetProcAddress(module,
+        "?SfFio_ReleaseTemplate@@YAXPEAUtagSFTEMPLATExV2@@@Z"));
+    return copy && release ? new LegacyTemplateAllocator(copy, release) : nullptr;
+  }
+  HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** out) override {
+    if (!out) return E_POINTER;
+    *out = nullptr;
+    if (iid != IID_IUnknown && iid != IID_SfHostAllocator) return E_NOINTERFACE;
+    *out = static_cast<ISfHostAllocator*>(this);
+    AddRef();
+    return S_OK;
+  }
+  ULONG STDMETHODCALLTYPE AddRef() override { return InterlockedIncrement(&refs_); }
+  ULONG STDMETHODCALLTYPE Release() override {
+    const LONG refs = InterlockedDecrement(&refs_);
+    if (!refs) delete this;
+    return refs;
+  }
+  void* STDMETHODCALLTYPE Alloc(SIZE_T size) override {
+    if (size < tpl::fixedSize || size > Tpl::kMaxBytes) return nullptr;
+    Tpl shell;
+    shell.b.resize(size);
+    shell.SetU32(tpl::cbStruct, static_cast<DWORD>(size));
+    SFTEMPLATE* copy = nullptr;
+    return copy_(&copy, shell.Ptr()) == S_OK ? copy : nullptr;
+  }
+  void STDMETHODCALLTYPE Free(void* value) override {
+    if (value) release_(static_cast<SFTEMPLATE*>(value));
+  }
+ private:
+  LegacyTemplateAllocator(Copy copy, FreeTemplate release) : copy_(copy), release_(release) {}
+  LONG refs_ = 1;
+  Copy copy_;
+  FreeTemplate release_;
+};
+#endif
+
 // --- Render class ------------------------------------------------------------
 
 class RenderClass final : public ISfRenderFileClass {
  public:
+  explicit RenderClass(const RenderFormat& format) : format_(format), presets_(ClassPresets(format)) {}
   ~RenderClass() {
     if (alloc_) alloc_->Release();
   }
@@ -164,6 +293,38 @@ class RenderClass final : public ISfRenderFileClass {
     return (ULONG)n;
   }
 
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  HRESULT STDMETHODCALLTYPE SetTypeIndex(LONG index) override {
+    typeIndex_ = index;
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE GetTypeIndex(LONG* index) override {
+    if (!index) return E_POINTER;
+    *index = typeIndex_;
+    return S_OK;
+  }
+  HRESULT STDMETHODCALLTYPE SetIOManager(IUnknown* manager) override {
+    return NativeBoundary([&]() -> HRESULT {
+      if (manager && !alloc_) {
+        alloc_ = LegacyTemplateAllocator::Acquire();
+        if (!alloc_) {
+          BestEffortDiagnostic([&] { Log("Legacy SetIOManager: template copy/free exports unavailable"); });
+          return E_NOINTERFACE;
+        }
+      }
+      if (manager) manager->AddRef();
+      manager_.reset(manager);
+      return S_OK;
+    });
+  }
+  HRESULT STDMETHODCALLTYPE GetIOManager(IUnknown** out) override {
+    if (!out) return E_POINTER;
+    *out = manager_.get();
+    if (!*out) return E_NOINTERFACE;
+    (*out)->AddRef();
+    return S_OK;
+  }
+#else
   HRESULT STDMETHODCALLTYPE SetHostInterface(IUnknown* host) override {
     return NativeBoundary([&]() -> HRESULT {
       ISfHostAllocator* a = nullptr;
@@ -177,10 +338,12 @@ class RenderClass final : public ISfRenderFileClass {
     });
   }
 
+#endif
+
   HRESULT STDMETHODCALLTYPE GetTypeID(GUID* g) override {
     return NativeBoundary([&]() -> HRESULT {
       if (!g) return E_POINTER;
-      *g = GUID_VegasEncoderType;
+      *g = format_.owner;
       if (LogDetail("class.4")) BestEffortDiagnostic([&] { Log("GetTypeID -> %s", GuidText(*g).c_str()); });
       return S_OK;
     });
@@ -201,6 +364,13 @@ class RenderClass final : public ISfRenderFileClass {
       return S_OK;
     });
   }
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  HRESULT STDMETHODCALLTYPE GetReadClass(IUnknown** out) override {
+    if (!out) return E_POINTER;
+    *out = nullptr;
+    return E_NOTIMPL;
+  }
+#else
   HRESULT STDMETHODCALLTYPE GetReadClassGuid(GUID* g) override {
     return NativeBoundary([&]() -> HRESULT {
       if (!g) return E_POINTER;
@@ -210,22 +380,34 @@ class RenderClass final : public ISfRenderFileClass {
     });
   }
 
+#endif
+
   HRESULT STDMETHODCALLTYPE GetStrings(const LONG* ids, LONG count, BSTR* strings) override {
     return NativeBoundary([&]() -> HRESULT {
       if (!ids || !strings || count < 0) return E_POINTER;
       for (LONG i = 0; i < count; i++) strings[i] = nullptr;
       const bool encode = Cfg().encode;
+      const wchar_t* extensions = format_.container ? format_.wildcard : kEncodeExtensions;
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      // Legacy automatic mode advertises one placeholder class suffix, as
+      // Voukoder Pro does (*.voukoderpro, research F-071): older hosts cannot ask
+      // per template, so VEGAS never shows a container it cannot know. SetFile
+      // resolves the actual destination from the selected recipe.
+      // The retained manual experiment instead skips 23's suffix rewrite.
+      if (Cfg().legacyAutoNames) extensions = kLegacyPlaceholderExtensions;
+      else if (Cfg().legacyManualNames) extensions = L"";
+#endif
       for (LONG i = 0; i < count; i++) {
         // Ids paired by position with FrameServer's SFFIO_FILECLASS_TEXT_* list
         // and Voukoder's answers (F-033): 1 brief, 2 long, 4 extensions, 5 localized.
         const wchar_t* s = nullptr;
         switch (ids[i]) {
-          case 1: s = kDisplayName; break;
-          case 2: s = kDisplayName; break;
+          case 1: s = format_.name; break;
+          case 2: s = format_.name; break;
           // Exact 2026 mp4plug3 writer ID-4 table uses semicolon-separated
           // wildcards. Keep MKV first for legacy/default class-wide naming.
-          case 4: s = encode ? kEncodeExtensions : L"*.ffdiag"; break;
-          case 5: s = kDisplayName; break;
+          case 4: s = encode ? extensions : L"*.ffdiag"; break;
+          case 5: s = format_.name; break;
         }
         strings[i] = s ? SysAllocString(s) : nullptr;
         if (s && !strings[i]) {
@@ -241,6 +423,9 @@ class RenderClass final : public ISfRenderFileClass {
     });
   }
 
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  HRESULT STDMETHODCALLTYPE Open(ISfRenderFile*, LONG, LPCWSTR) override { return E_NOTIMPL; }
+#else
   HRESULT STDMETHODCALLTYPE Open(ISfRenderFile** file, LONG h, LPCWSTR path) override {
     return NativeBoundary([&]() -> HRESULT {
       if (file) *file = nullptr;
@@ -248,6 +433,8 @@ class RenderClass final : public ISfRenderFileClass {
       return E_NOTIMPL;
     });
   }
+
+#endif
 
   HRESULT STDMETHODCALLTYPE Create(ISfRenderFile** file, LPCWSTR path, LONG cStreams,
                                    ISfReadStream** streams, const SFTEMPLATE* t) override {
@@ -258,8 +445,14 @@ class RenderClass final : public ISfRenderFileClass {
       if (!file) return E_POINTER;
       *file = nullptr;
       if (!Tpl::Valid(t)) return E_INVALIDARG;
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      if (format_.container) {
+        const auto checked = CheckClassTemplate(Tpl::Copy(t),format_);
+        if (FAILED(checked)) return checked;
+      }
+#endif
       ISfRenderFile* f = nullptr;
-      HRESULT hr = CreateRenderFile(t, &f);
+      HRESULT hr = CreateRenderFile(t, &f, format_.owner, this);
       if (SUCCEEDED(hr) && path) hr = f->SetFile(path);
       for (LONG i = 0; SUCCEEDED(hr) && streams && i < cStreams; i++) hr = f->SetStreamReader(streams[i], i);
       if (FAILED(hr)) {
@@ -276,7 +469,7 @@ class RenderClass final : public ISfRenderFileClass {
   HRESULT STDMETHODCALLTYPE GetPresetCount(LONG* count) override {
     return NativeBoundary([&]() -> HRESULT {
       if (!count) return E_POINTER;
-      *count = PresetCount();
+      *count = static_cast<LONG>(presets_.size());
       if (LogDetail("class.11")) BestEffortDiagnostic([&] { Log("GetPresetCount -> %ld", *count); });
       return S_OK;
     });
@@ -286,8 +479,8 @@ class RenderClass final : public ISfRenderFileClass {
     return NativeBoundary([&]() -> HRESULT {
       if (!out) return E_POINTER;
       *out = nullptr;
-      if (index < 0 || index >= PresetCount()) return E_INVALIDARG;
-      HRESULT hr = ToHost(BuildPreset(index), out);
+      if (index < 0 || static_cast<size_t>(index) >= presets_.size()) return E_INVALIDARG;
+      HRESULT hr = ToHost(BuildPreset(presets_[index],format_), out);
       bool detail = LogDetail("class.12");
       if (detail || FAILED(hr)) BestEffortDiagnostic([&] { Log("GetPreset(%ld) -> %s", index, Hr(hr).c_str()); });
       if (detail && SUCCEEDED(hr)) LogTemplate("preset", *out, index == 0 && LogDetail("class.12.dump"));
@@ -299,8 +492,8 @@ class RenderClass final : public ISfRenderFileClass {
     return NativeBoundary([&]() -> HRESULT {
       if (!g || !index) return E_POINTER;
       *index = 0;
-      for (LONG i = 0; i < PresetCount(); i++)
-        if (*g == kPresets[i].guid) {
+      for (LONG i = 0; i < static_cast<LONG>(presets_.size()); i++)
+        if (*g == ClassPresetGuid(presets_[i],format_)) {
           *index = i;
           BestEffortDiagnostic([&] { Log("GetPresetIndexFromGuid(%s) -> %ld", GuidText(*g).c_str(), i); });
           return S_OK;
@@ -343,7 +536,7 @@ class RenderClass final : public ISfRenderFileClass {
       Tpl t = Tpl::Make(L"Project Settings", L"Render Audio and Video", sizeof(Extra));
 #endif
       t.SetU32(tpl::id, s.U32(tpl::id));
-      t.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
+      t.SetGuid(tpl::iidOwner, format_.owner);
       t.SetU32(tpl::audioCb, tpl::sectionCb);
       t.SetU32(tpl::audioStreams, 1);
       SFAUDIORECORD a = s.Audio(tpl::audioRender);
@@ -358,13 +551,20 @@ class RenderClass final : public ISfRenderFileClass {
       BITMAPINFOHEADER codec = s.Bih(tpl::videoCodecBih);
       t.SetBih(tpl::videoCodecBih, codec.biWidth ? codec : t.Bih(tpl::videoRenderBih));
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-      auto snapshot = s.Guid(tpl::iidOwner) == GUID_VegasEncoderType ?
-          configuration::ReadRecipeSnapshot(s, GUID_VegasEncoderType) : DefaultRecipeSnapshot();
+      const bool own = s.Guid(tpl::iidOwner) == format_.owner;
+      if (own && format_.container) {
+        const auto checked = CheckClassTemplate(s,format_);
+        if (FAILED(checked)) return checked;
+      } else if (!own) {
+        for (const auto& other : kLegacyFormats)
+          if (s.Guid(tpl::iidOwner) == other.owner) return E_INVALIDARG;
+      }
+      auto snapshot = own ? configuration::ReadRecipeSnapshot(s,format_.owner) : ClassDefault(format_);
       // The candidate accepts P010 input only. Never inherit a project RGB codec.
       auto input = t.Bih(tpl::videoRenderBih);
       input.biCompression = MAKEFOURCC('P', '0', '1', '0'); input.biBitCount = 32;
       t.SetBih(tpl::videoRenderBih, input); t.SetBih(tpl::videoCodecBih, input);
-      t = configuration::CreateRecipeTemplate(t, GUID_VegasEncoderType, snapshot);
+      t = configuration::CreateRecipeTemplate(t, format_.owner, snapshot);
 #else
       SetExtra(t, 0xFFFFFFFF);
 #endif
@@ -394,6 +594,12 @@ class RenderClass final : public ISfRenderFileClass {
         return S_FALSE;
       }
       if (!Tpl::Valid(base) || !Tpl::Valid(source)) return E_INVALIDARG;
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      if (format_.container) {
+        const auto checked = CheckClassTemplate(Tpl::Copy(base),format_);
+        if (FAILED(checked)) return checked;
+      }
+#endif
       if (*io && *io != base) BestEffortDiagnostic([&] { Log("ConformTemplateToSource: *io=%p was set; replacing", (void*)*io); });
       Tpl t = Tpl::Copy(base);
       Tpl s = Tpl::Copy(source);
@@ -430,15 +636,25 @@ class RenderClass final : public ISfRenderFileClass {
       // 2026.0.3.189 mp4plug3 writer slot 17 / selector 11 returns a UTF-16
       // wildcard for this template; capacity is WCHARs, not bytes. The host
       // calls it with 0x104 and 0x20-character buffers. See container plan.
-#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+      if (VEGAS_ENCODER_LEGACY_HOST == 22 && type == 11) {
+        if (!value || !info) return E_POINTER;
+        if (cch < static_cast<LONG>(sizeof(DWORD)) || !Tpl::Valid(value)) return E_INVALIDARG;
+        const auto streams = Tpl::Copy(value).U32(tpl::videoStreams);
+        memcpy(info, &streams, sizeof streams);
+        return S_OK;
+      }
+      (void)value; (void)info;
+#elif defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
       if (type == 11 && Cfg().encode) {
         if (!info || !value) return E_POINTER;
         if (cch <= 0) return E_INVALIDARG;
         const wchar_t zero = L'\0';
         memcpy(info, &zero, sizeof zero);
-        const auto snapshot = configuration::ReadRecipeSnapshot(Tpl::Copy(value), GUID_VegasEncoderType);
+        const auto snapshot = configuration::ReadRecipeSnapshot(Tpl::Copy(value), format_.owner);
         const auto extension = configuration::RecipeOutputExtension(snapshot.at("recipe"));
         if (extension.empty()) return E_FAIL;
+        if (format_.container && extension != std::wstring(L".") + Widen(format_.container)) return E_INVALIDARG;
         const auto wildcard = L"*" + extension;
         if (static_cast<size_t>(cch) <= wildcard.size()) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
         memcpy(info, wildcard.c_str(), (wildcard.size() + 1) * sizeof(wchar_t));
@@ -453,6 +669,11 @@ class RenderClass final : public ISfRenderFileClass {
     });
   }
 
+#if defined(VEGAS_ENCODER_LEGACY_HOST) && VEGAS_ENCODER_LEGACY_HOST != 13
+  HRESULT STDMETHODCALLTYPE GetLegacyTemplateInfoText(const SFTEMPLATE*, wchar_t*, LONG, LONG) override {
+    return E_NOTIMPL;
+  }
+#endif
   HRESULT STDMETHODCALLTYPE GetPropertyPageCount(LONG* free, LONG* forSale, LONG* options) override {
     return NativeBoundary([&]() -> HRESULT {
       constexpr LONG count =
@@ -476,7 +697,7 @@ class RenderClass final : public ISfRenderFileClass {
       if (index == 0) return configuration::CreateNativeProofPage(alloc_, page);
 #elif defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
       if (!page) return E_POINTER;
-      if (index == 0) return configuration::CreateNativeRecipePage(alloc_, RecipeEditorOptions(), page);
+      if (index == 0) return configuration::CreateNativeRecipePage(alloc_, RecipeEditorOptions(format_.owner,format_.container), page);
 #endif
       BestEffortDiagnostic([&] { Log("GetPropertyPage(%ld) -> E_INVALIDARG", index); });
       return E_INVALIDARG;
@@ -534,6 +755,12 @@ class RenderClass final : public ISfRenderFileClass {
 
   LONG ref_ = 1;
   ISfHostAllocator* alloc_ = nullptr;
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+  std::unique_ptr<IUnknown, ComRelease> manager_;
+  LONG typeIndex_ = 0;
+#endif
+  const RenderFormat& format_;
+  const std::vector<LONG> presets_;
 };
 
 // --- Plug-in info ------------------------------------------------------------
@@ -568,8 +795,8 @@ class PluginInfo final : public ISfUnsharedFIOPluginInfo {
   HRESULT STDMETHODCALLTYPE GetFilterCount(LONG* count) override {
     return NativeBoundary([&]() -> HRESULT {
       if (!count) return E_POINTER;
-      *count = 1;
-      BestEffortDiagnostic([&] { Log("GetFilterCount -> 1"); });
+      *count = RenderFormatCount();
+      BestEffortDiagnostic([&] { Log("GetFilterCount -> %ld",*count); });
       return S_OK;
     });
   }
@@ -577,18 +804,19 @@ class PluginInfo final : public ISfUnsharedFIOPluginInfo {
                                           DWORD* streamTypes, DWORD* app1, DWORD* app2, DWORD* app3,
                                           DWORD* app4, DWORD* expire, DWORD* flags) override {
     return NativeBoundary([&]() -> HRESULT {
-      if (index != 0) return E_INVALIDARG;
+      if (index < 0 || index >= RenderFormatCount()) return E_INVALIDARG;
+      const auto& format = RenderFormatAt(index);
       const Config& c = Cfg();
-      if (clsid) *clsid = CLSID_VegasEncoderFilter;
-      if (name && cchName > 0) wcsncpy_s(name, (size_t)cchName, kDisplayName, _TRUNCATE);
+      if (clsid) *clsid = format.filter;
+      if (name && cchName > 0) wcsncpy_s(name, (size_t)cchName, format.name, _TRUNCATE);
       if (access) *access = c.access;
       if (streamTypes) *streamTypes = c.streamTypes;
       for (DWORD* p : {app1, app2, app3, app4})
         if (p) *p = 0xFFFFFFFF;
       if (expire) *expire = 0;
       if (flags) *flags = c.pluginFlags;
-      BestEffortDiagnostic([&] { Log("GetFilterInfo(0, cch=%ld) -> clsid %s access=0x%lx streamTypes=0x%lx flags=0x%lx", cchName,
-          GuidText(CLSID_VegasEncoderFilter).c_str(), c.access, c.streamTypes, c.pluginFlags); });
+      BestEffortDiagnostic([&] { Log("GetFilterInfo(%ld, cch=%ld) -> clsid %s access=0x%lx streamTypes=0x%lx flags=0x%lx", index,cchName,
+          GuidText(format.filter).c_str(), c.access, c.streamTypes, c.pluginFlags); });
       return S_OK;
     });
   }
@@ -629,7 +857,8 @@ class Factory final : public IClassFactory {
       if (clsid_ == CLSID_SfMediaGetUnsharedTypeInfo) {
         if (riid == IID_IUnknown || riid == __uuidof(ISfUnsharedFIOPluginInfo)) obj = new PluginInfo;
       } else if (riid == IID_IUnknown || riid == __uuidof(ISfRenderFileClass)) {
-        obj = new RenderClass;
+        const auto* format = FindRenderFormat(clsid_);
+        if (format) obj = new RenderClass(*format);
       }
       HRESULT hr = E_NOINTERFACE;
       if (obj) {
@@ -670,8 +899,11 @@ STDAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void** ppv) {
   return NativeBoundary([&]() -> HRESULT {
     if (!ppv) return E_POINTER;
     *ppv = nullptr;
+#if defined(VEGAS_ENCODER_LEGACY_HOST)
+    if (!IsLegacyHost()) return CLASS_E_CLASSNOTAVAILABLE;
+#endif
     HRESULT hr = CLASS_E_CLASSNOTAVAILABLE;
-    if (clsid == CLSID_SfMediaGetUnsharedTypeInfo || clsid == CLSID_VegasEncoderFilter) {
+    if (clsid == CLSID_SfMediaGetUnsharedTypeInfo || FindRenderFormat(clsid)) {
       Factory* f = new Factory(clsid);
       hr = f->QueryInterface(riid, ppv);
       f->Release();

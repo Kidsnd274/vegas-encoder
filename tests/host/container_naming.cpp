@@ -1,6 +1,8 @@
 // Actual candidate DLL callbacks with a fake allocator; no VEGAS/FFmpeg launch.
 #include "../../src/vegas/adapter/vegas_encoder.h"
+#include "../../src/vegas/adapter/render_formats.h"
 #include "../../src/vegas/configuration/recipe_template.h"
+#include "vegas_text.h"
 #include <cstdio>
 #include <fstream>
 #include <iterator>
@@ -35,6 +37,16 @@ int wmain(int argc, wchar_t** argv) {
     const auto getClass = reinterpret_cast<GetClass>(GetProcAddress(module,"DllGetClassObject"));
     Check(getClass != nullptr,"candidate factory export");
     IClassFactory* factory = nullptr;
+    Check(getClass(CLSID_SfMediaGetUnsharedTypeInfo,IID_IClassFactory,reinterpret_cast<void**>(&factory)) == S_OK,"modern discovery factory");
+    ISfUnsharedFIOPluginInfo* info = nullptr;
+    Check(factory->CreateInstance(nullptr,__uuidof(ISfUnsharedFIOPluginInfo),reinterpret_cast<void**>(&info)) == S_OK,"modern discovery instance");
+    factory->Release(); LONG formats = -1;
+    Check(info->GetFilterCount(&formats) == S_OK && formats == 1,"default 2026 mode exposes one format");
+    info->Release();
+    for (size_t index = 1; index < std::size(kLegacyFormats); ++index) {
+      factory = reinterpret_cast<IClassFactory*>(1);
+      Check(getClass(kLegacyFormats[index].filter,IID_IClassFactory,reinterpret_cast<void**>(&factory)) == CLASS_E_CLASSNOTAVAILABLE && !factory,"legacy-only identity unavailable in default mode");
+    }
     Check(getClass(CLSID_VegasEncoderFilter,IID_IClassFactory,reinterpret_cast<void**>(&factory)) == S_OK,"filter identity unchanged");
     ISfRenderFileClass* writer = nullptr;
     Check(factory->CreateInstance(nullptr,__uuidof(ISfRenderFileClass),reinterpret_cast<void**>(&writer)) == S_OK,"create writer");
@@ -65,6 +77,8 @@ int wmain(int argc, wchar_t** argv) {
       Check(writer->GetPreset(&returned,index) == S_OK && returned,"exporter creates starter through host allocator without app/user files");
       const auto value = Tpl::Copy(returned); allocator.Free(returned);
       Check(value.Guid(tpl::iidOwner) == GUID_VegasEncoderType,"owned type");
+      Check(value.U32(tpl::cbExtra)%4 == 0,"all supplied template names start at the VEGAS DWORD boundary");
+      Check(test::VegasDisplayName(value) == value.Name() && !value.Name().empty(),"VEGAS 2026 shows the full name the exporter wrote");
       const auto guid = value.Guid(tpl::guidPreset);
       Check(std::none_of(presetGuids.begin(),presetGuids.end(),[&](const GUID& prior) { return prior == guid; }),"unique preset GUID");
       presetGuids.push_back(guid);
@@ -96,7 +110,8 @@ int wmain(int argc, wchar_t** argv) {
       Check(!ve::HasErrors(compiled.at("issues")),"starter compiles for native target with project media");
       GUID expected{};
       Check(SUCCEEDED(CLSIDFromString((L"{" + Widen(entry.at("guid").get<std::string>()) + L"}").c_str(),&expected)) && guid == expected,"committed catalog GUID retained");
-      Check(Utf8(value.Name().c_str()) == entry.at("name"),"starter has catalog display name");
+      Check(Utf8(value.Name().c_str()) == entry.at("name") && Utf8(test::VegasDisplayName(value).c_str()) == entry.at("name"),
+            "starter shows its full catalog name in VEGAS 2026 (no missing first letter)");
       Check(ve::Canonical(snapshot.at("origin")) == ve::Canonical(Json({{"presetId",entry.at("presetId")},{"revision",source->at("revision")},{"name",source->at("recipe").at("name")}})),"origin links app ID, revision and name");
       const auto bih = value.Bih(tpl::videoRenderBih);
       Check(bih.biWidth == 0 && bih.biHeight == 0,"starter follows project dimensions");

@@ -36,6 +36,8 @@ struct Tpl {
   bool Zero(size_t off, size_t n) const;
   std::wstring Name() const;
   std::wstring Notes() const;
+  // Byte offset of name\0notes\0, as VEGAS reads it (see template.cpp).
+  size_t TextOffset() const;
   const sfio::SFTEMPLATE* Ptr() const {
     return reinterpret_cast<const sfio::SFTEMPLATE*>(b.data());
   }

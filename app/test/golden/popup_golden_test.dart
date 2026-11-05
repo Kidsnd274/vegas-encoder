@@ -72,6 +72,23 @@ void main() {
       await expectGolden('popup_video_$theme');
     });
 
+    testWidgets('$theme popup_legacy_container', (tester) async {
+      await pump(
+        tester,
+        b,
+        request: withRequest({
+          'context': b0.context.copyWith(
+            hostVersion: '23.0.0.278',
+            target: {'id': 'vegas-native-v1'},
+            extensions: {'renderAsExtension': '.vencoder'},
+          ).toJson(),
+        }),
+      );
+      await tap(tester, find.text('Container').first);
+      await tap(tester, find.text('Matroska (MKV)'));
+      await expectGolden('popup_legacy_container_$theme');
+    });
+
     testWidgets('$theme popup_update', (tester) async {
       await pump(tester, b);
       await tap(tester, find.text('Update from library'));

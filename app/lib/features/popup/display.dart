@@ -8,6 +8,14 @@ import '../../design/components/signal_path/signal_path_model.dart';
 import '../../state/popup.dart';
 import '../presets/display.dart';
 
+/// Whether Render As shows the `.vencoder` placeholder while the file gets the
+/// container's extension (older VEGAS; docs/LEGACY_NAMING.md). Only the
+/// exporter knows its naming policy, so the host version alone never implies it.
+bool usesVencoderPlaceholder(core.EditContext context) {
+  final extensions = context.toJson()['extensions'];
+  return extensions is Map && extensions['renderAsExtension'] == '.vencoder';
+}
+
 /// The rows of UI_SPEC §4's origin table.
 enum OriginState { unchanged, localChanges, libraryNewer, deleted, noOrigin, unreadable }
 

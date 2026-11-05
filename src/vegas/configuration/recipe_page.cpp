@@ -274,7 +274,9 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
       if (draft_->Dirty() && text.find(L"VEGAS Apply or OK") == std::wstring::npos)
         statusText_ += L" Click VEGAS Apply or OK to keep the pending changes.";
       const auto ext = RecipeOutputExtension(draft_->Snapshot().at("recipe"));
-      if (!ext.empty()) statusText_ += L" Use a " + ext + L" filename in Render As.";
+      if (!ext.empty()) statusText_ += options_.automaticOutputExtension ?
+        L" The output file will use " + ext + L" automatically." :
+        L" Use a " + ext + L" filename in Render As.";
     } catch (...) { /* Preserve the useful status when malformed drafts cannot compile. */ }
     if (status_) SetWindowTextW(status_, statusText_.c_str());
   }
