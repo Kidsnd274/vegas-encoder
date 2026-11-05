@@ -63,6 +63,9 @@ No payload/download/installer execution belongs to source inspection.
 
 Production code lives here; the sibling investigation is provenance and a place
 for targeted ABI experiments. Builds and fake tests must not require that checkout.
+Keep detailed reverse engineering, host comparisons and diagnostic captures in
+the private `vegas-ffmpeg-frameserver` repository. Keep implementation contracts,
+product plans, build and Setup instructions, and concise qualification status here.
 Keep origin/attribution for imported or reused code. Existing import manifests remain
 historical provenance; no per-task manifest is required. No project license is selected;
 check licences before adding a dependency or bundling a font or asset.

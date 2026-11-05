@@ -44,6 +44,7 @@ function Get-VeBuildPaths([string]$Repo) {
     [IO.Path]::GetRelativePath($Repo, $_.FullName).Replace('\', '/')
   })
   $paths += "$plugin/vegas-encoder.dll", "$plugin/vegas-encoder.ini", "$plugin/vegas-encoder.pdb"
+  foreach ($major in 22,21,13) { $paths += "$plugin/vegas$major/vegas-encoder.dll", "$plugin/vegas$major/vegas-encoder.pdb" }
   $paths += 'build/release/vegas-encoder/setup/ve-install.exe'
   return @($paths | Sort-Object)
 }

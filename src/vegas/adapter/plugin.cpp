@@ -168,7 +168,11 @@ Tpl BuildPreset(LONG index, const RenderFormat& format) {
   h.biSize = sizeof h;
   h.biPlanes = 1;
   h.biBitCount = 32;
+#if VEGAS_ENCODER_LEGACY_HOST == 13 && defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+  h.biCompression = BI_RGB;
+#else
   h.biCompression = p.compression;
+#endif
   t.SetBih(tpl::videoRenderBih, h);
   t.SetBih(tpl::videoCodecBih, h);
   t.SetU32(tpl::videoRenderVex + 0x0, (DWORD)tpl::vexSize);
@@ -560,9 +564,13 @@ class RenderClass final : public ISfRenderFileClass {
           if (s.Guid(tpl::iidOwner) == other.owner) return E_INVALIDARG;
       }
       auto snapshot = own ? configuration::ReadRecipeSnapshot(s,format_.owner) : ClassDefault(format_);
-      // The candidate accepts P010 input only. Never inherit a project RGB codec.
       auto input = t.Bih(tpl::videoRenderBih);
-      input.biCompression = MAKEFOURCC('P', '0', '1', '0'); input.biBitCount = 32;
+#if VEGAS_ENCODER_LEGACY_HOST == 13
+      input.biCompression = BI_RGB;
+#else
+      input.biCompression = MAKEFOURCC('P', '0', '1', '0');
+#endif
+      input.biBitCount = 32;
       t.SetBih(tpl::videoRenderBih, input); t.SetBih(tpl::videoCodecBih, input);
       t = configuration::CreateRecipeTemplate(t, format_.owner, snapshot);
 #else
@@ -616,6 +624,11 @@ class RenderClass final : public ISfRenderFileClass {
       if (r.biSize == 0) r.biSize = sizeof r;
       if (r.biPlanes == 0) r.biPlanes = 1;
       if (r.biBitCount == 0) r.biBitCount = sr.biBitCount;
+#if VEGAS_ENCODER_LEGACY_HOST == 13 && defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      r.biCompression = BI_RGB;
+      r.biBitCount = 32;
+      t.SetBih(tpl::videoCodecBih, r);
+#endif
       t.SetBih(tpl::videoRenderBih, r);
       if (t.F64(tpl::vexFps) == 0.0)
         memcpy(t.b.data() + tpl::videoRenderVex, s.b.data() + tpl::videoRenderVex, tpl::vexSize);

@@ -43,12 +43,12 @@ set "VE_BUILD_HELPERS=%VE_BUILD_ROOT%\build\host-tests"
 if not exist "%VE_BUILD_PLUGIN%" mkdir "%VE_BUILD_PLUGIN%"
 if not exist "%VE_BUILD_TESTS%" mkdir "%VE_BUILD_TESTS%"
 if not exist "%VE_BUILD_HELPERS%" mkdir "%VE_BUILD_HELPERS%"
-pushd "%VE_BUILD_PLUGIN%" || exit /b 1
-cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 /Zi /Fd:vegas-encoder.pdb %VE_BUILD_PROOF_FLAGS% "%VE_BUILD_ROOT%\src\vegas\adapter\plugin.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\render.cpp" "%VE_BUILD_ROOT%\src\support\diagnostics.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" "%VE_BUILD_ROOT%\src\engine\encode.cpp" "%VE_BUILD_ROOT%\src\engine\progress.cpp" "%VE_BUILD_ROOT%\src\engine\job_store.cpp" "%VE_BUILD_ROOT%\src\engine\recipe_job.cpp" %VE_BUILD_PROOF_SOURCES% || goto :fail
-rc /nologo %VE_BUILD_PROOF_FLAGS% /fo vegas-encoder.res "%VE_BUILD_ROOT%\src\vegas\adapter\version.rc" || goto :fail
-link /nologo /DLL /DEBUG /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj progress.obj job_store.obj recipe_job.obj "%VE_BUILD_ROOT%\build\release\vegas-encoder\core\ve_core_static.lib" %VE_BUILD_PROOF_OBJECTS% vegas-encoder.res ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
-copy /y "%VE_BUILD_ROOT%\config\vegas-encoder.ini" vegas-encoder.ini >nul || goto :fail
-popd
+call :build-plugin "%VE_BUILD_PLUGIN%" "" || exit /b 1
+if "%VE_BUILD_MODE%"=="release" (
+  for %%V in (22 21 13) do (
+    call :build-plugin "%VE_BUILD_PLUGIN%\vegas%%V" "/DVEGAS_ENCODER_LEGACY_HOST=%%V" || exit /b 1
+  )
+)
 pushd "%VE_BUILD_TESTS%" || exit /b 1
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\fiohost\fiohost.cpp" "%VE_BUILD_ROOT%\tests\fiohost\fakehost.cpp" /link /OUT:fiohost.exe ole32.lib oleaut32.lib wbemuuid.lib user32.lib || goto :fail
 popd
@@ -59,6 +59,15 @@ cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\nati
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\native_configuration.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\template_draft.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\proof_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" /link /OUT:native-configuration.exe ole32.lib user32.lib gdi32.lib || goto :fail
 popd
 echo BUILD OK: Vegas Encoder, fiohost and native helpers
+exit /b 0
+:build-plugin
+if not exist "%~1" mkdir "%~1"
+pushd "%~1" || exit /b 1
+cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 /Zi /Fd:compiler.pdb %VE_BUILD_PROOF_FLAGS% %~2 "%VE_BUILD_ROOT%\src\vegas\adapter\plugin.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\render.cpp" "%VE_BUILD_ROOT%\src\support\diagnostics.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" "%VE_BUILD_ROOT%\src\engine\encode.cpp" "%VE_BUILD_ROOT%\src\engine\progress.cpp" "%VE_BUILD_ROOT%\src\engine\job_store.cpp" "%VE_BUILD_ROOT%\src\engine\recipe_job.cpp" %VE_BUILD_PROOF_SOURCES% || goto :fail
+rc /nologo %VE_BUILD_PROOF_FLAGS% %~2 /fo vegas-encoder.res "%VE_BUILD_ROOT%\src\vegas\adapter\version.rc" || goto :fail
+link /nologo /DLL /DEBUG /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj progress.obj job_store.obj recipe_job.obj "%VE_BUILD_ROOT%\build\release\vegas-encoder\core\ve_core_static.lib" %VE_BUILD_PROOF_OBJECTS% vegas-encoder.res ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
+if "%~2"=="" copy /y "%VE_BUILD_ROOT%\config\vegas-encoder.ini" vegas-encoder.ini >nul || goto :fail
+popd
 exit /b 0
 :fail
 popd

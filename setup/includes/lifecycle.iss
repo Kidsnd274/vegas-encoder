@@ -46,6 +46,9 @@ begin
   if Result <> '' then Exit;
   ExtractTemporaryFile('payload.json');
   ExtractTemporaryFile('vegas-encoder.dll');
+  ExtractTemporaryFile('vegas-encoder-22.dll');
+  ExtractTemporaryFile('vegas-encoder-21.dll');
+  ExtractTemporaryFile('vegas-encoder-13.dll');
   ExtractTemporaryFile('vegas-encoder.ini.in');
   ExtractTemporaryFile('VegasEncoder-x64.fio2007-config');
   InitAppRequest;

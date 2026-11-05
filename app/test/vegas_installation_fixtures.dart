@@ -1,18 +1,20 @@
 import 'package:ve_services/ve_services.dart';
 
 /// `older` describes an older VEGAS: 23.0.0.278 (an owner-tested legacy host) by
-/// default, or a host that is detected only, such as VEGAS 22.
+/// default, or another version supplied by the test.
 VegasHostStatus vegasHostFixture(
   VegasInstallationState state, {
   bool older = false,
   String olderVersion = '23.0.0.278',
+  String? displayVersion,
 }) {
   final major = olderVersion.split('.').first;
   final root = older ? 'D:\\VEGAS\\VEGAS Pro $major.0' : r'C:\Program Files\BorisFX\Vegas Pro 2026';
   final plugin = '$root\\FileIO Plug-Ins\\vegas-encoder';
   return VegasHostStatus(
     name: older ? 'VEGAS Pro $major' : 'Boris FX VEGAS Pro 2026',
-    version: older ? olderVersion : '2026.0.3.189',
+    version: displayVersion ?? (older ? olderVersion : '2026.0.3.189'),
+    numericVersion: displayVersion == null ? null : olderVersion,
     executable: '$root\\${older ? 'vegas${major}0.exe' : 'vegas2026.exe'}',
     x64: true,
     exporterPath: '$plugin\\vegas-encoder.dll',

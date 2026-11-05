@@ -8,6 +8,10 @@ $paths = @('build/release/vegas-encoder/app/VegasEncoder.exe',
   'build/release/vegas-encoder/app/data/app.so', 'build/release/vegas-encoder/app/data/asset.txt',
   'build/release/vegas-encoder/plugin/vegas-encoder.dll', 'build/release/vegas-encoder/plugin/vegas-encoder.ini',
   'build/release/vegas-encoder/plugin/vegas-encoder.pdb', 'build/release/vegas-encoder/setup/ve-install.exe')
+foreach ($major in 22,21,13) {
+  $paths += "build/release/vegas-encoder/plugin/vegas$major/vegas-encoder.dll",
+    "build/release/vegas-encoder/plugin/vegas$major/vegas-encoder.pdb"
+}
 foreach ($relative in $paths) {
   $path = Join-Path $fake $relative
   New-Item -ItemType Directory -Path (Split-Path -Parent $path) -Force | Out-Null

@@ -64,71 +64,12 @@ five-extension list using the exact-host writer contract established below.
   Unknown selectors retain `E_NOTIMPL`; corrupt/unknown output cannot guess a
   suffix. Exact destination/suffix enforcement remains the final defense.
 
-### Exact 2026 writer naming contract (static inspection)
+### Native filename implementation
 
-This resolves the earlier bounded naming question without loading a third-party
-module or changing the installed exporter. It is static ABI evidence, **not a
-real Render As/UI qualification**. The earlier AIF reader observation was insufficient;
-this chain is the MP4 **writer's** recovered render-class vtable and the host caller.
-
-- Exact host remains VEGAS **2026.0.3.189**, SHA-256
-  `2B93C6613E1BDD4A435B65F63E3FC0B0EAD9EDB06B45F2458C43B63F784A73AF`.
-  Installed `FileIO Plug-Ins/mp4plug3/mp4plug3.dll` SHA-256:
-  `122AE99C8CBB7828F829F8D633FF09FD305E1889AC09CF8FCEAEE93BB1EB832B`.
-  Addresses below are RVAs on these bytes, not reusable across versions.
-- MP4 constructor `0x3EEF` installs the interface table at `0x5ED90` on the
-  object's `+8` subobject. Its slot 8 points to `0x4770`, slot 10 (Create) to
-  `0x4500`, and slot 17 to `0x4A60`. GetStrings `0x4787` supplies the four-entry
-  ID/text table at `0x6BBA0`; its ID-4 entry at `0x6BBC0` points to `0x5EB40`,
-  the UTF-16 `*.mp4;*.m2ts;*.avc` list. This ties the delimiter to writer ID 4,
-  rather than inferring it from a built-in wildcard string alone.
-- Slot 17 at `0x4A7E` compares its fifth argument with **11**. The branch
-  checks the UTF-16 buffer and capacity, then copies `*.mp4` (`0x5EC90`) or
-  template-selected `*.m2ts`/`*.avc`. The capacity is in **WCHARs**, including
-  the terminator, despite the older recovered parameter name `cb`.
-- Host `0x246CBD` passes selector 11, `r9d=0x104`, a UTF-16 destination and the
-  selected template before calling vtable `+0x88` at `0x246CD6`. Other host
-  calls use `0x20` characters (`0x2752BD`/`0x2752C5`) and `0x104`
-  (`0x4605F9`/`0x460610`). These corroborate the method/argument layout.
-  Static calls do not establish every UI refresh/filter path or default update.
-- Reproduce the bounded inspection with the existing MSVC `dumpbin
-  /disasm:nobytes` on those two exact modules and inspect the listed RVAs/table
-  bytes. Ignored diagnostics are in `build/test-results/container-naming/`.
-  No new finding series or research checkout dependency was introduced.
-
-`scripts/etc/Test-ContainerNaming.cmd` checks the actual recipe candidate DLL through
-a fake allocator/host: **62 checks**, five suffixes, Advanced precedence, class
-strings, conformance, exact/small/zero/null buffers, unknown selectors, corrupt
-snapshots, immutability and balanced host allocations. This complements the prior
-passed core/engine/fake-host FFmpeg checks; it does not repeat their render matrix.
-
-Validation results and the next queue are recorded in STATUS and NEXT_AGENT.
-The following table records the pre-implementation investigation baseline; its
-MKV guards and old temporary naming have since been replaced as described above.
-
-Source references below describe the reviewed implementation; finding references
-retain their historical host/build scope. The sibling investigation was consulted
-only for the unresolved filename/extension ABI questions.
-
-| Area | Established behavior and source/evidence | Gap or unresolved question |
-| --- | --- | --- |
-| Basic compilation | [compile.cpp](../../src/core/compile.cpp), Basic: emits `-f` from the five [container profiles](../../schema/encoder-profiles.v1.json); MP4 faststart is separate. | A compiled command is not native support or a guarantee for every codec/profile/rate. |
-| Native editor admission | [recipe_runtime.cpp](../../src/vegas/adapter/recipe_runtime.cpp), `ValidateCandidateRecipe`: requires `outputContainerId == "mkv"` and an established video output. [recipe_page.cpp](../../src/vegas/configuration/recipe_page.cpp), `PollEditor`: invokes it after the popup returns Apply. | Deliberate candidate policy. The popup can offer Apply before this native rejection becomes visible. |
-| Snapshot/conformance/Create | [recipe_template.cpp](../../src/vegas/configuration/recipe_template.cpp) preserves the complete core envelope and opaque native suffix. [plugin.cpp](../../src/vegas/adapter/plugin.cpp) preserves the snapshot through conformance. [render.cpp](../../src/vegas/adapter/render.cpp) decodes its owned copy at Create. | No new container payload representation is needed. Existing persistence observations concern the tested MKV recipes. |
-| Render admission | `DoEncode` in render.cpp requires `.mkv`; its RecipeJob options require container ID `mkv`. [recipe_job.cpp](../../src/engine/recipe_job.cpp) checks that requirement before child creation. | Explicit policy checks, independent of P010, square-pixel, rate and audio-input restrictions. |
-| Class-wide extension | plugin.cpp `GetStrings`, ID 4, returns `*.mkv` for encoding. [ADAPTER_PLAN](../ADAPTER_PLAN.md) and sibling [EXPORTER_CONTRACT](../../../vegas-ffmpeg-frameserver/docs/EXPORTER_CONTRACT.md), F-050, establish the working class-wide MKV path. | No reviewed evidence establishes multi-extension list syntax, preferred/default suffix or automatic suffix updates after template edits. |
-| Render As filtering | Sibling EXPORTER_CONTRACT, F-041/F-044: exporter discovery works; preset index-0/id-0 is hidden, with exact index-versus-ID rule unknown. | This is not evidence of container-sensitive filtering. Capability flag meanings and per-template extension behavior remain unresolved. |
-| Possible template callback | plugin.cpp `GetTemplateInfo` returns `E_NOTIMPL`; F-038/F-041 observed selectors 1, 9, 10 and 11 tolerated that answer. The recovered [ABI](../../src/vegas/abi/sfio_abi.h) defines no established per-template extension contract. | Do not assign extension semantics to a selector or add an older SDK callback from its name alone. |
-| Destination lifecycle | F-041/F-045/F-050: `Create(null, 0)`, later readers and `SetFile`; success then `GetFileName`, `CloseFile`, release. Current render.cpp stores and returns the exact SetFile path. | A post-success GetFileName call does not prove earlier overwrite checks, queued destinations or other host state follow a changed path. |
-| Temporary/publication path | [encode.cpp](../../src/engine/encode.cpp) uses `<destination>.<GUID>.partial`, `CREATE_NEW`, existing-destination refusal and MoveFileEx without replacement. | Actual temporary naming differs from [SETTINGS_AND_COMMANDS](SETTINGS_AND_COMMANDS.md) and [C2](CONTRACTS.md), which retain the final extension. |
-| Verification | recipe_job.cpp samples the first 32 packets, checks decoded video readability, stream kinds/count and known codecs. | It does not currently validate container identity or perform a full-file decode/count. |
-| Existing muxing evidence | [FFMPEG_WINDOWS](research/FFMPEG_WINDOWS.md): three supplied Windows builds, 85 matrix cases each, with explicit codec/profile/rate limits. MXF ProRes/DNxHR plus integer PCM worked at tested settings; float PCM failed. | Synthetic FFmpeg results do not qualify VEGAS filenames, native templates or arbitrary combinations. |
-
-End-to-end path: portable recipe -> core compile -> popup result -> native
-admission -> pending template draft -> host Apply -> VEnc snapshot -> conformance
--> immutable Create copy -> SetFile destination -> actual-media compile in
-RecipeJob -> FFmpeg temporary output -> finish -> verification -> publication.
-Rendering does not consult the preset library or wait for the app/monitor.
+VEGAS 2026 receives a format list and a per-template extension from the
+exporter. Older hosts use the filename policy described in
+[legacy naming](../LEGACY_NAMING.md). The private investigation repository
+holds the original binary trace and supporting evidence.
 
 ## Naming recommendation and alternatives
 

@@ -113,6 +113,9 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
     value = configuration::ReplaceRecipeSnapshot(value, GUID_VegasEncoderType, changed);
   }
   RenderTestOptions options; options.width = 320; options.height = 180; options.frames = 24;
+#if VEGAS_ENCODER_LEGACY_HOST == 13
+  options.recipeVideoCompression = BI_RGB;
+#endif
   options.fps = 30000.0 / 1001; options.cancelAt = cancelAt; options.progressFailureSlot = failureSlot;
   options.progressFailureAt = 8; options.shortRead = 257;
   RenderDeadline deadline;

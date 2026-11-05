@@ -8,7 +8,7 @@ param(
   [string]$PythonPath = 'python',
   [string[]]$VegasDir = @('C:\Program Files\BorisFX\Vegas Pro 2026',
     'L:\Program Files\VEGAS\VEGAS Pro 23.0', 'L:\Program Files\VEGAS\VEGAS Pro 22.0',
-    'L:\Program Files\VEGAS\VEGAS Pro 21.0'),
+    'L:\Program Files\VEGAS\VEGAS Pro 21.0', 'C:\Program Files\Sony\Vegas Pro 13.0'),
   [switch]$SkipRegistry
 )
 $ErrorActionPreference = 'Stop'
@@ -65,6 +65,15 @@ if ($native.ProductVersion -ne $version.exporter -or $frontend.ProductVersion -n
   throw "Require matched native $($version.exporter) / frontend $($version.app), numeric $($version.numeric)."
 }
 foreach ($name in 'flutter_windows.dll','ve_core.dll','ve_windows_services.dll') { $null = Read-Pe (Join-Path $appSource $name) }
+$legacyDlls = [ordered]@{}
+foreach ($major in 22,21,13) {
+  $path = Assert-PlainPath "$pluginSource\vegas$major\vegas-encoder.dll"
+  $info = Read-Pe $path
+  if ($info.ProductVersion -ne $version.exporter -or (Numeric-Version $info) -ne $version.numeric) {
+    throw "VEGAS $major exporter version does not match the app."
+  }
+  $legacyDlls["vegas$major"] = $path
+}
 $sourceIni = Assert-PlainPath (Join-Path $pluginSource 'vegas-encoder.ini')
 $ini = [IO.File]::ReadAllText($sourceIni)
 # Config is deployment-specific. Do not carry another candidate's absolute paths.
@@ -79,6 +88,17 @@ foreach ($file in $appFiles) {
   Copy-Item -LiteralPath $file.FullName -Destination $destination
 }
 Copy-Item -LiteralPath $nativeDll -Destination "$output\plugin\vegas-encoder.dll"
+$legacyHashes = [ordered]@{}
+foreach ($family in $legacyDlls.Keys) {
+  $path = $legacyDlls[$family]
+  $name = 'vegas-encoder-' + $family.Substring(5) + '.dll'
+  Copy-Item -LiteralPath $path -Destination "$output\plugin\$name"
+  $legacyHashes[$family] = (Get-FileHash -LiteralPath "$output\plugin\$name").Hash
+  $pdb = Assert-PlainPath ([IO.Path]::ChangeExtension($path, '.pdb'))
+  if (Test-Path -LiteralPath $pdb -PathType Leaf) {
+    Copy-Item -LiteralPath $pdb -Destination (Join-Path "$output\plugin" ([IO.Path]::ChangeExtension($name, '.pdb')))
+  }
+}
 Copy-Item -LiteralPath "$repo\packages\ve_core\THIRD_PARTY_NOTICES.md" -Destination "$output\app\licenses\ve_core.txt"
 Copy-Item -LiteralPath "$repo\packages\ve_services\THIRD_PARTY_NOTICES.md" -Destination "$output\app\licenses\ve_services.txt"
 foreach ($family in 'InstrumentSans','JetBrainsMono') {
@@ -89,10 +109,15 @@ if (Test-Path -LiteralPath "$pluginSource\vegas-encoder.pdb") {
   Copy-Item -LiteralPath $pdb -Destination "$output\plugin\vegas-encoder.pdb"
 }
 [IO.File]::WriteAllText("$output\plugin\vegas-encoder.ini", "$ini`r`nAppPath=$output\app\VegasEncoder.exe`r`nLogDir=$output\logs`r`n")
-# One DLL serves every supported VEGAS version. Setup fills LegacyAutoNames per
-# host: 0 for 2026, 1 (the .vencoder placeholder) for 23. See docs/LEGACY_NAMING.md.
+# Setup enables the placeholder on older hosts and applies the discovery
+# settings used by the 22, 21 and 13 trials.
 $template = [regex]::Replace($ini, '(?m)^LegacyAutoNames=[^\r\n]*', 'LegacyAutoNames={legacyAutoNames}')
 if ([regex]::Matches($template, '\{legacyAutoNames\}').Count -ne 1) { throw 'Plugin INI must set LegacyAutoNames exactly once.' }
+foreach ($setting in 'StreamTypes','Caps') {
+  $line = "(?m)^$setting=[^\r\n]*"
+  if ([regex]::Matches($template, $line).Count -ne 1) { throw "Plugin INI must set $setting exactly once." }
+  $template = [regex]::Replace($template, $line, "$setting={$setting}")
+}
 [IO.File]::WriteAllText("$output\installer\vegas-encoder.ini.in", "$template`r`nAppPath={app}\VegasEncoder.exe`r`n")
 [IO.File]::WriteAllText("$output\installer\VegasEncoder-x64.fio2007-config", "[FileIO Plug-Ins]`r`nvegas-encoder=FileIO Plug-Ins\vegas-encoder\vegas-encoder.dll`r`n")
 Copy-Item -LiteralPath (Assert-PlainPath "$repo\build\release\vegas-encoder\setup\ve-install.exe") -Destination "$output\installer\ve-install.exe"
@@ -109,6 +134,7 @@ $owned = @(foreach ($file in Get-ChildItem -LiteralPath "$output\app" -Recurse -
 $owned += [ordered]@{file='setup-support\ve-install.exe'; sha256=(Get-FileHash -LiteralPath "$output\installer\ve-install.exe").Hash}
 [ordered]@{schema='vegas-encoder-payload/1'; version=$version.app; coreVersion=$version.exporter; files=$owned
   pluginSha256=(Get-FileHash -LiteralPath "$output\plugin\vegas-encoder.dll").Hash
+  legacyPluginSha256=$legacyHashes
   iniSha256=(Get-FileHash -LiteralPath "$output\installer\vegas-encoder.ini.in").Hash
   configSha256=(Get-FileHash -LiteralPath "$output\installer\VegasEncoder-x64.fio2007-config").Hash
 } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath "$output\installer\payload.json" -Encoding utf8

@@ -36,6 +36,10 @@ Check ($actual.Count -eq $manifest.files.Count) 'Manifest must cover every packa
 Check ((Get-Content -LiteralPath "$bundle\installer\vegas-encoder.ini.in" -Raw) -match 'AppPath=\{app\}\\VegasEncoder.exe' ) 'Installer must render its selected application path'
 Check ([regex]::Matches((Get-Content -LiteralPath "$bundle\installer\vegas-encoder.ini.in" -Raw), '(?m)^LegacyAutoNames=\{legacyAutoNames\}\r?$').Count -eq 1) 'Installer must choose LegacyAutoNames per VEGAS version'
 $payload = Get-Content -LiteralPath "$bundle\installer\payload.json" -Raw | ConvertFrom-Json
+foreach ($major in 22,21,13) {
+  Check ((Get-FileHash -LiteralPath "$bundle\plugin\vegas-encoder-$major.dll").Hash -eq
+    $payload.legacyPluginSha256."vegas$major") "VEGAS $major payload hash must match"
+}
 Check ($payload.version -eq $version.app -and $payload.coreVersion -eq $version.exporter) 'App and host-core versions must be recorded independently'
 Check ((Get-Content -LiteralPath "$bundle\plugin\vegas-encoder.ini" -Raw).Contains("AppPath=$bundle\app\VegasEncoder.exe")) 'Trial must use its own app'
 $prepare = Join-Path $PSScriptRoot 'Prepare-B7.ps1'

@@ -43,12 +43,14 @@ foreach ($dir in ($dirs | Sort-Object)) {
       if ($reader.ReadUInt32() -ne 0x4550) { continue }
       $x64 = $reader.ReadUInt16() -eq 0x8664
     } finally { $stream.Dispose() }
+    $v = $exe.VersionInfo
+    $numericVersion = "$($v.FileMajorPart).$($v.FileMinorPart).$($v.FileBuildPart).$($v.FilePrivatePart)"
     [pscustomobject]@{
       vegasDir = $dir; executable = $exe.FullName
       fileVersion = $exe.VersionInfo.FileVersion; x64 = $x64
       qualification = if ($x64 -and $exe.VersionInfo.FileVersion -eq '2026.0.3.189') {
         'Selected host version; B6 qualification still pending'
-      } elseif ($x64 -and $exe.VersionInfo.FileVersion -eq '23.0.0.278') {
+      } elseif ($x64 -and $numericVersion -in '23.0.0.278','22.0.0.248','21.0.0.108','13.0.0.453') {
         'Owner-tested legacy host (.vencoder placeholder names); release qualification pending'
       } else { 'Detected only; unsupported until separately qualified' }
       pluginDir = Join-Path $dir 'FileIO Plug-Ins\vegas-encoder'

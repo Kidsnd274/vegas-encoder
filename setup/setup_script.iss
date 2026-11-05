@@ -51,6 +51,9 @@ Source: "{#BundleDir}\installer\payload.json"; Flags: dontcopy
 Source: "{#BundleDir}\installer\vegas-encoder.ini.in"; Flags: dontcopy
 Source: "{#BundleDir}\installer\VegasEncoder-x64.fio2007-config"; Flags: dontcopy
 Source: "{#BundleDir}\plugin\vegas-encoder.dll"; Flags: dontcopy
+Source: "{#BundleDir}\plugin\vegas-encoder-22.dll"; Flags: dontcopy
+Source: "{#BundleDir}\plugin\vegas-encoder-21.dll"; Flags: dontcopy
+Source: "{#BundleDir}\plugin\vegas-encoder-13.dll"; Flags: dontcopy
 
 [Icons]
 Name: "{autoprograms}\Vegas Encoder"; Filename: "{app}\VegasEncoder.exe"

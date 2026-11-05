@@ -137,7 +137,7 @@ bool X64(const std::wstring& path) {
   if (!SetFilePointerEx(f.handle,pos,nullptr,FILE_BEGIN) || !ReadFile(f.handle,pe,sizeof pe,&n,nullptr) || n != sizeof pe || memcmp(pe,"PE\0\0",4)) Error("Invalid PE signature",path,ERROR_BAD_EXE_FORMAT);
   return pe[4] == 0x64 && pe[5] == 0x86;
 }
-struct Version { std::string name, version; };
+struct Version { std::string name, version, numericVersion; };
 Version FileVersion(const std::wstring& path) {
   DWORD ignored = 0; const auto size = GetFileVersionInfoSizeW(path.c_str(),&ignored);
   if (!size) {
@@ -164,9 +164,10 @@ Version FileVersion(const std::wstring& path) {
     }
   }
   VS_FIXEDFILEINFO* fixed = nullptr; UINT length = 0;
-  if (result.version.empty() && VerQueryValueW(data.data(),L"\\",reinterpret_cast<void**>(&fixed),&length) && length >= sizeof *fixed && fixed->dwSignature == 0xfeef04bd) {
-    result.version = std::to_string(HIWORD(fixed->dwFileVersionMS))+"."+std::to_string(LOWORD(fixed->dwFileVersionMS))+"."+
+  if (VerQueryValueW(data.data(),L"\\",reinterpret_cast<void**>(&fixed),&length) && length >= sizeof *fixed && fixed->dwSignature == 0xfeef04bd) {
+    result.numericVersion = std::to_string(HIWORD(fixed->dwFileVersionMS))+"."+std::to_string(LOWORD(fixed->dwFileVersionMS))+"."+
       std::to_string(HIWORD(fixed->dwFileVersionLS))+"."+std::to_string(LOWORD(fixed->dwFileVersionLS));
+    if (result.version.empty()) result.version = result.numericVersion;
   }
   return result;
 }
@@ -332,6 +333,7 @@ Json Snapshot(const Json& options) {
         row["x64"] = X64(exe); const auto version = FileVersion(exe);
         if (!version.name.empty()) row["name"] = version.name;
         if (!version.version.empty()) row["version"] = version.version;
+        if (!version.numericVersion.empty()) row["numericVersion"] = version.numericVersion;
         Inspect(row,root,budget);
       } catch (const std::exception& e) { row["state"] = "unreadable"; row["details"].push_back(e.what()); }
       result["hosts"].push_back(std::move(row));

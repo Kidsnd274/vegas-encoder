@@ -513,7 +513,7 @@ bool ConfigureAndReload(ISfRenderFileClass* renderClass, ISfHostAllocator* alloc
 RecipeHostResult ExerciseRecipeHost(const RenderTestOptions& o,
   const std::function<HRESULT(ISfReadVideoRenderStream*,ISfReadAudioStream*,ISfProgress*)>& render) {
   const double fps = o.deliveredFps ? o.deliveredFps : o.fps;
-  FakeVideo video(o.frames,o.width,o.height,MAKEFOURCC('P','0','1','0'),fps);
+  FakeVideo video(o.frames,o.width,o.height,o.recipeVideoCompression,fps);
   FakeAudio audio(48000,2,SFAUDIO_FORMAT_FLOAT32,static_cast<LONGLONG>(llround(o.frames*48000/fps)),fps,o.shortRead);
   FakeProgress progress(o.cancelAt,o.progressFailureSlot,o.progressFailureAt,o.progressFailureCall,nullptr);
   RecipeHostResult result;

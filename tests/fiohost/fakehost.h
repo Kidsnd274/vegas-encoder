@@ -10,6 +10,7 @@ struct RenderTestOptions {
   std::wstring hostTemplate;  // 540-byte host project template (.tpl)
   std::wstring outDir;
   LONG preset = 1;  // ffbridge 0.1.1: 1 = P010, 2 = BI_RGB (0 is the hidden id-0 probe)
+  DWORD recipeVideoCompression = MAKEFOURCC('P', '0', '1', '0');
   LONG width = 0, height = 0;  // 0 = keep the host template's size
   double fps = 0;              // 0 = keep the host template's fps
   double deliveredFps = 0;     // 0 = template fps; mismatch regression (F-041)

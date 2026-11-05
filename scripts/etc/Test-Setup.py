@@ -30,12 +30,18 @@ class SetupTests(unittest.TestCase):
         self.payload = self.root / 'payload'
         self.payload.mkdir()
         (self.payload / 'vegas-encoder.dll').write_bytes(b'new plugin; never loaded')
-        (self.payload / 'vegas-encoder.ini.in').write_bytes(b'[vegas-encoder]\r\nLegacyAutoNames={legacyAutoNames}\r\nAppPath={app}\\VegasEncoder.exe\r\n')
+        (self.payload / 'vegas-encoder.ini.in').write_bytes(b'[vegas-encoder]\r\nLegacyAutoNames={legacyAutoNames}\r\nStreamTypes={StreamTypes}\r\nCaps={Caps}\r\nAppPath={app}\\VegasEncoder.exe\r\n')
+        legacy_hashes = {}
+        for major in (22, 21, 13):
+            dll = self.payload / f'vegas-encoder-{major}.dll'
+            dll.write_bytes(f'VEGAS {major} plugin fixture'.encode())
+            legacy_hashes[f'vegas{major}'] = sha(dll)
         (self.payload / 'VegasEncoder-x64.fio2007-config').write_bytes(b'[FileIO Plug-Ins]\r\nvegas-encoder=FileIO Plug-Ins\\vegas-encoder\\vegas-encoder.dll\r\n')
         self.files = {'VegasEncoder.exe': b'fake app; never executed', 'data/app.so': b'Dart fixture', 'setup-support/ve-install.exe': b'fake helper; never executed'}
         self.package = {'schema': 'vegas-encoder-payload/1', 'version': '0.1.7+1', 'coreVersion': '0.1.7-recipe-proof',
                         'files': [{'file': k, 'sha256': hashlib.sha256(v).hexdigest().upper()} for k, v in self.files.items()],
                         'pluginSha256': sha(self.payload / 'vegas-encoder.dll'),
+                        'legacyPluginSha256': legacy_hashes,
                         'iniSha256': sha(self.payload / 'vegas-encoder.ini.in'),
                         'configSha256': sha(self.payload / 'VegasEncoder-x64.fio2007-config')}
         self.save_package()
@@ -344,9 +350,9 @@ class SetupTests(unittest.TestCase):
         self.call('validate', host=str(legacy), family='vegas23')
         self.call('validate', success=False, host=str(legacy), family='vegas2026')
         self.call('validate', success=False, host=str(self.host), family='vegas23')
-        old = self.make_host('VEGAS 22', 'vegas220.exe')
-        self.call('validate', success=False, host=str(old), family='vegas22')
-        self.call('prepare', success=False, targets=[('vegas22', old)])
+        old = self.make_host('VEGAS 20', 'vegas200.exe')
+        self.call('validate', success=False, host=str(old), family='vegas20')
+        self.call('prepare', success=False, targets=[('vegas20', old)])
         self.call('prepare', success=False, targets=[('vegas2026', self.host), ('vegas2026', self.host)])
         answer = self.call('prepare', success=False, targets=[('vegas2026', '')])
         self.assertIn('VEGAS Pro 2026 was not found', answer['message'])
@@ -357,7 +363,8 @@ class SetupTests(unittest.TestCase):
         answer, rows = self.inspect(candidates=[old, legacy, self.host])
         self.assertEqual(answer['relation'], 'none')
         self.assertEqual([(r['family'], r['supported'], r['dir']) for r in rows],
-                         [('vegas2026', '1', str(self.host)), ('vegas23', '1', str(legacy)), ('vegas22', '0', str(old))])
+                         [('vegas2026', '1', str(self.host)), ('vegas23', '1', str(legacy)), ('vegas22', '1', str(old)),
+                          ('vegas21', '1', ''), ('vegas13', '1', '')])
         self.assertEqual(rows[1]['label'], 'VEGAS Pro 23')
         self.install()
         for version, relation in (('0.1.7+1', 'same'), ('0.1.8+1', 'older'), ('0.1.7+2', 'older'), ('0.1.6+9', 'newer'), ('0.1.7-rc1+1', 'newer')):
@@ -370,7 +377,8 @@ class SetupTests(unittest.TestCase):
 
     def test_inspect_lists_missing_supported_version(self):
         _, rows = self.inspect()
-        self.assertEqual([(r['family'], r['dir'], r['supported']) for r in rows], [('vegas2026', '', '1'), ('vegas23', '', '1')])
+        self.assertEqual([(r['family'], r['dir'], r['supported']) for r in rows],
+                         [(family, '', '1') for family in ('vegas2026', 'vegas23', 'vegas22', 'vegas21', 'vegas13')])
 
     def ini_number(self, host, key):
         import ctypes
@@ -408,6 +416,21 @@ class SetupTests(unittest.TestCase):
         self.install(targets=[('vegas23', legacy)])
         self.assertGreater(dll.stat().st_mtime, 946684800 + 86400)
         self.assertEqual(self.ini_number(legacy, 'LegacyAutoNames'), 1)
+
+    def test_older_host_payload_routing(self):
+        wrong = self.make_host('Wrong VEGAS 22 executable', 'vegas221.exe')
+        answer = self.call('validate', success=False, host=str(wrong), family='vegas22')
+        self.assertIn('22.0.0.248', answer['message'])
+        targets = [(f'vegas{major}', self.make_host(f'VEGAS {major}', f'vegas{major}0.exe'))
+                   for major in (22, 21, 13)]
+        self.install(targets=targets)
+        for family, host in targets:
+            major = family[5:]
+            self.assertEqual(sha(self.plugin_of(host) / 'vegas-encoder.dll'),
+                             self.package['legacyPluginSha256'][family])
+            self.assertEqual(self.ini_number(host, 'LegacyAutoNames'), 1)
+            self.assertEqual(self.ini_number(host, 'StreamTypes'), 3)
+            self.assertEqual(self.ini_number(host, 'Caps'), 0)
 
     def test_ini_template_needs_each_token_once(self):
         for i, template in enumerate((b'[vegas-encoder]\r\nAppPath={app}\\VegasEncoder.exe\r\n',

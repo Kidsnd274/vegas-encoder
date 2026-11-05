@@ -207,11 +207,11 @@ uninstaller identity; do not change it for a new release or VEGAS version.
 
 **Adding a VEGAS version:** build its exporter, ship it in the bundle, and mark the
 family supported in the helper (`supportedFamilies` in `setup/native/install.cpp`,
-which today maps every supported family to `vegas-encoder.dll`; `automaticNames()`
-chooses its INI policy). VEGAS 22, 21 and 13 need their own DLL builds
-([OLDER_VEGAS_TRIALS.md](OLDER_VEGAS_TRIALS.md)), so supporting them also needs a
-per-family payload. Detection, records and
-the wizard already handle several versions. Split installers are not implemented;
+which routes supported families to the staged DLL). VEGAS 2026 and 23 share
+the modern exporter. Setup selects a separate DLL for VEGAS 22 build 248, 21
+build 108, and Sony 13 build 453. Every selected host receives its DLL under the
+same installed filename. The older hosts use the `.vencoder` placeholder.
+Detection, records and the wizard already handle several versions. Split installers are not implemented;
 a future split must migrate uninstaller ownership and protect app dependencies
 rather than assigning new AppIds that leave two uninstallers owning the same files.
 
@@ -222,8 +222,9 @@ C++ runtime already installed (`vcruntime140`, `vcruntime140_1`, `msvcp140`).
 It reports a missing prerequisite rather than downloading or installing tools.
 Setup does not kill processes or schedule partial file replacement on reboot.
 Updates keep the existing app directory; uninstall first to relocate it.
-Detection does not qualify a new build: the tested hosts remain 2026.0.3.189 and
-23.0.0.278 (owner-tested on 2026-11-05 with the `.vencoder` trial).
+Detection alone does not qualify a build. The helper requires exact executable
+versions for the dedicated 22, 21 and Sony 13 exporters. See [status](STATUS.md)
+for the scope of real-host tests and installer qualification.
 
 The installed exporter goes under `{vegasDir}\FileIO Plug-Ins\vegas-encoder`, with
 its discovery file at the VEGAS root. Setup renders a UTF-16 INI with the final app

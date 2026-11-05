@@ -21,6 +21,7 @@ class VegasHostStatus {
     required this.discoveryPath,
     required this.manifestPath,
     required this.state,
+    this.numericVersion,
     this.exporterVersion,
     this.details = const [],
   });
@@ -31,19 +32,26 @@ class VegasHostStatus {
       discoveryPath,
       manifestPath;
   final bool x64;
-  final String? exporterVersion;
+  final String? numericVersion, exporterVersion;
   final VegasInstallationState state;
   final List<String> details;
 
   // This identifies the recorded target versions, never a support guarantee.
-  // 23.0.0.278 is the owner-tested legacy host (docs/LEGACY_NAMING.md).
   bool get selectedHostVersion =>
-      x64 && (version == '2026.0.3.189' || version == '23.0.0.278');
+      x64 &&
+      const {
+        '2026.0.3.189',
+        '23.0.0.278',
+        '22.0.0.248',
+        '21.0.0.108',
+        '13.0.0.453',
+      }.contains(numericVersion ?? version);
 
   factory VegasHostStatus.fromJson(Map<String, dynamic> json) =>
       VegasHostStatus(
         name: json['name'] as String,
         version: json['version'] as String,
+        numericVersion: json['numericVersion'] as String?,
         executable: json['executable'] as String,
         x64: json['x64'] as bool,
         exporterPath: json['exporterPath'] as String,

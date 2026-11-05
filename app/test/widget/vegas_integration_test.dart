@@ -50,6 +50,12 @@ void main() {
         hosts: [
           vegasHostFixture(VegasInstallationState.verified),
           vegasHostFixture(VegasInstallationState.unverified, older: true),
+          vegasHostFixture(
+            VegasInstallationState.notInstalled,
+            older: true,
+            olderVersion: '13.0.0.453',
+            displayVersion: 'Version 13.0 (Build 453) 64-bit',
+          ),
           vegasHostFixture(VegasInstallationState.notInstalled, older: true, olderVersion: '22.0.0.250'),
         ],
         errors: const ['Cannot open registry key (Windows error 5): HKCU\\Software'],
@@ -59,8 +65,8 @@ void main() {
     expect(service.inspections, 1);
     expect(find.text('Installed, verified'), findsOneWidget);
     expect(find.text('Installed, unverified'), findsOneWidget);
-    // 2026 and the owner-tested VEGAS 23 build are recorded hosts; 22 is detected only.
-    expect(find.textContaining('Recorded trial host version'), findsNWidgets(2));
+    expect(find.textContaining('Version 13.0 (Build 453) 64-bit'), findsOneWidget);
+    expect(find.textContaining('Recorded trial host version'), findsNWidgets(3));
     expect(find.textContaining('This host is not qualified'), findsOneWidget);
     expect(find.textContaining('Shared app/runtime integrity'), findsOneWidget);
     expect(find.textContaining('Discovery could not complete'), findsOneWidget);

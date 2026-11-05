@@ -4,14 +4,12 @@
 format and resolves the actual suffix from the selected immutable recipe before
 admission. Native page guidance says the suffix is set automatically; modern mode
 retains its manual suffix guidance. No C4 schema/popup UI change. The approved
-23 trial is installed; focused fake-host results, visual/real-host gates and rollback are in
-[LEGACY_NAMING.md](LEGACY_NAMING.md). Historical proof-build scope below remains.
+23 trial status is in [STATUS.md](STATUS.md). See [legacy naming](LEGACY_NAMING.md)
+for the filename contract.
 
 **Template text compatibility update, 2026-11-05:** current recipe placement
-DWORD-aligns the private allocation before name/notes. Exact VEGAS 23 build-278
-host bytes in investigation F-059 show `0x218 + round_up(cbExtra, 4)` readers
-(EXE RVA `0x2DCC80`), which skip one UTF-16 character for old WORD-only placements
-with cbExtra=2 mod 4. The native boundary accepts exact 0–3 zero DWORD padding and
+DWORD-aligns the private allocation before name/notes. The native boundary
+accepts exact 0–3 zero DWORD padding and
 legacy unpadded/one-byte WORD padding; the core envelope/checksum is unchanged.
 379 native snapshot/holder and 314 actual-DLL fake-host checks pass. The new DLL
 is uninstalled; visual/restart qualification is pending. The historical foundation
@@ -27,67 +25,12 @@ VEGAS Apply/Cancel/save/restart and broader runtime qualification remain open.
 This replaceable proof does not select the app framework, product editor, preset
 management or final settings schema; the design boundary is in `DESIGN_GATE.md`.
 
-## What the existing native evidence establishes
+## Native ownership contract
 
-The proxy/stub decoding in investigation F-026 and the working Voukoder Pro
-captures used by F-032/F-033/F-036 provide more detail than the earlier summary:
-
-| Interface / slot | Established shape and observation | Still unknown |
-| --- | --- | --- |
-| `ISfFileIOPropertyPage` `{9A518D06-4ABD-4860-B790-7C7F80DF80AD}` | Extends `IPropertyPage`; 16 methods including IUnknown. `sharedk.dll` queries this IID on the page returned from render-class slot 19. | Native method names; product compatibility |
-| Page slot 14 | `HRESULT(template, info56)`; called before `SetPageSite` / `SetObjects`. Matching connector implementation copies `cbStruct` template bytes and the first 28 scalar info bytes; does not retain pointer members of info56. | Scalar field meanings; native product-page behavior |
-| Page slot 15 | No arguments, HRESULT return; matching connector implementation returns S_OK without work. | No independent host invocation established |
-| `IPropertyPage::SetObjects` | One host COM object, not a raw template pointer; connector queries `ISfFileIOTemplateEditHolder`. | Behavior for multiple objects and host-side failure handling |
-| Holder `{2F5F5809-AE7E-44DF-83A7-76E60CE44EC5}` slot 3 | `HRESULT(out template*)`; matching host allocates with UCRT calloc and copies exactly `cbStruct` bytes. Caller owns the independent return. Release through the matching host allocator's Free. | Other host versions |
-| Holder slot 4 | `HRESULT(input template)`; matching host compares unchanged bytes or allocates/copies a complete replacement; does not retain/take/free caller storage. OOM occurs before replacement. | Real product Apply failures; Get/conform can have normal host-side effects before replacement |
-| Holder slots 5 / 6 / 7 | Stub shapes: out template; `(LONG, out LONG)`; `(LONG, LONG)`. | Method names and UI-path behavior; unused by this scaffold |
-
-These narrow shapes are declared in
-`src/vegas/abi/configuration_abi.h`. They preserve unnamed slots and carry explicit
-exact-build ownership annotations. Only the opt-in proof build calls them.
-
-The exact existing files were read in place, without copying captures:
-
-- `L:/repos/vegas-ffmpeg-frameserver/evidence/2026-10-09-proxystub/decode-2026.json`
-  and `decode-2026-v1.txt`: the two interface shapes.
-- `L:/repos/vegas-ffmpeg-frameserver/evidence/2026-10-10-host-template-capture/input/capture.log`:
-  page/holder observations at lines 164923–165055, 165375–165513 and
-  213638–213797; object release at 166296–166299 and 214033–214035.
-- `L:/repos/vegas-ffmpeg-frameserver/evidence/2026-10-10-fioprobe-vegas2026-pro/fioprobe-vegas2026.exe-20261010-112805-9480.log`:
-  corroborating holder read/write at lines 84159–84177 and 101189–101209.
-
-Recorded target: VEGAS 2026.0.3.189 on the host bytes in `docs/TARGET.md`.
-The captured connector calls are evidence for that native path; they do not
-qualify a new Vegas Encoder DLL or establish saved-template restart behavior.
-Probe calls whose caller is `fioprobe.dll` are nested implementation dispatch,
-not independent host calls. Unknown inherited slots also contain stale register
-values in the old generic logger; do not interpret those as actual arguments.
-
-Read-only static inspection used these exact existing copies (no DLL load):
-
-- `artifacts/2026-10-09-audio-service/vegas2026/sharedk.dll` in the investigation,
-  version 2026.0.3.189, SHA-256
-  `C57E71B9B1A9DF452CF2F5BADCD4D574F6DFC9DB240BEF985B199E06A7E3683B`.
-  Holder vtable RVA `0xF6BE18` identifies slots 3/4 at `0x2E7880` / `0x2E7910`.
-  Slot 3 calls calloc at `0x2E78BC`, stores its allocation and copies at
-  `0x2E78D3`. Slot 4 copies into its replacement at `0x2E79A0`; only then
-  replaces host storage, freeing the prior host-owned buffer as needed. OOM
-  returns `0x8007000E` before replacement. The unchanged branch returns S_OK.
-- Host allocator vtable RVA `0xF6EA48` has Alloc at `0x315B10` and Free at
-  `0x315B20`; these dispatch directly to the same UCRT calloc/free imports,
-  IAT RVAs `0x6C6BD0` / `0x6C6BE8`. This establishes a matching free route;
-  the bridge never uses its own CRT free for a host return.
-- `artifacts/2026-10-10-voukoderpro-connectors/vegas2026/voukoderproplug-vegas2026.dll`,
-  version 23.0.0.0, SHA-256
-  `F7D5ECFACAB6ECC698A4C7F1E2CEBE7EC31F39C0C77A9F622CF2D48B3CD8091F`.
-  Page vtable RVA `0x24AE8` places slot 14 at `0x88A0` and slot 15 at `0x6F60`.
-  Slot 14 copies template storage at `0x88E6` or `0x8912`, then copies info's
-  first 28 bytes at `0x8995`–`0x89AC`. Slot 15 is `xor eax,eax; ret`.
-
-The host allocator and holder output use the same allocation domain on these
-bytes. Those facts establish the bridge's synchronous copy/release contract;
-they do not replace real-host page and persistence qualification. No third-party
-implementation code or binary was imported into the product.
+The page copies the incoming template and scalar settings. The holder returns
+an independently owned template copy that must be freed through the matching
+host allocator. Writes copy the complete replacement without taking ownership
+of the caller's buffer. Host allocation stays separate from C++ allocations.
 
 ## Offline implementation and checks
 

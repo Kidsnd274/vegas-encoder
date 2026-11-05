@@ -76,7 +76,8 @@ The desktop app can manage presets and test FFmpeg without running VEGAS.
 | Host | Current status |
 | --- | --- |
 | **Boris FX VEGAS Pro 2026.0.3.189 x64** | Tested with the **0.1.7 development trials** at the scope below |
-| VEGAS Pro 23, 22, 21, and Sony VEGAS Pro 13 | Installation detection only; exporter compatibility is unqualified |
+| VEGAS Pro 23 build 278 | Uses the shared exporter with automatic filename extensions |
+| VEGAS Pro 22 build 248, VEGAS Pro 21 build 108, and Sony VEGAS Pro 13 build 453 | Owner-tested Windows x64 builds with dedicated exporters. See the release qualification status. |
 | Other builds or versions | Untested |
 
 On the tested 2026 build, owner-confirmed checks include basic renders, normal

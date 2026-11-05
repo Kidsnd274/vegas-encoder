@@ -978,80 +978,11 @@ consume the unchanged C4/C5 contracts, without declaring real-host gates.
   Results and remaining gate checklist:
   [NATIVE_RECIPE_BOUNDARY.md](../../NATIVE_RECIPE_BOUNDARY.md).
 
-## B5 delivered (`2bdb44d`, merged to master)
+## B5 progress decision
 
-- Static inspection uses the unchanged VEGAS **2026.0.3.189** executable in
-  TARGET.md, RTTI and the captured `CSfRenderProgress` identity. Slot 3 stores a
-  borrowed description pointer, sets total and resets position; slot 4 only stores
-  the pointer. The internal helper forwards it into a scripting description/title;
-  public SetPosition supplies a null description. **Visible status-line behavior
-  is unverified.** Details/addresses, retained-string lifetime and the concrete
-  owner keep/drop/cancel/rollback checklist are in
-  [NATIVE_PROGRESS.md](../../NATIVE_PROGRESS.md).
-- Isolated `progress-text-proof` build (`0.1.3-progress-text-proof`), default off.
-  `B5ProgressText=4` alternates immutable module-lifetime markers at <=2 Hz;
-  `=3` initializes once with the real total before frames, never updates via slot
-  3. Exact host hash/version/vtable required. Caller-thread/zero-lock guards,
-  nonfatal disable after a text failure, normal numeric cancellation unchanged.
-  No host interfaces enter workers; no app/monitor launch or reader wait.
-- `Inspect-VegasProgress.py` independently checks exact bytes/RTTI/consumer;
-  `Prepare-B5StatusLine.ps1` stages three review candidates without installation;
-  `Test-B5.ps1` runs fake interfaces and negative host-gating renders. They use
-  existing tools/standard-library Python and need no investigation checkout or
-  real host for fake tests (`-HostPath` is an explicit read-only static check).
-- Review candidates: `build/b5-owner-review/mode-{0,4,3}/`, identities in
-  `build/b5-owner-review/review.json`. DLL SHA-256
-  `BB3447D10A689895DB8A7652B8397F8B62F03A79BD0CE3D44F8022AECC4F72BF`.
-  Installed DLL/PDB/INI and discovery still match their manifest; all three
-  payloads also match the main checkout's preserved `candidate-0.1.2-config-proof`
-  rollback. B5 source is now committed/merged by owner request; nothing was
-  installed, replaced or pushed.
-- Focused checks: default/proof MSVC x64 `/W4 /WX` builds; **30** native fake
-  progress checks (borrowed lifetime, 500 ms boundary/repolls, slot-3 non-reset,
-  thread/lock guards, exact-object rejection, failures and exception containment);
-  **three fake-host gated modes with full decoded fixture checks**; retained
-  helper/boundary/configuration **24/9/67** and default exporter fake-host
-  regression (repeat/fractional/short-read/video-only/cancel/failure/destination/
-  Unicode and checker rejection). All pass. Static inspector checks pass against
-  the exact host, with eight changed/truncated/unbacked-span rejections. Changed
-  PowerShell scripts parse; staging rejects escaped/existing output directories;
-  three owner-candidate manifests match actual bytes; `git diff --check` passes.
-  Latest fake output: `build/test-results/b5-fabae044/` and
-  `build/test-results/b5-default-regression/`. **No new real VEGAS run.**
-
-Next: stop B5 marker trials under the owner's decision below; continue the B6
-offline transport work. B6 activation stays gated on A5–A7.
-Real two-template/restart persistence, controlled real failure recovery and
-monitor performance remain **unverified**. No monitor performance conclusion
-follows from text markers or the existing B4 async-file checks.
-
-## Owner progress preference / app coordination
-
-The owner reviewed the real slot-4 trial and screenshot on 2026-10-14: no apparent
-switching text, no need to change VEGAS's render dialog, and a request for somewhat
-accurate progress. **Drop the custom status-line requirement**; retain ordinary
-caller-thread numeric progress/cancellation. Retire probe calls in the next
-reviewed normal exporter update, without another install/INI change for this
-decision. The healthy candidate remains installed under the existing authorization.
-
-The current fixed-profile adapter reports frames submitted to the encoder; encoding
-and flushing can continue after that counter advances. Do not present that as
-completed output or promise a precise remaining time. B4 already publishes actual
-FFmpeg metrics and separate finishing/verifying/done phases asynchronously; B6
-must connect those to rendering without making Render wait for readers or a window.
-Completion remains successful encoder exit, required verification and publication.
-Any native percentage adjustment needs a separate reviewed implementation and
-real-host check; the screenshot alone does not establish an accurate ETA.
-
-Read-only check of ws/app: F7's real-service wiring/budgets are delivered there;
-F5 popup is next, F6 live monitor follows. `MonitorWindow` is currently a shell,
-not a live progress display. App F6 should consume C5 through the existing service
-reader, display measured encoding progress plus finishing/checking phases, and
-keep ETA explicitly estimated/unavailable when insufficient. App owns its UI/tests.
-Owner-owned TECH_ARCHITECTURE §5.6 / design decisions should reflect dropping
-custom dialog text and prioritizing the separate window; this is the request for
-those files, not an edit to them. A5–A7, real persistence, controlled failure
-recovery and real monitor performance remain **unverified**.
+The owner retired the custom host status-line experiment. The product uses
+numeric progress and the separate progress window. The detailed trial record
+is archived in the private investigation repository.
 
 ## F4 core metadata coordination (delivered above; unchanged during B5)
 

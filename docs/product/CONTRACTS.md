@@ -914,10 +914,13 @@ not impose a new format on the owner's future installer.
 
 ```text
 VegasInstallationSnapshot {hosts:VegasHostStatus[], errors:string[]}
-VegasHostStatus {name,version,executable:string, x64:bool,
+VegasHostStatus {name,version,executable:string, numericVersion:string|null, x64:bool,
   exporterPath,discoveryPath,manifestPath:string, exporterVersion:string|null,
   state:notInstalled|verified|unverified|changed|unreadable, details:string[]}
 ```
+
+The dashboard shows the file version text and uses the fixed numeric version
+resource when it compares a host with the recorded target builds.
 
 - `notInstalled`: no owned exporter/discovery files found. Failed access never
   becomes missing. `unverified`: files present but no supported manifest or

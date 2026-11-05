@@ -159,6 +159,9 @@ static Host probe(const fs::path& path) {
 #ifdef VE_SETUP_TESTING
   auto digits = lower(h.exe.filename().wstring()); digits = digits.substr(5, digits.size() - 9); if (digits.size() == 3) digits.pop_back();
   h.family = "vegas" + utf(fs::path(digits)); h.version = h.family.substr(5) + ".0.3.189";
+  if (h.family == "vegas22") h.version = "22.0.0.248";
+  if (h.family == "vegas21") h.version = "21.0.0.108";
+  if (h.family == "vegas13") h.version = "13.0.0.453";
 #else
   std::ifstream file(h.exe, std::ios::binary); IMAGE_DOS_HEADER dos{}; file.read(reinterpret_cast<char*>(&dos), sizeof dos);
   need(file && dos.e_magic == IMAGE_DOS_SIGNATURE && dos.e_lfanew >= sizeof dos, "Invalid VEGAS executable.");
@@ -181,7 +184,17 @@ static std::vector<Host> hostsIn(const fs::path& dir) {
 }
 // This bundle carries a core only for these families; other detected versions are listed as unsupported.
 // VEGAS 2026 and 23 share one exporter DLL; only its INI differs (see automaticNames).
-static constexpr const char* supportedFamilies[] = {"vegas2026", "vegas23"};
+static constexpr const char* supportedFamilies[] = {"vegas2026", "vegas23", "vegas22", "vegas21", "vegas13"};
+struct LegacyPayload { const char* family; const char* version; const char* executable; const char* file; };
+static constexpr LegacyPayload legacyPayloads[] = {
+  {"vegas22", "22.0.0.248", "vegas220.exe", "vegas-encoder-22.dll"},
+  {"vegas21", "21.0.0.108", "vegas210.exe", "vegas-encoder-21.dll"},
+  {"vegas13", "13.0.0.453", "vegas130.exe", "vegas-encoder-13.dll"},
+};
+static const LegacyPayload* legacyPayload(const std::string& family) {
+  for (const auto& entry : legacyPayloads) if (family == entry.family) return &entry;
+  return nullptr;
+}
 static bool supported(const std::string& family) {
   return std::any_of(std::begin(supportedFamilies), std::end(supportedFamilies), [&](const char* f) { return family == f; });
 }
@@ -191,7 +204,13 @@ static bool supported(const std::string& family) {
 static bool automaticNames(const std::string& family) { return family != "vegas2026"; }
 static Host hostFor(const fs::path& dir, const std::string& family) {
   need(supported(family), label(family) + " is not supported by this release.");
-  for (auto& h : hostsIn(plain(dir))) if (h.family == family) return h;
+  for (auto& h : hostsIn(plain(dir))) if (h.family == family) {
+    if (auto legacy = legacyPayload(family)) {
+      need(h.version == legacy->version && lower(h.exe.filename().wstring()) == wide(legacy->executable),
+           label(family) + " requires build " + legacy->version + ".");
+    }
+    return h;
+  }
   throw std::runtime_error("Select the " + label(family) + " folder. No " + label(family) + " executable was found in " + utf(dir) + ".");
 }
 static fs::path plugin(const fs::path& host) { return host / "FileIO Plug-Ins" / "vegas-encoder"; }
@@ -322,6 +341,8 @@ static fs::path prepare(const fs::path& app, const std::vector<Target>& wanted, 
     need(package.at("schema") == "vegas-encoder-payload/1", "Unknown setup payload.");
     // Payload hashes are embedded inside the signed/compiled setup, never read from a live build.
     matches(payload / "vegas-encoder.dll", package.at("pluginSha256")); matches(payload / "vegas-encoder.ini.in", package.at("iniSha256")); matches(payload / "VegasEncoder-x64.fio2007-config", package.at("configSha256"));
+    for (const auto& entry : legacyPayloads)
+      matches(payload / entry.file, package.at("legacyPluginSha256").at(entry.family));
   }
   auto appRecord = appRecordFor(app, old, records);
   if (!removal && appRecord.contains("version"))
@@ -435,15 +456,19 @@ static void commit(const fs::path& folder) {
     for (const auto& w : t["targets"]) if (same(fs::u8path(w["dir"].get<std::string>()), host)) target = w;
     if (target.is_null()) { removeCore(host); continue; }
     auto family = target["family"].get<std::string>(); auto vegas = hostFor(host, family);
-    matches(payload / "vegas-encoder.dll", package["pluginSha256"]);
+    auto legacy = legacyPayload(family);
+    auto source = payload / (legacy ? legacy->file : "vegas-encoder.dll");
+    matches(source, legacy ? package.at("legacyPluginSha256").at(family) : package.at("pluginSha256"));
     // Always a fresh write: VEGAS 23 keys its cached format list on the DLL's write
     // time, so every install or repair makes it rediscover the exporter's classes.
-    write(plugin(host) / "vegas-encoder.dll", read(payload / "vegas-encoder.dll"));
+    write(plugin(host) / "vegas-encoder.dll", read(source));
 #ifdef VE_SETUP_TESTING
     if (fs::exists(testRoot / "fail-commit")) throw std::runtime_error("Injected commit failure.");
 #endif
     auto text = read(payload / "vegas-encoder.ini.in");
     fill(text, "{app}", utf(app)); fill(text, "{legacyAutoNames}", automaticNames(family) ? "1" : "0");
+    fill(text, "{StreamTypes}", legacy ? "3" : "0x0B");
+    fill(text, "{Caps}", legacy ? "0" : "0x100006");
     // The exporter's Windows INI reader needs UTF-16 for non-ASCII app paths.
     auto unicode = wide(text); std::string iniBytes("\xff\xfe", 2);
     iniBytes.append(reinterpret_cast<const char*>(unicode.data()), unicode.size() * sizeof(wchar_t));
@@ -572,7 +597,8 @@ static void inspect(const fs::path& request, const fs::path& output) {
       RegCloseKey(key);
     }
   }
-  for (auto p : {L"C:\\Program Files\\BorisFX\\Vegas Pro 2026", L"C:\\Program Files\\VEGAS\\VEGAS Pro 2026", L"C:\\Program Files\\VEGAS\\VEGAS Pro 23.0"}) candidates.push_back(p);
+  for (auto p : {L"C:\\Program Files\\BorisFX\\Vegas Pro 2026", L"C:\\Program Files\\VEGAS\\VEGAS Pro 2026", L"C:\\Program Files\\VEGAS\\VEGAS Pro 23.0",
+    L"C:\\Program Files\\VEGAS\\VEGAS Pro 22.0", L"C:\\Program Files\\VEGAS\\VEGAS Pro 21.0", L"C:\\Program Files\\Sony\\Vegas Pro 13.0"}) candidates.push_back(p);
 #endif
   std::map<std::string, Host> found;
   for (auto& c : candidates) try { for (auto& h : hostsIn(plain(c))) found.emplace(h.family, h); } catch (...) {}

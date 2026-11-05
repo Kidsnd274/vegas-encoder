@@ -637,29 +637,39 @@ class RenderFile final : public ISfRenderFile {
       memcpy(&index, info + frameinfo::frame, sizeof index);
       memcpy(planes, info + frameinfo::planeFields, sizeof planes);
       std::vector<BYTE> owned;
-      uint64_t row = bih.biWidth > 0 ? (uint64_t)bih.biWidth * 2 : 0;
+#if VEGAS_ENCODER_LEGACY_HOST == 13 && defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      const bool rgb = bih.biCompression == BI_RGB && bih.biBitCount == 32 && bih.biPlanes == 1;
+#else
+      constexpr bool rgb = false;
+#endif
+      uint64_t row = bih.biWidth > 0 ? (uint64_t)bih.biWidth * (rgb ? 4 : 2) : 0;
       uint64_t height = bih.biHeight > 0 ? (uint64_t)bih.biHeight : 0;
-      uint64_t packed = row * height * 3 / 2;
-      bool layout = bih.biCompression == MAKEFOURCC('P', '0', '1', '0') && row && height &&
+      uint64_t packed = rgb ? row * height : row * height * 3 / 2;
+      bool layout = (rgb || bih.biCompression == MAKEFOURCC('P', '0', '1', '0')) && row && height &&
         bih.biWidth <= 8192 && bih.biHeight <= 8192 && !(bih.biWidth & 1) && !(bih.biHeight & 1) &&
-        packed <= 64u * 1024 * 1024 && planes[0] >= row && planes[2] >= row &&
-        (uint64_t)planes[0] * (height - 1) + row <= planes[1] &&
-        (uint64_t)planes[1] + (uint64_t)planes[2] * (height / 2 - 1) + row <= (uint64_t)count &&
+        packed <= 64u * 1024 * 1024 && planes[0] >= row &&
         count > 0 && tok.cbData == count && tok.offset >= 0 && tok.cbAlloc >= 0 &&
         (uint64_t)tok.offset + (uint64_t)count <= (uint64_t)tok.cbAlloc && tok.pData &&
         tok.pData <= (std::numeric_limits<ULONGLONG>::max)() - (uint64_t)tok.offset &&
         tok.pid == GetCurrentProcessId() && (tok.mode == 0 || tok.mode == 1) &&
         index == frame && std::isfinite(fps) && std::isfinite(par) && std::abs(par - 1.0) < 1e-8;
-      if (!layout) fail("unsupported P010 layout/token/aspect; inspect the frame log", E_INVALIDARG);
+      if (layout) {
+        const auto firstPlaneEnd = (uint64_t)planes[0] * (height - 1) + row;
+        layout = rgb ? firstPlaneEnd <= (uint64_t)count :
+          planes[2] >= row && firstPlaneEnd <= planes[1] &&
+          (uint64_t)planes[1] + (uint64_t)planes[2] * (height / 2 - 1) + row <= (uint64_t)count;
+      }
+      if (!layout) fail("unsupported video frame layout, memory token or aspect ratio", E_INVALIDARG);
+      const char* fourcc = rgb ? "BI_RGB" : "P010";
       if (ok && !r.haveInfo) {
         r.haveInfo = true;
-        r.fourcc = "P010"; r.width = bih.biWidth; r.height = bih.biHeight; r.bitCount = bih.biBitCount;
+        r.fourcc = fourcc; r.width = bih.biWidth; r.height = bih.biHeight; r.bitCount = bih.biBitCount;
         r.fps = fps; r.pixelAspect = par; r.frameBytes = (LONG)packed; r.tokenMode = tok.mode;
         r.rate = EncodeRate::FromDouble(fps);
         memcpy(r.firstInfo, info, sizeof info);
         memcpy(r.planeFields, planes, sizeof planes);
         LogHex("FFmpeg first frame info", info, sizeof info);
-        BestEffortDiagnostic([&] { Log("FFmpeg delivered P010 %ldx%ld fps=%.17g (%s), stream fps=%.17g", r.width, r.height,
+        BestEffortDiagnostic([&] { Log("FFmpeg delivered %s %ldx%ld fps=%.17g (%s), stream fps=%.17g", fourcc, r.width, r.height,
             fps, Utf8(r.rate.Text().c_str()).c_str(), streamFps); });
         if (!r.rate.num || (streamFps && (!std::isfinite(streamFps) || std::abs(streamFps - fps) > 1e-8)))
           fail("unsupported or inconsistent delivered frame rate", E_INVALIDARG);
@@ -672,7 +682,7 @@ class RenderFile final : public ISfRenderFile {
                             std::abs(expected - r.streamLength) > 1))
           fail("audio length differs from delivered video duration", E_INVALIDARG);
         r.samplesExpected = audio ? r.streamLength : 0;
-      } else if (ok && (bih.biWidth != r.width || bih.biHeight != r.height ||
+      } else if (ok && (r.fourcc != fourcc || bih.biWidth != r.width || bih.biHeight != r.height ||
                          std::abs(fps - r.fps) > 1e-8 || memcmp(planes, r.planeFields, sizeof planes))) {
         r.infoChanges++;
         fail("frame format changed during encoding", E_INVALIDARG);
@@ -681,11 +691,16 @@ class RenderFile final : public ISfRenderFile {
         t = NowMs();
         owned.resize((size_t)packed);
         const BYTE* data = reinterpret_cast<const BYTE*>((uintptr_t)(tok.pData + (uint64_t)tok.offset));
-        for (size_t y = 0; y < (size_t)height; y++)
-          memcpy(owned.data() + y * (size_t)row, data + y * planes[0], (size_t)row);
-        for (size_t y = 0; y < (size_t)height / 2; y++)
-          memcpy(owned.data() + (size_t)(row * height) + y * (size_t)row,
-                 data + planes[1] + y * planes[2], (size_t)row);
+        for (size_t y = 0; y < (size_t)height; y++) {
+          // Positive-height BI_RGB is bottom-up. FFmpeg expects top-down rows.
+          const size_t sourceRow = rgb ? (size_t)height - 1 - y : y;
+          memcpy(owned.data() + y * (size_t)row, data + sourceRow * planes[0], (size_t)row);
+        }
+        if (!rgb) {
+          for (size_t y = 0; y < (size_t)height / 2; y++)
+            memcpy(owned.data() + (size_t)(row * height) + y * (size_t)row,
+                   data + planes[1] + y * planes[2], (size_t)row);
+        }
         r.msWriteVideo += NowMs() - t;
       }
       t = NowMs();
@@ -709,7 +724,7 @@ class RenderFile final : public ISfRenderFile {
           options.nativeTarget = true;
           options.pipeTimeoutMs = cfg.pipeTimeoutMs; options.finishTimeoutMs = cfg.finishTimeoutMs;
           ve::Json media{{"video", {{"width", r.width}, {"height", r.height},
-              {"fps", ve::Json::array({r.rate.num, r.rate.den})}, {"pixfmt", "p010le"},
+              {"fps", ve::Json::array({r.rate.num, r.rate.den})}, {"pixfmt", rgb ? "bgr0" : "p010le"},
               {"sar", "1:1"}, {"frames", r.frameCountReported}}},
             {"audio", nullptr}, {"durationSec", double(r.frameCountReported) * r.rate.den / r.rate.num}};
           if (audio) media["audio"] = {{"rate", fmt.sampleRate}, {"channels", fmt.channels}, {"sampleFmt", "f32le"}};

@@ -1,30 +1,19 @@
 # Experimental exporters for VEGAS 22, 21 and Sony 13
 
-Each build uses the shared Vegas Encoder recipe, settings page and render loop.
-The native build selects the class, render object and stream interfaces for one
-specific host. Discovery checks the executable name and version. Template setup
-resolves the copy and release exports from the matching host module already
-loaded beside that executable. The package preflight records the executable,
-host module and proxy/stub hashes. Static evidence is in the
-[older-host comparison](../../vegas-ffmpeg-frameserver/docs/OLDER_VEGAS_STATIC_COMPARISON.md).
+The three Windows x64 trials use the same recipe core, settings page and render
+loop with separate native adapter builds.
 
-| Target | Installed executable | Audio/video read slots | Video frame info |
-| --- | --- | --- | --- |
-| VEGAS 22 build 248 | `L:/Program Files/VEGAS/VEGAS Pro 22.0/vegas220.exe` | 15 / 15 | 176 bytes |
-| VEGAS 21 build 108 | `L:/Program Files/VEGAS/VEGAS Pro 21.0/vegas210.exe` | 16 / 16 | 208 bytes |
-| Sony VEGAS 13 build 453 | `C:/Program Files/Sony/Vegas Pro 13.0/vegas130.exe` | 16 / 16 | 168 bytes |
+| Target | Build |
+| --- | --- |
+| VEGAS Pro 22 | 248 |
+| VEGAS Pro 21 | 108 |
+| Sony VEGAS Pro 13 | 453 |
 
-The legacy class stores the type index through slot 3 and returns it through
-slot 4. This corrects the original comparison table and is corroborated by
-the decoded proxy and Classic's setter/getter. Sony 13's settings-page count
-and retrieval are at 21/22. Those methods are at 22/23 on 22 and 21.
-
-The trial INIs use one format and advertise `.vencoder`. The recipe determines
-the real extension, with the existing checks for destination collisions and
-publication. All three INIs use the render-only audio/video mask and zero caps
-from the VEGAS 22 Classic reference. These are experimental discovery values for
-21 and 13. Selector 11 returns a DWORD video-stream count on 22. The older
-21/13 candidates return E_NOTIMPL for that selector pending evidence.
+Render As displays a .vencoder placeholder. The selected recipe supplies the
+actual output extension. The release build produces fresh per-host DLLs from
+the same source. Setup uses its matching bundled app and selects the DLL for
+the exact host build. The historical trial packages below remain rollback
+references.
 
 ## First owner-operated test
 
@@ -107,6 +96,38 @@ $vegas22 = 'L:/Program Files/VEGAS/VEGAS Pro 22.0'
 
 The rollback directory also contains the original install manifest and discovery
 file. The original bundle's launcher applies again after restoring its candidate.
+
+## VEGAS 21 and Sony 13 reinstall
+
+The original 21 and 13 candidates were reinstalled with owner authorization on
+2026-11-05. The DLL, INI, PDB and discovery hashes verified for both hosts.
+The 21 reinstall had changed `vegas210.exe`. The current executable has a valid
+MAGIX signature and reports build 108. Its kernel and FileIO proxy match the
+original trial inputs. All three Sony 13 build 453 host inputs still match.
+Existing discovery files in both installations matched their preinstall hashes.
+
+The owner reports the VEGAS 21 trial passed after the x86 runtime repair.
+Sony 13 starts and reaches Render with the H.264 (CPU) template. The exporter
+resolves the filename, then stops on first-frame validation. Detailed evidence
+lives in the private investigation repository. Sony 13 still needs a successful
+render before Setup integration.
+
+Use the refreshed launcher from the product root. It checks the current host
+hashes and points to each trial's existing isolated data and logs.
+
+```powershell
+$trial = 'L:/repos/vegas-encoder/build/test-results/older-vegas-reinstall-20261105-213340265'
+& "$trial/Start-OlderVegasTrial.ps1" -Major 21
+# Use -Major 13 for Sony VEGAS 13.
+```
+
+To remove either trial, close its host and run the corresponding command.
+
+```powershell
+$bundle = 'L:/repos/vegas-encoder/build/test-results/older-vegas-20261105-163430530'
+& "$bundle/Install-VegasEncoder.ps1" -VegasDir 'L:/Program Files/VEGAS/VEGAS Pro 21.0' -Uninstall
+& "$bundle/Install-VegasEncoder.ps1" -VegasDir 'C:/Program Files/Sony/Vegas Pro 13.0' -Uninstall
+```
 
 ## Rebuild
 
