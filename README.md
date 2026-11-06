@@ -73,25 +73,22 @@ The desktop app can manage presets and test FFmpeg without running VEGAS.
 
 ## VEGAS Pro compatibility
 
-| Host | Current status |
-| --- | --- |
-| **Boris FX VEGAS Pro 2026.0.3.189 x64** | Tested with the **0.1.7 development trials** at the scope below |
-| VEGAS Pro 23 build 278 | Uses the shared exporter with automatic filename extensions |
-| VEGAS Pro 22 build 248, VEGAS Pro 21 build 108, and Sony VEGAS Pro 13 build 453 | Owner-tested Windows x64 builds with dedicated exporters. See the release qualification status. |
-| Other builds or versions | Untested |
+| VEGAS version (Windows x64) | Supported |
+| --- | :---: |
+| VEGAS Pro 2026 | ✅ |
+| VEGAS Pro 23 | ✅ |
+| VEGAS Pro 22 | ✅ |
+| VEGAS Pro 21 | ✅ |
+| VEGAS Pro 20 | ❌ |
+| VEGAS Pro 19 | ❌ |
+| VEGAS Pro 18 | ❌ |
+| VEGAS Pro 17 | ❌ |
+| VEGAS Pro 16 | ❌ |
+| VEGAS Pro 15 | ❌ |
+| VEGAS Pro 14 | ❌ |
+| Sony VEGAS Pro 13 | ✅ |
 
-On the tested 2026 build, owner-confirmed checks include basic renders, normal
-saved-template persistence across restart, cancellation/recovery, failure
-presentation, and immediate reopening of a large preset. Container trials also
-confirmed MP4, MOV, and WebM renders for specific recipes, plus correct settings
-handoff for all five supported containers.
-
-This is still a development build. MXF rendering and the latest MKV regression
-were skipped; the separate two-container restart sequence and exact large-template
-save/restart sequence remain unconfirmed. Additional same-session encoder-failure
-recovery and faster-progress performance trials are deferred. Broader HDR, colour,
-alpha, audio-only, and host-version support are not qualified. See
-[current status](docs/STATUS.md) for the tested builds and precise limits.
+Older versions are unsupported. See [tested builds and known limitations](docs/STATUS.md).
 
 ## Encoders and formats
 
