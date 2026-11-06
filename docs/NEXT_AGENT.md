@@ -13,6 +13,17 @@ history; their old locations, ownership splits and queues do not apply.
 
 ## Current queue: older VEGAS release qualification
 
+The 0.2.0+2 logs from VEGAS 2026.0.3.189 and Sony VEGAS 13.0.0.453 confirm
+FFmpeg startup and exposed a separate AV1 (CPU) live pipe stall. The updated
+built-in starter (revision 4) stores the workaround `-svtav1-params lp=3` in
+Video Extra arguments. The owner confirmed the fix with 0.2.0+3. Real-host
+logs show AV1/Opus publication and sampled verification on both hosts with
+the supplied November FFmpeg build.
+The test installer is
+`dist/VegasEncoder-0.2.0.3-windows-x64-setup-20261106-112027936.exe`.
+See [status](STATUS.md#current-progress) for the comparison
+builds, other preset results and limits.
+
 The owner confirmed the RGB render fix in Sony 13 build 453. Logs show MP4 and
 WebM publication. Independent decode is pending. The trial's old app path causes
 a version mismatch. The 0.1.9+2 Setup candidate bundles the matching app and all

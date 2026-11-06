@@ -102,13 +102,13 @@ std::string Read(const std::wstring& path, DWORD limit) {
   if (!ReadFile(file.handle,bytes.data(),static_cast<DWORD>(bytes.size()),&count,nullptr) || count != bytes.size()) Error("Cannot read complete file",path);
   return bytes;
 }
-std::vector<std::wstring> Entries(const std::wstring& path, const wchar_t* pattern, size_t limit) {
+std::vector<std::wstring> Entries(const std::wstring& path, const wchar_t* pattern, size_t limit, bool allowMissingPath = false) {
   Plain(path);
   WIN32_FIND_DATAW data{};
   const auto search = FindFirstFileW((path + L"\\" + pattern).c_str(),&data);
   if (search == INVALID_HANDLE_VALUE) {
     const auto code = GetLastError();
-    if (code == ERROR_FILE_NOT_FOUND) return {};
+    if (code == ERROR_FILE_NOT_FOUND || (allowMissingPath && code == ERROR_PATH_NOT_FOUND)) return {};
     Error("Cannot enumerate directory",path,code);
   }
   struct Close { HANDLE h; ~Close() { FindClose(h); } } close{search};
@@ -321,10 +321,10 @@ Json Snapshot(const Json& options) {
     }
   }
   for (const auto& root : dirs) try {
-    budget.Check(); bool found = false;
-    for (const auto& name : Entries(root,L"vegas*.exe",256)) {
+    budget.Check();
+    for (const auto& name : Entries(root,L"vegas*.exe",256,true)) {
       if (!HostName(name)) continue;
-      found = true; const auto exe = root+L"\\"+name, plugin = root+L"\\FileIO Plug-Ins\\vegas-encoder";
+      const auto exe = root+L"\\"+name, plugin = root+L"\\FileIO Plug-Ins\\vegas-encoder";
       if (result["hosts"].size() >= 64) throw std::runtime_error("VEGAS discovery exceeded 64 hosts.");
       Json row{{"name","VEGAS Pro"},{"version","Unknown"},{"executable",Utf8(exe)},{"x64",false},
         {"exporterPath",Utf8(plugin+L"\\vegas-encoder.dll")},{"discoveryPath",Utf8(root+L"\\VegasEncoder-x64.fio2007-config")},
@@ -338,7 +338,6 @@ Json Snapshot(const Json& options) {
       } catch (const std::exception& e) { row["state"] = "unreadable"; row["details"].push_back(e.what()); }
       result["hosts"].push_back(std::move(row));
     }
-    if (!found) errors.push_back("No VEGAS executable found in registered/candidate directory: "+Utf8(root));
   } catch (const std::exception& e) { errors.push_back(e.what()); }
   return result;
 }

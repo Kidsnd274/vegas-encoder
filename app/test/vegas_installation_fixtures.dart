@@ -7,6 +7,8 @@ VegasHostStatus vegasHostFixture(
   bool older = false,
   String olderVersion = '23.0.0.278',
   String? displayVersion,
+  String? numericVersion,
+  String? executableName,
 }) {
   final major = olderVersion.split('.').first;
   final root = older ? 'D:\\VEGAS\\VEGAS Pro $major.0' : r'C:\Program Files\BorisFX\Vegas Pro 2026';
@@ -14,8 +16,8 @@ VegasHostStatus vegasHostFixture(
   return VegasHostStatus(
     name: older ? 'VEGAS Pro $major' : 'Boris FX VEGAS Pro 2026',
     version: displayVersion ?? (older ? olderVersion : '2026.0.3.189'),
-    numericVersion: displayVersion == null ? null : olderVersion,
-    executable: '$root\\${older ? 'vegas${major}0.exe' : 'vegas2026.exe'}',
+    numericVersion: numericVersion,
+    executable: '$root\\${executableName ?? (older ? 'vegas${major}0.exe' : 'vegas2026.exe')}',
     x64: true,
     exporterPath: '$plugin\\vegas-encoder.dll',
     discoveryPath: '$root\\VegasEncoder-x64.fio2007-config',

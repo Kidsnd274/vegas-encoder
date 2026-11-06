@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "release": {"version": "0.1.9", "build": 2, "exporterSuffix": "recipe-proof"},
+  "release": {"version": "0.2.0", "build": 3, "exporterSuffix": ""},
   "core": {"version": "0.3.0-filters", "packageVersion": "0.3.0", "abi": 1, "schemaMax": 2, "contracts": 1},
-  "services": {"packageVersion": "0.3.0"},
+  "services": {"packageVersion": "0.3.0", "ffmpegParserVersion": 4},
   "legacyExporters": {
     "default": {"version": "0.1.1-dev", "fileVersion": [0, 1, 1, 0]},
     "configuration": {"version": "0.1.2-config-proof", "fileVersion": [0, 1, 2, 0]},

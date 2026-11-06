@@ -137,6 +137,12 @@ Future<void> main(List<String> args) async {
       readRegistry: false,
     ).inspect();
     check(empty.hosts.isEmpty && empty.errors.isEmpty, 'empty discovery');
+    final capture = await Directory('${root.path}\\VEGASCapture').create();
+    await File('${capture.path}\\VegasCapture.exe').writeAsString('helper');
+    final overLimit = await Directory('${root.path}\\over-limit').create();
+    for (var i = 0; i <= 256; ++i) {
+      await File('${overLimit.path}\\vegas$i.exe').create();
+    }
     final scanner = WindowsVegasInstallations(
       readRegistry: false,
       candidateDirectories: [
@@ -144,6 +150,9 @@ Future<void> main(List<String> args) async {
         '${verified.path}\\',
         verified.path.toUpperCase(),
         '${root.path}\\gone',
+        capture.path,
+        '${capture.path}\\VEGASCapture',
+        overLimit.path,
       ],
     );
     final snapshot = await scanner.inspect();
@@ -152,8 +161,11 @@ Future<void> main(List<String> args) async {
       'deduplicated hosts and helpers excluded',
     );
     check(
-      snapshot.errors.length == 1 && snapshot.errors.single.contains('gone'),
-      'partial directory failure retained',
+      snapshot.errors.length == 1 &&
+          snapshot.errors.single.contains(
+            'Directory inspection limit exceeded',
+          ),
+      'missing and helper-only folders are quiet; actual scan failures are retained',
     );
     VegasHostStatus row(Directory d) => snapshot.hosts.singleWhere(
       (h) => h.executable == '${d.path}\\vegas999.exe',

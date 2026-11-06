@@ -44,7 +44,7 @@ class VegasIntegrationCard extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           const PanelBlurb(
-            'Detected hosts and exporter files on this PC. Use the installer to add or update Vegas Encoder.',
+            'VEGAS versions and exporter status on this PC. Use the installer to add or update Vegas Encoder.',
           ),
           const SizedBox(height: 12),
           if (status.isLoading)
@@ -55,31 +55,101 @@ class VegasIntegrationCard extends ConsumerWidget {
               text: 'Could not check VEGAS installations.',
               fix: status.error is ServiceException ? (status.error! as ServiceException).message : '${status.error}',
             )
-          else if (value != null) ...[
-            if (value.hosts.isEmpty)
-              VeMessage(
-                level: value.errors.isEmpty ? VeLevel.info : VeLevel.warning,
-                text: value.errors.isEmpty
-                    ? 'No registered VEGAS installations found.'
-                    : 'No VEGAS hosts could be checked.',
-                fix: 'Only registered installations are detected. Refresh after installing VEGAS.',
-              ),
-            for (final error in value.errors)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: VeMessage(level: VeLevel.warning, text: 'Discovery could not complete: $error'),
-              ),
-            for (final host in value.hosts) ...[
-              const SizedBox(height: 12),
-              _HostStatus(key: ValueKey(host.executable), host: host),
-            ],
-          ],
+          else if (value != null)
+            _HostList(snapshot: value),
           const SizedBox(height: 12),
           const PanelBlurb(
             'Verification covers recorded exporter, INI and discovery files only. Shared app/runtime integrity and host compatibility are separate checks.',
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HostList extends StatelessWidget {
+  const _HostList({required this.snapshot});
+
+  final VegasInstallationSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final hostsByRelease = <int?, List<VegasHostStatus>>{
+      2026: [],
+      for (var major = 23; major >= 13; major--) major: [],
+    };
+    for (final host in snapshot.hosts) {
+      hostsByRelease.putIfAbsent(host.releaseMajor, () => []).add(host);
+    }
+    final releases = hostsByRelease.keys.toList()..sort((a, b) => (b ?? 0).compareTo(a ?? 0));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 8,
+      children: [
+        for (final release in releases)
+          if (hostsByRelease[release]!.isEmpty)
+            _UndetectedHost(release: release!)
+          else
+            for (final host in hostsByRelease[release]!) _HostStatus(key: ValueKey(host.executable), host: host),
+        if (snapshot.errors.isNotEmpty) _DiscoveryDetails(errors: snapshot.errors),
+      ],
+    );
+  }
+}
+
+class _UndetectedHost extends StatelessWidget {
+  const _UndetectedHost({required this.release});
+
+  final int release;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = VeTokens.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: t.colors.line2),
+        borderRadius: BorderRadius.circular(VeRadius.md),
+      ),
+      child: MergeSemantics(
+        child: Row(
+          children: [
+            Expanded(child: Text('VEGAS Pro $release', style: t.text.small)),
+            Text('Not detected', style: t.text.small.copyWith(color: t.colors.muted)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoveryDetails extends StatefulWidget {
+  const _DiscoveryDetails({required this.errors});
+
+  final List<String> errors;
+
+  @override
+  State<_DiscoveryDetails> createState() => _DiscoveryDetailsState();
+}
+
+class _DiscoveryDetailsState extends State<_DiscoveryDetails> {
+  bool expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = VeTokens.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 6,
+      children: [
+        const VeMessage(level: VeLevel.warning, text: 'Some locations could not be checked.'),
+        VeLinkButton(
+          label: expanded ? 'Hide discovery details' : 'Show discovery details',
+          onPressed: () => setState(() => expanded = !expanded),
+        ),
+        if (expanded)
+          for (final error in widget.errors) SelectableText(error, style: t.text.small),
+      ],
     );
   }
 }
@@ -99,7 +169,7 @@ class _HostStatusState extends State<_HostStatus> {
     final host = widget.host;
     final t = VeTokens.of(context);
     final (label, level) = switch (host.state) {
-      VegasInstallationState.notInstalled => ('Not installed', VeLevel.info),
+      VegasInstallationState.notInstalled => ('Integration not installed', VeLevel.info),
       VegasInstallationState.verified => ('Installed, verified', VeLevel.ok),
       VegasInstallationState.unverified => ('Installed, unverified', VeLevel.warning),
       VegasInstallationState.changed => ('Files missing or changed', VeLevel.warning),

@@ -51,7 +51,7 @@ int wmain(int argc, wchar_t** argv) {
     }
     Write(machineFile,machine);
     const auto cacheFile = root / L"Local" / L"cache" / (Widen(key) + L".json");
-    Json caps{{"parser",3},{"identityKey",key},{"installationId","selected"},{"encoders",{{"h264_nvenc",{{"availability",{{"state","available"}}}}}}}};
+    Json caps{{"parser",VE_FFMPEG_PARSER_VERSION},{"identityKey",key},{"installationId","selected"},{"encoders",{{"h264_nvenc",{{"availability",{{"state","available"}}}}}}}};
     Write(cacheFile,{{"cache",1},{"capabilities",caps}});
     Check(LoadRecipeRuntime().capabilities.at("encoders").at("h264_nvenc").at("availability").at("state") == "unknown","native reader does not promote stored hardware readiness");
     caps["filters"] = {{"scale", {{"available", true}, {"algorithms", Json::array({"bicubic", "bilinear", "lanczos", "neighbor"})}}},
@@ -59,9 +59,9 @@ int wmain(int argc, wchar_t** argv) {
     Write(cacheFile,{{"cache",1},{"capabilities",caps}});
     Check(LoadRecipeRuntime().capabilities.at("filters") == caps.at("filters"),
           "native runtime preserves selected filter capability facts without probing");
-    caps["parser"] = 2; Write(cacheFile,{{"cache",1},{"capabilities",caps}});
-    Reject([] { LoadRecipeRuntime(); },"old filter-unaware cache requires refresh rather than implicit support");
-    caps["parser"] = 3;
+    caps["parser"] = VE_FFMPEG_PARSER_VERSION - 1; Write(cacheFile,{{"cache",1},{"capabilities",caps}});
+    Reject([] { LoadRecipeRuntime(); },"stale parser cache requires refresh");
+    caps["parser"] = VE_FFMPEG_PARSER_VERSION;
     caps["identityKey"] = std::string(64,'b'); Write(cacheFile,{{"cache",1},{"capabilities",caps}});
     Reject([] { LoadRecipeRuntime(); },"mismatched cache rejected");
     fs::remove(cacheFile);

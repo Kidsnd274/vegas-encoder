@@ -125,7 +125,7 @@ RecipeRuntime LoadRecipeRuntime() {
     if (!cache.is_object() || cache.value("cache",ve::Json(nullptr)) != 1 || !cache.at("cache").is_number_integer() ||
         !cache.contains("capabilities") || !cache.at("capabilities").is_object()) throw std::runtime_error("Invalid FFmpeg capability cache.");
     const auto& capabilities = cache.at("capabilities");
-    if (capabilities.value("parser",ve::Json(nullptr)) != 3 || ve::Str(capabilities,"identityKey") != key ||
+    if (capabilities.value("parser",ve::Json(nullptr)) != VE_FFMPEG_PARSER_VERSION || ve::Str(capabilities,"identityKey") != key ||
         ve::Str(capabilities,"installationId") != selected) throw std::runtime_error("FFmpeg capability cache does not match the selected installation; probe it again in the app.");
     result.capabilities = capabilities;
     // Hardware readiness includes GPU/driver/age checks in the app. Do not label

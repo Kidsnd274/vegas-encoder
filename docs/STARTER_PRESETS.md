@@ -25,7 +25,7 @@ or claim automatic per-preset naming. See the current STATUS/trial for its limit
 | H.264 (CPU) | x264, CRF 18, slow, 8-bit | AAC 256 kbps / MP4 |
 | HEVC (CPU) | x265, CRF 22, medium, 10-bit | AAC 256 kbps / MP4 |
 | HEVC (NVENC) | NVENC HEVC, CQ 20, p5, HQ, 10-bit | AAC 256 kbps / MP4 |
-| AV1 (CPU) | SVT-AV1, CRF 32, preset 6, 10-bit | Opus 192 kbps / WebM |
+| AV1 (CPU) | SVT-AV1, CRF 32, preset 6, 10-bit, parallelism level 3 | Opus 192 kbps / WebM |
 | ProRes 422 HQ | prores_ks, HQ, 10-bit | PCM 24-bit / MOV |
 | DNxHR HQ | dnxhd, DNxHR HQ, 8-bit | PCM 16-bit / MXF |
 | FFV1 | FFV1, 10-bit | Float PCM / MKV |
@@ -41,14 +41,20 @@ These are SDR BT.709 recipes; a 10-bit encoder does not imply HDR support.
 Hardware starters require the named encoder in the selected user-supplied FFmpeg
 and a compatible GPU/driver. Availability comes from existing discovery/test services.
 
+The AV1 (CPU) starter keeps `-svtav1-params lp=3` in the editable Video Extra
+arguments field. This setting mitigates a live pipe stall reproduced with
+SVT-AV1 at its default parallelism. Existing templates can add the option
+manually or take the new revision through Update from library. See [STATUS](STATUS.md).
+
 The quick-review, H.264/HEVC CRF 16 and H.264 720p/3500 kbps variants are no longer
 built-ins. Personal exports/imports and saved VEGAS snapshots keep their settings;
 no user files are deleted or rewritten. The previous YouTube-named recipes become
 the generic H.264 CPU and HEVC NVENC defaults.
 Retained library IDs, VEGAS GUIDs and numeric template IDs stay stable. Catalog
 `vegas[].index` is the persistent template ID; enumeration positions can close gaps.
-`retiredVegas` reserves removed IDs/GUIDs against reuse. The six H.264, HEVC and AV1
-starters are now revision 3. The other starters are revision 2. Library updates to
+`retiredVegas` reserves removed IDs/GUIDs against reuse. AV1 (CPU) is revision 4.
+The other H.264, HEVC and AV1 starters are revision 3. All remaining starters
+are revision 2. Library updates to
 saved templates remain explicit. Setup does not copy user `.sft2` files or refresh
 saved templates.
 

@@ -848,8 +848,9 @@ Other encoder help is fetched lazily and merged under the cache lock. The parser
 preserves literal bounds/defaults/constants, merges duplicate options/aliases, and
 detects unknown encoder help even with exit 0. Muxer aliases are individual lookup
 keys but counts deduplicate canonical implementations; joined device flag Ed is
-accepted. Production parser version is **2**, invalidating earlier qualification
-commands/cache entries. Existing parser-1 fakes remain historical fixtures.
+accepted. `services.ffmpegParserVersion` in `version.json` supplies the revision
+used by both the app's probe and the native exporter's cache reader. Revision 4
+accepts both two- and three-column filter lists.
 
 One shared pool allows at most four direct, shell-free hidden Windows children.
 Help/identity/hardware timeout is 10 s per child; stdout is bounded (1 MiB normally,
@@ -920,7 +921,11 @@ VegasHostStatus {name,version,executable:string, numericVersion:string|null, x64
 ```
 
 The dashboard shows the file version text and uses the fixed numeric version
-resource when it compares a host with the recorded target builds.
+resource when it compares a host with the recorded target builds. It groups by
+major release using the fixed numeric version, display version or executable
+name in that order. Missing candidate paths and directories without a host
+executable are normal absences. Other discovery errors remain available in a
+single disclosure below the list.
 
 - `notInstalled`: no owned exporter/discovery files found. Failed access never
   becomes missing. `unverified`: files present but no supported manifest or

@@ -646,9 +646,11 @@ are inspected through ve_services and its native Windows service DLL on a worker
 isolate; widgets do not access registration/files. No PowerShell or inspected
 host/exporter process is started. The contract is in CONTRACTS C3.
 
-- Show each detected host's name, actual version and executable path, plus the
-  exporter/discovery paths checked and the actual DLL version when readable.
-- Distinguish **Not installed**, **Installed, verified**, **Installed, unverified**
+- List VEGAS Pro 2026 and 23 through 13 newest first, with any additional detected
+  versions in the same order. Use a compact **Not detected** row for absent releases.
+  Give each detected installation a card with the host name, actual version and
+  readable exporter version. Keep paths and verification details behind a disclosure.
+- Distinguish **Integration not installed**, **Installed, verified**, **Installed, unverified**
   (missing/unsupported manifest), **Files missing or changed**, and **Could not
   check**. Show the relevant manifest path and concrete error/detail. Only say
   verified for bytes/paths actually covered by the supported installed manifest;
@@ -656,7 +658,8 @@ host/exporter process is started. The contract is in CONTRACTS C3.
   stays unknown rather than implying a whole installation was verified.
 - Keep supported/tested host scope separate from detection and file integrity;
   finding an older VEGAS executable does not establish compatibility.
-- Include explicit Refresh and readable loading, empty and partial-error states.
+- Include explicit Refresh and readable loading and failure states. Summarize
+  partial scan failures once below the list with a collapsed discovery disclosure.
   An unreadable host/manifest must not prevent other rows from being shown.
   Refresh hides old verification claims while checking; a failed scan remains
   visible until explicit Refresh (no automatic retry). Each row offers Show/Hide

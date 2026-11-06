@@ -7,6 +7,82 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**AV1 (CPU) live pipe stall.** With installed exporter `0.2.0+2` and FFmpeg
+`N-128435-g7798de15f86-gdb8537d8cc7+2` (SVT-AV1 4.3.0), owner logs from
+VEGAS 2026.0.3.189 and Sony VEGAS 13.0.0.453 show FFmpeg opening both streams
+for 1080p at 30000/1001, then stalling. Both hosts submitted 145 video frames
+before the 10-second pipe deadline and published no file. FFmpeg reported
+three output frames on 2026 (P010) and one on 13 (BGR0).
+
+A synthetic replay through the production Windows pipe transport reproduced
+the failure with both pixel formats. The October gyan `615b07170e` and BtbN
+`24e860f6d3` builds and the 2024 snapshot `N-115847-gb7a971f4bb-g7c95c7de4a+2`
+also stalled on P010. Gyan 5.1.2 and 6.0 completed the same P010 replay.
+On the November build, the other 11 built-in presets
+completed 300-frame P010 renders with full video and audio decode, including
+all three NVENC presets. Adding `-svtav1-params lp=3` under Video Extra
+arguments completed and fully decoded 900 frames with audio on both input
+formats. The other preset results still need real-host confirmation. The
+audit isolated the stall to the tested live audio/video
+interaction with SVT-AV1 at its default parallelism; it did not isolate a
+single upstream change.
+
+The AV1 (CPU) built-in starter now carries the mitigation in its editable
+Video Extra arguments field at revision 4, shared by the app and native
+templates. Saved snapshots keep their prior settings until explicitly edited
+or updated from the library. The revised starter compiled, completed and fully
+decoded 300 frames with P010 input and Opus on the November snapshot, both
+October builds and gyan 5.1.2 and 6.0. The older SVT-AV1 libraries treat
+`lp=3` as a logical processor setting. The isolated native template suite
+and all 11 built-in preset widget/golden tests passed. The Video Extra
+arguments field and command preview were reviewed in both themes. This
+change is packaged in test candidate `0.2.0+3`, built from the current
+working tree. The 39-file bundle and Setup checksums verified, and all 99
+packaging and detection checks passed against local files and fake targets.
+The owner then confirmed that the AV1 (CPU) render works. The installed
+2026 and Sony 13 DLL hashes match the test candidate. With the November
+FFmpeg snapshot and `lp=3`, VEGAS 2026.0.3.189 (P010) and Sony VEGAS
+13.0.0.453 (BGR0) each published a 300-frame 1080p AV1/Opus WebM with
+480,480 audio sample frames, FFmpeg exit 0 and successful sampled FFprobe
+verification. The outputs were unavailable for a separate full decode.
+This confirms the tested render path on those two hosts. Broader installer
+lifecycle and render qualification remain open.
+
+Two optional Vulkan encoders also fail the generic NV12 hardware probe on
+this PC. A one-frame CLI test succeeded with `yuv422p10le` for
+`apv_vulkan` and `yuv444p` for `ffv1_vulkan`, so those probe failures
+do not establish device unavailability. These are separate from the
+built-in FFV1 and the CPU AV1 stall.
+
+**0.2.0 render startup regression.** Installed build `0.2.0+1` rejected
+the valid revision-4 FFmpeg cache because the shared exporter reader still
+required revision 3. Logs from VEGAS 13 build 453, 21 build 108 and 2026.0.3.189
+show this failure before FFmpeg starts. Build `0.2.0+2` generates the revision
+from `version.json` for both the app probe and the native reader. The corrected
+reader accepted an isolated copy of the affected cache. Native runtime fixtures
+passed 34 checks each in modern and legacy naming modes, service fixtures passed
+4,469 checks, and the rebuilt Setup bundle passed 99 packaging checks. The
+later real-host logs above confirm FFmpeg launch with build 2 on 2026 and 13.
+
+**0.2.0 FFmpeg probe and VEGAS dashboard.** The FFmpeg capability parser accepts
+two- and three-column filter lists. The supplied `C:\ffmpeg\bin\ffmpeg.exe`
+(`N-128435-g7798de15f86-gdb8537d8cc7+2`) and matching FFprobe passed the full
+probe with `scale`, `pad` and `setsar`. The isolated runtime suite passed 76
+checks, including 14 synthetic preset encodes with readback and full decode.
+The service regression suite passed 4,469 checks.
+
+Settings lists VEGAS Pro 2026 and 23 through 13 newest first. Missing releases
+get compact status rows, and detected hosts keep their expandable cards.
+The native scanner passed 26 Windows fixture checks and detected the five local
+host builds (2026.0.3.189, 23.0.0.278, 22.0.0.248, 21.0.0.108 and 13.0.0.453)
+without discovery errors. This was read-only inspection of the installed files.
+App and service analysis passed, and 86 focused Flutter tests passed, including
+26 light and dark golden comparisons. The matched Windows app, core and exporter
+build passed receipt verification, and Setup compiled. The app reports `0.2.0+1`.
+All four packaged exporter DLLs report `0.2.0` with Windows file version
+`0.2.0.1`. The staged bundle passed 99 packaging and detection checks with
+local files and fake targets. Setup was compiled only.
+
 **VEGAS 21 trial passed on build 108, per the owner.** Both older trial payloads
 and their discovery files verified at reinstall. On the initial Sony 13 build
 453 trial, the exporter resolved `.vencoder` to `.mp4` before rejecting the

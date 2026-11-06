@@ -36,6 +36,31 @@ class VegasHostStatus {
   final VegasInstallationState state;
   final List<String> details;
 
+  /// Release family for display, including hosts whose version resource is unreadable.
+  int? get releaseMajor {
+    final versionMajor = RegExp(
+      r'^(?:Version\s+)?([1-9]\d*)(?:\.|\s|$)',
+      caseSensitive: false,
+    );
+    final major =
+        int.tryParse(versionMajor.firstMatch(numericVersion ?? '')?[1] ?? '') ??
+        int.tryParse(versionMajor.firstMatch(version)?[1] ?? '');
+    if (major != null) return major;
+
+    final filename = executable.split(RegExp(r'[/\\]')).last;
+    final digits = RegExp(
+      r'^vegas([1-9]\d*)\.exe$',
+      caseSensitive: false,
+    ).firstMatch(filename)?[1];
+    if (digits == null) return null;
+    // Numbered releases use names like vegas230.exe. Year-based releases use vegas2026.exe.
+    return int.tryParse(
+      digits.length == 3 && digits.endsWith('0')
+          ? digits.substring(0, 2)
+          : digits,
+    );
+  }
+
   // This identifies the recorded target versions, never a support guarantee.
   bool get selectedHostVersion =>
       x64 &&

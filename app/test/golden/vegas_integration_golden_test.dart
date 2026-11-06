@@ -24,6 +24,7 @@ void main() {
       'changed',
       'unreadable',
       'notInstalled',
+      'mixed',
       'empty',
       'partial',
       'error',
@@ -37,7 +38,21 @@ void main() {
         } else {
           final fake = FakeVegasInstallations(
             snapshot: VegasInstallationSnapshot(
-              hosts: state == null ? const [] : [vegasHostFixture(state, older: name == 'unverified')],
+              hosts: name == 'mixed'
+                  ? [
+                      for (final version in ['13.0.0.453', '21.0.0.108', '22.0.0.248', '23.0.0.278'])
+                        vegasHostFixture(
+                          version.startsWith('22')
+                              ? VegasInstallationState.notInstalled
+                              : VegasInstallationState.verified,
+                          older: true,
+                          olderVersion: version,
+                        ),
+                      vegasHostFixture(VegasInstallationState.verified),
+                    ]
+                  : state == null
+                  ? const []
+                  : [vegasHostFixture(state, older: name == 'unverified')],
               errors: name == 'partial' ? const ['Cannot inspect directory (Windows error 5): D:\\VEGAS'] : const [],
             ),
           );
@@ -54,7 +69,7 @@ void main() {
           ),
           brightness: brightness,
           width: 720,
-          view: const Size(800, 1100),
+          view: Size(800, name == 'mixed' ? 1400 : 1100),
         );
         if (state != null) {
           await tester.tap(find.text('Show paths and details'));

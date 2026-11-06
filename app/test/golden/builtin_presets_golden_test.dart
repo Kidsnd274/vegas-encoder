@@ -10,6 +10,7 @@ import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/app/launch.dart';
 import 'package:vegas_encoder/design/components/button.dart';
 import 'package:vegas_encoder/design/components/command_view.dart';
+import 'package:vegas_encoder/features/presets/panels/extra_field.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
 import 'package:vegas_encoder/state/popup.dart';
@@ -167,6 +168,29 @@ void main() {
       expect(command, contains('256k'));
       expect(command, contains('yuv420p10le'));
       await expectGolden('builtins_hevc_$theme');
+    });
+
+    testWidgets('CPU AV1 starter shows its parallelism argument $theme', (tester) async {
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+      tester.platformDispatcher.platformBrightnessTestValue = brightness;
+      final preset = builtins.singleWhere((p) => p.recipe.id == 'av1-small');
+      expect(preset.revision, 4);
+      await pumpApp(
+        tester,
+        core: core,
+        overrides: [
+          windowControllerProvider.overrideWithValue(FakeWindowController()),
+          presetLibraryProvider.overrideWithValue(FakePresetLibrary(presets: [preset])),
+        ],
+      );
+      await tester.tap(find.text('AV1 (CPU)').first);
+      await tester.pumpAndSettle();
+      final extra = find.byType(ExtraArgumentsField).first;
+      await tester.ensureVisible(extra);
+      await tester.pumpAndSettle();
+      final input = find.descendant(of: extra, matching: find.byType(EditableText));
+      expect(tester.widget<EditableText>(input).controller.text, '-svtav1-params lp=3');
+      await expectGolden('builtins_av1_cpu_$theme');
     });
 
     testWidgets('product popup load and linked origin $theme', (tester) async {

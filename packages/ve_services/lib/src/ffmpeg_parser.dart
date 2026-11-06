@@ -5,10 +5,11 @@ import 'dart:convert';
 import 'package:ve_core/ve_core.dart';
 import 'api.dart';
 import 'models.dart';
+import 'version.g.dart';
 
 class WindowsFFmpegHelpParser implements FFmpegHelpParser {
   @override
-  int get version => 3;
+  int get version => ffmpegParserVersion;
   static const _flags = r'[EDFVASXRBT.P]{11}';
   final _option = RegExp(
     r'^\s{2,}-([^\s]+)\s+(\[?<[^>]+>\]?)\s*(' + _flags + r')\s*(.*)$',
@@ -144,17 +145,23 @@ class WindowsFFmpegHelpParser implements FFmpegHelpParser {
   @override
   JsonMap parseFilters(String text) {
     _bound(text);
-    if (!text.contains('Filters:')) {
+    final lines = const LineSplitter().convert(text);
+    final header = lines.indexOf('Filters:');
+    if (header == -1) {
       throw const ServiceException(
         'HELP-PARSE',
         'Missing FFmpeg filter-list header.',
       );
     }
     final entries = <String, Object?>{};
-    for (final m in RegExp(
-      r'^\s+([TSC.]{3})\s+(\S+)\s+(\S+->\S+)\s+(.*)$',
-      multiLine: true,
-    ).allMatches(text.replaceAll('\r', ''))) {
+    // Builds that omit the command-support column still list timeline and
+    // slice-threading flags in the first two positions.
+    final row = RegExp(
+      r'^[ \t]+([T.][S.][C.]?)[ \t]+(\S+)[ \t]+(\S+->\S+)[ \t]+(.*)$',
+    );
+    for (final line in lines.skip(header + 1)) {
+      final m = row.firstMatch(line);
+      if (m == null) continue;
       entries[m[2]!] = {'flags': m[1], 'streams': m[3], 'description': m[4]};
     }
     // A custom build can omit all curated filters, but must still have a valid list.

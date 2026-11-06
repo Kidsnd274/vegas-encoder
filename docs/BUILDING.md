@@ -30,10 +30,11 @@ Edit **`version.json`** at the repository root. This is the authoritative input:
 | Field | Controls |
 | --- | --- |
 | `release.version` / `release.build` | App version, exporter numeric file version, staging versions and setup include |
-| `release.exporterSuffix` | Optional exporter product suffix, currently `recipe-proof`; empty removes it |
+| `release.exporterSuffix` | Optional exporter product suffix. An empty value uses the release version directly |
 | `core.version` / `core.packageVersion` | Core runtime stamp / Dart package metadata |
 | `core.abi` / `core.schemaMax` / `core.contracts` | Implemented compatibility levels; not release counters |
 | `services.packageVersion` | Windows services Dart package metadata |
+| `services.ffmpegParserVersion` | FFmpeg capability cache revision shared by the app and exporter |
 | `legacyExporters` | Retained historical proof variants; normal product builds do not use these |
 
 For example, release `0.1.7` and build `1` produce app `0.1.7+1` and Windows

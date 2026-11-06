@@ -201,11 +201,11 @@
     },
     {
       "vepreset": 1,
-      "revision": 3,
+      "revision": 4,
       "favorite": false,
       "pinned": false,
       "builtin": true,
-      "updatedAt": "2026-11-05T00:00:00Z",
+      "updatedAt": "2026-11-06T00:00:00+08:00",
       "origin": null,
       "requires": {
         "encoders": [],
@@ -216,7 +216,7 @@
         "schema": 1,
         "id": "av1-small",
         "name": "AV1 (CPU)",
-        "notes": "",
+        "notes": "Uses SVT-AV1 parallelism level 3 to avoid stalls with live VEGAS audio and video. Edit it under Video Extra arguments.",
         "tags": [
           "Web",
           "Small"
@@ -240,7 +240,7 @@
           "depth": 10,
           "gopSec": 2,
           "color": "bt709",
-          "extra": ""
+          "extra": "-svtav1-params lp=3"
         },
         "audio": [
           {

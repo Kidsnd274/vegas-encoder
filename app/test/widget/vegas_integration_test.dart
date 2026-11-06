@@ -48,17 +48,18 @@ void main() {
     final service = FakeVegasInstallations(
       snapshot: VegasInstallationSnapshot(
         hosts: [
-          vegasHostFixture(VegasInstallationState.verified),
-          vegasHostFixture(VegasInstallationState.unverified, older: true),
           vegasHostFixture(
             VegasInstallationState.notInstalled,
             older: true,
             olderVersion: '13.0.0.453',
             displayVersion: 'Version 13.0 (Build 453) 64-bit',
+            numericVersion: '13.0.0.453',
           ),
           vegasHostFixture(VegasInstallationState.notInstalled, older: true, olderVersion: '22.0.0.250'),
+          vegasHostFixture(VegasInstallationState.verified),
+          vegasHostFixture(VegasInstallationState.unverified, older: true),
         ],
-        errors: const ['Cannot open registry key (Windows error 5): HKCU\\Software'],
+        errors: const ['Cannot open registry key (Windows error 5): HKCU\\Software', 'Could not inspect D:\\VEGAS'],
       ),
     );
     await openSettings(tester, service);
@@ -69,13 +70,80 @@ void main() {
     expect(find.textContaining('Recorded trial host version'), findsNWidgets(3));
     expect(find.textContaining('This host is not qualified'), findsOneWidget);
     expect(find.textContaining('Shared app/runtime integrity'), findsOneWidget);
-    expect(find.textContaining('Discovery could not complete'), findsOneWidget);
+    expect(find.text('Not detected'), findsNWidgets(8));
+    expect(find.text('Integration not installed'), findsNWidgets(2));
+    final discovery = find.text('Show discovery details');
+    final rows = [
+      find.textContaining('2026.0.3.189'),
+      find.textContaining('23.0.0.278'),
+      find.textContaining('22.0.0.250'),
+      for (var major = 21; major >= 14; major--) find.text('VEGAS Pro $major'),
+      find.textContaining('Version 13.0 (Build 453) 64-bit'),
+      discovery,
+    ];
+    for (var i = 1; i < rows.length; i++) {
+      expect(tester.getTopLeft(rows[i]).dy, greaterThan(tester.getTopLeft(rows[i - 1]).dy));
+    }
+    expect(find.text(service.snapshot.errors.first), findsNothing);
+    await tester.ensureVisible(discovery);
+    await tester.tap(discovery);
+    await tester.pumpAndSettle();
+    for (final error in service.snapshot.errors) {
+      expect(find.text(error), findsOneWidget);
+    }
+    final hideDiscovery = find.text('Hide discovery details');
+    await tester.ensureVisible(hideDiscovery);
+    await tester.tap(hideDiscovery);
+    await tester.pumpAndSettle();
+    expect(find.text(service.snapshot.errors.first), findsNothing);
     await tester.ensureVisible(find.text('Show paths and details').first);
     await tester.tap(find.text('Show paths and details').first);
     await tester.pumpAndSettle();
     expect(find.text(vegasHostFixture(VegasInstallationState.verified).manifestPath), findsOneWidget);
     expect(find.textContaining('bytes match the installed manifest'), findsOneWidget);
+    await tester.tap(find.text('Hide paths and details'));
+    await tester.pumpAndSettle();
+    expect(find.text(vegasHostFixture(VegasInstallationState.verified).manifestPath), findsNothing);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('additional releases sort numerically and each detected installation keeps its card', (tester) async {
+    final service = FakeVegasInstallations(
+      snapshot: VegasInstallationSnapshot(
+        hosts: [
+          vegasHostFixture(VegasInstallationState.unreadable, displayVersion: 'Unknown', executableName: 'unknown.exe'),
+          vegasHostFixture(VegasInstallationState.verified, older: true, olderVersion: '23.0.0.279'),
+          vegasHostFixture(
+            VegasInstallationState.unreadable,
+            older: true,
+            olderVersion: 'Unknown',
+            displayVersion: 'Unknown',
+            executableName: 'VEGAS230.EXE',
+          ),
+          vegasHostFixture(
+            VegasInstallationState.verified,
+            older: true,
+            olderVersion: '24.0.0.100',
+            displayVersion: 'Version 24.0 (Build 100)',
+          ),
+        ],
+      ),
+    );
+    await openSettings(tester, service);
+    expect(find.text('VEGAS Pro 23'), findsNothing);
+    expect(find.text('Show paths and details'), findsNWidgets(4));
+    final rows = [
+      find.text('VEGAS Pro 2026'),
+      find.textContaining('Version 24.0 (Build 100)'),
+      find.textContaining('23.0.0.279'),
+      find.text('VEGAS Pro Unknown · Unknown · x64'),
+      find.text('VEGAS Pro 22'),
+      find.text('VEGAS Pro 13'),
+      find.text('Boris FX VEGAS Pro 2026 · Unknown · x64'),
+    ];
+    for (var i = 1; i < rows.length; i++) {
+      expect(tester.getTopLeft(rows[i]).dy, greaterThan(tester.getTopLeft(rows[i - 1]).dy));
+    }
   });
 
   testWidgets('refresh loading and failure remove stale verified status; retry recovers', (tester) async {
@@ -102,7 +170,7 @@ void main() {
     await tester.pump();
     service.pending.complete(const VegasInstallationSnapshot());
     await tester.pumpAndSettle();
-    expect(find.text('No registered VEGAS installations found.'), findsOneWidget);
+    expect(find.text('Not detected'), findsNWidgets(12));
     expect(find.text('Could not check VEGAS installations.'), findsNothing);
     expect(service.calls, 3);
   });

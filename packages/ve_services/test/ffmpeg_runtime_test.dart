@@ -56,6 +56,7 @@ Future<void> main(List<String> args) async {
         (i) => i.id == added.id,
       );
       final capabilities = progress.last.capabilities!;
+      print('  curated filters: ${capabilities.filters.keys.join(', ')}');
       check(
         installation.probedAt != null && installation.health == 'unchanged',
         'durable real probe record',

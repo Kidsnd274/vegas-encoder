@@ -69,10 +69,42 @@ Future<void> main(List<String> args) async {
     );
   }
   final parser = WindowsFFmpegHelpParser();
-  check(parser.version == 3, 'filter discovery invalidates parser-2 caches');
+  check(parser.version == 4, 'updated filter discovery invalidates old caches');
   check(
     parser.parseFilters(filterList).keys.join(',') == 'scale,pad,setsar',
     'filter list parsed independently of encoders',
+  );
+  final twoColumn = parser.parseFilters(
+    '''Filters:
+  T.. = Timeline support
+  .S. = Slice threading
+  ------
+ TS aap               AA->A      Apply Affine Projection algorithm.
+ .. scale             V->V       Scale the input video size.
+ .. anullsrc          |->A       Null audio source.
+'''
+        .replaceAll('\n', '\r\n'),
+  );
+  check(
+    canonicalJson(twoColumn) ==
+        canonicalJson({
+          'aap': {
+            'flags': 'TS',
+            'streams': 'AA->A',
+            'description': 'Apply Affine Projection algorithm.',
+          },
+          'scale': {
+            'flags': '..',
+            'streams': 'V->V',
+            'description': 'Scale the input video size.',
+          },
+          'anullsrc': {
+            'flags': '..',
+            'streams': '|->A',
+            'description': 'Null audio source.',
+          },
+        }),
+    'two-column filter entries preserve the original facts',
   );
   final scale = parser.parseFilterHelp(filterHelp('scale'), 'scale');
   check(
@@ -88,6 +120,12 @@ Future<void> main(List<String> args) async {
     'HELP-PARSE',
   );
   await rejects(() async => parser.parseFilters('invalid'), 'HELP-PARSE');
+  await rejects(
+    () async => parser.parseFilters(
+      'Filters:\n T.. = Timeline support\n .T bogus V->V Invalid flags\n .. scale\n',
+    ),
+    'HELP-PARSE',
+  );
   final catalog = jsonMap(
     jsonDecode(
       await File('../../schema/ffmpeg/windows-builds.v1.json').readAsString(),
@@ -422,7 +460,7 @@ Future<void> main(List<String> args) async {
     );
     final capabilities = progress.last.capabilities!;
     check(
-      capabilities.filters.length == 3 && capabilities.parser == 3,
+      capabilities.filters.length == 3 && capabilities.parser == parser.version,
       'filter facts use current capability cache generation',
     );
     check(

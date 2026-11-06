@@ -47,7 +47,8 @@ def load(path):
     release, core, services = data['release'], data['core'], data['services']
     fields(release, 'version build exporterSuffix', 'release')
     fields(core, 'version packageVersion abi schemaMax contracts', 'core')
-    fields(services, 'packageVersion', 'services')
+    fields(services, 'packageVersion ffmpegParserVersion', 'services')
+    integer(services['ffmpegParserVersion'], 0xffffffff, 'services.ffmpegParserVersion', minimum=1)
     numbers = semver(release['version'], 'release.version', release=True)
     build = integer(release['build'], 65535, 'release.build')
     suffix = release['exporterSuffix']
@@ -86,6 +87,7 @@ def outputs(root, version):
     lines = ['// Generated from version.json by scripts/etc/Generate-Versions.py. Do not edit.', '#pragma once']
     lines += [f'#define {key} {json.dumps(value)}' for key, value in macros.items()]
     lines += ['#define VE_APP_FILE_VERSION ' + ','.join(map(str, version['fileVersion']))]
+    lines += [f'#define VE_FFMPEG_PARSER_VERSION {version["services"]["ffmpegParserVersion"]}u']
     for key, field in [('ABI_VERSION', 'abi'), ('SCHEMA_MAX', 'schemaMax'), ('CONTRACTS_VERSION', 'contracts')]:
         lines += [f'#define VE_CORE_{key} {version["core"][field]}u']
     for key, macro in [('default', 'DEFAULT'), ('configuration', 'CONFIGURATION'), ('progressText', 'PROGRESS_TEXT')]:
@@ -96,6 +98,9 @@ def outputs(root, version):
     result['packages/ve_core/lib/src/version.g.dart'] = (
         '// Generated from version.json. Do not edit.\n'
         f'const expectedCoreAbi = {version["core"]["abi"]};\n')
+    result['packages/ve_services/lib/src/version.g.dart'] = (
+        '// Generated from version.json. Do not edit.\n'
+        f'const ffmpegParserVersion = {version["services"]["ffmpegParserVersion"]};\n')
     result['setup/version.generated.iss'] = (
         '; Generated from version.json. Do not edit; used by setup/setup_script.iss.\n'
         f'#define VeReleaseVersion "{version["release"]}"\n'

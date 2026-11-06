@@ -26,10 +26,11 @@ or FFmpeg. The behaviour below was agreed with the owner on 2026-10-23.
 - **App**: exactly one per machine, always installed. It owns the Windows
   uninstall entry and the existing Inno `AppId`.
 - **Core**: the VEGAS exporter. At most **one per VEGAS version**, installed in
-  that VEGAS folder. Supported today: VEGAS Pro 2026 and VEGAS Pro 23. They
-  share one exporter DLL; only its INI differs. Setup fills the template's
+  that VEGAS folder. Setup offers VEGAS Pro 2026, 23, 22 build 248, 21 build
+  108 and Sony VEGAS Pro 13 build 453. VEGAS Pro 2026 and 23 share one
+  exporter DLL. The other three use dedicated DLLs. Setup fills the template's
   `LegacyAutoNames={legacyAutoNames}` with 0 for 2026 (per-template extension)
-  and 1 for 23 (Render As shows `.vencoder`, the recipe picks the real extension;
+  and 1 for older hosts (Render As shows `.vencoder`, the recipe picks the real extension;
   [LEGACY_NAMING.md](LEGACY_NAMING.md)). Every install or repair rewrites the DLL,
   which gives it a new write time; VEGAS 23 caches its format list by that time.
 - **Everything moves together.** The exporter refuses to render with any app build
