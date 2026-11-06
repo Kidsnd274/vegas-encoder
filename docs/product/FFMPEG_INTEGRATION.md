@@ -18,13 +18,12 @@ available and which FFmpeg instance to use."
 
 Supporting material:
 
-- Measurements and parsing rules: [research/FFMPEG_DISCOVERY.md](research/FFMPEG_DISCOVERY.md).
 - Raw evidence in the ignored `evidence/2026-10-11-product-design/` folder (`ffmpeg-probe/`, `container-matrix/`).
 - [B1 Windows recapture](research/FFMPEG_WINDOWS.md) covers existing gyan 5.1.2,
   current gyan static and BtbN shared builds, with versioned facts, 255 measured
   mux/readback/decode cases and 184 native-generated profile plans. The Linux
-  design measurements below remain historical context; B1's tables qualify or
-  supersede them. These are offline checks, not real VEGAS evidence.
+  design measurements are archived in the investigation repository. These
+  Windows results come from offline checks.
 
 The implementation is `WindowsServices` in packages/ve_services; exact APIs,
 ownership and limits are in [CONTRACTS.md](CONTRACTS.md#b3-windows-ffmpeg-services-and-app-composition).

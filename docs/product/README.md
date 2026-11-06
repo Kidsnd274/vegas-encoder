@@ -30,8 +30,6 @@ are historical; current implementation and real-VEGAS evidence/limits are in
 | [UI_SPEC.md](UI_SPEC.md) | Shared behaviour: states, signal path, size card, theme, keyboard, copy, Flutter tokens and components |
 | [ROADMAP.md](ROADMAP.md) | Phases P0–P5 tied to adapter gates A4–A8, and the risks |
 | [design/DESIGN_BRIEF.md](design/DESIGN_BRIEF.md) | Design brief, vocabulary, screen list, the eight directions and the plan review |
-| [research/FFMPEG_DISCOVERY.md](research/FFMPEG_DISCOVERY.md) | Discovery, parsing rules, hardware tests, the 226-case container matrix, probe costs |
-| [research/FLUTTER_DESKTOP.md](research/FLUTTER_DESKTOP.md) | Flutter 3.47 / Dart 3.13 facts, package versions, Windows spikes still needed |
 
 ## The plan in brief
 
@@ -102,7 +100,7 @@ the owner objects.
 | 7 | Theme | **Decided:** light and dark, following the Windows app theme by default | UI_SPEC §1 |
 | 8 | Platform | **Decided:** Windows x64 only, including development and tests | TECH_ARCHITECTURE §3, §10 |
 | 9 | UI framework | **Decided:** Flutter, with its own components on `ThemeExtension`, not the Material look. A headless kit (such as forui) only if a check of its current version fits | TECH_ARCHITECTURE §1 T7 |
-| 10 | State management | **Decided:** Riverpod 3 | research/FLUTTER_DESKTOP.md |
+| 10 | State management | **Decided:** Riverpod 3 | TECH_ARCHITECTURE §9 |
 | 11 | FFmpeg distribution | **Decided:** user-supplied. No download offer for now | FFMPEG_INTEGRATION §1 |
 | 12 | Popup hosting | **Plan default:** separate process, owned and modal (T2) | TECH_ARCHITECTURE §5 |
 | 13 | Shared C++ core for compile and validation | **Plan default:** yes (T1) | TECH_ARCHITECTURE §4 |

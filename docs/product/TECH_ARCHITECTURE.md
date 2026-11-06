@@ -373,9 +373,7 @@ offset  size  field
 - fixed arguments (FFV1 `-level 3 -g 1 -slices 16 -slicecrc 1`);
 - Apple tag rules (`-tag:v hvc1` in MP4/MOV).
 
-It also declares container rules from the measured matrix
-([research/FFMPEG_DISCOVERY.md](research/FFMPEG_DISCOVERY.md); evidence
-`container-matrix`). The core embeds this file at build time; the app reads it through
+It also declares container rules backed by the [Windows FFmpeg qualification](research/FFMPEG_WINDOWS.md). The core embeds this file at build time; the app reads it through
 `ve_profiles()`. The prototype of this data is `design/shared/model.js`.
 
 **Uncurated encoders** still work. The editor shows the generic controls (bitrate,
@@ -384,7 +382,6 @@ the encoder's parsed private options. Advanced mode remains the escape hatch.
 
 ## 7. FFmpeg management
 
-Detailed research: [research/FFMPEG_DISCOVERY.md](research/FFMPEG_DISCOVERY.md).
 Product behaviour: [FFMPEG_INTEGRATION.md](FFMPEG_INTEGRATION.md).
 
 - **Machine settings.** `%APPDATA%\VegasEncoder\machine.json` lists installations
@@ -425,8 +422,6 @@ Product behaviour: [FFMPEG_INTEGRATION.md](FFMPEG_INTEGRATION.md).
    marks combinations outside it as "Not tested with VEGAS yet": informational, never blocking.
 
 ## 9. Flutter application
-
-Research notes and versions: [research/FLUTTER_DESKTOP.md](research/FLUTTER_DESKTOP.md).
 
 ### 9.1 Layers
 

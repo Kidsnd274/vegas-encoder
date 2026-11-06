@@ -112,9 +112,3 @@ Never removed: render outputs, exported `.vepreset` files, VEGAS `.sft2` templat
 the user's FFmpeg, a custom exporter `LogDir`, and folders under
 `VEGAS_ENCODER_DATA_ROOT`. Removal never enters a junction or symbolic link, and it
 refuses a data root that is one.
-
-## Known inconsistency
-
-`docs/product/research/FFMPEG_DISCOVERY.md` names an `ffmpeg-cache\` folder; the
-code uses `cache\` (as `docs/product/FFMPEG_INTEGRATION.md` says). The research
-note is historical and left unchanged.

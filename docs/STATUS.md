@@ -1603,8 +1603,8 @@ Supporting work:
 - a prototype command compiler/validator used by the mockups.
 
 Documentation and mockups only: no product code, no Windows build, and **no real
-VEGAS test ran**. Gate state is unchanged. See the
-[experiment note](experiments/2026-10-11-product-design.md).
+VEGAS test ran**. Gate state is unchanged. The historical design note is archived
+in the investigation repository.
 
 ## Next task
 
