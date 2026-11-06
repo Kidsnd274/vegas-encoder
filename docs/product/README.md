@@ -30,7 +30,6 @@ are historical; current implementation and real-VEGAS evidence/limits are in
 | [UI_SPEC.md](UI_SPEC.md) | Shared behaviour: states, signal path, size card, theme, keyboard, copy, Flutter tokens and components |
 | [ROADMAP.md](ROADMAP.md) | Phases P0–P5 tied to adapter gates A4–A8, and the risks |
 | [design/DESIGN_BRIEF.md](design/DESIGN_BRIEF.md) | Design brief, vocabulary, screen list, the eight directions and the plan review |
-| [research/REFERENCE_PRODUCTS.md](research/REFERENCE_PRODUCTS.md) | Voukoder Classic/Pro, StaxRip, HandBrake, Shutter Encoder, Resolve: what to copy and avoid |
 | [research/FFMPEG_DISCOVERY.md](research/FFMPEG_DISCOVERY.md) | Discovery, parsing rules, hardware tests, the 226-case container matrix, probe costs |
 | [research/FLUTTER_DESKTOP.md](research/FLUTTER_DESKTOP.md) | Flutter 3.47 / Dart 3.13 facts, package versions, Windows spikes still needed |
 

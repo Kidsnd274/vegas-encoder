@@ -57,7 +57,7 @@ public SDK or richer UI framework is required for this foundation.
 | Native cancellation and repeats | F-045: raw 0.1.1 repeats and observed slot-6 `0x8004E00C` cancel; renderer returns `0x8004E017` | This does not qualify the FFmpeg-backed build's blocked waits or error paths |
 | FFmpeg offline behavior | F-048: decoded fixtures, fractional rate, short reads, video-only, cancel and selected failures pass in fiohost | Fake streams are consistency tests, not real-host compatibility evidence |
 | FFmpeg real-host success | F-050: one short fixture passes on 2026.0.3.189 with installed 0.2.0 | Repeat/cancel/error, fractional/1080p and slow/long real renders remain pending |
-| Configuration UI | F-032/F-033/F-038: property-page calls observed on Voukoder Pro | Our exporter exposes zero pages; VEGAS-specific template-editing interface, ownership and commit behavior need recovery |
+| Configuration UI | F-032/F-033/F-038: property-page calls observed in VEGAS | Our exporter exposes zero pages; VEGAS-specific template-editing interface, ownership and commit behavior need recovery |
 | Container naming | F-050: working MKV path. Current recipe source advertises five extensions and returns the active template wildcard through selector 11; exact 2026 MP4 writer/host static evidence is in product/NATIVE_CONTAINER_PLAN.md | Real Render As defaults/filtering, template switching/restart and new-container renders remain unqualified. Static/fake-host checks do not pass that gate. |
 
 Keep [INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md) as the evidence authority.
@@ -204,7 +204,7 @@ may proceed before this finishes; runtime-parity and release claims depend on it
    Remove absolute investigation-checkout includes and script paths. Document tool
    prerequisites and an override for the local compiler setup path.
 4. Bring deterministic fixtures/checkers and the fake-host suite into the product.
-   Normal fake tests must not require loading Voukoder or an installed VEGAS.
+   Normal fake tests must not require an installed copy of VEGAS or third-party plug-ins.
 5. Choose discovery name, CLSID/type/preset IDs and install destination deliberately.
    The recommended development default is a distinct product identity so the proof
    installation remains available. New IDs require new templates; automatic migration
@@ -286,7 +286,7 @@ mark the real-host gate pending while continuing independent work.
    whether the FileIO-specific property-page interface adds a template exchange.
    Recover IDs, method shapes, allocation/lifetime and HRESULTs with evidence.
 3. If existing captures are insufficient, prepare a focused, reversible probe of
-   the known-working Voukoder Pro configuration workflow. Capture page creation,
+   a working configuration workflow in VEGAS. Capture page creation,
    QueryInterface, settings exchange, Apply/Cancel, close/reopen and template save.
 4. Implement only the measured host bridge, using the standard COM property-page
    lifecycle where applicable. Test site/object references and repeated activation

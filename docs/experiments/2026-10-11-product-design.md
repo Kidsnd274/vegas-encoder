@@ -13,12 +13,12 @@
 
 - Product docs: ARCHITECTURE, ADAPTER_PLAN, INTEGRATION_CONTRACT, ADAPTER_DATA_FLOW.
 - Investigation findings: F-032/F-033 (property pages and template layout) and F-017
-  (the user's Voukoder workflow).
+  (the desired export workflow).
 - Local FFmpeg 8.1.3 (Linux, Fedora shared build).
 - Flutter 3.47.2 / Dart 3.13.2.
 - Context7 and pub.dev for current Flutter/Dart facts.
-- Web sources for Voukoder, StaxRip, HandBrake, Shutter Encoder and Resolve (listed in
-  research notes).
+- Public sources on existing encoding tools. The comparison notes are archived
+  in the sibling investigation repository.
 
 ## Results
 
@@ -26,7 +26,7 @@
 
 - README, PRODUCT_SPEC, TECH_ARCHITECTURE, SETTINGS_AND_COMMANDS, FFMPEG_INTEGRATION,
   UI_SPEC, ROADMAP.
-- research/ notes: REFERENCE_PRODUCTS, FFMPEG_DISCOVERY, FLUTTER_DESKTOP.
+- Product research notes: FFMPEG_DISCOVERY and FLUTTER_DESKTOP.
 
 **Key proposals:**
 

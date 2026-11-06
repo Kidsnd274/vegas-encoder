@@ -173,7 +173,7 @@ anything else goes in Extra arguments or Advanced mode.
   - exporter status per install: installed version, the file path checked, and
     whether the files match the installer manifest;
   - help for finding Vegas Encoder in Render As, such as VEGAS's "Show all formats"
-    and Components checks, which confused Voukoder Pro users;
+    and Components checks;
   - read-only status and guidance; installation/repair/uninstall are performed
     through the owner's installer, not new dashboard mutation endpoints.
 - **About:** retain existing information. Dashboard version facts are part of its
@@ -275,7 +275,7 @@ are flagged, not removed.
 
 ## 5. Not in v1
 
-- Free-form node graphs (Voukoder Pro style). The fixed pipeline covers VEGAS's single
+- Free-form node graphs. The fixed pipeline covers VEGAS's single
   video + single audio delivery.
 - Bundled or auto-downloaded FFmpeg.
 - Multiple audio tracks or stems.

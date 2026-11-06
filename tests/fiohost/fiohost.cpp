@@ -92,10 +92,8 @@ class HostObject : public IUnknown {
 
 using GetClassObjectFn = HRESULT(STDAPICALLTYPE*)(REFCLSID, REFIID, void**);
 
-// Voukoder Pro's core runs a WMI query inside its DLL initialisation. In a
-// fresh process that is the first COM remoting setup, which blocks under the
-// loader lock (observed hang, F-033). VEGAS has remoting initialised long
-// before loading plug-ins; do the same by connecting to WMI up front.
+// Connect to WMI before loading a plug-in so COM remoting is initialized.
+// This avoids first-time COM remoting setup under the DLL loader lock (F-033).
 static void WarmUpComRemoting() {
   IWbemLocator* loc = nullptr;
   if (FAILED(CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER, IID_IWbemLocator,

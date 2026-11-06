@@ -13,9 +13,9 @@ exporter rendered frames and audio; FFmpeg encodes them with settings the user c
 The product UI is where those settings are made, saved and trusted.
 
 **Audience.** VEGAS editors who outgrew the built-in render templates: YouTubers,
-wedding/event editors, small studios, and encoding enthusiasts who know StaxRip,
-HandBrake or Voukoder. Most know what CRF, NVENC and ProRes are; fewer want to type
-FFmpeg commands; a few want nothing else.
+wedding/event editors, small studios, and encoding enthusiasts who know tools such as
+StaxRip or HandBrake. Most know CRF, NVENC and ProRes. Some prefer to write
+FFmpeg commands.
 
 **Primary jobs, in order of frequency.**
 

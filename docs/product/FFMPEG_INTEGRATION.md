@@ -189,8 +189,7 @@ No family-level table claims every profile/rate or player/NLE works.
   combinations where FFmpeg refused to mux in a real test. "Muxes but few players open
   it" is a warning.
 
-  Voukoder Pro removed its own compatibility check after it wrongly blocked ProRes in
-  MXF (research/REFERENCE_PRODUCTS.md). Rules are kept per FFmpeg major version. A
+  Compatibility rules are kept per FFmpeg major version. A
   v1+ "Check this combination" action can run the real test mux (~0.1 s) against the
   selected installation.
 - **Automatic pixel format selection** from `p010le` input can fail (`dnxhr_hq` needs

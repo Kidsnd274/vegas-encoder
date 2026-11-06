@@ -1,8 +1,7 @@
 // plugin.cpp - DLL exports, class factory, plug-in info and render class.
 //
-// Answers follow the calls VEGAS 2026.0.3 made to Voukoder Pro (F-031, F-036,
-// F-038); unobserved methods return E_NOTIMPL and are logged so a capture
-// shows whether the host relies on them.
+// The adapter handles calls observed in VEGAS 2026.0.3 (F-031, F-036, F-038).
+// Unimplemented methods return E_NOTIMPL and log the call.
 #include "vegas_encoder.h"
 #include "render_formats.h"
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
@@ -55,10 +54,9 @@ struct Preset {
 // Template IDs originally matched enumeration indices. Retiring a built-in leaves
 // its ID unused; remaining GUIDs/IDs stay stable as enumeration becomes shorter.
 // VEGAS 2026 did not list the id-0 preset
-// in Render As (F-041); Voukoder Pro also fills id 0 with a duplicate (F-033).
-// Index 0 is therefore a probe that should stay hidden; the real presets
-// start at id 1. P010 was delivered to Voukoder (F-031, F-036); BI_RGB 32 was
-// delivered bottom-up through a direct-pointer token (F-041).
+// in Render As (F-041). Index 0 is a probe and real presets start at id 1.
+// VEGAS delivered P010 in F-031 and F-036, and bottom-up BI_RGB 32 through a
+// direct-pointer token in F-041.
 const Preset kPresets[] = {
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
     {{0x8f4af392, 0x31b0, 0x48c1, {0xa2, 0xa0, 0x4b, 0x40, 0xdf, 0x3f, 0x9c, 0x20}},
@@ -155,8 +153,7 @@ Tpl BuildPreset(LONG index, const RenderFormat& format) {
   const wchar_t* notes = Cfg().encode ? L"Fixed FFmpeg proof: FFV1 video + PCM float stereo; settings in vegas-encoder.ini." : p.notes;
   Tpl t = Tpl::Make(name, notes, sizeof(Extra));
 #endif
-  // Byte pattern mirrors Voukoder Pro's presets (F-033): zero audio records
-  // and zero size/fps mean "use the project".
+  // Zero audio records and zero size/fps request project defaults (F-033).
   t.SetU32(tpl::id, p.templateId == 0xFFFFFFFF ? (DWORD)index : p.templateId);
   t.SetGuid(tpl::iidOwner, format.owner);
   t.SetGuid(tpl::guidPreset, ClassPresetGuid(index,format));
@@ -393,9 +390,8 @@ class RenderClass final : public ISfRenderFileClass {
       const bool encode = Cfg().encode;
       const wchar_t* extensions = format_.container ? format_.wildcard : kEncodeExtensions;
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-      // Legacy automatic mode advertises one placeholder class suffix, as
-      // Voukoder Pro does (*.voukoderpro, research F-071): older hosts cannot ask
-      // per template, so VEGAS never shows a container it cannot know. SetFile
+      // Legacy automatic mode advertises one placeholder class suffix.
+      // Older hosts lack per-template extension selection (F-071). SetFile
       // resolves the actual destination from the selected recipe.
       // The retained manual experiment instead skips 23's suffix rewrite.
       if (Cfg().legacyAutoNames) extensions = kLegacyPlaceholderExtensions;
@@ -403,7 +399,7 @@ class RenderClass final : public ISfRenderFileClass {
 #endif
       for (LONG i = 0; i < count; i++) {
         // Ids paired by position with FrameServer's SFFIO_FILECLASS_TEXT_* list
-        // and Voukoder's answers (F-033): 1 brief, 2 long, 4 extensions, 5 localized.
+        // (F-033): 1 brief, 2 long, 4 extensions, 5 localized.
         const wchar_t* s = nullptr;
         switch (ids[i]) {
           case 1: s = format_.name; break;
@@ -586,8 +582,8 @@ class RenderClass final : public ISfRenderFileClass {
   }
 
   // Fills project-default (zero) fields of `base` from `source` into a new
-  // template. With no source the host passes *io == base and Voukoder returns
-  // S_FALSE without touching it; the final Create template comes from two
+  // template. With no source, the host passes *io == base and the adapter
+  // returns S_FALSE with *io unchanged. The final Create template comes from two
   // reason-0 passes with *io == null (F-036, F-038).
   HRESULT STDMETHODCALLTYPE ConformTemplateToSource(SFTEMPLATE** io, const SFTEMPLATE* base,
                                                     const SFTEMPLATE* source, LONG reason) override {
@@ -933,7 +929,7 @@ STDAPI DllCanUnloadNow() {
   });
 }
 
-// Exported like FrameServer and Voukoder; VEGAS was not seen calling it (F-033).
+// VEGAS did not call this export in the observed sequence (F-033).
 extern "C" void STDAPICALLTYPE DllInitClasses(BOOL loading) { BestEffortDiagnostic([&] { Log("DllInitClasses(%d)", loading); }); }
 
 STDAPI DllRegisterServer() {

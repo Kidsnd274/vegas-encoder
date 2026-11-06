@@ -86,7 +86,7 @@ does not by itself prove a delivered layout or product support.
 | --- | --- | --- |
 | P010 | 10-bit 4:2:0 YUV | Delivered through the research exporter; current product encoded profile, checked with synthetic/fake-host media |
 | BI_RGB / BGRA | 8-bit RGB components in four-byte pixels | Research raw-export observations, including bottom-up rows; raw diagnostic path is distinct from encoded support |
-| I420 | 8-bit 4:2:0 YUV | Observed in Voukoder templates in the investigation; product delivery/layout validation remains |
+| I420 | 8-bit 4:2:0 YUV | Observed in reference templates; product delivery/layout validation remains |
 | A410 | Reference preset describes 10-bit 4:4:4 plus alpha | Observed in investigation templates; delivered layout and product support remain unvalidated |
 
 The P010 restriction is an implementation choice. It does not establish that

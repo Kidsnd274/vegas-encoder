@@ -36,17 +36,13 @@ inline constexpr GUID IID_SfHostAllocator = {
 inline constexpr GUID IID_ISfReadFileClass = {
     0xe16f92bf, 0x5d01, 0x4325, {0x84, 0x75, 0x47, 0x9f, 0x44, 0xa3, 0x16, 0xce}};
 
-// GetFilterInfo values (F-038). Voukoder Pro (render + read classes) reports
-// access 0x30, stream types 0x0B, flags 1; Voukoder Classic (render only)
-// reports access 0x20, stream types 0x3, flags 1. Bit names are hypotheses
+// GetFilterInfo values (F-038). Bit names are hypotheses
 // matched to FrameServer's SFFIO_FILTER_TYPE_RENDER / SFFIO_STREAM_TYPE_*.
 inline constexpr DWORD SFFIO_FILTER_ACCESS_RENDER = 0x20;
 inline constexpr DWORD SFFIO_FILTER_ACCESS_READ = 0x10;
 inline constexpr DWORD SFFIO_STREAM_AUDIO_VIDEO = 0x3;
 
-// Render returns this when progress or frame acquisition fails in Voukoder Pro
-// (connector RVA 0x1162E, F-038). FrameServer maps the same case to
-// SF_E_CANCEL; whether the names match is a hypothesis.
+// Stop code for progress or frame acquisition failure (F-038).
 inline constexpr HRESULT SF_E_RENDER_STOPPED = (HRESULT)0x8004E017L;
 
 // VEGAS 2026 cancel signal: ISfProgress::SetPosition (slot 6) returned this
@@ -106,8 +102,8 @@ inline constexpr size_t vexSize = 64;
 }  // namespace tpl
 
 // 32-byte audio format record at template +0x48 (render) and +0x90 (codec).
-// Not a WAVEFORMATEX (F-036). Field semantics come from Voukoder's conform
-// stores; +0x10..+0x18 are zero in every observed record.
+// A distinct record from WAVEFORMATEX. Observed records have zeros at
+// +0x10..+0x18 (F-036).
 struct SFAUDIORECORD {
   DWORD cbRecord;        // +0x00  32 (size? hypothesis)
   DWORD format;          // +0x04  0x11 PCM16, 0x20 IEEE float32 (only codes seen)
@@ -300,8 +296,7 @@ ISfRenderFileClass : IUnknown {
 #else
   virtual HRESULT STDMETHODCALLTYPE SetHostInterface(IUnknown* host) = 0;
 #endif
-  // Slots 4-7 (F-038): Voukoder Pro's render slot 4 equals its read class's
-  // slot 7 and vice versa, so 4 = own type ID, 7 = counterpart class (FrameServer:
+  // Slots 4-7 (F-038): 4 = own type ID, 7 = counterpart class (FrameServer:
   // GetReadClassGuid returns GUID_NULL). Slot 5 equals GetFilterInfo's stream
   // types. Slot 6 = caps by elimination. Names: FrameServer, positions: evidence.
   virtual HRESULT STDMETHODCALLTYPE GetTypeID(GUID* g) = 0;                   // 4 [rt]

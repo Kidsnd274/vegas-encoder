@@ -4,7 +4,7 @@
 // F-031): frame count (video slot 9), progress total, then per frame
 // SetPosition, cancel check, GetRenderFrame, ReleaseRenderFrame, audio Read.
 // Audio is read per frame up to round((i + 1) * rate / fps) so it does not
-// drift (Voukoder's fixed 1601-sample reads lose ~0.6 samples per frame).
+// drift at fractional frame rates.
 #include "vegas_encoder.h"
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
 #include "recipe_destination.h"
@@ -1120,7 +1120,6 @@ class RenderFile final : public ISfRenderFile {
       r.status = "ok";
       r.returned = S_OK;
     } else {
-      // Voukoder Pro returns this for every in-loop stop (F-038).
       r.returned = SF_E_RENDER_STOPPED;
     }
     double fps = r.fps > 0 ? r.fps : r.tplFps;

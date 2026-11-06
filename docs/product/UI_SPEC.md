@@ -255,8 +255,7 @@ ffprobe verification and a full synthetic-output decode. The log streams into a
 panel. This is a lightweight check of those settings on that input; it does not
 establish project-resolution or real VEGAS behavior.
 
-This catches failing hardware encoders and bad extra arguments early. Voukoder Pro's
-"Scene Test" is the precedent.
+This catches failing hardware encoders and bad extra arguments early.
 
 As built (desktop, on C3 `PresetTests`): a **Test** button beside the header's FFmpeg
 picker (an icon below 1080 px) tests the editor's current settings, unsaved changes
@@ -478,7 +477,7 @@ AAC") or what it needs on this PC, and the footnote "Loading replaces the templa
 settings right away. You can undo it." Choosing a preset replaces the template's settings
 **immediately**; the template keeps its name and the preset becomes its origin. An Undo
 bar ("Loaded “Lossless master, FFV1”. Undo") stays 8 seconds. There is no separate "apply
-the preset" step. Voukoder Classic's preset-then-Apply confused users.
+the preset" step.
 
 ### Save to library
 

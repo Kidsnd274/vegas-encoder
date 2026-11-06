@@ -24,7 +24,7 @@ Build the user's own encoding product, beginning with a reliable VEGAS Pro
 Render As exporter that delivers timeline video/audio to an external FFmpeg
 without a signpost AVI. Eventually support reusable presets, detailed editing,
 a basic view, a desktop configuration app, and a configuration popup reached
-from VEGAS, similar to the user's Voukoder workflow.
+from VEGAS.
 
 **Build the internal VEGAS adapter first. Postpone a separately maintained SDK.**
 The recovered interfaces and host helpers are still needed, but initially serve

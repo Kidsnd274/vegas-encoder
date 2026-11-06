@@ -275,8 +275,7 @@ experiment. The original investigation outline below is retained for context.
 VEGAS's progress
 interface (`ISfProgress`, `src/vegas/abi/sfio_abi.h`) has two unmapped methods that
 take text: slot 3 `(LPCWSTR, LONGLONG)` and slot 4 `(LPCWSTR)`. Their signatures come
-from the proxy-stub descriptors; their meaning is unknown, and neither Voukoder capture
-used them.
+from the proxy-stub descriptors. Their meaning remains unknown.
 
 - First, static analysis in the sibling investigation: what VEGAS 2026.0.3.189 does with
   them.

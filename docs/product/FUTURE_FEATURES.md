@@ -14,10 +14,8 @@ No release date or new real-VEGAS qualification is implied.
 
 Choose the encoded output resolution and scaling algorithm without writing
 FFmpeg arguments. Leave room to add other filters through the same UI.
-The owner's Voukoder 13.4.1 screenshot is the interaction reference: a filter
-list with Add, Edit and Remove actions, and a scale editor with width, height
-and an algorithm picker. It does not require copying Voukoder's layout or
-exposing every FFmpeg option.
+The filter list has Add, Edit and Remove actions. The scale editor offers
+width, height and an algorithm picker.
 
 ### Proposed experience
 
@@ -186,7 +184,6 @@ This is a proposed future order, not a replacement for
 
 ## References
 
-- Owner-supplied Voukoder screenshot: filter list and width/height/algorithm editor.
 - [Current release scope](PRODUCT_SPEC.md#current-release-scope-owner-2026-10-17),
   [Extra arguments](UI_SPEC.md#extra-arguments) and [contracts](CONTRACTS.md).
 - [FFmpeg scale](https://ffmpeg.org/ffmpeg-filters.html#scale),

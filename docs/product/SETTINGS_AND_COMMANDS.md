@@ -226,8 +226,7 @@ are measured for delivered float32 stereo; FDK AAC was absent and remains unknow
 - **Extra arguments override.** An option typed in a stream's Extra arguments replaces
   the generated option of the same name in that stream, together with its value. It is
   not duplicated: `-preset slower` as an extra removes the generated `-preset slow`.
-  This matches StaxRip's "Custom" behaviour (research/REFERENCE_PRODUCTS.md), and the
-  preview marks replaced fields as "set in Extra arguments". The encoder itself
+  The preview marks replaced fields as "set in Extra arguments". The encoder itself
   (`-c:v`/`-c:a`) can't be overridden this way; use the picker.
   B2 rejects owned input/map/mux/progress options in these per-stream boxes as well;
   use the relevant control or Advanced mode. `CompileResult.overriddenFields`

@@ -561,7 +561,7 @@ int RunRenderTest(ISfRenderFileClass* rc, ISfHostAllocator* alloc, const RenderT
   SFTEMPLATE* io = preset;
   hr = rc->ConformTemplateToSource(&io, preset, nullptr, 2);
   printf("ConformTemplateToSource(preset, null, 2) hr=0x%08lx\n", hr);
-  Check(hr == S_FALSE && io == preset, "no source: S_FALSE and *io untouched (as Voukoder)");
+  Check(hr == S_FALSE && io == preset, "no source: S_FALSE and *io untouched");
   SFTEMPLATE* pass1 = nullptr;
   hr = rc->ConformTemplateToSource(&pass1, preset, project, 0);
   printf("ConformTemplateToSource(preset, project, 0) hr=0x%08lx\n", hr);
@@ -626,7 +626,7 @@ int RunRenderTest(ISfRenderFileClass* rc, ISfHostAllocator* alloc, const RenderT
       Check(video.served == o.frames, "every frame requested once");
       Check(audio.samples == (o.videoOnly ? 0 : samples), "audio sample count matches delivered duration");
     } else {
-      Check(hr == SF_E_RENDER_STOPPED, "cancelled Render returns 0x8004E017 (Voukoder's code)");
+      Check(hr == SF_E_RENDER_STOPPED, "cancelled Render returns 0x8004E017");
       Check(video.served == cancelAt, "no frame requested after the cancel");
     }
     Check(progress.total == o.frames, "progress total = frame count");
