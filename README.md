@@ -75,7 +75,7 @@ The desktop app can manage presets and test FFmpeg without running VEGAS.
 
 | Host | Current status |
 | --- | --- |
-| **Boris FX VEGAS Pro 2026.0.3.189 x64** | Tested with the **0.1.7 development trials** at the scope below |
+| **Boris FX VEGAS Pro 2026.0.3.189 x64** | Tested in the development trials below and with AV1 (CPU) in **0.2.0+3** |
 | VEGAS Pro 23 build 278 | Uses the shared exporter with automatic filename extensions |
 | VEGAS Pro 22 build 248, VEGAS Pro 21 build 108, and Sony VEGAS Pro 13 build 453 | Owner-tested Windows x64 builds with dedicated exporters. See the release qualification status. |
 | Other builds or versions | Untested |
@@ -85,6 +85,9 @@ saved-template persistence across restart, cancellation/recovery, failure
 presentation, and immediate reopening of a large preset. Container trials also
 confirmed MP4, MOV, and WebM renders for specific recipes, plus correct settings
 handoff for all five supported containers.
+
+The **0.2.0+3** AV1 (CPU) starter also passed a short AV1/Opus WebM render
+on Sony VEGAS Pro 13 build 453 with the same November FFmpeg snapshot.
 
 This is still a development build. MXF rendering and the latest MKV regression
 were skipped; the separate two-container restart sequence and exact large-template
