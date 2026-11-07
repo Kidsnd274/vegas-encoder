@@ -532,7 +532,7 @@ class FakeJobRepository implements JobRepository, JobLogs {
         outputPath: r.outputPath,
         encoderSummary: r.data['encoderSummary'] as String?,
         project: r.project,
-        durationSec: r.durationSec ?? r.media.durationSec,
+        durationSec: r.durationSec ?? r.media?.durationSec,
         elapsedSec: r.elapsedSec,
         realtime: r.realtime,
         sizeBytes: r.sizeBytes,

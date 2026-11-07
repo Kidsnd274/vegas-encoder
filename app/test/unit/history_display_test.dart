@@ -38,7 +38,7 @@ void main() {
 
     test('recorded speed is independent of project length and elapsed time', () {
       final r = jobs['j-1042']!;
-      final noLength = r.copyWith(media: MediaDescription.fromJson({...r.media.toJson(), 'durationSec': null}));
+      final noLength = r.copyWith(media: MediaDescription.fromJson({...r.media!.toJson(), 'durationSec': null}));
       expect(realtimeRatio(noLength.copyWith(realtime: 0.7, elapsedSec: 0)), 0.7);
       expect(resultSentence(noLength.copyWith(realtime: 0.7)), 'Rendered in 24:46, 0.70× realtime, 9.84\u00A0GB.');
     });
@@ -98,7 +98,7 @@ void main() {
     test('the executable, then every argument', () {
       final r = jobs['j-1039']!;
       final line = commandLine(r);
-      expect(line, startsWith('${r.ffmpeg.path} -hide_banner -nostdin'));
+      expect(line, startsWith('${r.ffmpeg!.path} -hide_banner -nostdin'));
       expect(line, contains(r' -i \\.\pipe\vegas-encoder-j-1039-video '));
       expect(line, endsWith(r' -f matroska "D:\Renders\Channel trailer v2.ve-partial-j-1039.mkv"'));
     });
@@ -223,7 +223,7 @@ void main() {
       final r = jobs['j-1039']!;
       final at = r.argv.indexOf('-preset');
       final parts = commandParts(r.copyWith(errorTokenIndices: [at, at + 1]));
-      expect(parts.first, (text: quoteArgument(r.ffmpeg.path), error: false));
+      expect(parts.first, (text: quoteArgument(r.ffmpeg!.path), error: false));
       expect(parts.length, r.argv.length + 1);
       expect(
         [

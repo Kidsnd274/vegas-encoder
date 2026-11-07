@@ -772,6 +772,85 @@ Future<void> main(List<String> args) async {
       await rejects(() => jobs.list(), 'INVALID-DATA');
     }
     await jobs.rebuildIndex();
+    // Contract 3.1: optional 0.2.1 fields, preflight records and clock skew.
+    Future<JobRecord?> readBack(String id, JsonMap data) async {
+      final file = joinPath(paths.jobs, '$id.json');
+      await atomicWrite(file, jsonEncode(data));
+      try {
+        return await jobs.get(id);
+      } finally {
+        await File(file).delete();
+      }
+    }
+
+    const newFieldsId = '00000000-0000-4000-8000-0000000000a1';
+    final newFields = (await readBack(newFieldsId, {
+      ...job.data,
+      'id': newFieldsId,
+      'logFile': null,
+      'stage': 'encode',
+      'requestedOutputPath': r'C:\Renders\render.vencoder',
+      'replacedExisting': true,
+      'endedEarly': true,
+      'transport': {
+        'videoHighWater': 1382400,
+        'audioHighWater': 115312,
+        'videoBytes': 10368000,
+        'audioBytes': 768000,
+        'videoQueueLimit': 67108864,
+        'audioQueueLimit': 23040000,
+      },
+    }))!;
+    check(
+      newFields.stage == 'encode' &&
+          newFields.requestedOutputPath == r'C:\Renders\render.vencoder' &&
+          newFields.replacedExisting &&
+          newFields.endedEarly &&
+          newFields.transport?['audioQueueLimit'] == 23040000,
+      'job records carry stage, requested path, replacement, early finish and transport facts',
+    );
+    check(
+      !job.replacedExisting && !job.endedEarly && job.stage == 'encode' &&
+          job.requestedOutputPath == null && job.transport == null,
+      'older records read the new facts as absent',
+    );
+    const preflightId = '00000000-0000-4000-8000-0000000000a2';
+    final preflight = (await readBack(preflightId, {
+      ...job.data,
+      'id': preflightId,
+      'stage': 'preflight',
+      'status': 'failed',
+      'media': null,
+      'ffmpeg': null,
+      'argv': <String>[],
+      'commandLine': null,
+      'errorTokenIndices': <int>[],
+      'published': false,
+      'sizeBytes': 0,
+      'ffmpegExitCode': null,
+      'logFile': null,
+      'message': 'Change the Render As filename to end in .mkv.',
+      'verification': {'state': 'skipped', 'message': 'The render stopped before encoding started.'},
+    }))!;
+    check(
+      preflight.isPreflight &&
+          preflight.media == null &&
+          preflight.ffmpeg == null &&
+          preflight.message.contains('.mkv'),
+      'preflight records with no media or FFmpeg are readable',
+    );
+    const skewId = '00000000-0000-4000-8000-0000000000a3';
+    final started = DateTime.parse(job.startedAt);
+    final skewed = (await readBack(skewId, {
+      ...job.data,
+      'id': skewId,
+      'logFile': null,
+      'endedAt': started.subtract(const Duration(milliseconds: 5)).toUtc().toIso8601String(),
+    }))!;
+    check(
+      skewed.knownElapsedSec == null && job.knownElapsedSec == job.elapsedSec,
+      'a record that ends 5 ms before it starts is read, with elapsed time unknown',
+    );
     final fromHistory = await transfers.fromJob(job, newId: 'history-copy');
     check(
       fromHistory.origin == 'job/$jobId',
@@ -800,11 +879,11 @@ Future<void> main(List<String> args) async {
       jsonEncode(badMedia),
     );
     await rejects(() => jobs.get(jobId), 'INVALID-DATA');
-    final badDimensions = job.media.video.copyWith(width: -1);
+    final badDimensions = job.media!.video.copyWith(width: -1);
     await atomicWrite(
       joinPath(paths.jobs, '$jobId.json'),
       jsonEncode(
-        job.copyWith(media: job.media.copyWith(video: badDimensions)).data,
+        job.copyWith(media: job.media!.copyWith(video: badDimensions)).data,
       ),
     );
     await rejects(() => jobs.get(jobId), 'INVALID-DATA');

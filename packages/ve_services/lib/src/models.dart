@@ -1271,10 +1271,28 @@ class JobRecord extends JsonModel {
   Origin? get origin =>
       data['origin'] == null ? null : Origin.fromJson(jsonMap(data['origin']));
   String get recipeSha256 => data['recipeSha256'] as String;
-  MediaDescription get media =>
-      MediaDescription.fromJson(jsonMap(data['media']));
-  FFmpegInstallation get ffmpeg =>
-      FFmpegInstallation.fromJson(jsonMap(data['ffmpeg']));
+  /// Null only for a preflight record (stage "preflight"), which stopped before media were known.
+  MediaDescription? get media => data['media'] == null
+      ? null
+      : MediaDescription.fromJson(jsonMap(data['media']));
+  /// Null only for a preflight record that stopped before an FFmpeg was selected.
+  FFmpegInstallation? get ffmpeg => data['ffmpeg'] == null
+      ? null
+      : FFmpegInstallation.fromJson(jsonMap(data['ffmpeg']));
+  /// "preflight" (stopped before FFmpeg started) or "encode" (contract 3.1).
+  String get stage => data['stage'] as String? ?? 'encode';
+  bool get isPreflight => stage == 'preflight';
+  /// The path VEGAS asked for, when the file written ([outputPath]) differs.
+  String? get requestedOutputPath => data['requestedOutputPath'] as String?;
+  bool get replacedExisting => data['replacedExisting'] as bool? ?? false;
+  bool get endedEarly => data['endedEarly'] as bool? ?? false;
+  JsonMap? get transport =>
+      data['transport'] == null ? null : jsonMap(data['transport']);
+  /// [elapsedSec], or null when the recorded clock stepped back (endedAt < startedAt).
+  double? get knownElapsedSec =>
+      DateTime.parse(endedAt).isBefore(DateTime.parse(startedAt))
+      ? null
+      : elapsedSec;
   List<String> get argv =>
       List<String>.unmodifiable((data['argv'] as List? ?? []).cast<String>());
   double get elapsedSec => (data['elapsedSec'] as num?)?.toDouble() ?? 0;
@@ -1344,9 +1362,9 @@ class JobRecord extends JsonModel {
       if (!identical(origin, absent)) 'origin': (origin as Origin?)?.toJson(),
       if (!identical(recipeSha256, absent)) 'recipeSha256': recipeSha256,
       if (!identical(media, absent))
-        'media': (media as MediaDescription).toJson(),
+        'media': (media as MediaDescription?)?.toJson(),
       if (!identical(ffmpeg, absent))
-        'ffmpeg': (ffmpeg as FFmpegInstallation).toJson(),
+        'ffmpeg': (ffmpeg as FFmpegInstallation?)?.toJson(),
       if (!identical(argv, absent)) 'argv': argv,
       if (!identical(elapsedSec, absent)) 'elapsedSec': elapsedSec,
       if (!identical(sizeBytes, absent)) 'sizeBytes': sizeBytes,

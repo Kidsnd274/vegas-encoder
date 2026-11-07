@@ -50,7 +50,7 @@ class FileJobRepository implements JobRepository, JobLogs {
     outputPath: record.outputPath,
     encoderSummary: record.encoderSummary,
     project: record.project,
-    durationSec: record.durationSec ?? record.media.durationSec,
+    durationSec: record.durationSec ?? record.media?.durationSec,
     elapsedSec: record.elapsedSec,
     realtime: record.realtime,
     sizeBytes: record.sizeBytes,

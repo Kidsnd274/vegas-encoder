@@ -319,25 +319,53 @@ JobRecord decodeJob(JsonMap data, VeCore core) {
     timestamp(data, key);
   }
   choice(data, 'status', ['succeeded', 'failed', 'cancelled']);
+  // Contract 3.1: optional 0.2.1 facts. Absent stage means "encode".
+  if (data.containsKey('stage')) choice(data, 'stage', ['preflight', 'encode']);
+  final preflight = data['stage'] == 'preflight';
+  stringField(data, 'requestedOutputPath', required: false);
+  boolField(data, 'replacedExisting');
+  boolField(data, 'endedEarly');
+  if (data.containsKey('transport')) {
+    final transport = objectField(data, 'transport');
+    for (final key in [
+      'videoHighWater',
+      'audioHighWater',
+      'videoBytes',
+      'audioBytes',
+      'videoQueueLimit',
+      'audioQueueLimit',
+    ]) {
+      intField(transport, key);
+    }
+  }
   decodeRecipe(objectField(data, 'recipe'), core);
-  validateInstallation(objectField(data, 'ffmpeg'));
+  // A preflight record stopped before FFmpeg or media were established.
+  if (!preflight || data['ffmpeg'] != null)
+    validateInstallation(objectField(data, 'ffmpeg'));
   // The native core checks media; no domain rules are duplicated in services.
   final recipe = Recipe.fromJson(objectField(data, 'recipe'));
-  final mediaData = objectField(data, 'media');
-  validateExtensions(mediaData);
-  validateExtensions(objectField(mediaData, 'video'));
-  if (mediaData['audio'] != null)
-    validateExtensions(objectField(mediaData, 'audio'));
-  numberField(mediaData, 'durationSec', nullable: true);
-  final media = MediaDescription.fromJson(mediaData);
-  try {
-    // Historical failed recipes may have domain errors. Ignore those returned
-    // issues; malformed delivered media is a contained native MEDIA failure.
-    core.validate(recipe, media: media);
-  } on CoreException catch (e) {
-    if (e.code != 'MEDIA') rethrow;
-    invalid('Invalid recorded media: ${e.message}');
+  if (!preflight || data['media'] != null) {
+    final mediaData = objectField(data, 'media');
+    validateExtensions(mediaData);
+    validateExtensions(objectField(mediaData, 'video'));
+    if (mediaData['audio'] != null)
+      validateExtensions(objectField(mediaData, 'audio'));
+    numberField(mediaData, 'durationSec', nullable: true);
+    final media = MediaDescription.fromJson(mediaData);
+    try {
+      // Historical failed recipes may have domain errors. Ignore those returned
+      // issues; malformed delivered media is a contained native MEDIA failure.
+      core.validate(recipe, media: media);
+    } on CoreException catch (e) {
+      if (e.code != 'MEDIA') rethrow;
+      invalid('Invalid recorded media: ${e.message}');
+    }
   }
+  if (preflight &&
+      (data['status'] == 'succeeded' ||
+          data['published'] == true ||
+          (data['argv'] as List? ?? const []).isNotEmpty))
+    invalid('A preflight record cannot report encoding or publication.');
   if (data['origin'] != null) {
     final origin = objectField(data, 'origin');
     validateExtensions(origin);
@@ -398,10 +426,7 @@ JobRecord decodeJob(JsonMap data, VeCore core) {
     if (verification.containsKey(key)) strings(verification, key);
   }
   stringField(verification, 'ffprobeVersion', required: false, nullable: true);
-  if (DateTime.parse(
-    data['endedAt'] as String,
-  ).isBefore(DateTime.parse(data['startedAt'] as String)))
-    invalid('Job ended before it started.');
+  // Clock skew never rejects a record; JobRecord.knownElapsedSec reports it as unknown.
   if (data['published'] != true && (data['sizeBytes'] as int? ?? 0) != 0)
     invalid('Unpublished job cannot report a published file size.');
   if (data['status'] == 'succeeded' &&

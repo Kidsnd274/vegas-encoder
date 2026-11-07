@@ -181,17 +181,20 @@ class _Record extends StatelessWidget {
           const SizedBox(height: 4),
           _PathBox(partial, label: 'Unfinished file', onCopy: () => onCopy(partial, 'Path copied')),
         ],
-        const _Heading('FFmpeg'),
-        _Facts(
-          [
-            ('Installation', ffmpeg.label),
-            ('Build', ffmpegSummary(ffmpeg)),
-            ('SHA-256', shortHash(ffmpeg.identity.sha256)),
-          ],
-          tooltips: {'SHA-256': ffmpeg.identity.sha256},
-        ),
-        const SizedBox(height: 8),
-        _PathBox(ffmpeg.path, label: 'FFmpeg', onCopy: () => onCopy(ffmpeg.path, 'Path copied')),
+        // A preflight record stopped before an FFmpeg was selected.
+        if (ffmpeg != null) ...[
+          const _Heading('FFmpeg'),
+          _Facts(
+            [
+              ('Installation', ffmpeg.label),
+              ('Build', ffmpegSummary(ffmpeg)),
+              ('SHA-256', shortHash(ffmpeg.identity.sha256)),
+            ],
+            tooltips: {'SHA-256': ffmpeg.identity.sha256},
+          ),
+          const SizedBox(height: 8),
+          _PathBox(ffmpeg.path, label: 'FFmpeg', onCopy: () => onCopy(ffmpeg.path, 'Path copied')),
+        ],
         const _Heading('Output check'),
         _Facts([
           ('Result', v.message.isEmpty ? verificationLabel(v) : '${verificationLabel(v)}. ${v.message}'),

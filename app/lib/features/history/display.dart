@@ -105,8 +105,10 @@ String? indexSpeed(core.JobIndexEntry e) => e.realtime == null ? null : ratioLab
 /// counted). Indexes outside `argv` are ignored.
 List<({String text, bool error})> commandParts(core.JobRecord r) {
   final marked = r.errorTokenIndices.toSet();
+  final ffmpeg = r.ffmpeg;
+  if (ffmpeg == null) return const []; // A preflight record: no command ran.
   return [
-    (text: quoteArgument(r.ffmpeg.path), error: false),
+    (text: quoteArgument(ffmpeg.path), error: false),
     for (var i = 0; i < r.argv.length; i++) (text: quoteArgument(r.argv[i]), error: marked.contains(i)),
   ];
 }
@@ -137,7 +139,7 @@ String resultSentence(core.JobRecord r) {
   String withMessage(String lead) => r.message.isEmpty ? '$lead.' : '$lead. ${_sentence(r.message)}';
   switch (JobOutcome.of(r.status)) {
     case JobOutcome.succeeded:
-      final length = r.media.durationSec;
+      final length = r.media?.durationSec;
       final ratio = realtimeRatio(r);
       final parts = [
         length == null ? 'Rendered in $took' : 'Rendered ${VeFormat.duration(length)} in $took',
@@ -175,7 +177,10 @@ String shortHash(String hash) =>
 /// `commandLine`). An older record without it: the executable, then its
 /// arguments, each quoted the way the Windows C runtime reads them back, so a
 /// copied command can be pasted into a terminal.
-String commandLine(core.JobRecord r) => r.commandLine ?? [r.ffmpeg.path, ...r.argv].map(quoteArgument).join(' ');
+String commandLine(core.JobRecord r) {
+  final ffmpeg = r.ffmpeg;
+  return r.commandLine ?? (ffmpeg == null ? '' : [ffmpeg.path, ...r.argv].map(quoteArgument).join(' '));
+}
 
 /// Quotes one argument for the Windows C runtime's parser: an argument with
 /// no space, tab, newline or quote stays as it is; otherwise it goes in double
