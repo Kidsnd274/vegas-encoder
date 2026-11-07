@@ -19,6 +19,10 @@ std::string FourCC(DWORD v);
 std::string JsonEscape(const std::string& s);
 double NowMs();  // milliseconds since DLL load
 std::string ModulePath(HMODULE m);
+// Full module path (nullptr: the process image); the buffer grows up to 32768 characters.
+std::wstring ModuleFileName(HMODULE module, DWORD initialLength = MAX_PATH);
+// An environment variable of any length; empty when unset.
+std::wstring EnvironmentValue(const wchar_t* name);
 std::string FileVersion(const std::string& path);
 std::string Sha256File(const std::wstring& path, const std::function<bool()>& poll = {});
 

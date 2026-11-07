@@ -103,6 +103,36 @@ ve::Json DefaultRecipeSnapshot() {
   if (ve::HasErrors(normalized.at("issues"))) throw std::runtime_error("Candidate default recipe failed native normalization.");
   return {{"recipe",normalized.at("recipe")},{"origin",nullptr},{"vegasPrefs",ve::Json::object()},{"writtenBy",kVersion}};
 }
+uintptr_t ChooseHostWindow(const HostWindowCandidate& foreground, const std::vector<HostWindowCandidate>& topLevel, DWORD process) {
+  if (foreground.handle && foreground.process == process) return foreground.handle;
+  const HostWindowCandidate* best = nullptr;
+  for (const auto& window : topLevel)
+    if (window.handle && window.process == process && window.visible && !window.owned && (!best || window.area > best->area)) best = &window;
+  return best ? best->handle : 0;
+}
+namespace {
+HostWindowCandidate Candidate(HWND window) {
+  HostWindowCandidate candidate; RECT bounds{};
+  candidate.handle = reinterpret_cast<uintptr_t>(window);
+  GetWindowThreadProcessId(window,&candidate.process);
+  candidate.visible = IsWindowVisible(window) != FALSE;
+  candidate.owned = GetWindow(window,GW_OWNER) != nullptr;
+  if (GetWindowRect(window,&bounds)) candidate.area = LONGLONG(bounds.right - bounds.left) * (bounds.bottom - bounds.top);
+  return candidate;
+}
+BOOL CALLBACK CollectWindow(HWND window, LPARAM list) {
+  reinterpret_cast<std::vector<HostWindowCandidate>*>(list)->push_back(Candidate(window)); return TRUE;
+}
+// Only non-messaging calls (no GetWindowText/SendMessage) run here on Render's thread.
+ve::Json HostWindow() {
+  const auto foreground = GetAncestor(GetForegroundWindow(),GA_ROOTOWNER);
+  const auto current = foreground ? Candidate(foreground) : HostWindowCandidate{};
+  std::vector<HostWindowCandidate> windows;
+  if (current.process != GetCurrentProcessId()) EnumWindows(CollectWindow,reinterpret_cast<LPARAM>(&windows));
+  const auto chosen = ChooseHostWindow(current,windows,GetCurrentProcessId());
+  return chosen ? ve::Json(std::to_string(chosen)) : ve::Json(nullptr);
+}
+}
 std::wstring RecipeJobsRoot() { return (fs::path(Root(true)) / L"jobs").wstring(); }
 RecipeRuntime LoadRecipeRuntime() {
   RecipeRuntime result;
@@ -143,9 +173,7 @@ RecipeRuntime LoadRecipeRuntime() {
       encoder["availability"] = {{"state","unknown"},{"reason","Hardware readiness is not requalified by the native candidate."}};
     }
   }
-  HWND window = GetAncestor(GetForegroundWindow(),GA_ROOTOWNER); DWORD pid = 0;
-  if (window && GetWindowThreadProcessId(window,&pid) && pid == GetCurrentProcessId())
-    result.hostHwnd = std::to_string(reinterpret_cast<uintptr_t>(window));
+  result.hostHwnd = HostWindow();
   if (Flag(machine,"progressWindow",true)) {
     try { AppReady(); result.monitorApplication = Cfg().appPath; }
     catch (const std::exception& error) { Log("monitor unavailable (render continues): %s",error.what()); }

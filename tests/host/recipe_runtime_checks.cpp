@@ -2,6 +2,7 @@
 #include "../../src/vegas/adapter/recipe_runtime.h"
 #include "../../src/vegas/adapter/vegas_encoder.h"
 #include "../../src/vegas/adapter/render_formats.h"
+#include "../../src/support/diagnostics.h"
 #include <filesystem>
 #include <fstream>
 #include <cstdio>
@@ -24,8 +25,17 @@ int wmain(int argc, wchar_t** argv) {
     const bool legacyNames = argc == 4 && std::wstring(argv[3]) == L"--legacy-auto-names";
     Check(argc == 3 || legacyNames, "usage: recipe-runtime <fresh-root> <candidate-app> [--legacy-auto-names]");
     const auto root = fs::absolute(argv[1]); Check(!fs::exists(root),"fresh root required"); fs::create_directories(root);
+    const DWORD me = 100, other = 200;
+    const std::vector<HostWindowCandidate> windows{{1,other,true,false,900},{2,me,true,true,800},{3,me,false,false,700},{4,me,true,false,300},{5,me,true,false,600}};
+    Check(ChooseHostWindow({9,me,true,false,100},windows,me) == 9,"progress window follows this process's foreground window");
+    Check(ChooseHostWindow({1,other,true,false,900},windows,me) == 5,"otherwise it follows this process's visible, unowned, largest top-level window");
+    Check(ChooseHostWindow({1,other,true,false,900},{{1,other,true,false,900}},me) == 0,"no window of this process leaves placement unknown");
     Check(SetEnvironmentVariableW(L"VEGAS_ENCODER_DATA_ROOT",root.c_str()),"set isolated data root");
     wchar_t self[32768]{}; GetModuleFileNameW(nullptr,self,32768);
+    Check(ModuleFileName(nullptr,4) == self && !ModuleFileName(nullptr).empty(),"module path helper grows a tiny buffer and returns the full path");
+    Check(SetEnvironmentVariableW(L"VEGAS_ENCODER_LONG_TEST",std::wstring(1000,L'x').c_str()) &&
+          EnvironmentValue(L"VEGAS_ENCODER_LONG_TEST") == std::wstring(1000,L'x') && EnvironmentValue(L"VEGAS_ENCODER_UNSET_TEST").empty(),
+          "environment helper returns values longer than MAX_PATH");
     const auto ini = fs::path(self).parent_path() / L"vegas-encoder.ini";
     WritePrivateProfileStringW(L"vegas-encoder",L"AppPath",argv[2],ini.c_str());
     Check(WritePrivateProfileStringW(L"vegas-encoder",L"LegacyAutoNames",legacyNames ? L"1" : L"0",ini.c_str()),
