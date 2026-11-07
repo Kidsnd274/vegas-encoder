@@ -92,6 +92,13 @@ Flutter defaults to the existing `L:\flutter\bin\flutter.bat` when present,
 otherwise `flutter.bat` on PATH. MSVC uses the existing build script's detection
 or `VEGAS_ENCODER_VCVARS`. No tool installation or upgrade is performed.
 
+Dart native-asset hooks (`package:native_toolchain_c` 0.19.2) run `cl.exe`
+through `cmd` and fail with `'C:\Program' is not recognized` when the checkout
+path contains a space (for example under `C:\Users\<First Last>`). Map the
+checkout to a drive letter, run `dart pub get` and the script from there, then
+remove the mapping and rerun `dart pub get` from the real path:
+`subst V: "<checkout>"` … `subst V: /D`.
+
 Flutter supports these version overrides in its
 [Windows build documentation](https://docs.flutter.dev/deployment/windows).
 The actual x64 paths here are verified against this checkout's build output.

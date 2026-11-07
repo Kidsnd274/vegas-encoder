@@ -25,11 +25,11 @@ option line on all seven. FFmpeg 4.4 reports libavformat 58.76.100. The
 filter command column disappeared in 8.0. A libx264/AAC MP4 command with the
 compiled global options, using lavfi rather than pipe inputs, completed on all
 seven, and each emitted the progress keys the engine reads. No build older
-than 4.4 was tested. With Dart 3.13.7, `dart analyze --fatal-infos` is clean and
-the 4,459 parser/discovery checks of `ffmpeg_services_test.dart` (everything
-before its native-core section) pass in the Dart VM. The full AOT suite
-(`scripts/etc/Test-B3Services.ps1`) could not build the native core: the local
-Visual Studio 2026 Community install is incomplete and has no MSVC compiler.
+than 4.4 was tested. With Dart 3.13.7 and MSVC 19.51 (VS 2026 Community),
+`scripts/etc/Test-B3Services.ps1` passed: analysis clean, 4,514 checks (parser
+fixtures, fake FFmpeg processes, real Windows process/timeout/pool and DXGI
+helper; no VEGAS). It ran from a `subst` drive because the checkout path
+contains a space (see docs/BUILDING.md).
 The test now also expects the constants the B1 catalog misattributed to
 `discard_damaged_percentage` on `side_data_prefer_packet`.
 

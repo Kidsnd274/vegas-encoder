@@ -14,10 +14,8 @@ history; their old locations, ownership splits and queues do not apply.
 ## Pending on branch `ffmpeg-parser-compat`
 
 The owner requested this FFmpeg-version parsing work in a separate worktree,
-`C:\Users\Samuel Tee\repos\vegas-encoder-ffmpeg-compat`. Before merging, run
-`scripts/etc/Test-B3Services.ps1` on a machine with MSVC (the parser checks pass;
-the native-core build was blocked by an incomplete Visual Studio install),
-and decide with the owner whether to bump `ffmpegParserVersion` together with the
+`C:\Users\Samuel Tee\repos\vegas-encoder-ffmpeg-compat`. The B3 service suite
+passes there (4,514 checks). Before merging, decide with the owner whether to bump `ffmpegParserVersion` together with the
 next exporter release. Release fixtures 4.4 to 9.0.2 are committed; a
 `--enable-small` or shared-DLL build is still uncovered. See [status](STATUS.md#current-progress).
 
