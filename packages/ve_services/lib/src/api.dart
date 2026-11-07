@@ -112,6 +112,9 @@ abstract interface class LibraryHealth {
 abstract interface class JobIndexHealth {
   /// Malformed lines the latest [JobRepository.list] skipped (blank and `\r` lines are not counted).
   int get skippedIndexLines;
+
+  /// Rewrites the index from the job records (History's Rebuild index).
+  Future<void> rebuildIndex();
 }
 
 /// Stars/pins on built-ins are stored as user metadata without changing recipes

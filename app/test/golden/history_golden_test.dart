@@ -6,6 +6,7 @@
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ve_services/ve_services.dart' show FakeJobRepository;
 import 'package:vegas_encoder/features/history/job_detail.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
@@ -15,8 +16,8 @@ import '../helpers.dart';
 import '../history_doubles.dart';
 
 void main() {
-  Future<void> open(WidgetTester tester, {Size view = const Size(1440, 900)}) async {
-    final jobs = await summarisedJobs();
+  Future<FakeJobRepository> open(WidgetTester tester, {Size view = const Size(1440, 900), int skipped = 0}) async {
+    final jobs = await summarisedJobs()..skippedIndexLines = skipped;
     await pumpApp(
       tester,
       view: view,
@@ -30,6 +31,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pumpAndSettle();
+    return jobs;
   }
 
   Finder inDetail(Finder f) => find.descendant(of: find.byType(JobDetail), matching: f);
@@ -75,6 +77,18 @@ void main() {
           await act(tester);
           await expectGolden('history_${name}_$theme');
         });
+      });
+      // C4: malformed index lines are counted in a banner with Rebuild index.
+      testWidgets('history_index_problem', (tester) async {
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        final jobs = await open(tester, skipped: 2);
+        expect(find.text('2 lines of the render history couldn’t be read.'), findsOneWidget);
+        expect(find.text('Small web file, AV1'), findsWidgets, reason: 'the readable renders stay listed');
+        await expectGolden('history_index_problem_$theme');
+        await tester.tap(find.text('Rebuild index'));
+        await tester.pumpAndSettle();
+        expect(jobs.rebuilds, 1);
       });
     });
   }

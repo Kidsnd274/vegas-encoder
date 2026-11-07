@@ -88,6 +88,7 @@ class FileJobRepository implements JobRepository, JobLogs, JobIndexHealth {
   Stream<List<JobIndexEntry>> watch() => watchSnapshots(list);
 
   /// Explicit recovery only. read/list/watch never modify the index.
+  @override
   Future<void> rebuildIndex() => withFileLock('$_index.lock', () async {
     final entries = await _recover();
     // The index may exceed 1 MiB; each bounded line is written to an adjacent

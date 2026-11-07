@@ -258,6 +258,13 @@ final discoveredInstallationsProvider = StreamProvider<List<FFmpegInstallation>>
 /// The job index (C6 `jobs.jsonl`), kept current.
 final jobsProvider = StreamProvider<List<JobIndexEntry>>((ref) => ref.watch(jobRepositoryProvider).watch());
 
+/// Malformed job index lines the latest read skipped (contract 3.3), refreshed with the list.
+final skippedIndexLinesProvider = Provider<int>((ref) {
+  ref.watch(jobsProvider);
+  final jobs = ref.watch(jobRepositoryProvider);
+  return jobs is JobIndexHealth ? (jobs as JobIndexHealth).skippedIndexLines : 0;
+});
+
 /// One job's full record; null if the record is gone.
 final jobRecordProvider = FutureProvider.family<JobRecord?, String>(
   (ref, id) => ref.watch(jobRepositoryProvider).get(id),
@@ -269,6 +276,13 @@ final profilesProvider = Provider<ProfileCatalog>((ref) => ref.watch(veCoreProvi
 
 /// Every preset in the library, kept current.
 final presetsProvider = StreamProvider<List<Preset>>((ref) => ref.watch(presetLibraryProvider).watch());
+
+/// Preset files the latest library read skipped (contract 3.3), refreshed with the list.
+final libraryProblemsProvider = FutureProvider<List<LibraryProblem>>((ref) async {
+  ref.watch(presetsProvider);
+  final library = ref.watch(presetLibraryProvider);
+  return library is LibraryHealth ? await (library as LibraryHealth).problems() : const <LibraryProblem>[];
+});
 
 /// C7 machine settings, kept current.
 final machineSettingsProvider = StreamProvider<MachineSettings>(

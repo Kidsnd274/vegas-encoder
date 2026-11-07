@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
 
+import '../../design/components/button.dart';
+import '../../design/components/message.dart';
 import '../../design/components/page_header.dart';
 import '../../design/tokens.dart';
 import '../../state/app_state.dart';
@@ -100,6 +102,14 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with VeToastHost {
     });
   }
 
+  /// Rebuild index: reads every render record again and rewrites the index.
+  Future<void> _rebuildIndex() async {
+    final jobs = ref.read(jobRepositoryProvider);
+    if (jobs is! JobIndexHealth) return;
+    await (jobs as JobIndexHealth).rebuildIndex();
+    if (mounted) ref.invalidate(jobsProvider);
+  }
+
   @override
   Widget build(BuildContext context) {
     final view = ref.watch(historyViewProvider);
@@ -144,6 +154,34 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with VeToastHost {
       AsyncError(:final error) => _Centered('The render history couldn’t be read: $error'),
       _ => const SizedBox.shrink(),
     };
+    // Contract 3.3: malformed index lines are skipped and counted, never fatal.
+    final skipped = ref.watch(skippedIndexLinesProvider);
+    final Widget shown = skipped == 0
+        ? body
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 14, 22, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: VeMessage(
+                        level: VeLevel.warning,
+                        text: skipped == 1
+                            ? '1 line of the render history couldn’t be read.'
+                            : '$skipped lines of the render history couldn’t be read.',
+                        fix: 'Rebuild index reads every render record again.',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    VeButton(label: 'Rebuild index', size: VeButtonSize.small, onPressed: () => unawaited(_rebuildIndex())),
+                  ],
+                ),
+              ),
+              Expanded(child: body),
+            ],
+          );
 
     return CallbackShortcuts(
       bindings: {
@@ -164,7 +202,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with VeToastHost {
                       'Renders made with Vegas Encoder in VEGAS: how each one ended, the FFmpeg and command that ran, '
                       'and what FFmpeg said.',
                 ),
-                Expanded(child: body),
+                Expanded(child: shown),
               ],
             ),
             toastLayer(),

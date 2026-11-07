@@ -521,6 +521,13 @@ class FakeJobRepository implements JobRepository, JobLogs, JobIndexHealth {
   /// Malformed index lines to report; tests set this (contract 3.3).
   @override
   int skippedIndexLines = 0;
+  /// How often [rebuildIndex] ran; rebuilding clears [skippedIndexLines].
+  int rebuilds = 0;
+  @override
+  Future<void> rebuildIndex() async {
+    rebuilds++;
+    skippedIndexLines = 0;
+  }
 
   FakeJobRepository({
     List<JobRecord>? records,

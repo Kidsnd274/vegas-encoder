@@ -4,9 +4,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ve_services/ve_services.dart' show FakeFileReveal, FakePresetLibrary, LibraryProblem;
 import 'package:vegas_encoder/features/presets/library_pane.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
+import 'package:vegas_encoder/state/services.dart';
 
 import '../helpers.dart';
 
@@ -95,6 +97,33 @@ void main() {
         tester.platformDispatcher.textScaleFactorTestValue = 1.5;
         await pumpApp(tester, overrides: [windowControllerProvider.overrideWithValue(FakeWindowController())]);
         await expectGolden('presets_text150_$theme');
+      });
+      // C4: an unreadable preset file is a banner, never an empty library.
+      testWidgets('presets_library_problem', (tester) async {
+        addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+        tester.platformDispatcher.platformBrightnessTestValue = brightness;
+        final library = FakePresetLibrary()
+          ..problemsForTest = const [
+            LibraryProblem(path: r'Library\My preset (1).vepreset', code: 'INVALID-DATA', message: 'The preset ID is not valid.'),
+          ];
+        final reveal = FakeFileReveal();
+        await pumpApp(
+          tester,
+          overrides: [
+            windowControllerProvider.overrideWithValue(FakeWindowController()),
+            presetLibraryProvider.overrideWithValue(library),
+            fileRevealProvider.overrideWithValue(reveal),
+          ],
+        );
+        expect(
+          find.text('1 preset file couldn’t be read: My preset (1).vepreset: The preset ID is not valid.'),
+          findsOneWidget,
+        );
+        expect(find.text('Small web file, AV1'), findsWidgets, reason: 'the readable presets stay listed');
+        await expectGolden('presets_library_problem_$theme');
+        await tester.tap(find.text('Show in folder'));
+        await tester.pumpAndSettle();
+        expect(reveal.revealed.single, endsWith('My preset (1).vepreset'));
       });
     });
   }

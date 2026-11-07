@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ve_services/ve_services.dart' show LibraryProblem;
 
 import '../../design/components/button.dart';
 import '../../design/components/interactive.dart';
+import '../../design/components/message.dart';
 import '../../design/components/popover.dart';
 import '../../design/components/segmented.dart';
 import '../../design/components/text_field.dart';
@@ -21,6 +25,33 @@ enum LibraryAdd { newPreset, importShareString, importFile }
 
 /// The preset library (UI_SPEC §2, Library): search, Built-in/Mine filter,
 /// favorites, and the grouped list.
+/// "1 preset file couldn't be read: name: reason", with Show in folder.
+class _LibraryProblems extends ConsumerWidget {
+  const _LibraryProblems(this.problems);
+  final List<LibraryProblem> problems;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final first = problems.first;
+    final name = first.path.split(RegExp(r'[\\/]')).last;
+    final count = problems.length;
+    final lead = count == 1 ? '1 preset file couldn’t be read' : '$count preset files couldn’t be read';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        VeMessage(level: VeLevel.warning, text: '$lead: $name: ${first.message}'),
+        const SizedBox(height: 6),
+        VeButton(
+          label: 'Show in folder',
+          icon: VeIcons.folder,
+          size: VeButtonSize.small,
+          onPressed: () => unawaited(ref.read(fileRevealProvider).reveal(first.path).catchError((Object _) {})),
+        ),
+      ],
+    );
+  }
+}
+
 class LibraryPane extends ConsumerWidget {
   const LibraryPane({
     super.key,
@@ -151,6 +182,12 @@ class LibraryPane extends ConsumerWidget {
               ],
             ),
           ),
+          // Contract 3.3: an unreadable preset file is listed here, never an empty library.
+          if (ref.watch(libraryProblemsProvider).value case final problems? when problems.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              child: _LibraryProblems(problems),
+            ),
           Expanded(
             child: !ref.watch(presetsProvider).hasValue
                 ? const SizedBox.shrink()
