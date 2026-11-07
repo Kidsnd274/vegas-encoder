@@ -81,8 +81,8 @@ class Counted : public I {
 
 class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
  public:
-  FakeVideo(LONGLONG frames, LONG w, LONG h, DWORD compression, double fps)
-      : frames_(frames), w_(w), h_(h), compression_(compression), fps_(fps) {
+  FakeVideo(LONGLONG frames, LONG w, LONG h, DWORD compression, double fps, double par = 1.0)
+      : frames_(frames), w_(w), h_(h), compression_(compression), fps_(fps), par_(par) {
     bool p010 = compression == MAKEFOURCC('P', '0', '1', '0');
     stride0_ = p010 ? w * 2 : w * 4;
     plane1_ = p010 ? stride0_ * h : 0;
@@ -164,7 +164,7 @@ class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
     DWORD vex[4] = {64, 0xFFFFFFFF, 0, 0};
     memcpy(fi + frameinfo::vex, vex, sizeof vex);
     memcpy(fi + frameinfo::fps, &fps_, 8);
-    memcpy(fi + frameinfo::pixelAspect, &one, 8);
+    memcpy(fi + frameinfo::pixelAspect, &par_, 8);
     BITMAPINFOHEADER h{};
     h.biSize = sizeof h;
     h.biWidth = w_;
@@ -235,7 +235,7 @@ class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
   LONG_PTR lastLock_ = 0;
   LONG w_, h_;
   DWORD compression_;
-  double fps_;
+  double fps_, par_;
   LONG stride0_, plane1_, stride1_, size_;
   std::vector<BYTE> buf_;
 };
@@ -513,14 +513,15 @@ bool ConfigureAndReload(ISfRenderFileClass* renderClass, ISfHostAllocator* alloc
 RecipeHostResult ExerciseRecipeHost(const RenderTestOptions& o,
   const std::function<HRESULT(ISfReadVideoRenderStream*,ISfReadAudioStream*,ISfProgress*)>& render) {
   const double fps = o.deliveredFps ? o.deliveredFps : o.fps;
-  FakeVideo video(o.frames,o.width,o.height,o.recipeVideoCompression,fps);
-  FakeAudio audio(48000,2,SFAUDIO_FORMAT_FLOAT32,static_cast<LONGLONG>(llround(o.frames*48000/fps)),fps,o.shortRead);
+  FakeVideo video(o.frames,o.width,o.height,o.recipeVideoCompression,fps,o.pixelAspect);
+  FakeAudio audio(o.sampleRate,o.channels,SFAUDIO_FORMAT_FLOAT32,static_cast<LONGLONG>(llround(o.frames*double(o.sampleRate)/fps)),fps,o.shortRead);
   FakeProgress progress(o.cancelAt,o.progressFailureSlot,o.progressFailureAt,o.progressFailureCall,nullptr);
   RecipeHostResult result;
   result.returned = render(&video,o.videoOnly ? nullptr : &audio,&progress);
   result.served = video.served; result.released = video.released; result.outstanding = video.outstanding;
   result.lockErrors = video.lockErrors; result.samples = audio.samples; result.reads = audio.reads; result.tokenErrors = audio.tokenErrors;
   result.callerThreadErrors = video.callerThreadErrors + audio.callerThreadErrors + progress.callerThreadErrors;
+  result.progressCalls = progress.positions + progress.checks;
   if (video.ref != 1 || audio.ref != 1 || progress.ref != 1) ++result.lockErrors;
   return result;
 }

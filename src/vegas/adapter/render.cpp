@@ -533,6 +533,10 @@ class RenderFile final : public ISfRenderFile {
       if (!video && SUCCEEDED(s->QueryInterface(__uuidof(ISfReadVideoRenderStream), (void**)&v))) video.reset(v);
       else if (!audio && SUCCEEDED(s->QueryInterface(__uuidof(ISfReadAudioStream), (void**)&a))) audio.reset(a);
     }
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    // VEGAS still supplies audio when the recipe turns it off; never check or read it then.
+    try { if (audio && !ve::Bool(recipeSnapshot_.at("recipe").at("audio").at(0), "enabled", true)) audio.reset(); } catch (...) {}
+#endif
     r.videoPresent = video != nullptr;
     r.audioPresent = audio != nullptr;
     SFAUDIORECORD fmt = r.tplAudio;
@@ -566,9 +570,21 @@ class RenderFile final : public ISfRenderFile {
       fail("choose a .mkv output filename for the fixed FFmpeg profile", E_INVALIDARG);
     else if (!video) fail("fixed FFmpeg profile requires a video render stream", E_NOINTERFACE);
 #endif
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    // The core and engine accept any float32 rate and channel count within the core's limits.
+    else if (audio && (fmt.format != SFAUDIO_FORMAT_FLOAT32 || fmt.channels < 1 || fmt.channels > 64 ||
+                       fmt.blockAlign != 4u * fmt.channels || fmt.sampleRate < 1 || fmt.sampleRate > 768000)) {
+      char why[256];
+      snprintf(why, sizeof why, "Project audio must be 32-bit float with 1 to 64 channels at 1 to 768000 Hz; "
+               "VEGAS delivered format %lu, %u channels, %lu Hz, block align %u.",
+               (unsigned long)fmt.format, (unsigned)fmt.channels, (unsigned long)fmt.sampleRate, (unsigned)fmt.blockAlign);
+      fail(why, E_INVALIDARG);
+    }
+#else
     else if (audio && (fmt.format != SFAUDIO_FORMAT_FLOAT32 || fmt.sampleRate != 48000 ||
                        fmt.channels != 2 || fmt.blockAlign != 8))
       fail("fixed FFmpeg profile requires float32 stereo at 48000 Hz", E_INVALIDARG);
+#endif
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
     if (ok) try {
       // Destination agreement is independent of delivered dimensions/rate. Check

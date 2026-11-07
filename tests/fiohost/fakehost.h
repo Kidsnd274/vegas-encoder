@@ -26,6 +26,9 @@ struct RenderTestOptions {
   bool videoOnly = false, expectFailure = false;
   LONG shortRead = 0;
   LONG configurationProof = -1;  // -1 off; 0/1 edits the opt-in native page and reloads its saved bytes
+  double pixelAspect = 1.0;      // delivered frame pixel aspect (non-square project regression)
+  DWORD sampleRate = 48000;      // delivered float32 project audio (ExerciseRecipeHost)
+  WORD channels = 2;
 };
 
 // Replays the template calls VEGAS 2026 made before Create (F-036), then
@@ -37,6 +40,7 @@ struct RecipeHostResult {
   HRESULT returned = E_FAIL;
   LONGLONG served = 0, released = 0, outstanding = 0, lockErrors = 0;
   LONGLONG samples = 0, reads = 0, tokenErrors = 0, callerThreadErrors = 0;
+  LONGLONG progressCalls = 0;  // SetPosition + CheckCancel
 };
 // Reuses the same measured fake stream fixtures without enabling the gated
 // production template/recipe adapter. Callback executes on this caller thread.

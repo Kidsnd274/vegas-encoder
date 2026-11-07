@@ -7,6 +7,7 @@
 #include "../fiohost/fakehost.h"
 #include <cstdio>
 #include <filesystem>
+#include <tuple>
 #include <fstream>
 #include <atomic>
 #include <thread>
@@ -60,10 +61,12 @@ Json Installation(const std::wstring& ffmpeg) {
     {"identity", {{"sha256", hash}, {"key", hash}, {"libraries", libraries}}},
     {"extensions", {{"ffprobeIdentity", {{"sha256", Sha256File(probe)}}}}}};
 }
+// Project facts the conformed template and the fake streams deliver (T2).
+DWORD projectRate = 48000; WORD projectChannels = 2; double projectAspect = 1.0;
 Tpl Template(const Json& recipe) {
   auto value = Tpl::Make(L"Immutable recipe", L"B6 adapter test", 0);
   value.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
-  value.SetAudio(tpl::audioRender, Float32Record(48000, 2));
+  value.SetAudio(tpl::audioRender, Float32Record(projectRate, projectChannels));
   return configuration::CreateRecipeTemplate(value, GUID_VegasEncoderType,
     {{"recipe", recipe}, {"origin", nullptr}, {"vegasPrefs", Json::object()}, {"writtenBy", "b6-adapter-test"}, {"extensions", Json::object()}});
 }
@@ -118,6 +121,7 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
 #endif
   options.fps = 30000.0 / 1001; options.cancelAt = cancelAt; options.progressFailureSlot = failureSlot;
   options.progressFailureAt = 8; options.shortRead = 257;
+  options.sampleRate = projectRate; options.channels = projectChannels; options.pixelAspect = projectAspect;
   RenderDeadline deadline;
   const auto began = GetTickCount64();
   const auto host = ExerciseRecipeHost(options, [&](ISfReadVideoRenderStream* video, ISfReadAudioStream* audio, ISfProgress* progress) {
@@ -232,6 +236,19 @@ int wmain(int argc, wchar_t** argv) {
     advanced["command"]["template"] = "{inputs} -c:v ffv1 -c:a pcm_f32le {output}";
     Run(root, L"unknown-container", advanced, E_FAIL);
     Run(root, L"recovery", recipe, S_OK);
+    // Projects that are not 48 kHz stereo: the template carries the project's audio format.
+    auto aac = recipe; aac["audio"][0]["encoder"] = "aac"; aac["audio"][0]["mode"] = "bitrate"; aac["audio"][0]["bitrateK"] = 192;
+    for (const auto& [name, rate, channels] : {std::tuple{L"audio-44100-stereo", DWORD(44100), WORD(2)},
+                                               std::tuple{L"audio-48000-mono", DWORD(48000), WORD(1)},
+                                               std::tuple{L"audio-48000-5.1", DWORD(48000), WORD(6)}}) {
+      projectRate = rate; projectChannels = channels;
+      const auto record = Run(root, name, aac, S_OK);
+      Check(record.at("media").at("audio").at("rate") == rate && record.at("media").at("audio").at("channels") == channels,
+            "C6 media records the project's audio rate and channel count");
+    }
+    projectRate = 44100; projectChannels = 2;
+    Run(root, L"audio-44100-video-only", noAudio, S_OK);
+    projectRate = 48000; projectChannels = 2;
     auto badFilter = recipe; badFilter["video"]["extra"] = "-vf vegas_encoder_deliberate_failure";
     const auto filterFailure = Run(root, L"bad-filter", badFilter, E_FAIL, -1, 0, false, false, true);
     Check(ve::Str(filterFailure,"message").find("No such filter: 'vegas_encoder_deliberate_failure'") != std::string::npos,
