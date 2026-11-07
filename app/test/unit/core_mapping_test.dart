@@ -14,23 +14,23 @@ void main() {
   final ntsc = media([30000, 1001]);
 
   group('keyframesReadout', () {
-    test('typed seconds: the seconds, then the core\'s frames at the delivered rate', () {
+    test('typed seconds: the seconds, then project frame rate note', () {
       final r = keyframesReadout(gopFrames: 60, gopSec: 2, overridden: false, media: ntsc);
       expect(r, isNotNull);
       expect(r!.value, '2 s');
-      expect(r.meaning, ' (60 frames at 29.97 fps)');
+      expect(r.meaning, ' (at project frame rate)');
     });
 
     test('Extra arguments set the interval: frames only, the typed seconds left out', () {
       final r = keyframesReadout(gopFrames: 120, gopSec: 2, overridden: true, media: ntsc)!;
       expect(r.value, '120 frames');
-      expect(r.meaning, ' at 29.97 fps');
+      expect(r.meaning, '');
     });
 
     test('no seconds typed: frames only', () {
       final r = keyframesReadout(gopFrames: 250, gopSec: null, overridden: false, media: ntsc)!;
       expect(r.value, '250 frames');
-      expect(r.meaning, ' at 29.97 fps');
+      expect(r.meaning, '');
     });
 
     test('one frame is singular; large counts get separators', () {
@@ -43,20 +43,20 @@ void main() {
       expect(keyframesReadout(gopFrames: null, gopSec: null, overridden: true, media: ntsc), isNull);
     });
 
-    test('a whole frame rate reads without decimals', () {
+    test('read-out does not assume a fixed sample frame rate', () {
       final r = keyframesReadout(gopFrames: 50, gopSec: 2, overridden: false, media: media([25, 1]))!;
       expect(r.value, '2 s');
-      expect(r.meaning, ' (50 frames at 25 fps)');
+      expect(r.meaning, ' (at project frame rate)');
       expect(
         keyframesReadout(gopFrames: 50, gopSec: null, overridden: false, media: media([25, 1]))!.meaning,
-        ' at 25 fps',
+        '',
       );
     });
 
     test('decimal seconds keep their fraction', () {
       final r = keyframesReadout(gopFrames: 15, gopSec: 0.5, overridden: false, media: ntsc)!;
       expect(r.value, '0.5 s');
-      expect(r.meaning, ' (15 frames at 29.97 fps)');
+      expect(r.meaning, ' (at project frame rate)');
     });
   });
 

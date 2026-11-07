@@ -129,14 +129,12 @@ encoder, Container, and File. Every panel must:
 - Show messages at the field they belong to (`field` in validation output), plus a
   summary list near the command. Clicking a summary item focuses its field.
 - Show units and meaning: "CRF 18, visually lossless", "8 Mb/s average, 12 Mb/s peak",
-  "2 s (60 frames at 29.97 fps)".
-- **Keyframes** read out the interval the core emits (C2 `resolved.gopFrames`, after
-  Extra arguments and fixed GOPs) at the delivered frame rate: "**2 s** (60 frames at
-  29.97 fps)" for the seconds typed; "**120 frames** at 29.97 fps" when Extra arguments
-  set `-g` or no seconds are typed; nothing when no interval is emitted (encoder
-  default). The app never rounds seconds into frames itself. Keyframes has a row of its
-  own in the Video panel so the read-out fits; Bit depth and Color tags each take the
-  column's width.
+  "2 s (at project frame rate)".
+- **Keyframes** read out the interval typed in seconds ("**2 s** (at project frame rate)"),
+  or the frame count emitted by the core ("**120 frames**") when Extra arguments set `-g`
+  or no seconds are typed; nothing when no interval is emitted (encoder default). The UI
+  does not display a sample frame rate. Keyframes has a row of its own in the Video panel
+  so the read-out fits; Bit depth and Color tags each take the column's width.
 
 Basic has no list of every FFmpeg option and no cross-setting search. The curated
 controls cover the common settings; anything else goes in Extra arguments.
@@ -420,11 +418,13 @@ Switching mode or editing the command counts as a change.
 - The one-row strip. A dot marks each node this template changed from its origin
   revision; "Rev. 6" marks each node the library changed since. Both come from the core's
   diff.
-- **From VEGAS** shows the project's facts from the request ("3840×2160", "29.97 fps,
-  10-bit", "48 kHz float"). When VEGAS didn't share them, the node reads "Set by project",
-  "Sample: 29.97 fps" and "Sample: 48 kHz float", and its panel says "Set by the project"
-  for each fact: "VEGAS didn’t share this project’s settings. The command and checks use a
-  sample: 1920×1080, 29.97 fps, 48 kHz stereo."
+- **From VEGAS** shows the live video and audio pipes leaving VEGAS rather than arbitrary
+  sample dimensions or rates: "Live pipe input" with colored stream dots for the video
+  pipe ("P010, 10-bit 4:2:0" / "10-bit P010 pipe" in the strip) and audio pipe ("32-bit
+  float PCM" / "32-bit float pipe" in the strip). Its panel ("Piped from VEGAS when
+  rendering") presents separated **Video pipe** and **Audio pipe** cards on the left and
+  explains on the right that VEGAS supplies the project's dimensions, frame rate, sample
+  rate, and channel layout when the render starts.
 - The panels are the desktop's, without the fields' explanations. Reset goes back to the
   template as it opened. Checks are for the default FFmpeg, from what was last checked
   (the popup never runs a check). The File node starts with the project's length when

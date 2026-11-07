@@ -25,7 +25,6 @@ class AudioPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = scope;
     final a = s.recipe.audioTrack;
-    final media = s.data.media.audio;
     final toggle = Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Align(
@@ -107,10 +106,7 @@ class AudioPanel extends StatelessWidget {
                   semanticLabel: 'Sample rate',
                   value: a.sampleRate,
                   options: [
-                    VeOption<Object>(
-                      'source',
-                      media == null ? 'Same as VEGAS' : 'Same as VEGAS, ${kiloHertz(media.rate)}',
-                    ),
+                    const VeOption<Object>('source', 'Same as VEGAS'),
                     for (final x in rates) VeOption<Object>(x, kiloHertz(x)),
                   ],
                   onChanged: (x) => s.edit((r) => r.withAudio((a) => a.copyWith(sampleRate: x))),
@@ -127,13 +123,10 @@ class AudioPanel extends StatelessWidget {
                 child: VeSelect<String>(
                   semanticLabel: 'Channels',
                   value: a.channels,
-                  options: [
-                    VeOption(
-                      'source',
-                      media == null ? 'Same as VEGAS' : 'Same as VEGAS, ${channelsLabel(media.channels)}',
-                    ),
-                    const VeOption('stereo', 'Stereo'),
-                    const VeOption('mono', 'Mono'),
+                  options: const [
+                    VeOption('source', 'Same as VEGAS'),
+                    VeOption('stereo', 'Stereo'),
+                    VeOption('mono', 'Mono'),
                   ],
                   onChanged: (x) => s.edit((r) => r.withAudio((a) => a.copyWith(channels: x))),
                 ),

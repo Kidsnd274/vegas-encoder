@@ -291,6 +291,7 @@ class _SignalPathState extends State<SignalPath> {
     }
 
     final src = m.source;
+    final audioDot = src.audio == 'No audio' || src.stripAudio == 'No audio' ? null : c.audioWire;
     out.add(
       node(
         SignalNode.source,
@@ -301,8 +302,8 @@ class _SignalPathState extends State<SignalPath> {
                 children: [
                   _nk(t, 'From VEGAS'),
                   _nt(t, src.stripTitle),
-                  _nd(t, src.stripVideo),
-                  _nd(t, src.stripAudio),
+                  _nd(t, src.stripVideo, dotColor: c.videoWire),
+                  _nd(t, src.stripAudio, dotColor: audioDot),
                 ],
               )
             : _Lines(
@@ -310,10 +311,10 @@ class _SignalPathState extends State<SignalPath> {
                 children: [
                   _nk(t, 'From VEGAS'),
                   _nt(t, src.frameSize),
+                  _nd(t, src.pixelFormat, dotColor: c.videoWire),
                   _nd(t, src.frameRate),
-                  _nd(t, src.pixelFormat),
                   Container(height: 1, color: c.line, margin: const EdgeInsets.symmetric(vertical: 6)),
-                  _nd(t, src.audio),
+                  _nd(t, src.audio, dotColor: audioDot),
                 ],
               ),
         spoken: 'From VEGAS. ${src.spokenSummary}. Show details',
@@ -551,12 +552,27 @@ class _SignalPathState extends State<SignalPath> {
     overflow: TextOverflow.ellipsis,
   );
 
-  Widget _nd(VeTokens t, String text) => Text(
-    text,
-    style: (_strip ? t.text.caption : t.text.small).copyWith(color: t.colors.nodeText, height: _strip ? 1.35 : 1.4),
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-  );
+  Widget _nd(VeTokens t, String text, {Color? dotColor}) {
+    final label = Text(
+      text,
+      style: (_strip ? t.text.caption : t.text.small).copyWith(color: t.colors.nodeText, height: _strip ? 1.35 : 1.4),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+    if (dotColor == null) return label;
+    final size = _strip ? 6.0 : 7.0;
+    return Row(
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+        ),
+        SizedBox(width: _strip ? 5 : 6),
+        Expanded(child: label),
+      ],
+    );
+  }
 }
 
 class _Lines extends StatelessWidget {

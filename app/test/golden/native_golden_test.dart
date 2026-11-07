@@ -39,12 +39,12 @@ void main() {
 
   final states = <String, Future<void> Function(WidgetTester)>{
     // "YouTube upload, H.264", video node: the live command, the checks and
-    // the keyframes read-out "2 s (60 frames at 29.97 fps)".
+    // the keyframes read-out "2 s (at project frame rate)".
     'video': (tester) async {
-      expect(find.text('2 s (60 frames at 29.97 fps)', findRichText: true), findsOneWidget);
+      expect(find.text('2 s (at project frame rate)', findRichText: true), findsOneWidget);
     },
     // Extra arguments replace -preset and -g: "Set in Extra arguments." under
-    // Encoder speed and Keyframes every, "120 frames at 29.97 fps", the Extra
+    // Encoder speed and Keyframes every, "120 frames", the Extra
     // tokens in the command. The caret stays on, so the image doesn't depend
     // on where its blink is.
     'extra': (tester) async {
@@ -54,7 +54,7 @@ void main() {
       await tester.enterText(extra, '-preset fast -g 120');
       await tester.pumpAndSettle();
       expect(find.text('Set in Extra arguments.'), findsNWidgets(2));
-      expect(find.text('120 frames at 29.97 fps', findRichText: true), findsOneWidget);
+      expect(find.text('120 frames', findRichText: true), findsOneWidget);
     },
     // Save with an error in the settings (owner decision, 2026-10-15): the
     // warning lists the core's error and nothing is saved.
@@ -72,7 +72,7 @@ void main() {
     },
     // File node at the default 10:00: the core's total and its range for 10:00.
     'file': (tester) async {
-      await tester.tap(find.text('Sample project.mp4').first);
+      await tester.tap(find.text('Render As (.mp4)').first);
       await tester.pumpAndSettle();
       expect(find.textContaining('for 10:00.'), findsOneWidget);
     },

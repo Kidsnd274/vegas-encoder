@@ -39,16 +39,30 @@ String presetFileName(String name) {
 
 /// Display labels for what VEGAS delivers. The adapter sends P010 frames and
 /// 32-bit float samples (ARCHITECTURE); other values show as FFmpeg names.
-const _deliveredVideo = <String, ({String label, String short, int depth})>{
-  'p010le': (label: 'P010, 10-bit 4:2:0', short: '10-bit', depth: 10),
+const _deliveredVideo = <String, ({String label, String short, String pipeShort, int depth})>{
+  'p010le': (label: 'P010, 10-bit 4:2:0', short: '10-bit', pipeShort: '10-bit P010 pipe', depth: 10),
 };
-const _deliveredAudio = <String, ({String label, String short, int bits})>{
-  'f32le': (label: '32-bit float', short: 'float', bits: 32),
+const _deliveredAudio = <String, ({String label, String short, String pipeLabel, String pipeShort, int bits})>{
+  'f32le': (
+    label: '32-bit float',
+    short: 'float',
+    pipeLabel: '32-bit float PCM',
+    pipeShort: '32-bit float pipe',
+    bits: 32,
+  ),
 };
 
 String deliveredPixelFormat(String pixfmt) => _deliveredVideo[pixfmt]?.label ?? pixfmt;
+String deliveredVideoPipeTag(String pixfmt) =>
+    pixfmt == 'p010le' ? 'P010 · 10-bit 4:2:0' : '$pixfmt · ${deliveredPixelFormat(pixfmt)}';
 int? deliveredDepth(String pixfmt) => _deliveredVideo[pixfmt]?.depth;
 String deliveredSampleFormat(String fmt) => _deliveredAudio[fmt]?.label ?? fmt;
+String deliveredAudioPipeTag(String fmt) =>
+    fmt == 'f32le' ? 'f32le · 32-bit float PCM' : '$fmt · ${deliveredSampleFormat(fmt)}';
+
+String renderAsNodeLabel(String ext) => ext.isEmpty ? 'Render As' : 'Render As ($ext)';
+String renderAsPathLabel(String? ext) =>
+    ext == null || ext.isEmpty ? 'Chosen in VEGAS Render As' : 'Chosen in VEGAS Render As ($ext)';
 
 /// What kind of samples an FFmpeg sample format holds, for wire labels. Bits
 /// always come from the core's facts.
@@ -124,11 +138,9 @@ String qualityUnit(String flag) => switch (flag) {
 /// C2 `overriddenFields`).
 const setInExtraArguments = 'Set in Extra arguments.';
 
-/// "**2 s** (60 frames at 29.97 fps)": the keyframe interval the core emits
-/// (`resolved.gopFrames`, after Extra arguments and fixed GOPs) at the
-/// delivered frame rate. The seconds are what the user typed, so they're left
-/// out ("**120 frames** at 29.97 fps") when Extra arguments set the interval
-/// or no seconds were typed. Null when the core emits no interval.
+/// "**2 s** (at project frame rate)": the keyframe interval the user typed,
+/// or "**120 frames**" when Extra arguments set `-g` or no seconds were typed.
+/// Null when the core emits no interval.
 ({String value, String meaning})? keyframesReadout({
   required int? gopFrames,
   required num? gopSec,
@@ -137,9 +149,8 @@ const setInExtraArguments = 'Set in Extra arguments.';
 }) {
   if (gopFrames == null) return null;
   final frames = '${VeFormat.count(gopFrames)} ${gopFrames == 1 ? 'frame' : 'frames'}';
-  final rate = 'at ${VeFormat.fps(media.video.fps[0], media.video.fps[1])}';
-  if (gopSec == null || overridden) return (value: frames, meaning: ' $rate');
-  return (value: '${_num(gopSec)} s', meaning: ' ($frames $rate)');
+  if (gopSec == null || overridden) return (value: frames, meaning: '');
+  return (value: '${_num(gopSec)} s', meaning: ' (at project frame rate)');
 }
 
 /// "MP4", "MKV" from the container's extension.
@@ -394,58 +405,32 @@ SignalPathModel signalPathModel({
       detail: recipe.container.faststart && recipe.container.format == 'mp4' ? 'Fast start' : ext,
       spokenLabel: cp?.label,
     ),
-    fileName: 'Sample project$ext',
+    fileName: renderAsNodeLabel(ext),
     contextLabel: _contextLabel(media, lengthSec, preview),
   );
 }
 
-/// What the preview is worked out with: the sample, or the project's facts.
-String _contextLabel(core.MediaDescription media, int? lengthSec, PreviewMedia preview) {
-  final length = lengthSec == null ? '' : ', ${lengthPhrase(lengthSec)}';
-  return switch (preview) {
-    PreviewMedia.sample => 'Preview with: ${mediaSummary(media)}$length',
-    PreviewMedia.project => 'The project: ${mediaSummary(media)}$length',
-    PreviewMedia.projectUnknown => 'Set by the project. Preview with the sample: ${mediaSummary(media)}$length',
-  };
-}
+/// How video and audio reach FFmpeg across the signal path.
+String _contextLabel(core.MediaDescription media, int? lengthSec, PreviewMedia preview) =>
+    'Uncompressed video and audio pipes from VEGAS into FFmpeg';
 
-/// The "From VEGAS" node: what the project delivers. When VEGAS didn't share
-/// the project's facts they are "Set by the project", and the lines name the
-/// sample the preview uses (UI_SPEC §4).
+/// The "From VEGAS" node: the live video and audio pipes leaving VEGAS.
 SignalSource _signalSource(core.MediaDescription media, int depth, PreviewMedia preview) {
   final mediaAudio = media.audio;
+  final videoIn = _deliveredVideo[media.video.pixfmt];
   final audioIn = _deliveredAudio[mediaAudio?.sampleFmt];
-  final fps = VeFormat.fps(media.video.fps[0], media.video.fps[1]);
-  if (preview == PreviewMedia.projectUnknown) {
-    const unset = 'Set by the project';
-    return SignalSource(
-      frameSize: unset,
-      // What fits in the strip's node; the panel says it in full.
-      stripTitle: 'Set by project',
-      frameRate: unset,
-      pixelFormat: unset,
-      audio: unset,
-      stripVideo: 'Sample: $fps',
-      stripAudio: mediaAudio == null
-          ? 'Sample: no audio'
-          : 'Sample: ${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt}',
-      depth: depth,
-      spokenSummary: '$unset. The preview uses a sample: ${mediaSummary(media)}',
-    );
-  }
+  final videoFormat = deliveredPixelFormat(media.video.pixfmt);
+  final audioFormat = mediaAudio == null ? 'No audio' : (audioIn?.pipeLabel ?? mediaAudio.sampleFmt);
   return SignalSource(
-    frameSize: '${media.video.width}×${media.video.height}',
-    frameRate: fps,
-    pixelFormat: deliveredPixelFormat(media.video.pixfmt),
-    audio: mediaAudio == null
-        ? 'No audio'
-        : '${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt} ${channelsLabel(mediaAudio.channels)}',
-    stripVideo: '$fps, ${_deliveredVideo[media.video.pixfmt]?.short ?? media.video.pixfmt}',
-    stripAudio: mediaAudio == null
-        ? 'No audio'
-        : '${kiloHertz(mediaAudio.rate)} ${audioIn?.short ?? mediaAudio.sampleFmt}',
+    frameSize: 'Live pipe input',
+    stripTitle: 'Live pipe input',
+    frameRate: 'Project size & frame rate',
+    pixelFormat: videoFormat,
+    audio: audioFormat,
+    stripVideo: videoIn?.pipeShort ?? '$depth-bit ${media.video.pixfmt} pipe',
+    stripAudio: mediaAudio == null ? 'No audio' : (audioIn?.pipeShort ?? '${mediaAudio.sampleFmt} pipe'),
     depth: depth,
-    spokenSummary: '${media.video.width} by ${media.video.height}, $fps',
+    spokenSummary: 'Live pipe input, $videoFormat, $audioFormat',
   );
 }
 
@@ -565,7 +550,7 @@ SignalPathModel _commandSignalPath({
             detail: fromCommand,
             spokenLabel: muxer,
           ),
-    fileName: 'Sample project$ext',
+    fileName: renderAsNodeLabel(ext),
     contextLabel: _contextLabel(media, lengthSec, preview),
     fromCommand: true,
   );

@@ -48,7 +48,7 @@ class NodePanelHeader extends StatelessWidget {
     final t = VeTokens.of(context);
     final c = t.colors;
     final (title, sub, color) = switch (node) {
-      SignalNode.source => ('From VEGAS', 'What the project delivers', c.faint),
+      SignalNode.source => ('From VEGAS', 'Piped from VEGAS when rendering', c.faint),
       SignalNode.video => ('Video encoder', 'Encodes the frames', c.videoWire),
       SignalNode.audio => ('Audio encoder', 'Encodes the samples', c.audioWire),
       SignalNode.container => ('Container', 'Joins the streams into one file', c.containerWire),
