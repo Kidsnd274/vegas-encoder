@@ -92,7 +92,7 @@ void main() {
   testWidgets('a quality edit rebuilds the command, the node and the estimate', (tester) async {
     await pump(tester);
     expect(command(tester), contains('-c:v libx264 -preset slow -crf 18'));
-    await openNode(tester, 'Sample project.mp4');
+    await openNode(tester, 'Render As (.mp4)');
     final before = editor(tester).total!.value!.totalBytes;
 
     await openNode(tester, 'CRF 18, slow');
@@ -102,7 +102,7 @@ void main() {
     expect(inCommand(find.textContaining('preview core')), findsNothing, reason: 'no fake-core notice');
     expect(find.text('CRF 26, slow'), findsOneWidget, reason: 'the node shows the core\'s summary');
 
-    await openNode(tester, 'Sample project.mp4');
+    await openNode(tester, 'Render As (.mp4)');
     final after = editor(tester).total!.value!;
     expect(after.totalBytes, isNot(before), reason: 'a higher CRF changes the core\'s estimate');
     expect(find.text('About ${VeFormat.bytes(after.totalBytes!)}', findRichText: true), findsOneWidget);
@@ -136,7 +136,7 @@ void main() {
 
   testWidgets('Extra arguments say which controls they replace', (tester) async {
     await pump(tester);
-    expect(find.text('2 s (60 frames at 29.97 fps)', findRichText: true), findsOneWidget);
+    expect(find.text('2 s (at project frame rate)', findRichText: true), findsOneWidget);
     expect(setInExtra(), findsNothing);
 
     await type(tester, extraField(), '-preset fast -g 120');
@@ -147,7 +147,7 @@ void main() {
     expect(messagesAt(tester, 'Keyframes every').first.text, 'Set in Extra arguments.');
     expect(setInExtra(), findsNWidgets(2), reason: 'only the replaced controls say so');
     expect(
-      find.text('120 frames at 29.97 fps', findRichText: true),
+      find.text('120 frames', findRichText: true),
       findsOneWidget,
       reason: 'the core\'s final -g, without the seconds Extra replaced',
     );
@@ -245,21 +245,21 @@ void main() {
       expect(await mine(tester), isEmpty);
     });
   });
-  testWidgets('keyframes read out the core\'s frame count for the typed seconds', (tester) async {
+  testWidgets('keyframes read out the typed seconds without assuming a sample rate', (tester) async {
     await pump(tester);
     await type(tester, fieldWith('2'), '4');
     expect(editor(tester).compiled.value!.resolved!.gopFrames, 120);
-    expect(find.text('4 s (120 frames at 29.97 fps)', findRichText: true), findsOneWidget);
+    expect(find.text('4 s (at project frame rate)', findRichText: true), findsOneWidget);
     expect(command(tester), contains('-g 120'));
 
     await type(tester, fieldWith('4'), '');
     expect(editor(tester).compiled.value!.resolved!.gopFrames, isNull, reason: 'encoder default: no -g');
-    expect(find.textContaining('frames at', findRichText: true), findsNothing);
+    expect(find.textContaining('project frame rate', findRichText: true), findsNothing);
   });
 
   testWidgets('a typed length gets the core\'s total and its range', (tester) async {
     await pump(tester);
-    await openNode(tester, 'Sample project.mp4');
+    await openNode(tester, 'Render As (.mp4)');
     await type(tester, fieldWith('10:00'), '25:00');
     final total = editor(tester).total!.value!;
     expect(total.minTotalBytes, isNotNull);
@@ -277,7 +277,7 @@ void main() {
   testWidgets('no estimate: the File node gives the core\'s reason', (tester) async {
     await pump(tester);
     await type(tester, extraField(), '-vf scale=1280:720');
-    await openNode(tester, 'Sample project.mp4');
+    await openNode(tester, 'Render As (.mp4)');
     final estimate = editor(tester).perMinute.value!;
     expect(estimate.available, isFalse);
     expect(find.byType(SizeQualityCard), findsNothing);
@@ -295,7 +295,7 @@ void main() {
     expect(inCommand(find.text('The core couldn’t build the command: ${error.message}')), findsOneWidget);
     expect(inCommand(find.textContaining('preview core')), findsNothing);
 
-    await openNode(tester, 'Sample project.mp4');
+    await openNode(tester, 'Render As (.mp4)');
     expect(find.text('The core couldn’t work out an estimate: ${error.message}'), findsOneWidget);
   });
 

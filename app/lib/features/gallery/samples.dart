@@ -12,26 +12,18 @@ import '../../design/components/status.dart';
 
 abstract final class Samples {
   static const source1080 = SignalSource(
-    frameSize: '1920×1080',
-    frameRate: '29.97 fps',
+    frameSize: 'Live pipe input',
+    stripTitle: 'Live pipe input',
+    frameRate: 'Project size & frame rate',
     pixelFormat: 'P010, 10-bit 4:2:0',
-    audio: '48 kHz float stereo',
-    stripVideo: '29.97 fps, 10-bit',
-    stripAudio: '48 kHz float',
+    audio: '32-bit float PCM',
+    stripVideo: '10-bit P010 pipe',
+    stripAudio: '32-bit float pipe',
     depth: 10,
-    spokenSummary: '1920 by 1080, 29.97 fps',
+    spokenSummary: 'Live pipe input, P010, 10-bit 4:2:0, 32-bit float PCM',
   );
 
-  static const source4k = SignalSource(
-    frameSize: '3840×2160',
-    frameRate: '29.97 fps',
-    pixelFormat: 'P010, 10-bit 4:2:0',
-    audio: '48 kHz float stereo',
-    stripVideo: '29.97 fps, 10-bit',
-    stripAudio: '48 kHz float',
-    depth: 10,
-    spokenSummary: '3840 by 2160, 29.97 fps',
-  );
+  static const source4k = source1080;
 
   static const x264 = SignalStream(
     encoder: 'x264',
@@ -64,8 +56,8 @@ abstract final class Samples {
     video: x264,
     audio: aac,
     container: mp4,
-    fileName: 'Sample project.mp4',
-    contextLabel: 'Preview with: 1920×1080, 29.97 fps, 48 kHz stereo, 10 minutes',
+    fileName: 'Render As (.mp4)',
+    contextLabel: 'Uncompressed video and audio pipes from VEGAS into FFmpeg',
   );
 
   /// 4K HEVC master, 10-bit: no conversion, FLAC with a float-to-integer pip,
@@ -92,8 +84,8 @@ abstract final class Samples {
       conversion: SignalConversion(label: 'f32le to s32', shortLabel: 'Float to 24-bit', note: '24-bit integer'),
     ),
     container: SignalContainer(label: 'MKV', detail: '.mkv'),
-    fileName: 'Master 4K.mkv',
-    contextLabel: 'Preview with: 3840×2160, 29.97 fps, 48 kHz stereo, 10 minutes',
+    fileName: 'Render As (.mkv)',
+    contextLabel: 'Uncompressed video and audio pipes from VEGAS into FFmpeg',
   );
 
   /// Audio off, and a container that can't hold the codec.
@@ -117,8 +109,8 @@ abstract final class Samples {
       muxProblem: true,
     ),
     container: SignalContainer(label: 'WebM', detail: '.webm'),
-    fileName: 'Edit proxy.webm',
-    contextLabel: 'Preview with: 1920×1080, 29.97 fps, 48 kHz stereo, 10 minutes',
+    fileName: 'Render As (.webm)',
+    contextLabel: 'Uncompressed video and audio pipes from VEGAS into FFmpeg',
   );
 
   /// S2: Advanced mode, read back from the command.
@@ -144,7 +136,7 @@ abstract final class Samples {
       conversion: SignalConversion(label: 'f32le to s32', shortLabel: 'Float to 24-bit', note: '24-bit integer'),
     ),
     container: SignalContainer(label: 'MKV', detail: '.mkv'),
-    fileName: 'Sample project.mkv',
+    fileName: 'Render As (.mkv)',
     fromCommand: true,
   );
 

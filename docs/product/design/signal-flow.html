@@ -903,9 +903,9 @@ function drawDiagram(E) {
   const ctx = P.ctx;
   const cname = P.cont.label.replace(/ \(.*\)/, '');
   const fileName = P.output.split('\\').pop();
-  const srcAria = `From VEGAS. ${ctx.video.width} by ${ctx.video.height}, ${VE.fmt.fps(ctx.video.fps)}. Show details`;
+  const srcAria = `From VEGAS. Live pipe input, ${srcPix(ctx)}, 32-bit float PCM. Show details`;
   if (strip) {
-    n.push(`<button type="button" class="node src" data-node="src" style="${box(L.src)}" aria-pressed="${sel === 'src'}" aria-label="${srcAria}"><span class="nk">From VEGAS</span><span class="nt">${ctx.video.width}×${ctx.video.height}</span><span class="nd">${VE.fmt.fps(ctx.video.fps)}, ${P.src.depth}-bit</span><span class="nd">${ctx.audio.rate / 1000} kHz float</span></button>`);
+    n.push(`<button type="button" class="node src" data-node="src" style="${box(L.src)}" aria-pressed="${sel === 'src'}" aria-label="${srcAria}"><span class="nk">From VEGAS</span><span class="nt">Live pipe input</span><span class="nd"><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--vw);margin-right:5px"></i>10-bit P010 pipe</span><span class="nd"><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--aw);margin-right:5px"></i>32-bit float pipe</span></button>`);
     const one = (cls, id, X, aria) => `<button type="button" class="node one ${cls} ${X.state !== 'ok' ? 'bad' : ''} ${P.fromCmd ? 'fromcmd' : ''}" data-node="${id}" style="${box(L[id])}" aria-pressed="${sel === id}" aria-label="${aria}" title="${esc(X.label + ', ' + X.detail)}"><i class="vstripe"></i><span class="nt">${esc(X.label)}</span><span class="nd">${esc(X.detail)}</span>${mk(id)}${X.state !== 'ok' ? `<span class="st ${X.state}" title="${STATE[X.state]}">${stIcon[X.state]}</span>` : ''}</button>`;
     if (V) n.push(one('venc', 'venc', V, `Video encoder ${esc(V.label)}. ${STATE[V.state]}`));
     if (A) n.push(one('aenc', 'aenc', A, `Audio encoder ${esc(A.label)}. ${STATE[A.state]}`));
@@ -914,7 +914,7 @@ function drawDiagram(E) {
     n.push(`<button type="button" class="node file" data-node="file" style="${box(L.file)}" aria-pressed="${sel === 'file'}" aria-label="File. Show size and quality"><span class="nk">File</span>${P.fromCmd ? '<span class="nd">Name from Render As</span>' : `<span class="nd lk">Size and quality${I.chevR}</span>`}</button>`);
   } else {
     n.push(`<button type="button" class="node src" data-node="src" style="${box(L.src)}" aria-pressed="${sel === 'src'}" aria-label="${srcAria}">
-      <span class="nk">From VEGAS</span><span class="nt">${ctx.video.width}×${ctx.video.height}</span><span class="nd">${VE.fmt.fps(ctx.video.fps)}</span><span class="nd">${srcPix(ctx)}</span><span class="sep"></span><span class="nd">${srcAudio(ctx)}</span></button>`);
+      <span class="nk">From VEGAS</span><span class="nt">Live pipe input</span><span class="nd"><i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--vw);margin-right:6px"></i>${srcPix(ctx)}</span><span class="nd">Project size &amp; frame rate</span><span class="sep"></span><span class="nd"><i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--aw);margin-right:6px"></i>32-bit float PCM</span></button>`);
     const okTag = (id) => `<span class="st ok">${I.check}${hwLabel(id)}</span>`;
     if (V) n.push(`<button type="button" class="node venc ${V.state !== 'ok' ? 'bad' : ''} ${P.fromCmd ? 'fromcmd' : ''}" data-node="venc" style="${box(L.venc)}" aria-pressed="${sel === 'venc'}" aria-label="Video encoder ${esc(V.label)}. ${STATE[V.state]}"><i class="vstripe"></i>
       <span class="nk"><span>Video encoder</span><span class="nkr">${mk('venc')}${V.state === 'ok' ? (VE.videoEncoders[V.id] ? okTag(V.id) : '') : stateTag(V.state)}</span></span><span class="nt">${esc(V.label)}</span><span class="nd">${esc(V.detail)}</span></button>`);
@@ -1025,9 +1025,11 @@ function contHTML(E) {
   return `<div class="cols"><div class="col">${fld('mux', '-f', 'Container', null, `<div class="optlist" role="radiogroup" aria-label="Container">${list}</div>${slot('container')}`)}</div><div class="col">${B.join('')}</div></div>`;
 }
 function srcHTML(E) {
-  const c = E.ctx;
-  return `<div class="cols"><div class="col"><dl class="facts"><dt>Frame size</dt><dd>${c.video.width}×${c.video.height}</dd><dt>Frame rate</dt><dd>${VE.fmt.fps(c.video.fps)} (${c.video.fps[0]}/${c.video.fps[1]})</dd><dt>Pixel format</dt><dd>${srcPix(c)}</dd><dt>Audio</dt><dd>${c.audio.rate / 1000} kHz, 32-bit float, stereo</dd><dt>Length</dt><dd>${VE.fmt.duration(c.durationSec)}</dd></dl></div>
-    <div class="col"><p class="static">VEGAS renders every frame and sends it to FFmpeg through a pipe. This is read-only today; the project settings in VEGAS decide it.</p><p class="blurb">${E.compact ? '' : 'The desktop app uses these preview values. A real render uses the project’s own size and rate.'}</p></div></div>`;
+  return `<div class="cols"><div class="col" style="gap:10px">
+    <div style="position:relative;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px 14px 10px 16px"><i style="position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 2px 2px 0;background:var(--vw)"></i><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px"><b style="font-size:13px;font-weight:650">Video pipe</b><span class="mono" style="font-size:12px;color:var(--text2)">P010 · 10-bit 4:2:0</span></div><p style="margin:0;font-size:12.5px;color:var(--muted)">Frames are rendered by VEGAS at your project’s resolution, pixel aspect ratio, and frame rate.</p></div>
+    <div style="position:relative;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px 14px 10px 16px"><i style="position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 2px 2px 0;background:var(--aw)"></i><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px"><b style="font-size:13px;font-weight:650">Audio pipe</b><span class="mono" style="font-size:12px;color:var(--text2)">f32le · 32-bit float PCM</span></div><p style="margin:0;font-size:12.5px;color:var(--muted)">Audio samples are rendered by VEGAS at your project’s sample rate and channel count.</p></div>
+  </div>
+  <div class="col"><p class="static">VEGAS renders every frame and sends it to FFmpeg through a pipe. This is read-only; the project settings in VEGAS decide it.</p><p class="blurb">Vegas Encoder receives the project’s exact dimensions, frame rate, and audio layout as soon as the render starts.</p></div></div>`;
 }
 // The size and quality card lives behind the File node only.
 function parseLen(s) {
@@ -1073,7 +1075,7 @@ function fileHTML(E) {
     <div class="col">${fld('output', 'path', 'File name', null, `<div class="path">${esc(VE.outputPath(r, E.ctx))}</div><p class="blurb">VEGAS chooses the folder and name in Render As. Vegas Encoder writes to a temporary name and renames it when the render succeeds.</p>`)}
     ${fld('output', '', 'How this is worked out', null, `<p class="static">${est.approx ? 'Quality modes have no fixed size. This guide uses the frame size, frame rate and codec, so treat it as a range.' : 'Bitrate modes multiply the bitrate by the length, so the figure is close.'}</p><p class="blurb">After each render, History shows the real size and average bitrate.</p>`)}</div></div>`;
 }
-const NODES = { src: ['From VEGAS', 'What the project delivers', 'var(--faint)'], venc: ['Video encoder', 'Encodes the frames', 'var(--vw)'], aenc: ['Audio encoder', 'Encodes the samples', 'var(--aw)'], cont: ['Container', 'Joins the streams into one file', 'var(--cont)'], file: ['File', 'Where the render goes, and how big it will be', 'var(--cont)'] };
+const NODES = { src: ['From VEGAS', 'Piped from VEGAS when rendering', 'var(--faint)'], venc: ['Video encoder', 'Encodes the frames', 'var(--vw)'], aenc: ['Audio encoder', 'Encodes the samples', 'var(--aw)'], cont: ['Container', 'Joins the streams into one file', 'var(--cont)'], file: ['File', 'Where the render goes, and how big it will be', 'var(--cont)'] };
 function renderInspector(E) {
   if (E.isCmd()) return renderCmdInspector(E, true);
   const nd = NODES[E.node];

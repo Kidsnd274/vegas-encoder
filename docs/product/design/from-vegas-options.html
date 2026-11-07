@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>"From VEGAS" Display Options — Signal Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&family=JetBrains+Mono:wght@400..600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --canvas:#CDD5DE; --paper:#F4F6F8; --dots:#D9DEE4; --ink:#1F2933; --ink2:#33404E;
+  --on-ink:#FFFFFF; --text2:#4A5767; --muted:#64748B; --sub-text:#566476; --nd-text:#3E4A59;
+  --faint:#A9B4C0; --faint-text:#7A8698; --surface:#FFFFFF; --surface-2:#FBFCFD; --panel:#FAFBFC;
+  --line:#D6DDE4; --line2:#BCC6D1; --line-hover:#8E9BAA; --fill:#EEF1F4; --fill-hover:#F0F3F6;
+  --fill-sel:#EEF2F5; --fill-sel2:#E6EBF0; --vw:#0E7C86; --vw-text:#0B5F67; --aw:#B5446E;
+  --aw-text:#8E3456; --pip:#E8A33D; --on-pip:#2B1D04; --cont:#3E4C59; --ok:#2E6B4F;
+  --amber-line:#EDC17A; --pipl-bg:#FFF3DD; --pipl-text:#6B4100;
+  --vwl:rgba(14,124,134,.1); --awl:rgba(181,68,110,.09); --legend-bg:rgba(244,246,248,.92);
+  --shadow-rgb:31,41,51;
+  --ui:'Instrument Sans','Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;
+  --mono:'JetBrains Mono','Cascadia Mono',Consolas,ui-monospace,monospace;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas:#0D1013; --paper:#15191E; --dots:#272D35; --ink:#E6EAF0; --ink2:#C9D1DB;
+  --on-ink:#11151A; --text2:#AEB8C4; --muted:#95A0AE; --sub-text:#9AA5B2; --nd-text:#B7C0CB;
+  --faint:#4B5562; --faint-text:#7F8A98; --surface:#1D2228; --surface-2:#1A1F25; --panel:#1A1F24;
+  --line:#2C333B; --line2:#3A434E; --line-hover:#5B6675; --fill:#262C34; --fill-hover:#242A31;
+  --fill-sel:#2A3139; --fill-sel2:#2E363F; --vw:#3DB6C1; --vw-text:#63CAD3; --aw:#E0779D;
+  --aw-text:#EC98B7; --pip:#F0B04F; --on-pip:#2B1D04; --cont:#8E9CAD; --ok:#5DC495;
+  --amber-line:#6E5420; --pipl-bg:#3B2C10; --pipl-text:#F6CF88;
+  --vwl:rgba(61,182,193,.16); --awl:rgba(224,119,157,.15); --legend-bg:rgba(21,25,30,.9);
+  --shadow-rgb:0,0,0;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  padding-bottom: 80px;
+}
+button, input, select { font: inherit; color: inherit; }
+.mono { font-family: var(--mono); }
+
+/* Top bar */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  box-shadow: 0 4px 16px rgba(var(--shadow-rgb), .18);
+}
+.topbar h1 {
+  font-size: 17px;
+  margin: 0;
+  font-weight: 650;
+}
+.topbar .sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-left: 10px;
+  font-weight: 400;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.seg {
+  display: inline-flex;
+  background: var(--fill);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+}
+.seg button {
+  border: 0;
+  background: transparent;
+  color: var(--text2);
+  font-size: 12.5px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.seg button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(var(--shadow-rgb), .18), 0 0 0 1px rgba(var(--shadow-rgb), .06);
+  font-weight: 600;
+}
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 24px;
+}
+.intro {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin-bottom: 28px;
+}
+.intro h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 650;
+}
+.intro p {
+  margin: 0;
+  color: var(--text2);
+  font-size: 13.5px;
+  max-width: 88ch;
+}
+
+/* Option section */
+.opt-section {
+  margin-bottom: 38px;
+}
+.opt-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.opt-badge {
+  font-size: 12px;
+  font-weight: 650;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--vwl);
+  color: var(--vw-text);
+  border: 1px solid var(--vw);
+}
+.opt-badge.current {
+  background: var(--fill);
+  color: var(--muted);
+  border-color: var(--line2);
+}
+.opt-head h3 {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 650;
+}
+.opt-desc {
+  color: var(--text2);
+  font-size: 13.5px;
+  margin: 0 0 14px;
+  max-width: 85ch;
+}
+
+/* Mock frame matching Signal Flow */
+.frame {
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--line2);
+  box-shadow: 0 12px 28px -12px rgba(var(--shadow-rgb), .35);
+}
+
+/* Diagram area */
+.dgw {
+  position: relative;
+  background-color: var(--paper);
+  background-image: radial-gradient(var(--dots) 1.2px, transparent 1.3px);
+  background-size: 16px 16px;
+  background-position: 8px 8px;
+  border-bottom: 1px solid var(--line);
+  height: 216px;
+  overflow: hidden;
+}
+.dgw.strip-mode {
+  height: 104px;
+}
+.dgtitle {
+  position: absolute;
+  left: 22px;
+  top: 12px;
+  font-size: 12.5px;
+  color: var(--text2);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.dgtitle b { color: var(--ink); font-weight: 600; }
+.dglegend {
+  position: absolute;
+  right: 14px;
+  top: 8px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text2);
+  background: var(--legend-bg);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.dglegend span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Nodes */
+.node {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  padding: 8px 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  box-shadow: 0 1px 2px rgba(var(--shadow-rgb), .06);
+}
+.node.selected {
+  border: 2px solid var(--ink);
+  padding: 7px 11px;
+  box-shadow: 0 6px 16px -6px rgba(var(--shadow-rgb), .35);
+}
+.node.src { background: var(--surface-2); }
+.node .nk {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  min-height: 17px;
+}
+.node .nt {
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.node .nd {
+  font-size: 12.5px;
+  color: var(--nd-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.node .sep {
+  height: 1px;
+  background: var(--line);
+  margin: 6px 0;
+}
+.node .vstripe {
+  position: absolute;
+  left: -1px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+}
+.node.venc .vstripe { background: var(--vw); }
+.node.aenc .vstripe { background: var(--aw); }
+.node.cont .vstripe { background: var(--cont); }
+.st-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ok);
+  font-weight: 550;
+}
+.pipl {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--pipl-bg);
+  color: var(--pipl-text);
+  border: 1px solid var(--amber-line);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.wl {
+  position: absolute;
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+  font-weight: 550;
+  transform: translateX(-50%);
+}
+.wl.v { color: var(--vw-text); }
+.wl.a { color: var(--aw-text); }
+.wl.sub { font-weight: 450; color: var(--sub-text); }
+
+/* Inspector area */
+.ip {
+  background: var(--surface);
+  padding: 16px 22px 20px;
+}
+.ip-h {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.ip-h h4 {
+  font-size: 15px;
+  margin: 0;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ip-h h4 i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+  background: var(--faint);
+}
+.ip-h .sub {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 36px;
+}
+dl.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 7px 18px;
+  margin: 0;
+  font-size: 13px;
+}
+dl.facts dt { color: var(--muted); }
+dl.facts dd { margin: 0; }
+.static { margin: 0 0 10px; font-size: 13px; line-height: 1.45; }
+.blurb { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+
+/* Stream cards for Option D */
+.stream-cards {
+  display: grid;
+  gap: 10px;
+}
+.scard {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px 10px 16px;
+}
+.scard::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+}
+.scard.v::before { background: var(--vw); }
+.scard.a::before { background: var(--aw); }
+.scard-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3px;
+}
+.scard-top b { font-size: 13px; font-weight: 650; }
+.scard-top span { font-size: 12px; font-family: var(--mono); color: var(--text2); }
+.scard p { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+/* Pill tag inside node or facts */
+.pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: var(--fill);
+  color: var(--ink2);
+  border: 1px solid var(--line2);
+}
+.dot-v, .dot-a {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+.dot-v { background: var(--vw); }
+.dot-a { background: var(--aw); }
+
+/* Secondary places grid */
+.places-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+.place-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+.place-card h4 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.ba-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 6px 10px;
+  font-size: 12.5px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.ba-label {
+  font-weight: 600;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.ba-label.after { color: var(--vw-text); }
+.code-pill {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <h1>"From VEGAS" Display Examples</h1>
+    <span class="sub">Replacing sample 1080p / 29.97 fps / 48 kHz values with honest pipe &amp; project information</span>
+  </div>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Layout">
+      <button type="button" data-layout="full" aria-pressed="true">Desktop diagram</button>
+      <button type="button" data-layout="strip" aria-pressed="false">VEGAS popup strip</button>
+    </div>
+    <div class="seg" role="group" aria-label="Theme">
+      <button type="button" data-theme-btn="dark" aria-pressed="true">Dark</button>
+      <button type="button" data-theme-btn="light" aria-pressed="false">Light</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="intro">
+    <h2>What Vegas Encoder actually knows before render starts</h2>
+    <p>
+      Until a render begins in VEGAS, Vegas Encoder does <b>not</b> know the project’s frame size, frame rate, audio sample rate, channel count, or timeline length.
+      What it <b>does</b> know is the <b>pipe transport format</b> leaving VEGAS: uncompressed <b>10-bit 4:2:0 (P010)</b> video frames and <b>32-bit float PCM</b> audio samples.
+      Those pipe formats are what drive the 10-bit / 32-bit float wires and conversion pips on the Signal Path diagram.
+    </p>
+  </div>
+
+  <div id="examples"></div>
+
+  <section class="opt-section">
+    <div class="opt-head">
+      <span class="opt-badge">Also in the editor</span>
+      <h3>Other places where sample values currently leak into the UI</h3>
+    </div>
+    <p class="opt-desc">
+      Even when the "From VEGAS" card is not selected, the 1080p / 29.97 fps / 48 kHz sample currently shows up in four other places in the editor:
+    </p>
+    <div class="places-grid">
+      <div class="place-card">
+        <h4>1. Audio panel — Sample rate &amp; Channels dropdowns</h4>
+        <div class="ba-row">
+          <span class="ba-label">Current</span>
+          <span><span class="code-pill">Same as VEGAS, 48 kHz</span> and <span class="code-pill">Same as VEGAS, stereo</span></span>
+        </div>
+        <div class="ba-row">
+          <span class="ba-label after">Proposed</span>
+          <span><span class="code-pill">Same as VEGAS</span> (or <span class="code-pill">From VEGAS project</span>) — never append fake Hz or stereo</span>
+        </div>
+      </div>
+
+      <div class="place-card">
+        <h4>2. Video panel — "Keyframes every" readout</h4>
+        <div class="ba-row">
+          <span class="ba-label">Current</span>
+          <span><span class="code-pill">2 s (60 frames at 29.97 fps)</span></span>
+        </div>
+        <div class="ba-row">
+          <span class="ba-label after">Proposed</span>
+          <span><span class="code-pill">2 s (at project frame rate)</span> — don’t multiply by 29.97 fps in the UI</span>
+        </div>
+      </div>
+
+      <div class="place-card">
+        <h4>3. File node card &amp; File panel</h4>
+        <div class="ba-row">
+          <span class="ba-label">Current</span>
+          <span>Node says <span class="code-pill">Sample project.webm</span>; panel says <span class="code-pill">D:\Renders\Sample project.webm</span></span>
+        </div>
+        <div class="ba-row">
+          <span class="ba-label after">Proposed</span>
+          <span>Node says <span class="code-pill">Render As (.webm)</span>; panel says <span class="code-pill">Chosen in VEGAS Render As (.webm)</span></span>
+        </div>
+      </div>
+
+      <div class="place-card">
+        <h4>4. Signal path top caption</h4>
+        <div class="ba-row">
+          <span class="ba-label">Current</span>
+          <span><span class="code-pill">Signal path &nbsp; Preview with: 1920×1080, 29.97 fps, 48 kHz stereo, 10 minutes</span></span>
+        </div>
+        <div class="ba-row">
+          <span class="ba-label after">Proposed</span>
+          <span><span class="code-pill">Signal path &nbsp; Video and audio piped from VEGAS at render time</span> (or omit the subtitle)</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const OPTIONS = [
+  {
+    id: 'combined-bc',
+    badge: 'Selected · B + C Combined',
+    title: 'Live Pipe Input Card (B) + Two Stream Cards in Panel (C)',
+    desc: 'Upper card from Option B ("Live pipe input" with colored stream dots for P010 10-bit 4:2:0 and 32-bit float PCM), paired with Option C’s separated Video pipe and Audio pipe cards in the bottom inspector panel.',
+    dgSubtitle: 'Uncompressed video and audio pipes from VEGAS into FFmpeg',
+    nodeFull: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">Live pipe input</span>
+      <span class="nd"><i class="dot-v"></i>P010, 10-bit 4:2:0</span>
+      <span class="nd">Project size &amp; frame rate</span>
+      <span class="sep"></span>
+      <span class="nd"><i class="dot-a"></i>32-bit float PCM</span>
+    `,
+    nodeStrip: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">Live pipe input</span>
+      <span class="nd"><i class="dot-v"></i>10-bit P010 pipe</span>
+      <span class="nd"><i class="dot-a"></i>32-bit float pipe</span>
+    `,
+    fileTitle: 'Render As (.webm)',
+    panelSub: 'Piped from VEGAS when rendering',
+    leftHTML: `
+      <div class="stream-cards">
+        <div class="scard v">
+          <div class="scard-top">
+            <b>Video pipe</b>
+            <span>P010 · 10-bit 4:2:0</span>
+          </div>
+          <p>Frames are rendered by VEGAS at your project’s resolution, pixel aspect ratio, and frame rate.</p>
+        </div>
+        <div class="scard a">
+          <div class="scard-top">
+            <b>Audio pipe</b>
+            <span>f32le · 32-bit float PCM</span>
+          </div>
+          <p>Audio samples are rendered by VEGAS at your project’s sample rate and channel count.</p>
+        </div>
+      </div>
+    `,
+    rightHTML: `
+      <p class="static">VEGAS renders every frame and sends it to FFmpeg through a pipe. This is read-only; the project settings in VEGAS decide it.</p>
+      <p class="blurb">Vegas Encoder receives the project’s exact dimensions, frame rate, and audio layout as soon as the render starts.</p>
+    `
+  },
+  {
+    id: 'current',
+    badge: 'Current',
+    current: true,
+    title: 'Current UI (shows 1080p / 29.97 fps / 48 kHz sample)',
+    desc: 'For reference: the card and panel look like concrete 1080p 29.97 fps settings, with a disclaimer on the right.',
+    dgSubtitle: 'Preview with: 1920×1080, 29.97 fps, 48 kHz stereo, 10 minutes',
+    nodeFull: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">1920×1080</span>
+      <span class="nd">29.97 fps</span>
+      <span class="nd">P010, 10-bit 4:2:0</span>
+      <span class="sep"></span>
+      <span class="nd">48 kHz float stereo</span>
+    `,
+    nodeStrip: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">Set by project</span>
+      <span class="nd">Sample: 29.97 fps</span>
+      <span class="nd">Sample: 48 kHz float</span>
+    `,
+    fileTitle: 'Sample project.webm',
+    panelSub: 'What the project delivers',
+    leftHTML: `
+      <dl class="facts">
+        <dt>Frame size</dt><dd>1920×1080</dd>
+        <dt>Frame rate</dt><dd>29.97 fps (30000/1001)</dd>
+        <dt>Pixel format</dt><dd>P010, 10-bit 4:2:0</dd>
+        <dt>Audio</dt><dd>48 kHz, 32-bit float, stereo</dd>
+        <dt>Length</dt><dd>Set by the project</dd>
+      </dl>
+    `,
+    rightHTML: `
+      <p class="static">VEGAS renders every frame and sends it to FFmpeg through a pipe. This is read-only; the project settings in VEGAS decide it.</p>
+      <p class="blurb">These are sample values for the preview. A real render uses the project’s own size and rate.</p>
+    `
+  },
+  {
+    id: 'opt-a',
+    badge: 'Option A · Recommended',
+    title: 'Project Settings + Real Pipe Format ("As project")',
+    desc: 'Replaces the fake resolution/FPS/Hz on the card with "Project settings" (or "As project") while keeping the real pipe bit-depth & format (P010 10-bit 4:2:0 and 32-bit float PCM) that explain the diagram wires.',
+    dgSubtitle: 'Video and audio are piped from your VEGAS project when rendering',
+    nodeFull: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">Project settings</span>
+      <span class="nd">Size &amp; frame rate from VEGAS</span>
+      <span class="nd">P010, 10-bit 4:2:0 pipe</span>
+      <span class="sep"></span>
+      <span class="nd">32-bit float audio pipe</span>
+    `,
+    nodeStrip: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">Project settings</span>
+      <span class="nd">P010, 10-bit video</span>
+      <span class="nd">32-bit float audio</span>
+    `,
+    fileTitle: 'Render As (.webm)',
+    panelSub: 'What the project delivers',
+    leftHTML: `
+      <dl class="facts">
+        <dt>Frame size</dt><dd>From VEGAS project</dd>
+        <dt>Frame rate</dt><dd>From VEGAS project</dd>
+        <dt>Video pipe</dt><dd>P010, 10-bit 4:2:0</dd>
+        <dt>Audio pipe</dt><dd>32-bit float PCM · project rate &amp; channels</dd>
+        <dt>Length</dt><dd>Timeline or loop region</dd>
+      </dl>
+    `,
+    rightHTML: `
+      <p class="static">VEGAS renders every frame and sends it to FFmpeg through a pipe. This is read-only; the project settings in VEGAS decide it.</p>
+      <p class="blurb">Resolution, frame rate, audio sample rate, and channels are read from VEGAS when the render starts.</p>
+    `
+  },
+  {
+    id: 'opt-b',
+    badge: 'Option B',
+    title: 'Live Pipe Input (Transport-focused)',
+    desc: 'Highlights the pipe mechanism directly on the card ("Named pipes" / "Live pipe input"), making it immediately obvious why each wire carries raw 10-bit video and 32-bit float audio.',
+    dgSubtitle: 'Uncompressed video and audio pipes from VEGAS into FFmpeg',
+    nodeFull: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">Live pipe input</span>
+      <span class="nd"><i class="dot-v"></i>P010, 10-bit 4:2:0</span>
+      <span class="nd">Project size &amp; frame rate</span>
+      <span class="sep"></span>
+      <span class="nd"><i class="dot-a"></i>32-bit float PCM</span>
+    `,
+    nodeStrip: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">Live pipe input</span>
+      <span class="nd"><i class="dot-v"></i>10-bit P010 pipe</span>
+      <span class="nd"><i class="dot-a"></i>32-bit float pipe</span>
+    `,
+    fileTitle: 'Render As (.webm)',
+    panelSub: 'Uncompressed streams piped into FFmpeg',
+    leftHTML: `
+      <dl class="facts">
+        <dt>Video pipe</dt><dd>Uncompressed P010 (10-bit 4:2:0)</dd>
+        <dt>Video geometry</dt><dd>Project width, height, aspect ratio &amp; FPS</dd>
+        <dt>Audio pipe</dt><dd>Uncompressed 32-bit float PCM</dd>
+        <dt>Audio format</dt><dd>Project sample rate &amp; channel layout</dd>
+        <dt>Duration</dt><dd>Set by VEGAS timeline or selection</dd>
+      </dl>
+    `,
+    rightHTML: `
+      <p class="static">No intermediate file is created. VEGAS streams rendered frames and audio samples directly into FFmpeg over Windows named pipes.</p>
+      <p class="blurb">Because VEGAS opens these pipes when you start rendering, project dimensions and rates are supplied automatically at render time.</p>
+    `
+  },
+  {
+    id: 'opt-c',
+    badge: 'Option C',
+    title: 'Two Stream Cards (Video Pipe & Audio Pipe instead of a 5-row table)',
+    desc: 'Instead of a 5-row table where half the rows say "From VEGAS project", the inspector panel shows two clean cards matching the two output wires: one for the Video pipe and one for the Audio pipe.',
+    dgSubtitle: 'Signal path from VEGAS timeline to output file',
+    nodeFull: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">Timeline streams</span>
+      <span class="nd"><i class="dot-v"></i>10-bit 4:2:0 video</span>
+      <span class="nd">Project size &amp; rate</span>
+      <span class="sep"></span>
+      <span class="nd"><i class="dot-a"></i>32-bit float audio</span>
+    `,
+    nodeStrip: `
+      <span class="nk">From VEGAS</span>
+      <span class="nt">Timeline streams</span>
+      <span class="nd">10-bit P010 video</span>
+      <span class="nd">32-bit float audio</span>
+    `,
+    fileTitle: 'Render As (.webm)',
+    panelSub: 'Piped from VEGAS when rendering',
+    leftHTML: `
+      <div class="stream-cards">
+        <div class="scard v">
+          <div class="scard-top">
+            <b>Video pipe</b>
+            <span>P010 · 10-bit 4:2:0</span>
+          </div>
+          <p>Frames are rendered by VEGAS at your project’s resolution, pixel aspect ratio, and frame rate.</p>
+        </div>
+        <div class="scard a">
+          <div class="scard-top">
+            <b>Audio pipe</b>
+            <span>f32le · 32-bit float PCM</span>
+          </div>
+          <p>Audio samples are rendered by VEGAS at your project’s sample rate and channel count.</p>
+        </div>
+      </div>
+    `,
+    rightHTML: `
+      <p class="static">VEGAS renders every frame and sends it to FFmpeg through a pipe. This is read-only; the project settings in VEGAS decide it.</p>
+      <p class="blurb">Vegas Encoder receives the project’s exact dimensions, frame rate, and audio layout as soon as the render starts.</p>
+    `
+  }
+];
+
+let currentLayout = 'full';
+
+function renderAll() {
+  const container = document.getElementById('examples');
+  const strip = currentLayout === 'strip';
+
+  container.innerHTML = OPTIONS.map(opt => {
+    const h = strip ? 104 : 216;
+    const srcRect = strip
+      ? 'left:16px;top:10px;width:158px;height:84px;padding:5px 10px'
+      : 'left:22px;top:40px;width:214px;height:156px';
+    const vencRect = strip
+      ? 'left:270px;top:10px;width:250px;height:38px;flex-direction:row;align-items:center;gap:8px;padding:5px 10px'
+      : 'left:434px;top:40px;width:270px;height:70px';
+    const aencRect = strip
+      ? 'left:270px;top:56px;width:250px;height:38px;flex-direction:row;align-items:center;gap:8px;padding:5px 10px'
+      : 'left:434px;top:126px;width:270px;height:70px';
+    const contRect = strip
+      ? 'left:590px;top:24px;width:130px;height:56px;padding:5px 10px'
+      : 'left:806px;top:64px;width:132px;height:96px';
+    const fileRect = strip
+      ? 'left:760px;top:24px;width:160px;height:56px;padding:5px 10px'
+      : 'left:978px;top:64px;width:136px;height:96px';
+
+    const sx = strip ? 174 : 236;
+    const vx = strip ? 270 : 434;
+    const vy = strip ? 29 : 75;
+    const ay = strip ? 75 : 161;
+    const pipX = (sx + vx) / 2;
+    const vr = strip ? 520 : 704;
+    const cx = strip ? 590 : 806;
+    const cvy = strip ? 42 : 98;
+    const cay = strip ? 62 : 126;
+    const cr = strip ? 720 : 938;
+    const fx = strip ? 760 : 978;
+    const fy = strip ? 52 : 112;
+
+    return `
+      <section class="opt-section">
+        <div class="opt-head">
+          <span class="opt-badge ${opt.current ? 'current' : ''}">${opt.badge}</span>
+          <h3>${opt.title}</h3>
+        </div>
+        <p class="opt-desc">${opt.desc}</p>
+
+        <div class="frame">
+          <div class="dgw ${strip ? 'strip-mode' : ''}">
+            <svg width="100%" height="${h}" style="position:absolute;inset:0;overflow:visible">
+              <path d="M${sx} ${vy} H${vx}" style="stroke:var(--vw);stroke-width:${strip ? 7 : 10}px;fill:none"/>
+              <path d="M${sx} ${ay} H${vx}" style="stroke:var(--aw);stroke-width:${strip ? 5 : 6}px;fill:none"/>
+              <path d="M${vr} ${vy} C${(vr+cx)/2} ${vy}, ${(vr+cx)/2} ${cvy}, ${cx} ${cvy}" style="stroke:var(--vw);stroke-width:${strip ? 7 : 10}px;fill:none"/>
+              <path d="M${vr} ${ay} C${(vr+cx)/2} ${ay}, ${(vr+cx)/2} ${cay}, ${cx} ${cay}" style="stroke:var(--aw);stroke-width:${strip ? 4 : 4}px;fill:none"/>
+              <path d="M${cr} ${fy} H${fx}" style="stroke:var(--cont);stroke-width:5px;fill:none"/>
+              <circle cx="${pipX}" cy="${vy}" r="${strip ? 6 : 8}" style="fill:var(--pip);stroke:var(--paper);stroke-width:3px"/>
+            </svg>
+
+            ${!strip ? `
+              <div class="dgtitle"><b>Signal path</b><span>${opt.dgSubtitle}</span></div>
+              <div class="dglegend">
+                <span><svg width="24" height="10"><path d="M0 5h24" style="stroke:var(--vw);stroke-width:10px"/></svg>10-bit</span>
+                <span><svg width="24" height="10"><path d="M0 5h24" style="stroke:var(--vw);stroke-width:4px"/></svg>8-bit</span>
+                <span><svg width="14" height="14"><circle cx="7" cy="7" r="6" style="fill:var(--pip)"/></svg>Pixel format conversion</span>
+              </div>
+              <div class="pipl" style="left:${pipX}px;top:${vy - 16}px">p010le to yuv420p10le</div>
+              <div class="wl v" style="left:${(sx + pipX)/2}px;top:${vy + 9}px">10-bit</div>
+              <div class="wl v" style="left:${(pipX + vx)/2}px;top:${vy + 9}px">10-bit</div>
+              <div class="wl sub" style="left:${pipX}px;top:${vy + 25}px">4:2:0</div>
+              <div class="wl a" style="left:${(sx + vx)/2}px;top:${ay + 7}px">32-bit float</div>
+              <div class="wl v" style="left:${(vr + cx)/2}px;top:${(vy + cvy)/2 - 22}px">AV1</div>
+              <div class="wl a" style="left:${(vr + cx)/2}px;top:${(ay + cay)/2 + 10}px">Opus</div>
+            ` : `
+              <div class="pipl" style="left:${pipX}px;top:${vy - 9}px;font-size:11px;padding:0 5px">Layout change</div>
+            `}
+
+            <div class="node src selected" style="${srcRect}">
+              ${strip ? opt.nodeStrip : opt.nodeFull}
+            </div>
+
+            <div class="node venc" style="${vencRect}">
+              <i class="vstripe"></i>
+              ${strip ? `
+                <span class="nt" style="font-size:14px">SVT-AV1</span>
+                <span class="nd" style="font-size:12px">CRF 32, 6</span>
+              ` : `
+                <span class="nk"><span>Video encoder</span><span class="st-ok">✓ CPU</span></span>
+                <span class="nt">SVT-AV1</span>
+                <span class="nd">CRF 32, 6</span>
+              `}
+            </div>
+
+            <div class="node aenc" style="${aencRect}">
+              <i class="vstripe"></i>
+              ${strip ? `
+                <span class="nt" style="font-size:14px">Opus</span>
+                <span class="nd" style="font-size:12px">192 kb/s</span>
+              ` : `
+                <span class="nk">Audio encoder</span>
+                <span class="nt">Opus</span>
+                <span class="nd">192 kb/s</span>
+              `}
+            </div>
+
+            <div class="node cont" style="${contRect}">
+              <i class="vstripe"></i>
+              <span class="nk">Container</span>
+              <span class="nt" style="${strip ? 'font-size:14px' : ''}">WEBM</span>
+              ${!strip ? `<span class="nd">.webm</span>` : ''}
+            </div>
+
+            <div class="node" style="${fileRect}">
+              <span class="nk">File</span>
+              ${!strip ? `<span class="nt" style="font-size:13.5px;line-height:1.45">${opt.fileTitle}</span>` : ''}
+              <span class="nd" style="color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--faint)">Size and quality ›</span>
+            </div>
+          </div>
+
+          <div class="ip">
+            <div class="ip-h">
+              <h4><i></i>From VEGAS</h4>
+              <span class="sub">${opt.panelSub}</span>
+            </div>
+            <div class="cols">
+              <div>${opt.leftHTML}</div>
+              <div>${opt.rightHTML}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }).join('');
+}
+
+document.querySelectorAll('[data-theme-btn]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const theme = btn.dataset.themeBtn;
+    document.documentElement.setAttribute('data-theme', theme);
+    document.querySelectorAll('[data-theme-btn]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+  });
+});
+
+document.querySelectorAll('[data-layout]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentLayout = btn.dataset.layout;
+    document.querySelectorAll('[data-layout]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+    renderAll();
+  });
+});
+
+renderAll();
+</script>
+</body>
+</html>
