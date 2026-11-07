@@ -668,7 +668,14 @@ class RenderFile final : public ISfRenderFile {
         (uint64_t)tok.offset + (uint64_t)count <= (uint64_t)tok.cbAlloc && tok.pData &&
         tok.pData <= (std::numeric_limits<ULONGLONG>::max)() - (uint64_t)tok.offset &&
         tok.pid == GetCurrentProcessId() && (tok.mode == 0 || tok.mode == 1) &&
-        index == frame && std::isfinite(fps) && std::isfinite(par) && std::abs(par - 1.0) < 1e-8;
+        index == frame && std::isfinite(fps) && std::isfinite(par);
+      if (layout && std::abs(par - 1.0) > 1e-8) {
+        // The most common cause of a refused frame: say exactly what to change.
+        char why[256];
+        snprintf(why, sizeof why, "This project uses non-square pixels (pixel aspect %.4f). Vegas Encoder renders "
+                 "square-pixel projects only. Set the pixel aspect ratio to 1.0000.", par);
+        fail(why, E_INVALIDARG); break;
+      }
       if (layout) {
         const auto firstPlaneEnd = (uint64_t)planes[0] * (height - 1) + row;
         layout = rgb ? firstPlaneEnd <= (uint64_t)count :
@@ -689,10 +696,6 @@ class RenderFile final : public ISfRenderFile {
             fps, Utf8(r.rate.Text().c_str()).c_str(), streamFps); });
         if (!r.rate.num || (streamFps && (!std::isfinite(streamFps) || std::abs(streamFps - fps) > 1e-8)))
           fail("unsupported or inconsistent delivered frame rate", E_INVALIDARG);
-#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-        if (!std::isfinite(par) || std::abs(par - 1.0) > 1e-8)
-          fail("the B6 candidate currently requires square-pixel video", E_INVALIDARG);
-#endif
         LONGLONG expected = 0;
         if (ok && audio && (!r.rate.Endpoint(r.frameCountReported, fmt.sampleRate, expected) ||
                             std::abs(expected - r.streamLength) > 1))
@@ -815,8 +818,15 @@ class RenderFile final : public ISfRenderFile {
             break;
           }
           r.samplesWritten += got;
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+          if (recipeJob->EndedEarly()) break;
+#endif
         }
       }
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      // FFmpeg finished early (for example -t): stop fetching from VEGAS, then verify and publish.
+      if (recipeJob && recipeJob->EndedEarly()) break;
+#endif
     }
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
     if (ok && recipeJob) {
@@ -830,6 +840,16 @@ class RenderFile final : public ISfRenderFile {
       if (!ok) recipeJob->Stop(r.stopHr, r.stopReason, r.status == "cancelled");
       r.encoder = recipeJob->Stats();
     }
+    if (!ok && (!recipeJob || recipeJob->Record().is_null())) BestEffortDiagnostic([&] {
+      PreflightFailure failure;
+      failure.jobsRoot = RecipeJobsRoot(); failure.output = path_; failure.templateName = r.tplName;
+      failure.recipe = recipeSnapshot_.at("recipe"); failure.origin = recipeSnapshot_.at("origin");
+      failure.hresult = r.stopHr; failure.message = r.stopReason; failure.cancelled = r.status == "cancelled";
+      // Placement and the progress window are optional; a missing setup still records its reason.
+      try { const auto runtime = LoadRecipeRuntime(); failure.hostHwnd = runtime.hostHwnd; failure.monitorApplication = runtime.monitorApplication; }
+      catch (...) {}
+      WritePreflightRecord(failure);
+    });
 #else
     if (ok && encoder_) {
       auto finalPoll = [&] { return poll(r.frameCountReported); };

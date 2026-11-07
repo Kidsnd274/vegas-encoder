@@ -57,6 +57,17 @@ class RecipeJob {
   HRESULT error_ = S_OK;
   bool cancelled_ = false, terminal_ = false, startedOnce_ = false, encoderFailure_ = false;
 };
+// Contracts 3.1/3.2: a render that stops before FFmpeg starts (suffix, audio format,
+// pixel aspect, missing setup) still gets a C6 record with stage "preflight" and a
+// terminal live file, so the progress window and history can say why.
+struct PreflightFailure {
+  std::wstring jobsRoot, output, monitorApplication;
+  std::string templateName, project, message;
+  ve::Json recipe = nullptr, origin = nullptr, media = nullptr, hostHwnd = nullptr;
+  HRESULT hresult = E_FAIL;
+  bool cancelled = false;
+};
+void WritePreflightRecord(const PreflightFailure& failure);
 // Pure fact comparison, independently exercised with malformed/mismatched probes.
 ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expectedStreams, const std::string& outputContainerId = {});
 // C5's nullable video facts come only from a successfully compiled, scoped

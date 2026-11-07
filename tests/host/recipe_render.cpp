@@ -142,8 +142,15 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
   Check(host.served == host.released && !host.outstanding && !host.lockErrors && !host.callerThreadErrors && !host.tokenErrors,
         "adapter copies/releases frames and keeps all host calls on caller thread");
   if (expected == E_INVALIDARG) {
-    Check(host.served == 0 && !std::filesystem::exists(output),"suffix mismatch is rejected before acquiring frames");
-    return nullptr;
+    Check((host.served == 0 || projectAspect != 1.0) && !std::filesystem::exists(output),"preflight failure is rejected before encoding");
+    // Contracts 3.1/3.2: a render that stops before FFmpeg starts still explains itself.
+    const auto record = Record(selected.jobsRoot);
+    Check(ve::Str(record,"stage") == "preflight" && record.at("status") == "failed" && record.at("argv").empty() &&
+          record.at("published") == false && record.at("sizeBytes") == 0 && record.at("ffmpegExitCode").is_null() &&
+          record.at("logFile").is_null() && !ve::Str(record,"message").empty(),"preflight failure writes a C6 record with its reason");
+    const auto live = Read(std::filesystem::path(selected.jobsRoot) / (Widen(ve::Str(record,"id")) + L".live.json"));
+    Check(live.at("state") == "failed" && live.at("message") == record.at("message"),"preflight failure writes a terminal live status");
+    return record;
   }
   const auto record = Record(selected.jobsRoot);
   Check(record.at("outputPath") == Utf8(output.c_str()),"C6 preserves exact selected destination");
@@ -171,7 +178,10 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
   return record;
 }
 } // namespace
-namespace vegas_encoder { RecipeRuntime LoadRecipeRuntime() { return selected; } }
+namespace vegas_encoder {
+RecipeRuntime LoadRecipeRuntime() { return selected; }
+std::wstring RecipeJobsRoot() { return selected.jobsRoot; }
+}
 
 int wmain(int argc, wchar_t** argv) {
   try {
@@ -249,6 +259,11 @@ int wmain(int argc, wchar_t** argv) {
     projectRate = 44100; projectChannels = 2;
     Run(root, L"audio-44100-video-only", noAudio, S_OK);
     projectRate = 48000; projectChannels = 2;
+    projectAspect = 1.2121;
+    const auto nonSquare = Run(root, L"non-square", recipe, E_INVALIDARG);
+    Check(ve::Str(nonSquare,"message").find("non-square pixels (pixel aspect 1.2121)") != std::string::npos,
+          "non-square project explains the pixel aspect requirement");
+    projectAspect = 1.0;
     auto badFilter = recipe; badFilter["video"]["extra"] = "-vf vegas_encoder_deliberate_failure";
     const auto filterFailure = Run(root, L"bad-filter", badFilter, E_FAIL, -1, 0, false, false, true);
     Check(ve::Str(filterFailure,"message").find("No such filter: 'vegas_encoder_deliberate_failure'") != std::string::npos,

@@ -11,6 +11,8 @@ struct RecipeRuntime {
 };
 // Owned C7/C3 snapshots only. No discovery, probes or executable hashing here.
 RecipeRuntime LoadRecipeRuntime();
+// The per-user jobs folder, available even when machine.json is missing or invalid.
+std::wstring RecipeJobsRoot();
 configuration::RecipePageOptions RecipeEditorOptions(const GUID& owner, const char* container);
 ve::Json DefaultRecipeSnapshot();
 ve::Json BuiltinRecipeSnapshot(const char* presetJson);

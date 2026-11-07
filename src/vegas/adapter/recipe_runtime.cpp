@@ -103,6 +103,7 @@ ve::Json DefaultRecipeSnapshot() {
   if (ve::HasErrors(normalized.at("issues"))) throw std::runtime_error("Candidate default recipe failed native normalization.");
   return {{"recipe",normalized.at("recipe")},{"origin",nullptr},{"vegasPrefs",ve::Json::object()},{"writtenBy",kVersion}};
 }
+std::wstring RecipeJobsRoot() { return (fs::path(Root(true)) / L"jobs").wstring(); }
 RecipeRuntime LoadRecipeRuntime() {
   RecipeRuntime result;
   const auto machine = Read((fs::path(Root(false)) / L"machine.json").wstring());

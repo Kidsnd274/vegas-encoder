@@ -228,6 +228,24 @@ ve::Json LiveVideoFacts(const ve::Json& compiled) {
     facts["pixelFormatConversionReducesPrecision"] = video.at("inputBits").get<int64_t>() > video.at("outputBits").get<int64_t>();
   return facts;
 }
+void WritePreflightRecord(const PreflightFailure& f) {
+  const auto id = NewJobId(), now = JobUtcNow(), output = Utf8(f.output.c_str());
+  const auto status = f.cancelled ? "cancelled" : "failed";
+  ve::Json live{{"live",1},{"jobId",id},{"hostHwnd",f.hostHwnd},{"sequence",1},{"updatedAt",now},{"state",status},
+    {"framesDone",0},{"framesTotal",nullptr},{"encodeFps",nullptr},{"speed",nullptr},{"bitrateKbps",nullptr},
+    {"bytesWritten",0},{"elapsedSec",0},{"etaSec",nullptr},{"estimatedFinalBytes",nullptr},{"outputPath",output},
+    {"templateName",f.templateName},{"encoderSummary",""},{"outputBitDepth",nullptr},{"pixelFormatConversionReducesPrecision",nullptr},
+    {"message",f.message},{"ffmpegExitCode",nullptr}};
+  ve::Json record{{"job",1},{"id",id},{"startedAt",now},{"endedAt",now},{"project",f.project},{"templateName",f.templateName},
+    {"outputPath",output},{"status",status},{"stage","preflight"},{"recipe",f.recipe},{"origin",f.origin},
+    {"recipeSha256",f.recipe.is_object() ? ve::Json(RecipeHash(f.recipe)) : ve::Json(nullptr)},{"media",f.media},{"ffmpeg",nullptr},
+    {"argv",ve::Json::array()},{"elapsedSec",0},{"sizeBytes",0},{"avgFps",nullptr},{"ffmpegExitCode",nullptr},{"hresult",Hr(f.hresult)},
+    {"message",f.message},{"stderrTail",""},{"verification",Verification("skipped","The render stopped before encoding started.")},
+    {"timings",ve::Json::object()},{"published",false},{"retainedPartialPath",nullptr},{"commandLine",nullptr},{"encoderSummary",""},
+    {"logFile",nullptr},{"durationSec",nullptr},{"realtime",nullptr},{"errorTokenIndices",ve::Json::array()}};
+  // The writer thread finishes the queued live file and record after the store is released.
+  JobStore::Create(f.jobsRoot,id,f.monitorApplication)->Complete(live,record);
+}
 RecipeJob::RecipeJob() : parser_([this](const ve::Json& metrics) { Progress(metrics); }) {}
 RecipeJob::~RecipeJob() { if (startedOnce_ && !terminal_) Stop(E_ABORT,"Job abandoned before completion."); }
 bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::Json& installation,
