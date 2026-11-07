@@ -237,10 +237,21 @@ buffersink AVOptions:
     final allOptions = parser.parseOptions(
       await File(fixture('b3-$name-generic.txt')).readAsString(),
     );
-    // The B1 catalog capture predates padded list-type support.
+    // The B1 catalog capture predates padded list-type support: it dropped
+    // side_data_prefer_packet and attached its constants to the preceding
+    // discard_damaged_percentage option.
+    final listTyped = allOptions
+        .where((o) => o.name == 'side_data_prefer_packet')
+        .firstOrNull;
+    final misattributed = jsonMaps(
+      builds[i]['genericOptions'],
+    ).firstWhere((o) => o['name'] == 'discard_damaged_percentage');
     check(
-      allOptions.any((o) => o.name == 'side_data_prefer_packet') == (i > 0),
-      '$name list-typed generic options are retained',
+      (listTyped != null) == (i > 0) &&
+          (listTyped == null ||
+              canonicalJson(listTyped.data['constants']) ==
+                  canonicalJson(misattributed['constants'])),
+      '$name list-typed generic options keep their own constants',
     );
     final options = allOptions
         .where((o) => o.name != 'side_data_prefer_packet')
@@ -259,9 +270,13 @@ buffersink AVOptions:
         'defaultValue',
         'constants',
       ]) {
+        final fixed =
+            listTyped != null &&
+            key == 'constants' &&
+            options[n].name == 'discard_damaged_percentage';
         check(
           canonicalJson(options[n].data[key]) ==
-              canonicalJson(expected[n][key]),
+              canonicalJson(fixed ? <Object?>[] : expected[n][key]),
           '$name ${options[n].name} $key',
         );
       }
