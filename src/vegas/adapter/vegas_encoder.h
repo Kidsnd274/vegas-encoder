@@ -62,7 +62,9 @@ struct Config {
   bool validMode = true;
   bool showEncoderErrors = true;
   std::wstring ffmpegPath = L"C:\\ffmpeg\\bin\\ffmpeg.exe";
-  DWORD pipeTimeoutMs = 10000, finishTimeoutMs = 120000;
+  // Contract 3.5: fail only after this long without FFmpeg activity; separate pipe-connect bound.
+  DWORD stallTimeoutMs = 120000, connectTimeoutMs = 30000;
+  const char* stallTimeoutSource = "default";
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
   std::wstring appPath;
 #endif

@@ -22,7 +22,7 @@ struct EncodeRate {
 
 struct EncodeStats {
   DWORD pid = 0, exitCode = STILL_ACTIVE;
-  uint64_t videoBytes = 0, audioBytes = 0, videoHighWater = 0, audioHighWater = 0;
+  uint64_t videoBytes = 0, audioBytes = 0, videoHighWater = 0, audioHighWater = 0, videoQueueLimit = 0, audioQueueLimit = 0;
   bool published = false;
   std::wstring command, stderrPath, tempPath;
 };
@@ -36,14 +36,17 @@ class FfmpegEncoder {
   FfmpegEncoder& operator=(const FfmpegEncoder&) = delete;
 
   bool Start(const std::wstring& exe, const std::wstring& output, LONG width, LONG height,
-             EncodeRate rate, bool audio, DWORD pipeTimeoutMs, DWORD finishTimeoutMs);
+             EncodeRate rate, bool audio, DWORD stallTimeoutMs, DWORD connectTimeoutMs);
+  // Before Start: size the audio queue by time (bytes per second x 60 s).
+  void SetAudioBytesPerSecond(uint64_t bytesPerSecond);
+  bool EndedEarly() const;
   struct CommandPlan { std::vector<std::wstring> argv; bool audioInput = false; };
   // The factory compiles after unique pipe/temp names are allocated, before spawn.
   // argv excludes the executable. The core owns every command/domain decision.
   using Compile = std::function<CommandPlan(const std::wstring&, const std::wstring&, const std::wstring&)>;
   using Progress = std::function<void(const char*, size_t)>;
   bool StartCompiled(const std::wstring& exe, const std::wstring& output,
-                     const std::wstring& log, DWORD pipeTimeoutMs, DWORD finishTimeoutMs,
+                     const std::wstring& log, DWORD stallTimeoutMs, DWORD connectTimeoutMs,
                      const Compile& compile, const Progress& progress, const Poll& startupPoll);
   bool Submit(bool audio, std::vector<BYTE> bytes, const Poll& poll);
   bool Finish(const Poll& poll, bool publish = true);

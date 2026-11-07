@@ -102,7 +102,10 @@ Future<void> main(List<String> args) async {
         await repository.logLocation(entry.id) != null) {
       final log = await repository.readLog(entry.id).join();
       check(
-        log.contains('Input #') || log.isEmpty || log.contains('Unrecognized'),
+        log.contains('Input #') ||
+            log.isEmpty ||
+            log.contains('Unrecognized') ||
+            log.contains('Conversion failed!'),
         'Native log streams through B3.',
       );
     }

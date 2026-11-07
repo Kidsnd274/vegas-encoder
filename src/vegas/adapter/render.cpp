@@ -722,7 +722,7 @@ class RenderFile final : public ISfRenderFile {
           options.verifyOutput = runtime.verifyOutput;
           options.monitorApplication = runtime.monitorApplication;
           options.nativeTarget = true;
-          options.pipeTimeoutMs = cfg.pipeTimeoutMs; options.finishTimeoutMs = cfg.finishTimeoutMs;
+          options.stallTimeoutMs = cfg.stallTimeoutMs; options.connectTimeoutMs = cfg.connectTimeoutMs;
           ve::Json media{{"video", {{"width", r.width}, {"height", r.height},
               {"fps", ve::Json::array({r.rate.num, r.rate.den})}, {"pixfmt", rgb ? "bgr0" : "p010le"},
               {"sar", "1:1"}, {"frames", r.frameCountReported}}},
@@ -751,7 +751,7 @@ class RenderFile final : public ISfRenderFile {
       if (!encoder_) {
         encoder_.reset(new FfmpegEncoder);
         if (!encoder_->Start(cfg.ffmpegPath, path_, r.width, r.height, r.rate, audio != nullptr,
-                             cfg.pipeTimeoutMs, cfg.finishTimeoutMs)) {
+                             cfg.stallTimeoutMs, cfg.connectTimeoutMs)) {
           fail(encoder_->Reason().c_str(), encoder_->Error()); break;
         }
       }

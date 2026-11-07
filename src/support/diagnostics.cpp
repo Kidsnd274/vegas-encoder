@@ -72,8 +72,14 @@ Config LoadConfig() {
   c.validMode = c.encode || mode == L"raw";
   c.ffmpegPath = IniString(c.iniPath, L"FFmpegPath", c.ffmpegPath.c_str());
   c.showEncoderErrors = IniNumber(c.iniPath, L"ShowEncoderErrors", 1) != 0;
-  c.pipeTimeoutMs = IniNumber(c.iniPath, L"PipeTimeoutMs", c.pipeTimeoutMs);
-  c.finishTimeoutMs = IniNumber(c.iniPath, L"FinishTimeoutMs", c.finishTimeoutMs);
+  // Contract 3.5: PipeTimeoutMs/FinishTimeoutMs are deprecated aliases for StallTimeoutMs.
+  const DWORD unset = 0xFFFFFFFFu;
+  const DWORD stall = IniNumber(c.iniPath, L"StallTimeoutMs", unset), pipe = IniNumber(c.iniPath, L"PipeTimeoutMs", unset),
+              finish = IniNumber(c.iniPath, L"FinishTimeoutMs", unset);
+  c.stallTimeoutSource = stall != unset ? "StallTimeoutMs" : finish != unset ? "FinishTimeoutMs (deprecated)" : pipe != unset ? "PipeTimeoutMs (deprecated)" : "default";
+  if (stall != unset) c.stallTimeoutMs = stall;
+  else if (finish != unset || pipe != unset) c.stallTimeoutMs = (std::max)(finish != unset ? finish : 0u, pipe != unset ? pipe : 0u);
+  c.connectTimeoutMs = IniNumber(c.iniPath, L"ConnectTimeoutMs", c.connectTimeoutMs);
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
   c.appPath = IniString(c.iniPath, L"AppPath", L"");
 #endif
@@ -113,8 +119,9 @@ void OpenLogLocked() {
           Utf8(c.iniPath.c_str()).c_str(), c.access, c.streamTypes, c.caps, c.pluginFlags,
           c.writeVideo, c.writeAudio, c.probeGetters, c.detailCalls);
   fflush(g_log);
-  fprintf(g_log, "output mode=%s legacyContainers=%d legacyManualNames=%d legacyAutoNames=%d FFmpegPath=%s pipeTimeoutMs=%lu finishTimeoutMs=%lu\n",
-          c.encode ? "ffmpeg" : "raw", c.legacyContainers, c.legacyManualNames, c.legacyAutoNames, Utf8(c.ffmpegPath.c_str()).c_str(), c.pipeTimeoutMs, c.finishTimeoutMs);
+  fprintf(g_log, "output mode=%s legacyContainers=%d legacyManualNames=%d legacyAutoNames=%d FFmpegPath=%s stallTimeoutMs=%lu (from %s) connectTimeoutMs=%lu\n",
+          c.encode ? "ffmpeg" : "raw", c.legacyContainers, c.legacyManualNames, c.legacyAutoNames, Utf8(c.ffmpegPath.c_str()).c_str(),
+          c.stallTimeoutMs, c.stallTimeoutSource, c.connectTimeoutMs);
   fflush(g_log);
 }
 

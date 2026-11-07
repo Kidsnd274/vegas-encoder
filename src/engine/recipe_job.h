@@ -13,7 +13,9 @@ struct RecipeJobOptions {
   bool verifyOutput = true;
   std::wstring monitorApplication;
   bool nativeTarget = false;
-  DWORD pipeTimeoutMs = 10000, finishTimeoutMs = 120000, probeTimeoutMs = 120000;
+  // Contract 3.5: fail only after StallTimeoutMs without FFmpeg activity; ConnectTimeoutMs bounds pipe connection.
+  DWORD stallTimeoutMs = 120000, connectTimeoutMs = 30000, probeTimeoutMs = 120000;
+  std::function<std::string()> clock; // Tests inject a stepping clock; production uses JobUtcNow.
 };
 // Immutable, already-selected installation/capability snapshot from C7/C3; B6
 // supplies the real template payload. This engine contains no native host API.
@@ -30,6 +32,8 @@ class RecipeJob {
   HRESULT Error() const { return error_; }
   std::string Reason() const { return message_; }
   EncodeStats Stats() const { return encoder_.Stats(); } // only after stop/finish
+  // FFmpeg finished successfully before all input was sent (for example -t). Stop fetching host frames, then Finish.
+  bool EndedEarly() const { return encoder_.EndedEarly(); }
   const ve::Json& Compiled() const { return compiled_; }
   const ve::Json& Record() const { return record_; }
   const std::string& Id() const { return id_; }
