@@ -530,6 +530,39 @@ Future<void> main(List<String> args) async {
     );
 
     await rejects(() => library.save(mineDuplicate), 'REVISION-CONFLICT');
+    // C2 / contract 3.3: free IDs skip retained history and compare case-insensitively.
+    final freeAfterDelete = await library.availableId('mine copy');
+    check(
+      freeAfterDelete != 'mine-copy' &&
+          (await library.save(
+                mineDuplicate.copyWith(
+                  recipe: mineDuplicate.recipe.copyWith(id: freeAfterDelete),
+                ),
+              ))
+              .recipe
+              .id ==
+              freeAfterDelete,
+      'a deleted preset keeps its ID, and availableId offers a free one that saves',
+    );
+    await library.save(
+      mineDuplicate.copyWith(
+        recipe: mineDuplicate.recipe.copyWith(id: 'My-Preset', name: 'My Preset'),
+      ),
+    );
+    check(
+      await library.availableId('my preset') == 'my-preset-2',
+      'an existing My-Preset makes "my preset" my-preset-2',
+    );
+    final c2Library = FakePresetLibrary(presets: [mineDuplicate]);
+    await c2Library.delete('mine-copy', expectedRevision: mineDuplicate.revision);
+    await rejects(
+      () => c2Library.save(mineDuplicate.copyWith(revision: 0)),
+      'REVISION-CONFLICT',
+    );
+    check(
+      await c2Library.availableId('mine copy') == 'mine-copy-2',
+      'the fake library models retained history like the file library',
+    );
     for (var i = 0; i < 23; i++) {
       await library.setPreferences('shared', favorite: i.isEven);
     }

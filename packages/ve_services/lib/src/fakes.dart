@@ -371,6 +371,13 @@ class FakePresetLibrary
         'REVISION-CONFLICT',
         'Updated elsewhere: reload or save as new.',
       );
+    // Like the file library: a deleted preset's history keeps its ID (case-insensitive).
+    if (existing == null &&
+        _history.keys.any((k) => k.toLowerCase() == preset.recipe.id.toLowerCase()))
+      throw const ServiceException(
+        'REVISION-CONFLICT',
+        'This ID has retained history. Save with a new ID.',
+      );
     if (existing != null) {
       final history = _history.putIfAbsent(preset.recipe.id, () => []);
       history.add(existing);
@@ -404,8 +411,16 @@ class FakePresetLibrary
         'REVISION-CONFLICT',
         'Updated elsewhere: reload first.',
       );
+    // Deletion keeps the last version as history, as the file library does.
+    _history.putIfAbsent(id, () => []).add(existing);
     _store.set(List.unmodifiable(_store.value.where((v) => v.recipe.id != id)));
   }
+
+  @override
+  Future<String> availableId(String name) async => freePresetId(name, [
+    for (final preset in _store.value) preset.recipe.id,
+    ..._history.keys,
+  ]);
 
   @override
   Future<Preset> importPreset(String jsonText, {required String newId}) async {

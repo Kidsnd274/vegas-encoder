@@ -152,6 +152,18 @@ void main() {
     expect(await library.get('yt-h264'), isNotNull);
   });
 
+  test('a deleted preset keeps its ID, and the next copy gets a free one (C2)', () async {
+    await controller().duplicate('yt-h264');
+    await settle();
+    final first = state().selectedId!;
+    await controller().delete(first);
+    await controller().duplicate('yt-h264');
+    await settle();
+    final second = state().selectedId!;
+    expect(second, isNot(first), reason: 'the deleted copy\'s history still holds its ID');
+    expect(await library.get(second), isNotNull);
+  });
+
   group('editor results', () {
     test('a built-in as shipped compiles; an edit is beyond the preview core', () {
       final data = container.read(editorProvider)!;

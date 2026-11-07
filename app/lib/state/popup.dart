@@ -7,7 +7,7 @@ import '../design/components/signal_path/signal_path_model.dart';
 import '../design/format.dart';
 import 'app_state.dart';
 import 'editor.dart';
-import 'presets.dart' show copyName, presetId, presetRecipe, uniqueId;
+import 'presets.dart' show copyName, presetRecipe;
 import 'preview.dart';
 import 'recipe_edit.dart';
 import 'services.dart';
@@ -326,7 +326,7 @@ class PopupController extends AsyncNotifier<PopupState> implements RecipeEditor 
             ? 'builtin/${origin.presetId}'
             : 'preset/${origin.presetId}@${origin.revision}',
         requires: PresetRequirements(known: false),
-        recipe: s.recipe.copyWith(id: uniqueId(newName, presets.map(presetId).toSet()), name: newName),
+        recipe: s.recipe.copyWith(id: await library.availableId(newName), name: newName),
       ),
     );
     if (!ref.mounted) return created;

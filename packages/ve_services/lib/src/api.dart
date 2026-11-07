@@ -60,6 +60,24 @@ abstract interface class CapabilityCache {
   Future<void> invalidate(String identityKey);
 }
 
+/// The first of `base`, `base-2`, `base-3`… for [name] (`^[a-z0-9][a-z0-9-]*$`,
+/// at most 48 characters) that is not in [taken], compared case-insensitively.
+String freePresetId(String name, Iterable<String> taken) {
+  var base = name
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  if (base.isEmpty) base = 'preset';
+  if (base.length > 48)
+    base = base.substring(0, 48).replaceAll(RegExp(r'-+$'), '');
+  final used = {for (final id in taken) id.toLowerCase()};
+  var candidate = base;
+  for (var n = 2; used.contains(candidate); n++) {
+    candidate = '$base-$n';
+  }
+  return candidate;
+}
+
 abstract interface class PresetLibrary {
   Future<List<Preset>> list();
   Stream<List<Preset>> watch();
@@ -69,6 +87,10 @@ abstract interface class PresetLibrary {
   /// read-only. A duplicate is a new ID with origin "builtin/<id>".
   Future<Preset> save(Preset preset, {int? expectedRevision});
   Future<void> delete(String id, {required int expectedRevision});
+
+  /// A safe ID from [name] that is free among current presets **and** retained
+  /// history (a deleted preset keeps its history), compared case-insensitively.
+  Future<String> availableId(String name);
   Future<Preset> importPreset(String jsonText, {required String newId});
   Future<String> exportPreset(String id);
 }

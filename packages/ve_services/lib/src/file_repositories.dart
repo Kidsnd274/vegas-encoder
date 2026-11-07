@@ -391,6 +391,18 @@ class FilePresetLibrary
   }
 
   @override
+  Future<String> availableId(String name) async {
+    final taken = [for (final preset in await list()) preset.recipe.id];
+    final history = Directory(joinPath(paths.library, '.history'));
+    if (await history.exists()) {
+      await for (final entity in history.list(followLinks: false)) {
+        if (entity is Directory) taken.add(entity.uri.pathSegments.where((s) => s.isNotEmpty).last);
+      }
+    }
+    return freePresetId(name, taken);
+  }
+
+  @override
   Future<void> delete(
     String id, {
     required int expectedRevision,
