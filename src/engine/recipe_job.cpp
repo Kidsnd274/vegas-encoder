@@ -336,6 +336,7 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
     const auto requiredFilters = ve::Normalize({{"recipe",recipe}}).value("requiredFilters",ve::Json(nullptr));
     if (requiredFilters.is_array() && !requiredFilters.empty() && !capabilities.is_object())
       throw std::runtime_error("Filter support for the selected FFmpeg is not verified. Refresh it on the FFmpeg page before rendering this preset.");
+    encoder_.SetReplaceExisting(options.replaceExisting);
     if (media.contains("audio") && media.at("audio").is_object())
       encoder_.SetAudioBytesPerSecond(uint64_t(ve::Num(media.at("audio"),"rate")) * uint64_t(ve::Num(media.at("audio"),"channels")) * 4u);
     const bool ok = encoder_.StartCompiled(Widen(ve::Str(installation,"path")), options.output,log,options.stallTimeoutMs,options.connectTimeoutMs,
@@ -487,6 +488,9 @@ void RecipeJob::Complete(bool success) {
     {"transport",{{"videoHighWater",stats.videoHighWater},{"audioHighWater",stats.audioHighWater},{"videoBytes",stats.videoBytes},
                   {"audioBytes",stats.audioBytes},{"videoQueueLimit",stats.videoQueueLimit},{"audioQueueLimit",stats.audioQueueLimit}}}};
   if (success && encoder_.EndedEarly()) record_["endedEarly"] = true;
+  if (success && stats.replacedExisting) record_["replacedExisting"] = true;
+  if (!options_.requestedOutput.empty() && _wcsicmp(options_.requestedOutput.c_str(), options_.output.c_str()) != 0)
+    record_["requestedOutputPath"] = Utf8(options_.requestedOutput.c_str());
   Log("job %s transport: video %llu bytes (high water %llu of %llu), audio %llu bytes (high water %llu of %llu)%s",id_.c_str(),
       stats.videoBytes,stats.videoHighWater,stats.videoQueueLimit,stats.audioBytes,stats.audioHighWater,stats.audioQueueLimit,
       encoder_.EndedEarly() ? ", FFmpeg finished early" : "");

@@ -24,6 +24,23 @@ struct Handle {
   }
   bool Valid() const { return h && h != INVALID_HANDLE_VALUE; }
 };
+// Volume serial, file index, size and last write time: "still the same file".
+struct FileIdentity {
+  DWORD volume = 0; uint64_t index = 0, size = 0, written = 0;
+  bool operator==(const FileIdentity& o) const { return volume == o.volume && index == o.index && size == o.size && written == o.written; }
+};
+bool ReadIdentity(const std::wstring& path, FileIdentity& identity) {
+  Handle file;
+  file.h = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  BY_HANDLE_FILE_INFORMATION info{};
+  if (!file.Valid() || !GetFileInformationByHandle(file.h, &info)) return false;
+  identity.volume = info.dwVolumeSerialNumber;
+  identity.index = (uint64_t(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
+  identity.size = (uint64_t(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
+  identity.written = (uint64_t(info.ftLastWriteTime.dwHighDateTime) << 32) | info.ftLastWriteTime.dwLowDateTime;
+  return true;
+}
 
 // Windows CRT argv quoting; CreateProcessW receives an explicit application path.
 std::wstring Quote(const std::wstring& value) {
@@ -101,6 +118,8 @@ struct FfmpegEncoder::Impl {
   std::atomic<ULONGLONG> activity{0};
   std::atomic<long long> lastFrame{-1};
   std::atomic<uint64_t> videoBuffersAllocated{0};
+  bool replaceExisting = false, hadExisting = false;
+  FileIdentity existing;
   // Finished input buffers come back here (bounded: queue depth + 2); ownership moves only.
   std::mutex poolMutex;
   std::vector<std::vector<BYTE>> pool[2];
@@ -316,8 +335,14 @@ bool FfmpegEncoder::StartImpl(const std::wstring& exe, const std::wstring& outpu
     p.Fail(E_INVALIDARG, "FFmpegPath must be an absolute executable path"); return false;
   }
   if (GetFileAttributesW(output.c_str()) != INVALID_FILE_ATTRIBUTES) {
-    p.Fail(HRESULT_FROM_WIN32(ERROR_FILE_EXISTS), "destination already exists (prototype refuses overwrite)");
-    return false;
+    // Decision D1: replace only a file VEGAS confirmed, and only if it is unchanged at publication.
+    if (!p.replaceExisting) {
+      p.Fail(HRESULT_FROM_WIN32(ERROR_FILE_EXISTS), "The destination file already exists. Choose another name."); return false;
+    }
+    if (!ReadIdentity(output, p.existing)) {
+      p.Fail(HRESULT_FROM_WIN32(GetLastError()), "Cannot read the existing destination file."); return false;
+    }
+    p.hadExisting = true;
   }
   GUID id{};
   if (FAILED(CoCreateGuid(&id))) { p.Fail(E_FAIL, "cannot create encode session ID"); return false; }
@@ -524,9 +549,28 @@ bool FfmpegEncoder::Publish() {
   if (!p.finished || p.failed || p.stopping || p.stats.published) {
     p.Fail(E_UNEXPECTED, "publication requires a finished unfailed encoder"); return false;
   }
-  // No REPLACE_EXISTING: a destination created during encoding must be preserved.
-  if (!MoveFileExW(p.stats.tempPath.c_str(), p.output.c_str(), MOVEFILE_WRITE_THROUGH)) {
-    p.Fail(HRESULT_FROM_WIN32(GetLastError()), "cannot publish completed output"); p.Abort(); return false;
+  // A refused publication keeps the finished render and names it.
+  auto refuse = [&](DWORD code, const std::string& why) {
+    p.tempOwned = false;
+    p.Fail(HRESULT_FROM_WIN32(code), (why + " The finished render was kept as " + Utf8(p.stats.tempPath.c_str()) + ".").c_str());
+    p.Abort(); return false;
+  };
+  if (p.hadExisting) {
+    FileIdentity now;
+    if (!ReadIdentity(p.output, now) || !(now == p.existing))
+      return refuse(ERROR_FILE_EXISTS, "The destination file changed during the render, so it was not replaced.");
+    if (!MoveFileExW(p.stats.tempPath.c_str(), p.output.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+      const DWORD code = GetLastError();
+      return refuse(code, code == ERROR_SHARING_VIOLATION || code == ERROR_ACCESS_DENIED || code == ERROR_LOCK_VIOLATION ?
+        "The existing destination file is in use, so it was not replaced." : "The existing destination file could not be replaced.");
+    }
+    p.stats.replacedExisting = true;
+  } else if (!MoveFileExW(p.stats.tempPath.c_str(), p.output.c_str(), MOVEFILE_WRITE_THROUGH)) {
+    // No REPLACE_EXISTING: a destination created during encoding must be preserved.
+    const DWORD code = GetLastError();
+    if (code == ERROR_ALREADY_EXISTS || code == ERROR_FILE_EXISTS)
+      return refuse(code, "The destination file appeared during the render, so it was not overwritten.");
+    p.Fail(HRESULT_FROM_WIN32(code), "cannot publish completed output"); p.Abort(); return false;
   }
   p.stats.published = true;
   p.tempOwned = false;
@@ -534,6 +578,7 @@ bool FfmpegEncoder::Publish() {
   return true;
 }
 void FfmpegEncoder::SetAudioBytesPerSecond(uint64_t bytesPerSecond) { p_->audioBytesPerSecond = bytesPerSecond; }
+void FfmpegEncoder::SetReplaceExisting(bool replace) { p_->replaceExisting = replace; }
 bool FfmpegEncoder::EndedEarly() const { return p_->endedEarly; }
 std::vector<BYTE> FfmpegEncoder::TakeBuffer(bool audio, size_t size) {
   auto& p = *p_;

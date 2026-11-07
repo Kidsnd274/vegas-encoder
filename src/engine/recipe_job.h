@@ -18,6 +18,9 @@ struct RecipeJobOptions {
   std::function<std::string()> clock; // Tests inject a stepping clock; production uses JobUtcNow.
   // {encoder:{reason,testedAt}} from the app's last hardware test (decision D8): context, never a block.
   ve::Json failedEncoders = ve::Json::object();
+  // Decision D1: VEGAS confirmed this exact name, so an unchanged existing file may be replaced.
+  bool replaceExisting = false;
+  std::wstring requestedOutput; // the name VEGAS asked for, when the adapter chose another
 };
 // Immutable, already-selected installation/capability snapshot from C7/C3; B6
 // supplies the real template payload. This engine contains no native host API.

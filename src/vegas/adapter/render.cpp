@@ -300,11 +300,22 @@ class RenderFile final : public ISfRenderFile {
   HRESULT STDMETHODCALLTYPE SetFile(LPCWSTR path) override {
     return NativeBoundary([&]() -> HRESULT {
       std::wstring resolved = path ? path : L"";
+      requestedPath_ = resolved;
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
       if (Cfg().encode && Cfg().legacyAutoNames) {
         try { resolved = ResolveRecipeDestination(recipeSnapshot_.at("recipe"),resolved); }
         catch (const std::invalid_argument&) { return E_INVALIDARG; }
         catch (const ve::Error&) { return E_INVALIDARG; }
+        // Decision D1: VEGAS checked the requested name, not this one, so never replace;
+        // take the first free "name (n).ext" and report it as the actual path.
+        if (_wcsicmp(resolved.c_str(), requestedPath_.c_str()) != 0 && GetFileAttributesW(resolved.c_str()) != INVALID_FILE_ATTRIBUTES) {
+          const auto dot = resolved.find_last_of(L'.'), slash = resolved.find_last_of(L"/\\");
+          const auto split = dot != std::wstring::npos && (slash == std::wstring::npos || dot > slash) ? dot : resolved.size();
+          for (int n = 2; n < 10000; ++n) {
+            const auto candidate = resolved.substr(0, split) + L" (" + std::to_wstring(n) + L")" + resolved.substr(split);
+            if (GetFileAttributesW(candidate.c_str()) == INVALID_FILE_ATTRIBUTES) { resolved = candidate; break; }
+          }
+        }
         BestEffortDiagnostic([&] { Log("Legacy destination: requested=%s actual=%s", Utf8(path ? path : L"").c_str(), Utf8(resolved.c_str()).c_str()); });
       }
 #endif
@@ -751,6 +762,9 @@ class RenderFile final : public ISfRenderFile {
           options.nativeTarget = true;
           options.stallTimeoutMs = cfg.stallTimeoutMs; options.connectTimeoutMs = cfg.connectTimeoutMs;
           options.failedEncoders = runtime.failedEncoders;
+          // Replace an existing file only when VEGAS checked this exact name (decision D1).
+          options.replaceExisting = _wcsicmp(path_.c_str(), requestedPath_.c_str()) == 0;
+          options.requestedOutput = requestedPath_;
           ve::Json media{{"video", {{"width", r.width}, {"height", r.height},
               {"fps", ve::Json::array({r.rate.num, r.rate.den})}, {"pixfmt", rgb ? "bgr0" : "p010le"},
               {"sar", "1:1"}, {"frames", r.frameCountReported}}},
@@ -778,6 +792,7 @@ class RenderFile final : public ISfRenderFile {
 #else
       if (!encoder_) {
         encoder_.reset(new FfmpegEncoder);
+        encoder_->SetReplaceExisting(_wcsicmp(path_.c_str(), requestedPath_.c_str()) == 0);
         if (!encoder_->Start(cfg.ffmpegPath, path_, r.width, r.height, r.rate, audio != nullptr,
                              cfg.stallTimeoutMs, cfg.connectTimeoutMs)) {
           fail(encoder_->Reason().c_str(), encoder_->Error()); break;
@@ -1304,7 +1319,7 @@ class RenderFile final : public ISfRenderFile {
 #if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
   bool proofExtraReport_ = false;
 #endif
-  std::wstring path_;
+  std::wstring path_, requestedPath_;  // actual destination, and the name VEGAS supplied
   std::vector<ISfReadStream*> streams_;
   ISfReadMeta* meta_ = nullptr;
   std::unique_ptr<FfmpegEncoder> encoder_;

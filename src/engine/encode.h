@@ -24,7 +24,7 @@ struct EncodeStats {
   DWORD pid = 0, exitCode = STILL_ACTIVE;
   uint64_t videoBytes = 0, audioBytes = 0, videoHighWater = 0, audioHighWater = 0, videoQueueLimit = 0, audioQueueLimit = 0;
   uint64_t videoBuffersAllocated = 0;  // new video buffers TakeBuffer had to allocate
-  bool published = false;
+  bool published = false, replacedExisting = false;
   std::wstring command, stderrPath, tempPath;
 };
 
@@ -40,6 +40,9 @@ class FfmpegEncoder {
              EncodeRate rate, bool audio, DWORD stallTimeoutMs, DWORD connectTimeoutMs);
   // Before Start: size the audio queue by time (bytes per second x 60 s).
   void SetAudioBytesPerSecond(uint64_t bytesPerSecond);
+  // Before Start (decision D1): VEGAS confirmed this exact name, so an existing file
+  // that is unchanged at publication is replaced. Otherwise an existing file is refused.
+  void SetReplaceExisting(bool replace);
   bool EndedEarly() const;
   std::vector<BYTE> TakeBuffer(bool audio, size_t size);
   struct CommandPlan { std::vector<std::wstring> argv; bool audioInput = false; };

@@ -228,6 +228,7 @@ struct Case {
   bool success = true, verify = true, blockedIndex = false, blockedLive = false, collision = false;
   bool cancelDuringProbe = false, timedCancel = false, invalidRoot = false;
   bool endedEarly = false, clockStep = false;
+  bool preexisting = false, replaceExisting = false, lockExisting = false; // decision D1
   Json failedEncoders = Json::object(); // encoders the app's last hardware test marked failed
   std::string reason; // expected exact (or, with partialReason, contained) C6 message
   bool partialReason = true;
@@ -245,6 +246,12 @@ Json Run(const Case& test, const std::wstring& root) {
   options.connectTimeoutMs = instrumented && test.connectTimeout >= 3000 ? 10000 : test.connectTimeout;
   options.probeTimeoutMs = test.probeTimeout;
   options.failedEncoders = test.failedEncoders;
+  options.replaceExisting = test.replaceExisting;
+  HANDLE existingLock = INVALID_HANDLE_VALUE;
+  if (test.preexisting) {
+    { std::ofstream file(std::filesystem::path(options.output),std::ios::binary); file << "old destination"; }
+    if (test.lockExisting) existingLock = CreateFileW(options.output.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+  }
   if (test.clockStep) {
     // The wall clock steps back 5 ms between start and end.
     auto calls = std::make_shared<int>(0);
@@ -335,6 +342,13 @@ Json Run(const Case& test, const std::wstring& root) {
   monitoring=false; monitor.join();
   const auto duration = GetTickCount64()-began;
   if (liveHandle != INVALID_HANDLE_VALUE) CloseHandle(liveHandle);
+  if (existingLock != INVALID_HANDLE_VALUE) CloseHandle(existingLock);
+  if (test.preexisting) {
+    std::ifstream file(std::filesystem::path(options.output),std::ios::binary); const std::string bytes((std::istreambuf_iterator<char>(file)),{});
+    Require(test.success ? bytes != "old destination" && job.Record().value("replacedExisting",false) == true
+                         : bytes == "old destination" && !job.Record().contains("replacedExisting"),
+            "a confirmed existing destination is replaced only on success; otherwise it stays intact");
+  }
   if (indexLock != INVALID_HANDLE_VALUE) { UnlockFileEx(indexLock,0,1,0,&overlap); CloseHandle(indexLock); }
   if ((result.returned == S_OK) != test.success) {
     WaitStore(job.Store()); fprintf(stderr,"%s: %s\n%s\n",test.name.c_str(),job.Reason().c_str(),job.Compiled().dump().c_str());
@@ -389,6 +403,9 @@ Json Run(const Case& test, const std::wstring& root) {
     if (test.cancelAt >= 0 || test.timedCancel || test.cancelDuringProbe) Require(job.Record()["status"] == "cancelled","cancellation remains distinct");
     if (test.failureSlot) Require(job.Record()["status"] == "failed" && job.Error() == E_ACCESSDENIED,"host failure HRESULT preserved");
     if (test.collision) { std::ifstream file(std::filesystem::path(options.output)); std::string text; file>>text; Require(text=="sentinel","destination created during render preserved"); }
+    if (test.collision || test.lockExisting)
+      Require(!job.Record()["retainedPartialPath"].is_null() && ve::Str(job.Record(),"message").find(ve::Str(job.Record(),"retainedPartialPath")) != std::string::npos,
+              "a refused replacement keeps the finished render and names it");
     if (test.name == "child-exit") Require(!job.Record()["errorTokenIndices"].empty(),"native runtime error provenance recorded");
     if (test.name == "resize-unverified")
       Require(job.Reason().find("Refresh") != std::string::npos && stats.videoBytes == 0 && stats.audioBytes == 0,
@@ -574,8 +591,15 @@ int wmain(int argc, wchar_t** argv) {
     test.name="cancel-mid"; test.cancelAt=15; test.success=false; summaries.push_back(Run(test,root));
     test.name="cancel-final"; test.cancelAt=60; summaries.push_back(Run(test,root));
     test.cancelAt=-1; test.name="host-failure"; test.failureSlot=6; summaries.push_back(Run(test,root));
-    test.failureSlot=0; test.name="destination-race"; test.collision=true; summaries.push_back(Run(test,root));
-    test.collision=false; test.success=true; test.name="recovery"; summaries.push_back(Run(test,root));
+    test.failureSlot=0; test.name="destination-race"; test.collision=true; test.replaceExisting=true;
+    test.reason="appeared during the render"; summaries.push_back(Run(test,root));
+    test.collision=false; test.success=true; test.name="recovery"; test.reason.clear(); summaries.push_back(Run(test,root));
+    test.name="preexisting-confirmed"; test.preexisting=true; summaries.push_back(Run(test,root));          // A4 (D1)
+    test.name="preexisting-locked"; test.lockExisting=true; test.success=false; test.reason="is in use, so it was not replaced";
+    summaries.push_back(Run(test,root));
+    test.name="preexisting-unconfirmed"; test.lockExisting=false; test.replaceExisting=false; test.reason="already exists";
+    summaries.push_back(Run(test,root));
+    test.preexisting=false; test.success=true; test.reason.clear();
     test.name="1080p-fractional"; test.width=1920; test.height=1080; summaries.push_back(Run(test,root));
     test.width=320; test.height=180; test.name="index-blocked"; test.blockedIndex=true; summaries.push_back(Run(test,root));
     test.blockedIndex=false; test.name="live-blocked"; test.blockedLive=true; summaries.push_back(Run(test,root));

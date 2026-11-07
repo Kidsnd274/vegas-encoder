@@ -100,9 +100,14 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
   const auto extension = legacyAutomaticNames ? configuration::RecipeOutputExtension(recipe) :
     pathExtension ? std::wstring(pathExtension) : container ? Widen(ve::Str(*container,"ext")) : L".mkv";
   const auto requested = folder + L"\\" + (suffixOnlyName ? L"" : L"render") + (pathExtension ? pathExtension : extension);
-  const auto output = legacyAutomaticNames ? ResolveRecipeDestination(recipe,requested) : requested;
+  const auto resolved = legacyAutomaticNames ? ResolveRecipeDestination(recipe,requested) : requested;
+  // Decision D1: VEGAS 2026 checked this exact name, so an existing file is replaced. Legacy automatic
+  // names change the suffix VEGAS checked, so they never replace and take the first free "name (n)".
+  const auto output = legacyAutomaticNames && existing ?
+    (std::filesystem::path(resolved).parent_path() / (std::filesystem::path(resolved).stem().wstring() + L" (2)" +
+                                                      std::filesystem::path(resolved).extension().wstring())).wstring() : resolved;
   const bool success = expected == S_OK;
-  if (existing) { std::ofstream file{std::filesystem::path(output)}; file << "preserve destination"; }
+  if (existing) { std::ofstream file{std::filesystem::path(resolved)}; file << "preserve destination"; }
   if (nominalExisting) { Check(requested != output,"nominal-collision fixture must use a different actual path"); std::ofstream file{std::filesystem::path(requested)}; file << "preserve nominal"; }
   auto value = Template(recipe);
   ISfRenderFile* raw = nullptr;
@@ -169,6 +174,13 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
     const auto temporary = std::filesystem::path(Widen(record.at("argv").back().get<std::string>()));
     Check(temporary.parent_path() == std::filesystem::path(output).parent_path() && temporary.extension() == extension &&
       temporary.filename().wstring().find(L".ve-partial-") != std::wstring::npos,"unique temporary stays beside destination and retains final extension");
+    if (existing) {
+      std::ifstream file{std::filesystem::path(resolved)}; const std::string bytes((std::istreambuf_iterator<char>(file)), {});
+      if (legacyAutomaticNames)
+        Check(bytes == "preserve destination" && record.at("requestedOutputPath") == Utf8(requested.c_str()) && !record.contains("replacedExisting"),
+              "legacy automatic names keep the existing file and render to the first free name");
+      else Check(bytes != "preserve destination" && record.value("replacedExisting",false) == true,"a confirmed existing destination is replaced");
+    }
   }
   else if (existing) {
     std::ifstream file{std::filesystem::path(output)}; const std::string bytes((std::istreambuf_iterator<char>(file)), {});
@@ -235,7 +247,7 @@ int wmain(int argc, wchar_t** argv) {
         Run(root,L"recovery",recipe,S_OK,-1,0,false,false,false,L".vencoder");
       } else Run(root,L"mismatched-suffix",recipe,E_INVALIDARG,-1,0,false,false,false,L".mp4");
       Run(root,L"suffix-only-name",recipe,S_OK,-1,0,false,false,false,L".mkv",true);
-      Run(root,L"existing-destination",recipe,HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),-1,0,false,true,false,legacyAutomaticNames ? L".vencoder" : nullptr);
+      Run(root,L"existing-destination",recipe,S_OK,-1,0,false,true,false,legacyAutomaticNames ? L".vencoder" : nullptr);
       printf("Native %s PASS: %d checks / short fake-host real-FFmpeg renders across five containers, output paths and existing destination. No VEGAS.\n",legacyAutomaticNames ? "automatic names" : "containers",checks);
       return 0;
     }
@@ -278,7 +290,7 @@ int wmain(int argc, wchar_t** argv) {
     const auto failedLive = Read(std::filesystem::path(root) / L"bad-filter" / L"jobs" / (failedId + L".live.json"));
     Check(failedLive.at("message") == filterFailure.at("message"), "C5 and C6 share the actionable failure message");
     Run(root, L"after-filter-failure", recipe, S_OK);
-    Run(root, L"existing-destination", recipe, HRESULT_FROM_WIN32(ERROR_FILE_EXISTS), -1, 0, false, true);
+    Run(root, L"existing-destination", recipe, S_OK, -1, 0, false, true);
     auto empty = Tpl::Make(L"Not a recipe", L"", 0); empty.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
     ISfRenderFile* rejected = nullptr;
     Check(CreateRenderFile(empty.Ptr(), &rejected) == E_INVALIDARG && !rejected, "Create rejects absent recipe instead of using proof settings");
