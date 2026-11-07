@@ -12,8 +12,14 @@ service parser now accepts the padded list types FFmpeg 7.0+ prints
 (`[<int>     ]`), which it previously dropped, and `-encoders`/`-muxers` rows
 without a description (`--enable-small` builds), which previously hid the
 following row. Discovery rejects builds older than FFmpeg 4.4 (libavformat
-58.76) with `FFMPEG-UNSUPPORTED`. The parser revision stays 4: bumping it
-invalidates exporter caches, so it should ship with a matched exporter release.
+58.76) with `FFMPEG-UNSUPPORTED`. The owner approved bumping the FFmpeg parser
+revision to 5 (`version.json`, regenerated `version.g.dart` and
+`version.generated.h`), so both app and exporter discard revision-4 capability
+caches. App and exporter must be released together: an installed revision-4
+exporter rejects caches written by a revision-5 app until the user probes again
+with a matching pair. The native recipe-runtime checks for cache acceptance and
+stale-parser rejection passed against revision 5. The rest of that executable
+needs an installed app and was not run.
 
 New `v<version>-*.txt` fixtures, captured by
 `scripts/etc/Capture-FFmpegVersionFixtures.py` from the Gyan essentials release

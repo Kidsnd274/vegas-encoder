@@ -15,8 +15,8 @@ history; their old locations, ownership splits and queues do not apply.
 
 The owner requested this FFmpeg-version parsing work in a separate worktree,
 `C:\Users\Samuel Tee\repos\vegas-encoder-ffmpeg-compat`. The B3 service suite
-passes there (4,514 checks). Before merging, decide with the owner whether to bump `ffmpegParserVersion` together with the
-next exporter release. Release fixtures 4.4 to 9.0.2 are committed; a
+passes there (4,514 checks). `ffmpegParserVersion` is now 5, so the next
+release must ship the app and exporters together. Release fixtures 4.4 to 9.0.2 are committed; a
 `--enable-small` or shared-DLL build is still uncovered. See [status](STATUS.md#current-progress).
 
 ## Current queue: older VEGAS release qualification

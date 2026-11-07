@@ -1,2 +1,2 @@
 // Generated from version.json. Do not edit.
-const ffmpegParserVersion = 4;
+const ffmpegParserVersion = 5;

@@ -69,7 +69,7 @@ Future<void> main(List<String> args) async {
     );
   }
   final parser = WindowsFFmpegHelpParser();
-  check(parser.version == 4, 'updated filter discovery invalidates old caches');
+  check(parser.version == 5, 'list-type and empty-description parsing invalidates old caches');
   check(
     parser.parseFilters(filterList).keys.join(',') == 'scale,pad,setsar',
     'filter list parsed independently of encoders',
