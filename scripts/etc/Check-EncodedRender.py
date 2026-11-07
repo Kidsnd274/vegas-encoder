@@ -85,7 +85,7 @@ def check(manifest, ffmpeg, ffprobe, out, fixture=False, reference=None):
 
         vpath = out / "decoded.p010"
         run([ffmpeg, "-hide_banner", "-nostdin", "-v", "error", "-n", "-i", media, "-map", "0:v:0",
-             "-vsync", "0", "-pix_fmt", "p010le", "-f", "rawvideo", vpath], out / "video-decode.stderr.txt")
+             "-fps_mode", "passthrough", "-pix_fmt", "p010le", "-f", "rawvideo", vpath], out / "video-decode.stderr.txt")
         rep.check(vpath.stat().st_size == frames * width * height * 3, "decode: video byte count")
 
         # Inspect actual container timestamps, allowing only its time-base quantization.

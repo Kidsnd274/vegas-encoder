@@ -281,13 +281,14 @@ bool FfmpegEncoder::StartImpl(const std::wstring& exe, const std::wstring& outpu
                                          1, 65536, 65536, 0, nullptr);
     if (!p.pipes[i].handle.Valid()) { p.Fail(HRESULT_FROM_WIN32(GetLastError()), "cannot create input pipe"); return false; }
   }
+  // Current FFmpeg rejects -thread_queue_size as an input option; the core dropped it too.
   std::vector<std::wstring> args = {exe, L"-hide_banner", L"-nostdin", L"-y",
-    L"-thread_queue_size", L"8", L"-probesize", L"32", L"-analyzeduration", L"0",
+    L"-probesize", L"32", L"-analyzeduration", L"0",
     L"-f", L"rawvideo", L"-pixel_format", L"p010le", L"-video_size",
     std::to_wstring(width) + L"x" + std::to_wstring(height), L"-framerate", rate.Text(),
     L"-i", prefix + L"-video"};
   if (audio) {
-    const std::vector<std::wstring> a = {L"-thread_queue_size", L"8", L"-probesize", L"32",
+    const std::vector<std::wstring> a = {L"-probesize", L"32",
       L"-analyzeduration", L"0", L"-f", L"f32le", L"-ar", L"48000", L"-ac", L"2",
       L"-i", prefix + L"-audio"};
     args.insert(args.end(), a.begin(), a.end());
