@@ -1,0 +1,66 @@
+{
+  "program_version": {
+    "version": "9.0.2-essentials_build-www.gyan.dev",
+    "copyright": "Copyright (c) 2007-2026 the FFmpeg developers",
+    "compiler_ident": "gcc 16.2.0 (Rev3, Built by MSYS2 project)",
+    "configuration": "--enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-cairo --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-openal --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband"
+  },
+  "library_versions": [
+    {
+      "name": "libavutil",
+      "major": 61,
+      "minor": 1,
+      "micro": 102,
+      "version": 3998054,
+      "ident": "Lavu61.1.102"
+    },
+    {
+      "name": "libavcodec",
+      "major": 63,
+      "minor": 1,
+      "micro": 102,
+      "version": 4129126,
+      "ident": "Lavc63.1.102"
+    },
+    {
+      "name": "libavformat",
+      "major": 63,
+      "minor": 1,
+      "micro": 102,
+      "version": 4129126,
+      "ident": "Lavf63.1.102"
+    },
+    {
+      "name": "libavdevice",
+      "major": 63,
+      "minor": 1,
+      "micro": 102,
+      "version": 4129126,
+      "ident": "Lavd63.1.102"
+    },
+    {
+      "name": "libavfilter",
+      "major": 12,
+      "minor": 1,
+      "micro": 102,
+      "version": 786790,
+      "ident": "Lavfi12.1.102"
+    },
+    {
+      "name": "libswscale",
+      "major": 10,
+      "minor": 1,
+      "micro": 102,
+      "version": 655718,
+      "ident": "SwS10.1.102"
+    },
+    {
+      "name": "libswresample",
+      "major": 7,
+      "minor": 1,
+      "micro": 102,
+      "version": 459110,
+      "ident": "SwR7.1.102"
+    }
+  ]
+}

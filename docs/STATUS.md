@@ -8,19 +8,25 @@ the owner is managing shared-app/2026 reinstallation.
 ## Current progress
 
 **FFmpeg help parsing across versions (branch `ffmpeg-parser-compat`).** The
-service parser now accepts FFmpeg 7.1+ padded list types (`[<int>     ]`),
-which it previously dropped, and `-encoders`/`-muxers` rows without a
-description (`--enable-small` builds), which previously hid the following row.
-Discovery rejects builds older than FFmpeg 4.4 (libavformat 58.76) with
-`FFMPEG-UNSUPPORTED`. The 4.4/`-stats_period` boundary was not rechecked
-against primary documentation (no Node/Context7 on the working machine). The
-parser revision stays 4: bumping it invalidates exporter caches, so it should
-ship with a matched exporter release. Validation: the new regexes were replayed
-in Python against all committed fixtures (unchanged except the intended
-`side_data_prefer_packet` addition) and a live gyan 2025-10-27 `-h full`
-(7,593 typed option lines, none missed). The Dart service suite
-(`scripts/etc/Test-B3Services.ps1`) was not run; no Dart SDK was available.
-Real-output fixtures still cover only 5.1.2 and 2026 master builds.
+service parser now accepts the padded list types FFmpeg 7.0+ prints
+(`[<int>     ]`), which it previously dropped, and `-encoders`/`-muxers` rows
+without a description (`--enable-small` builds), which previously hid the
+following row. Discovery rejects builds older than FFmpeg 4.4 (libavformat
+58.76) with `FFMPEG-UNSUPPORTED`. The parser revision stays 4: bumping it
+invalidates exporter caches, so it should ship with a matched exporter release.
+
+New `v<version>-*.txt` fixtures, captured by
+`scripts/etc/Capture-FFmpegVersionFixtures.py` from the Gyan essentials release
+builds 4.4, 5.1.2, 6.1.1, 7.0.2, 7.1.1, 8.0.1 and 9.0.2 (GitHub
+`GyanD/codexffmpeg`; sizes checked, and SHA-256 for 8.0.1/9.0.2, the only ones
+with published digests), cover identity, lists, generic options, libx264/aac
+help and scale help. A Python replica of the parser read every list row and
+option line on all seven. FFmpeg 4.4 reports libavformat 58.76.100. The
+filter command column disappeared in 8.0. A libx264/AAC MP4 command with the
+compiled global options, using lavfi rather than pipe inputs, completed on all
+seven, and each emitted the progress keys the engine reads. No build older
+than 4.4 was tested. The Dart service suite (`scripts/etc/Test-B3Services.ps1`)
+was not run; no Dart SDK was available.
 
 **AV1 (CPU) live pipe stall.** With installed exporter `0.2.0+2` and FFmpeg
 `N-128435-g7798de15f86-gdb8537d8cc7+2` (SVT-AV1 4.3.0), owner logs from

@@ -1,0 +1,74 @@
+{
+  "program_version": {
+    "version": "7.1.1-essentials_build-www.gyan.dev",
+    "copyright": "Copyright (c) 2007-2025 the FFmpeg developers",
+    "compiler_ident": "gcc 14.2.0 (Rev1, Built by MSYS2 project)",
+    "configuration": "--enable-gpl --enable-version3 --enable-static --disable-w32threads --disable-autodetect --enable-fontconfig --enable-iconv --enable-gnutls --enable-libxml2 --enable-gmp --enable-bzlib --enable-lzma --enable-zlib --enable-libsrt --enable-libssh --enable-libzmq --enable-avisynth --enable-sdl2 --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxvid --enable-libaom --enable-libopenjpeg --enable-libvpx --enable-mediafoundation --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libvidstab --enable-libvmaf --enable-libzimg --enable-amf --enable-cuda-llvm --enable-cuvid --enable-dxva2 --enable-d3d11va --enable-d3d12va --enable-ffnvcodec --enable-libvpl --enable-nvdec --enable-nvenc --enable-vaapi --enable-libgme --enable-libopenmpt --enable-libopencore-amrwb --enable-libmp3lame --enable-libtheora --enable-libvo-amrwbenc --enable-libgsm --enable-libopencore-amrnb --enable-libopus --enable-libspeex --enable-libvorbis --enable-librubberband"
+  },
+  "library_versions": [
+    {
+      "name": "libavutil",
+      "major": 59,
+      "minor": 39,
+      "micro": 100,
+      "version": 3876708,
+      "ident": "Lavu59.39.100"
+    },
+    {
+      "name": "libavcodec",
+      "major": 61,
+      "minor": 19,
+      "micro": 101,
+      "version": 4002661,
+      "ident": "Lavc61.19.101"
+    },
+    {
+      "name": "libavformat",
+      "major": 61,
+      "minor": 7,
+      "micro": 100,
+      "version": 3999588,
+      "ident": "Lavf61.7.100"
+    },
+    {
+      "name": "libavdevice",
+      "major": 61,
+      "minor": 3,
+      "micro": 100,
+      "version": 3998564,
+      "ident": "Lavd61.3.100"
+    },
+    {
+      "name": "libavfilter",
+      "major": 10,
+      "minor": 4,
+      "micro": 100,
+      "version": 656484,
+      "ident": "Lavfi10.4.100"
+    },
+    {
+      "name": "libswscale",
+      "major": 8,
+      "minor": 3,
+      "micro": 100,
+      "version": 525156,
+      "ident": "SwS8.3.100"
+    },
+    {
+      "name": "libswresample",
+      "major": 5,
+      "minor": 3,
+      "micro": 100,
+      "version": 328548,
+      "ident": "SwR5.3.100"
+    },
+    {
+      "name": "libpostproc",
+      "major": 58,
+      "minor": 3,
+      "micro": 100,
+      "version": 3801956,
+      "ident": "postproc58.3.100"
+    }
+  ]
+}

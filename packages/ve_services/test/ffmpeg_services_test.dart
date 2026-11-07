@@ -137,7 +137,7 @@ Future<void> main(List<String> args) async {
     listTyped.map((o) => '${o.name}:${o.data['type']}').join(',') ==
         'side_data_prefer_packet:int,view_ids_available:unsigned,'
             'layouts:channel_layout,b:int64',
-    'padded FFmpeg 7.1+ list types parse with their element type',
+    'padded FFmpeg 7.0+ list types parse with their element type',
   );
   check(
     listTyped[2].data['defaultValue'] == 'stereo' &&
@@ -312,6 +312,69 @@ buffersink AVOptions:
         );
       }
     }
+  }
+  // Gyan essentials release builds captured by Capture-FFmpegVersionFixtures.py:
+  // encoders, muxers, filters, filter flag width, generic options, libx264 and
+  // aac private options, and whether generic options include a list type.
+  for (final (version, counts, hasList) in [
+    ('4.4', [196, 171, 444, 3, 119, 46, 8], false),
+    ('5.1.2', [201, 176, 481, 3, 98, 47, 8], false),
+    ('6.1.1', [214, 179, 503, 3, 97, 48, 8], false),
+    ('7.0.2', [221, 181, 515, 3, 95, 48, 8], true),
+    ('7.1.1', [222, 182, 514, 3, 95, 48, 8], true),
+    ('8.0.1', [221, 182, 518, 2, 94, 48, 6], true),
+    ('9.0.2', [221, 184, 527, 2, 95, 48, 6], true),
+  ]) {
+    Future<String> read(String kind) =>
+        File(fixture('v$version-$kind.txt')).readAsString();
+    final identity = parser.parseVersion(await read('version'));
+    requireSupportedFFmpeg(identity);
+    final probe = parser.parseProbeVersion(await read('ffprobe'));
+    check(
+      identity['version'] == '$version-essentials_build-www.gyan.dev' &&
+          ['version', 'configuration', 'libraries'].every(
+            (k) => canonicalJson(probe[k]) == canonicalJson(identity[k]),
+          ),
+      '$version FFmpeg and FFprobe identities agree',
+    );
+    final filters = parser.parseFilters(await read('filters'));
+    final generic = parser.parseOptions(await read('generic'));
+    final x264 = parser.parseEncoderHelp(await read('encoder-libx264'));
+    final aac = parser.parseEncoderHelp(await read('encoder-aac'));
+    check(
+      canonicalJson([
+            parser.parseEncoders(await read('encoders')).length,
+            parser.parseMuxers(await read('muxers')).length,
+            filters.length,
+            (jsonMap(filters['scale'])['flags'] as String).length,
+            generic.length,
+            x264.options.length,
+            aac.options.length,
+          ]) ==
+          canonicalJson(counts),
+      '$version list and option counts',
+    );
+    check(
+      generic.any((o) => o.name == 'side_data_prefer_packet') == hasList &&
+          generic.any((o) => o.name == 'b' && o.data['type'] == 'int64'),
+      '$version generic options',
+    );
+    check(
+      x264.data['name'] == 'libx264' &&
+          (x264.data['pixelFormats'] as List).contains('yuv420p') &&
+          aac.data['name'] == 'aac' &&
+          canonicalJson(aac.data['sampleFormats']) == canonicalJson(['fltp']) &&
+          (aac.data['sampleRates'] as List).contains(48000),
+      '$version encoder help',
+    );
+    final scale = parser.parseFilterHelp(await read('filter-scale'), 'scale');
+    check(
+      (scale['algorithms'] as List).length == 4 &&
+          ['w', 'h', 'flags'].every(
+            (n) => jsonMaps(scale['options']).any((o) => o['name'] == n),
+          ),
+      '$version scale filter help',
+    );
   }
   await rejects(
     () async => parser.parseEncoderHelp(

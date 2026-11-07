@@ -17,8 +17,8 @@ The owner requested this FFmpeg-version parsing work in a separate worktree,
 `C:\Users\Samuel Tee\repos\vegas-encoder-ffmpeg-compat`. Before merging, run
 `scripts/etc/Test-B3Services.ps1` with a Dart SDK (not available when written),
 and decide with the owner whether to bump `ffmpegParserVersion` together with the
-next exporter release. Real-output 4.4, 6.1 and 7.1 fixtures would close the
-remaining coverage gap. See [status](STATUS.md#current-progress).
+next exporter release. Release fixtures 4.4 to 9.0.2 are committed; a
+`--enable-small` or shared-DLL build is still uncovered. See [status](STATUS.md#current-progress).
 
 ## Current queue: older VEGAS release qualification
 

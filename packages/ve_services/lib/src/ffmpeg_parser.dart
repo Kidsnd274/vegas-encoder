@@ -11,7 +11,7 @@ class WindowsFFmpegHelpParser implements FFmpegHelpParser {
   @override
   int get version => ffmpegParserVersion;
   static const _flags = r'[EDFVASXRBT.P]{11}';
-  // FFmpeg 7.1+ pads array types inside the brackets, e.g. `[<int>     ]`.
+  // FFmpeg 7.0+ pads array types inside the brackets, e.g. `[<int>     ]`.
   final _option = RegExp(
     r'^\s{2,}-([^\s]+)\s+(\[<[^>]+>\s*\]|<[^>]+>)\s*(' + _flags + r')\s*(.*)$',
   );
