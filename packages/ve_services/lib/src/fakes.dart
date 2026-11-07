@@ -322,7 +322,11 @@ class FakeCapabilityCache implements CapabilityCache {
 }
 
 class FakePresetLibrary
-    implements PresetLibrary, PresetPreferences, PresetLocations {
+    implements PresetLibrary, PresetPreferences, PresetLocations, LibraryHealth {
+  /// Problems [problems] reports; tests set these (contract 3.3).
+  List<LibraryProblem> problemsForTest = const [];
+  @override
+  Future<List<LibraryProblem>> problems() async => problemsForTest;
   FakePresetLibrary({List<Preset>? presets, String Function()? now})
     : _store = _Store(
         List.unmodifiable(
@@ -513,7 +517,11 @@ class FakeMachineSettingsRepository implements MachineSettingsRepository {
   Future<void> dispose() => _store.dispose();
 }
 
-class FakeJobRepository implements JobRepository, JobLogs {
+class FakeJobRepository implements JobRepository, JobLogs, JobIndexHealth {
+  /// Malformed index lines to report; tests set this (contract 3.3).
+  @override
+  int skippedIndexLines = 0;
+
   FakeJobRepository({
     List<JobRecord>? records,
     Map<String, String> logs = const {},

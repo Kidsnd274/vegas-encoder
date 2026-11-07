@@ -95,6 +95,25 @@ abstract interface class PresetLibrary {
   Future<String> exportPreset(String id);
 }
 
+/// A library file that couldn't be read (contract 3.3). [code] is the service
+/// error code (for example `INVALID-DATA`); [path] is the file.
+class LibraryProblem {
+  const LibraryProblem({required this.path, required this.code, required this.message});
+  final String path, code, message;
+}
+
+/// One unreadable preset file never empties the library: it is listed here instead.
+abstract interface class LibraryHealth {
+  /// The files the latest [PresetLibrary.list] skipped (reads the list first).
+  Future<List<LibraryProblem>> problems();
+}
+
+/// One malformed job index line never empties History: it is skipped and counted.
+abstract interface class JobIndexHealth {
+  /// Malformed lines the latest [JobRepository.list] skipped (blank and `\r` lines are not counted).
+  int get skippedIndexLines;
+}
+
 /// Stars/pins on built-ins are stored as user metadata without changing recipes
 /// or origin revisions. Existing save remains read-only for built-ins.
 abstract interface class PresetPreferences {

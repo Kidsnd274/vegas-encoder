@@ -6,7 +6,7 @@ import 'models.dart';
 import 'storage.dart';
 import 'storage_validation.dart';
 
-class FileJobRepository implements JobRepository, JobLogs {
+class FileJobRepository implements JobRepository, JobLogs, JobIndexHealth {
   FileJobRepository({required VeCore core, ServicePaths? paths})
     : _core = core,
       paths = paths ?? ServicePaths.windows();
@@ -25,14 +25,26 @@ class FileJobRepository implements JobRepository, JobLogs {
   }
 
   @override
+  int skippedIndexLines = 0;
+
+  @override
   Future<List<JobIndexEntry>> list() async {
+    skippedIndexLines = 0;
     if (!await File(_index).exists()) return _recover();
     final entries = <String, JobIndexEntry>{};
-    await for (final line in _completeLines(_index)) {
-      if (line.isEmpty) continue;
-      final entry = decodeIndex(decodeJson(line));
-      entries[entry.id.toLowerCase()] = entry;
+    var skipped = 0;
+    await for (final raw in _completeLines(_index)) {
+      // A CRLF edit leaves "\r"; trim it rather than calling the line malformed.
+      final line = raw.endsWith('\r') ? raw.substring(0, raw.length - 1) : raw;
+      if (line.trim().isEmpty) continue;
+      try {
+        final entry = decodeIndex(decodeJson(line));
+        entries[entry.id.toLowerCase()] = entry;
+      } on ServiceException {
+        skipped++; // Contract 3.3: counted, never fatal.
+      }
     }
+    skippedIndexLines = skipped;
     return _sort(entries.values.toList());
   }
 

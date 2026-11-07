@@ -101,7 +101,7 @@ Future<_LibraryMetadata> _libraryMetadata(
 }
 
 class FilePresetLibrary
-    implements PresetLibrary, PresetPreferences, PresetLocations {
+    implements PresetLibrary, PresetPreferences, PresetLocations, LibraryHealth {
   FilePresetLibrary({
     required VeCore core,
     ServicePaths? paths,
@@ -128,6 +128,12 @@ class FilePresetLibrary
       .map(_requirements)
       .toList(growable: false);
   Map<String, ({_PresetStamp stamp, Preset preset, Preset shown})> _listedFiles = {};
+  List<LibraryProblem> _problems = const [];
+  @override
+  Future<List<LibraryProblem>> problems() async {
+    await list();
+    return _problems;
+  }
   _PresetStamp? _listedPreferencesStamp;
   JsonMap? _listedPreferences;
   List<Preset>? _listedSnapshot;
@@ -251,6 +257,7 @@ class FilePresetLibrary
       );
       final entries = <String, ({_PresetStamp stamp, Preset preset, Preset shown})>{};
       final result = <Preset>[];
+      final problems = <LibraryProblem>[];
       JsonMap preferences;
       if (_listedPreferencesStamp == metadata.preferences &&
           _listedPreferences != null) {
@@ -284,24 +291,31 @@ class FilePresetLibrary
           result.add(shown);
           continue;
         }
-        final name = File(stamp.path).uri.pathSegments.last;
-        final id = name.substring(0, name.length - '.vepreset'.length);
-        safeId(id);
-        if (_builtin(id) != null)
-          invalid('User file shadows a built-in preset.');
         // Do not reuse an old successful entry after observing a malformed edit,
         // even if a later repair restores its original size/timestamps.
         _listedFiles.remove(key);
-        final data = await readJson(stamp.path);
-        if (data == null) continue; // Removed between enumeration and open.
-        final decoded = decodePreset(data, _core);
-        if (decoded.recipe.id.toLowerCase() != id.toLowerCase() ||
-            decoded.builtin)
-          invalid('Preset file identity mismatch.');
-        final preset = _requirements(decoded);
-        final shown = _withOverlay(preset, overlays, null);
-        entries[key] = (stamp: stamp, preset: preset, shown: shown);
-        result.add(shown);
+        try {
+          final name = File(stamp.path).uri.pathSegments.last;
+          final id = name.substring(0, name.length - '.vepreset'.length);
+          safeId(id);
+          if (_builtin(id) != null)
+            invalid('User file shadows a built-in preset.');
+          final data = await readJson(stamp.path);
+          if (data == null) continue; // Removed between enumeration and open.
+          final decoded = decodePreset(data, _core);
+          if (decoded.recipe.id.toLowerCase() != id.toLowerCase() ||
+              decoded.builtin)
+            invalid('Preset file identity mismatch.');
+          final preset = _requirements(decoded);
+          final shown = _withOverlay(preset, overlays, null);
+          entries[key] = (stamp: stamp, preset: preset, shown: shown);
+          result.add(shown);
+        } on ServiceException catch (e) {
+          // Contract 3.3: one bad file is a problem, never an empty library.
+          problems.add(LibraryProblem(path: stamp.path, code: e.code, message: e.message));
+        } on FileSystemException catch (e) {
+          problems.add(LibraryProblem(path: stamp.path, code: 'FILE-READ', message: e.message));
+        }
       }
       if (epoch != _listEpoch)
         continue; // An own write won while reads awaited.
@@ -318,6 +332,7 @@ class FilePresetLibrary
       _listedPreferences = preferences;
       _listedMetadataJson = metadataJson;
       _listedEpoch = epoch;
+      _problems = List.unmodifiable(problems);
       return _listedSnapshot = same ? old : List<Preset>.unmodifiable(result);
     }
     throw const ServiceException(

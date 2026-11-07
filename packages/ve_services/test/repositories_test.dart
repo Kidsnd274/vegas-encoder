@@ -599,6 +599,23 @@ Future<void> main(List<String> args) async {
       'the overlay wins over the value in the file',
     );
     await File(joinPath(paths.library, 'old-star.vepreset')).delete();
+    // C4 / contract 3.3: one bad file never empties the library.
+    final validCount = (await library.list()).length;
+    await File(joinPath(paths.library, 'broken.vepreset')).writeAsString('{"vepreset":');
+    await File(joinPath(paths.library, 'My preset (1).vepreset')).writeAsString(jsonEncode(oldStar.data));
+    final listedWithProblems = await library.list();
+    final problems = await library.problems();
+    check(
+      listedWithProblems.length == validCount &&
+          problems.length == 2 &&
+          problems.any((p) => p.path.endsWith('broken.vepreset')) &&
+          problems.any((p) => p.path.endsWith('My preset (1).vepreset')) &&
+          problems.every((p) => p.code.isNotEmpty && p.message.isNotEmpty),
+      'malformed and badly named files become problems; the valid presets stay listed',
+    );
+    await File(joinPath(paths.library, 'broken.vepreset')).delete();
+    await File(joinPath(paths.library, 'My preset (1).vepreset')).delete();
+    check((await library.problems()).isEmpty, 'problems clear once the files are fixed');
     check(
       await library.location(builtin.recipe.id) == null,
       'built-in has no user file to reveal',
@@ -805,7 +822,12 @@ Future<void> main(List<String> args) async {
       jsonEncode(job.data),
     );
     await File(indexPath).writeAsString('\n', mode: FileMode.append);
-    await rejects(() => jobs.list(), 'INVALID-DATA');
+    // C4 / contract 3.3: a malformed line is skipped and counted; a CRLF "\r" line is ignored.
+    await File(indexPath).writeAsString('\r\n', mode: FileMode.append);
+    check(
+      (await jobs.list()).single.id == jobId && jobs.skippedIndexLines == 1,
+      'one malformed index line is counted, never fatal, and a "\\r" line is ignored',
+    );
     await jobs.rebuildIndex();
     check(
       (await jobs.list()).single.id == jobId,
@@ -827,7 +849,10 @@ Future<void> main(List<String> args) async {
       await File(indexPath).writeAsString(
         '${jsonEncode({...speedEntry, 'realtime': invalidSpeed})}\n',
       );
-      await rejects(() => jobs.list(), 'INVALID-DATA');
+      check(
+        (await jobs.list()).isEmpty && jobs.skippedIndexLines == 1,
+        'an invalid index entry is skipped and counted',
+      );
     }
     await jobs.rebuildIndex();
     // Contract 3.1: optional 0.2.1 fields, preflight records and clock skew.
@@ -917,7 +942,10 @@ Future<void> main(List<String> args) async {
     final indexBad = (await jobs.list()).single.toJson();
     indexBad['recordFile'] = '../private.json';
     await File(indexPath).writeAsString('${jsonEncode(indexBad)}\n');
-    await rejects(() => jobs.list(), 'INVALID-DATA');
+    check(
+      (await jobs.list()).isEmpty && jobs.skippedIndexLines == 1,
+      'an index entry pointing outside the jobs folder is skipped and counted',
+    );
     await atomicWrite(
       joinPath(paths.jobs, '$jobId.json'),
       jsonEncode(job.copyWith(published: false).data),

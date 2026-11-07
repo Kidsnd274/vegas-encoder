@@ -303,24 +303,20 @@ Future<void> main() async {
     final good = await File(addedPath).readAsString();
     final lastGood = snapshots.last;
     await atomicWrite(addedPath, '{"vepreset":2}');
-    await until(
-      () => errors.any(
-        (e) => e is ServiceException && e.code == 'UNSUPPORTED-VERSION',
-      ),
-    );
+    // C4 / contract 3.3: one unreadable file is a problem, never an empty library.
+    await until(() => snapshots.last.length == lastGood.length - 1);
     check(
-      identical(snapshots.last, lastGood),
-      'malformed replacement emits an error and keeps last published snapshot',
+      !snapshots.last.any((p) => p.recipe.id == 'added'),
+      'malformed replacement drops only that preset from the published snapshot',
     );
-    try {
-      await library.list();
-      throw StateError('Malformed file was hidden by cache.');
-    } on ServiceException catch (e) {
-      check(
-        e.code == 'UNSUPPORTED-VERSION',
-        'explicit list still rejects malformed file',
-      );
-    }
+    final problems = await library.problems();
+    check(
+      (await library.list()).length == lastGood.length - 1 &&
+          problems.length == 1 &&
+          problems.single.code == 'UNSUPPORTED-VERSION' &&
+          problems.single.path.toLowerCase() == addedPath.toLowerCase(),
+      'explicit list reports the malformed file as a problem',
+    );
     final repaired = Preset.fromJson(jsonMap(jsonDecode(good)));
     await atomicWrite(
       addedPath,
