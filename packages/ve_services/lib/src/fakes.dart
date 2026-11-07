@@ -461,15 +461,7 @@ class FakePresetLibrary
     final current = _store.value.where((p) => p.recipe.id == id).firstOrNull;
     if (current == null)
       throw const ServiceException('NOT-FOUND', 'Preset not found.');
-    if (!current.builtin) {
-      return save(
-        current.copyWith(
-          favorite: favorite ?? current.favorite,
-          pinned: pinned ?? current.pinned,
-        ),
-        expectedRevision: current.revision,
-      );
-    }
+    // Like the file library's overlay: no revision bump and no history (contract 3.3).
     final saved = current.copyWith(
       favorite: favorite ?? current.favorite,
       pinned: pinned ?? current.pinned,

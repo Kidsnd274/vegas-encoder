@@ -127,7 +127,7 @@ class FilePresetLibrary
   late final _listedBuiltins = _builtins
       .map(_requirements)
       .toList(growable: false);
-  Map<String, ({_PresetStamp stamp, Preset preset})> _listedFiles = {};
+  Map<String, ({_PresetStamp stamp, Preset preset, Preset shown})> _listedFiles = {};
   _PresetStamp? _listedPreferencesStamp;
   JsonMap? _listedPreferences;
   List<Preset>? _listedSnapshot;
@@ -187,7 +187,27 @@ class FilePresetLibrary
     final preset = decodePreset(data, _core);
     if (preset.recipe.id.toLowerCase() != id.toLowerCase() || preset.builtin)
       invalid('Preset file identity mismatch.');
-    return _requirements(preset);
+    return _withOverlay(
+      _requirements(preset),
+      objectField(await _preferences(), 'presets'),
+      null,
+    );
+  }
+
+  /// Contract 3.3: stars and pins come from the preferences overlay (lowercase
+  /// ID), then from the preset itself. [prior] is reused when unchanged, so
+  /// watchers see identical snapshots.
+  Preset _withOverlay(Preset base, JsonMap overlays, Preset? prior) {
+    final overlay = jsonMap(
+      overlays[base.recipe.id.toLowerCase()] ?? <String, Object?>{},
+    );
+    final favorite = overlay['favorite'] as bool? ?? base.favorite;
+    final pinned = overlay['pinned'] as bool? ?? base.pinned;
+    if (prior != null && prior.favorite == favorite && prior.pinned == pinned)
+      return prior;
+    return favorite == base.favorite && pinned == base.pinned
+        ? base
+        : base.copyWith(favorite: favorite, pinned: pinned);
   }
 
   @override
@@ -229,7 +249,7 @@ class FilePresetLibrary
         paths.preferences,
         metadataJson,
       );
-      final entries = <String, ({_PresetStamp stamp, Preset preset})>{};
+      final entries = <String, ({_PresetStamp stamp, Preset preset, Preset shown})>{};
       final result = <Preset>[];
       JsonMap preferences;
       if (_listedPreferencesStamp == metadata.preferences &&
@@ -259,8 +279,9 @@ class FilePresetLibrary
         final key = stamp.path.toLowerCase();
         final cached = _listedFiles[key];
         if (cached != null && cached.stamp == stamp) {
-          entries[key] = cached;
-          result.add(cached.preset);
+          final shown = _withOverlay(cached.preset, overlays, cached.shown);
+          entries[key] = (stamp: stamp, preset: cached.preset, shown: shown);
+          result.add(shown);
           continue;
         }
         final name = File(stamp.path).uri.pathSegments.last;
@@ -278,8 +299,9 @@ class FilePresetLibrary
             decoded.builtin)
           invalid('Preset file identity mismatch.');
         final preset = _requirements(decoded);
-        entries[key] = (stamp: stamp, preset: preset);
-        result.add(preset);
+        final shown = _withOverlay(preset, overlays, null);
+        entries[key] = (stamp: stamp, preset: preset, shown: shown);
+        result.add(shown);
       }
       if (epoch != _listEpoch)
         continue; // An own write won while reads awaited.
@@ -427,24 +449,7 @@ class FilePresetLibrary
     final current = await _current(id);
     if (current == null)
       throw const ServiceException('NOT-FOUND', 'Preset not found.');
-    if (!current.builtin) {
-      // Preference writes change only the latest metadata, never a stale UI draft.
-      final saved = current.copyWith(
-        favorite: favorite ?? current.favorite,
-        pinned: pinned ?? current.pinned,
-        revision: current.revision + 1,
-        updatedAt: _now(),
-      );
-      decodeJson(jsonEncode(saved.data));
-      await atomicWrite(
-        _history(id, current.revision),
-        jsonEncode(current.data),
-      );
-      await atomicWrite(_file(id), jsonEncode(saved.data));
-      _invalidateList(id);
-      await _prune(id);
-      return saved;
-    }
+    // Built-ins and user presets alike: the overlay never bumps a revision or adds history.
     final data = await _preferences();
     final entries = objectField(data, 'presets');
     final key = current.recipe.id.toLowerCase();

@@ -563,17 +563,42 @@ Future<void> main(List<String> args) async {
       await c2Library.availableId('mine copy') == 'mine-copy-2',
       'the fake library models retained history like the file library',
     );
+    // C3 / contract 3.3: stars and pins live in the preferences overlay.
+    Future<int> historyFiles(String id) async {
+      final directory = Directory(joinPath(joinPath(paths.library, '.history'), id));
+      if (!await directory.exists()) return 0;
+      return (await directory.list().where((f) => f.path.endsWith('.vepreset')).toList()).length;
+    }
+
+    final sharedBefore = (await library.get('shared'))!;
+    final historyBefore = await historyFiles('shared');
     for (var i = 0; i < 23; i++) {
       await library.setPreferences('shared', favorite: i.isEven);
     }
+    final sharedStarred = (await library.get('shared'))!;
     check(
-      (await Directory(
-                joinPath(joinPath(paths.library, '.history'), 'shared'),
-              ).list().where((f) => f.path.endsWith('.vepreset')).toList())
-              .length ==
-          20,
-      'metadata changes also bound revision history',
+      sharedStarred.favorite &&
+          sharedStarred.revision == sharedBefore.revision &&
+          await historyFiles('shared') == historyBefore &&
+          (await library.list()).firstWhere((p) => p.recipe.id == 'shared').favorite,
+      'starring a user preset keeps its revision and adds no history',
     );
+    final oldStar = sharedBefore.copyWith(
+      recipe: sharedBefore.recipe.copyWith(id: 'old-star', name: 'Old star'),
+      favorite: true,
+    );
+    await atomicWrite(joinPath(paths.library, 'old-star.vepreset'), jsonEncode(oldStar.copyWith(revision: 1).data));
+    check(
+      (await library.get('old-star'))!.favorite &&
+          (await library.list()).firstWhere((p) => p.recipe.id == 'old-star').favorite,
+      'an older .vepreset with "favorite": true still shows as starred',
+    );
+    await library.setPreferences('old-star', favorite: false);
+    check(
+      !(await library.get('old-star'))!.favorite && (await library.get('old-star'))!.revision == 1,
+      'the overlay wins over the value in the file',
+    );
+    await File(joinPath(paths.library, 'old-star.vepreset')).delete();
     check(
       await library.location(builtin.recipe.id) == null,
       'built-in has no user file to reveal',

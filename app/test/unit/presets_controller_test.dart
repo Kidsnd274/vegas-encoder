@@ -106,7 +106,8 @@ void main() {
     await controller().toggleFavorite(id);
     await settle();
     expect((await library.get(id))!.favorite, isTrue);
-    expect(state().drafts[id]!.baseRevision, 2, reason: 'our own save is not a change elsewhere');
+    expect(state().drafts[id]!.baseRevision, 1, reason: 'a star is an overlay; it never moves the revision (C3)');
+    expect((await library.get(id))!.revision, 1);
     expect(container.read(editorProvider)!.changedElsewhere, isFalse);
 
     final builtin = (await library.get('av1-small'))!;

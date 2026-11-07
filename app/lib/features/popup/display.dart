@@ -62,8 +62,11 @@ class OriginLine {
 }
 
 /// UI_SPEC §4's origin line for [s], with [local] the core's count of the
-/// template's own changes (null without a copy of the origin revision).
-OriginLine originLine(PopupState s, {int? local}) {
+/// template's own changes (null without a copy of the origin revision), and
+/// [since] the core's count of library changes since that base (null when not
+/// computed). A newer revision with no recipe change (for example a star) is
+/// not "library newer" when the template carries its base.
+OriginLine originLine(PopupState s, {int? local, int? since}) {
   final origin = s.origin;
   if (origin == null) return const OriginLine(state: OriginState.noOrigin, lead: 'Made in VEGAS', trail: '.');
   switch (s.library) {
@@ -85,7 +88,7 @@ OriginLine originLine(PopupState s, {int? local}) {
       break;
   }
   final changed = local != null && local > 0;
-  final newer = s.libraryNewer ? s.libraryPreset!.revision : null;
+  final newer = s.libraryNewer && !(s.base != null && since == 0) ? s.libraryPreset!.revision : null;
   return OriginLine(
     state: newer != null
         ? OriginState.libraryNewer
