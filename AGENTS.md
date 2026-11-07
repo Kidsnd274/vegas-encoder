@@ -1,117 +1,113 @@
-# Vegas Encoder implementation instructions
+# Vegas Encoder: agent instructions
 
-This is a product development repository. The sibling investigation is historical
-provenance and a resource for specific unresolved native-interface questions.
-Use a lightweight development workflow; do not inherit its research ledger process.
+Vegas Encoder is a VEGAS Pro exporter plug-in, a shared C++ core, and a Flutter
+desktop app. This repository holds the production code, contracts, product docs,
+build and Setup instructions, and concise qualification status. Detailed reverse
+engineering and host diagnostics live in the private `vegas-ffmpeg-frameserver`
+repository. Builds and tests must never require that repository.
 
-## Current stage: building the product
+## Before you start
 
-The VEGAS integration foundation is committed. The owner reviewed the product design
-on 2026-10-12 and recorded the decisions in docs/product/README.md (Decisions):
+- Read `docs/STATUS.md` (current state and limits) and `docs/NEXT_AGENT.md`
+  (current queue).
+- For product or app work, also read `docs/product/README.md` (owner decisions)
+  and the relevant parts of `docs/product/UI_SPEC.md` and
+  `docs/product/CONTRACTS.md`.
+- Before changing native code, also read `docs/ARCHITECTURE.md`,
+  `docs/ADAPTER_PLAN.md`, `docs/INTEGRATION_CONTRACT.md` and `docs/TARGET.md`.
+- Build and test instructions are in `docs/BUILDING.md` and `scripts/README.md`.
 
-- Signal Flow is the direction. docs/product/design/signal-flow.html is the visual
-  reference in light and dark; docs/product/UI_SPEC.md is the behaviour.
-- Basic and Advanced modes. Basic has curated controls plus Extra arguments; there is
-  no all-options list. Advanced-mode autocomplete is built last.
-- Flutter with Riverpod and the app's own components (not the Material look). The
-  theme follows Windows.
+## Product decisions that constrain the work
+
+- Signal Flow design (`docs/product/design/signal-flow.html`, light and dark);
+  `UI_SPEC.md` defines behaviour.
+- Basic mode has curated controls plus Extra arguments. Advanced mode edits the
+  whole FFmpeg command.
+- Flutter with Riverpod and the app's own components (not the Material look).
+  The theme follows Windows.
 - Windows x64 only, for the product, development, tests and CI.
-- User-supplied FFmpeg. No proof-template migration.
-- Render progress: the owner dropped the VEGAS status-line experiment. Keep the
-  small progress window; its real-host overhead remains unqualified
-  (docs/product/TECH_ARCHITECTURE.md §5.6 and docs/STATUS.md).
+- FFmpeg is supplied by the user.
+- Render progress uses the small progress window. The VEGAS status-line
+  experiment was dropped.
 
-The owner consolidated app and platform work on 2026-10-16. One agent owns product
-work across app, packages, native code, tests, scripts and documentation in the
-original checkout, `L:\repos\vegas-encoder`, currently on
-`master`. Do not create or resume a separate worktree or split
-the work between agents unless the owner asks. A branch in this original folder
-is fine; it does not require another checkout. Do not spawn subagents by default.
+## Architecture rules
 
-Before product work, read docs/product/README.md, docs/product/WORKSTREAMS.md,
-docs/STATUS.md and docs/NEXT_AGENT.md, plus the contracts/specifications relevant
-to the change. The old docs/product/workstreams/ files are historical component
-handoffs, not active ownership boundaries or instructions to work elsewhere.
-Implement both sides of an integration together rather than leaving an ownership
-stub. Preserve architectural boundaries: the C++ core is the only implementation
-of compile, validate, lint and completion; the app reaches it and the system only
-through packages/ve_core and packages/ve_services.
+- The C++ core (`src/core`) is the only implementation of compile, validate,
+  lint and completion. The app reaches the core and the system only through
+  `packages/ve_core` and `packages/ve_services`.
+- Keep `src/core` free of Windows and VEGAS headers. Keep the engine and portable
+  settings/media concepts independent of VEGAS native interfaces.
+- Host (VEGAS) calls stay on Render's caller thread. Copy and release host frames
+  before any wait. Nothing may make Render wait on the app or the progress window.
+- Implement both sides of an integration together. Do not leave a stub for
+  someone else to finish.
 
-Outstanding qualification limits stay explicit in docs/STATUS.md. Basic renders,
-normal template restart persistence, cancellation/recovery, failure presentation
-and immediate large-preset reopen are owner-confirmed at their recorded scope.
-Extra same-session encoder-failure recovery and the faster-progress real-host trial/
-performance comparison are owner-deferred; do not request or resume them without
-new owner direction. The exact large-template save/restart sequence remains
-unconfirmed. Do not claim a gate passed from mocks, fakes or design decisions.
+## Working rules
 
-## Development rules
+- **Agents and worktrees.** Use subagents and git worktrees when the work splits
+  cleanly. Give each one clear file ownership, and agree any shared data formats
+  first. One lead agent merges the work, owns the shared docs, and keeps a
+  single task queue in `docs/NEXT_AGENT.md`. Each worktree builds and tests
+  inside itself. Never install anything from a worktree, so no installed file
+  depends on one. Ask the owner before removing a worktree.
+- **Commits.** Commit only when the owner allows it. Never push, merge into
+  `master`, rewrite shared history, publish, install, or replace an installed
+  exporter without asking. Commit messages must not contain co-author trailers
+  (`Co-Authored-By:`), "Generated with" lines or any other agent or tool
+  attribution.
+- **Machine-wide tools.** Upgrading the Flutter SDK or other machine-wide tools is
+  the owner's call.
+- **No machine-specific paths.** Never write absolute paths, drive letters or user
+  names into committed files. Use repo-relative paths, environment variables
+  (`VEGAS_ENCODER_FLUTTER`, `VEGAS_ENCODER_VCVARS`, `VEGAS_ENCODER_PYTHON`,
+  `VEGAS_ENCODER_FFMPEG`) or placeholders. The work must run on any PC.
+- **Installed trials.** Preserve existing installed trials, their candidate files,
+  isolated trial data and rollback files. Do not move, delete or rewrite them as
+  part of routine development. Keep installation changes reversible, with a backup
+  or manifest and clear restore steps.
+- **Test output.** Builds and test output go in this checkout's ignored `build/`
+  folders (test results under `build/test-results/`).
+- **Dependencies.** No project licence is selected yet. Check licences before
+  adding a dependency or bundling a font or asset. Keep origin and attribution for
+  imported or reused code.
 
-Read README.md, ORIGIN.md, docs/STATUS.md, docs/ARCHITECTURE.md,
-docs/ADAPTER_PLAN.md and docs/INTEGRATION_CONTRACT.md before changing native code.
-The primary target identity is in docs/TARGET.md. Keep the engine and portable
-settings/media concepts independent of VEGAS native interfaces. Keep src/core free of
-Windows and VEGAS headers. A public SDK is deferred.
+## Testing and claims
 
-Compatibility claims must identify the actual build and tested host. Keep binary
-hashes for installation/release verification or when needed to distinguish builds;
-do not inventory/hash every input for routine development. Fake-host checks do not
-prove real VEGAS compatibility. Preserve existing finding references and uncertain fields.
-Keep host calls on Render's caller thread; copy/release host frames before waits.
-Nothing may make Render wait on the app or the progress window.
-No payload/download/installer execution belongs to source inspection.
+- Write a failing regression test before fixing a bug, where possible.
+- Run focused checks for ownership, bounds, timing, cancellation and any changed
+  script.
+- App changes need widget tests and golden tests in light and dark. Review image
+  diffs before accepting new goldens.
+- Say whether each check used fakes, the fake host, real FFmpeg or real VEGAS.
+  Fake-host results do not prove real VEGAS compatibility.
+- Compatibility claims must name the exact build and the tested host. Never claim
+  a gate passed from mocks, fakes or design decisions.
+- Keep binary hashes for installation and release verification, or when needed to
+  tell builds apart. Don't hash every input during routine development.
+- Owner-deferred trials stay deferred until the owner says otherwise. `STATUS.md`
+  lists them.
 
-Production code lives here; the sibling investigation is provenance and a place
-for targeted ABI experiments. Builds and fake tests must not require that checkout.
-Keep detailed reverse engineering, host comparisons and diagnostic captures in
-the private `vegas-ffmpeg-frameserver` repository. Keep implementation contracts,
-product plans, build and Setup instructions, and concise qualification status here.
-Keep origin/attribution for imported or reused code. Existing import manifests remain
-historical provenance; no per-task manifest is required. No project license is selected;
-check licences before adding a dependency or bundling a font or asset.
+## Documentation
 
-Run focused checks for ownership, bounds, timing, cancellation and changed scripts.
-App work needs widget tests and golden tests in light and dark for what it changes.
-Update docs/STATUS.md when a milestone or limitation changes, and docs/NEXT_AGENT.md
-when the next task changes. Keep one current queue; do not maintain parallel app
-and platform queues. Summarize what changed and the focused checks actually performed
-in the task response or appropriate product documentation. State whether validation
-used fakes, a fake host or real VEGAS when that distinction matters.
+- Update `docs/STATUS.md` when a milestone or limitation changes, and
+  `docs/NEXT_AGENT.md` when the next task changes.
+- Summarize what changed, and the checks actually run, in your response or the
+  relevant doc.
+- Don't create dated experiment notes, numbered findings, raw command archives or
+  copied media for routine tasks. Keep detailed diagnostics only when they help
+  reproduce a failure, resolve an ABI question, or verify installation or release
+  behaviour.
+- `evidence/`, `docs/experiments/` and `docs/product/workstreams/` are historical
+  records. Preserve them and don't extend them.
 
-Do not create dated experiment notes, numbered findings, raw command archives,
-copied media or comprehensive evidence inventories for every task. Keep detailed
-diagnostics only when they help reproduce a failure, resolve an ABI uncertainty,
-or verify installation/release behavior. Existing evidence/ and docs/experiments/
-are historical records; preserve them without extending them by default.
+## External documentation
 
-Keep installation changes reversible with an appropriate backup/manifest and clear
-restoration instructions. This is operational rollback information, not a research
-workflow. Test output can go under ignored build/test-results/; existing runners'
--EvidenceDir argument simply names their output folder.
-Commit only when the owner's task prompt allows it, using the current local branch
-in the original checkout. Never push, merge into master, rewrite shared history, publish, install or
-replace an installed exporter without asking. Upgrading the Flutter SDK or other
-machine-wide tools is the owner's call.
+For Flutter, Dart, pub packages and other external libraries or APIs, use current
+primary documentation or Context7. Don't rely on memory.
 
-Existing sibling worktrees and `.claude/` are preserved, not active development
-locations. The owner authorized the containers/dashboard trial installation on
-2026-10-18; its INI points to this checkout's `build/release-inputs-containers-dashboard`.
-The prior trial's exact rollback INI still references candidate app/log files under
-`L:\repos\vegas-encoder-platform\build`; keep both candidates, isolated trial
-data and exact rollback files intact. Do not rewrite installed paths, relocate a
-live candidate, delete old worktrees or copy their build caches as part of routine
-development. New builds/tests belong in this checkout's ignored build folders.
-
-For external API/library-specific questions use current primary documentation and
-Context7, resolving the library before requesting docs (maximum three commands per
-question); do not guess quota/network failures away. This applies to Flutter, Dart
-and pub packages too. Pure refactoring and authored scripts can be validated from
-this implementation and its focused tests.
-
-Use `npx ctx7@latest library <official-name> "<specific concept>"` first unless a
-valid `/org/project` ID is supplied, then `npx ctx7@latest docs <id> "<concept>"`.
-Choose exact/relevant, reputable matches; use a supplied version-specific ID when
-available. Run requests outside the default sandbox. Network/DNS failures should
-be retried outside it; quota failures must be reported with the option to use
-`npx ctx7@latest login` or `CONTEXT7_API_KEY`. Do not send credentials in queries or
-silently substitute training knowledge when documentation retrieval fails.
+- Run `npx ctx7@latest library <official-name> "<concept>"`, then
+  `npx ctx7@latest docs <id> "<concept>"`. Use at most three commands per
+  question.
+- Run them outside the sandbox, and retry network failures there.
+- Report quota failures, with the option to use `npx ctx7@latest login` or
+  `CONTEXT7_API_KEY`. Never send credentials in queries.
