@@ -235,7 +235,7 @@ class WindowsHardwareTests implements HardwareTests {
             '-hide_banner',
             '-h',
             'encoder=$encoder',
-          ], cancellation: token);
+          ], cancellation: token, timeout: probeHelpTimeout);
           help.requireSuccess('Hardware encoder help');
           detail = {
             ...detail,

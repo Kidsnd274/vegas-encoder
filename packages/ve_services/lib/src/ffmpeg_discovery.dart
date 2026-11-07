@@ -236,7 +236,7 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
     final version = await runner.run(resolved, [
       '-hide_banner',
       '-version',
-    ], cancellation: token);
+    ], cancellation: token, timeout: probeIdentityTimeout);
     version.requireSuccess('FFmpeg identity');
     final metadata = parser.parseVersion(version.stdout + version.stderr);
     final ffprobe = joinPath(File(resolved).parent.path, 'ffprobe.exe');
@@ -254,7 +254,7 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
       '-show_versions',
       '-of',
       'json',
-    ], cancellation: token);
+    ], cancellation: token, timeout: probeIdentityTimeout);
     probe.requireSuccess('FFprobe identity');
     final actual = parser.parseProbeVersion(probe.stdout);
     for (final key in ['version', 'configuration', 'libraries']) {
