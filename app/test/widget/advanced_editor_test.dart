@@ -414,7 +414,7 @@ void main() {
       expect(d.video!.outputBits, 10);
       expect(d.video!.availability, isNotNull, reason: 'the core establishes the scoped command encoder ID');
       expect(d.container.label, 'MKV');
-      expect(d.fileName, 'Sample project.mkv', reason: 'uses the active muxer, not the inactive Basic MP4');
+      expect(d.fileName, 'Render As (.mkv)', reason: 'uses the active muxer, not the inactive Basic MP4');
       expect(tester.widget<SignalPath>(find.byType(SignalPath)).selected, isNull);
 
       await setCommand(tester, '{inputs} -c:v libx264 {output}');
@@ -423,7 +423,7 @@ void main() {
       expect(d.video!.conversion, isNull);
       expect(d.video!.formatLabel, isNull);
       expect(d.container.label, 'From file name');
-      expect(d.fileName, 'Sample project', reason: 'unknown muxer does not borrow the Basic suffix');
+      expect(d.fileName, 'Render As', reason: 'unknown muxer does not borrow the Basic suffix');
 
       await setCommand(tester, '{inputs} -c:v copy {output}');
       expect(diagram(tester).video!.availability, isNull, reason: 'stream copy has no encoder ID');

@@ -6,58 +6,120 @@ import '../../../design/components/interactive.dart';
 import '../../../design/components/message.dart';
 import '../../../design/components/size_card.dart';
 import '../../../design/components/switch.dart';
-import '../../../design/format.dart';
 import '../../../design/tokens.dart';
-import '../../../state/editor.dart' show PreviewMedia;
-import '../../../state/preview.dart';
 import '../../../state/recipe_edit.dart';
 import '../display.dart';
 import 'field_anchor.dart';
 import 'panel_kit.dart';
 
-/// From VEGAS: what the project delivers. Read-only.
+/// From VEGAS: the video and audio pipes from the project. Read-only.
 class SourcePanel extends StatelessWidget {
   const SourcePanel({super.key, required this.scope});
   final PanelScope scope;
 
   @override
   Widget build(BuildContext context) {
+    final t = VeTokens.of(context);
+    final c = t.colors;
     final m = scope.data.media;
     final v = m.video;
     final a = m.audio;
-    final preview = scope.data.preview;
-    const unset = 'Set by the project';
-    final known = preview != PreviewMedia.projectUnknown;
     return PanelColumns(
       left: [
-        PanelFacts([
-          ('Frame size', known ? '${v.width}×${v.height}' : unset),
-          ('Frame rate', known ? '${VeFormat.fps(v.fps[0], v.fps[1])} (${v.fps[0]}/${v.fps[1]})' : unset),
-          ('Pixel format', known ? deliveredPixelFormat(v.pixfmt) : unset),
-          (
-            'Audio',
-            !known
-                ? unset
-                : a == null
-                ? 'None'
-                : '${kiloHertz(a.rate)}, ${deliveredSampleFormat(a.sampleFmt)}, ${channelsLabel(a.channels)}',
-          ),
-          ('Length', !known || m.durationSec == null ? unset : VeFormat.duration(m.durationSec!)),
-        ]),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _PipeStreamCard(
+              title: 'Video pipe',
+              tag: deliveredVideoPipeTag(v.pixfmt),
+              description: 'Frames are rendered by VEGAS at your project’s resolution, pixel aspect ratio, and frame rate.',
+              stripeColor: c.videoWire,
+            ),
+            const SizedBox(height: 10),
+            _PipeStreamCard(
+              title: 'Audio pipe',
+              tag: a == null ? 'None' : deliveredAudioPipeTag(a.sampleFmt),
+              description: 'Audio samples are rendered by VEGAS at your project’s sample rate and channel count.',
+              stripeColor: c.audioWire,
+            ),
+          ],
+        ),
       ],
-      right: [
-        const PanelStatic(
+      right: const [
+        PanelStatic(
           'VEGAS renders every frame and sends it to FFmpeg through a pipe. This is read-only; '
           'the project settings in VEGAS decide it.',
         ),
-        PanelBlurb(switch (preview) {
-          PreviewMedia.sample =>
-            'These are sample values for the preview. A real render uses the project’s own size and rate.',
-          PreviewMedia.project => 'These are the project’s settings, as VEGAS shared them with this template.',
-          PreviewMedia.projectUnknown =>
-            'VEGAS didn’t share this project’s settings. The command and checks use a sample: '
-                '${mediaSummary(m)}.',
-        }),
+        PanelBlurb(
+          'Vegas Encoder receives the project’s exact dimensions, frame rate, and audio layout as soon as the render starts.',
+        ),
+      ],
+    );
+  }
+}
+
+class _PipeStreamCard extends StatelessWidget {
+  const _PipeStreamCard({
+    required this.title,
+    required this.tag,
+    required this.description,
+    required this.stripeColor,
+  });
+
+  final String title;
+  final String tag;
+  final String description;
+  final Color stripeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = VeTokens.of(context);
+    final c = t.colors;
+    return Stack(
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: c.paper,
+            border: Border.all(color: c.line),
+            borderRadius: BorderRadius.circular(VeRadius.lg),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(title, style: t.text.bodyStrong.copyWith(fontWeight: const FontWeight(650))),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      tag,
+                      style: t.text.monoSmall.copyWith(color: c.text2),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(description, style: t.text.small.copyWith(color: c.muted, height: 1.4)),
+            ],
+          ),
+        ),
+        Positioned(
+          left: 0,
+          top: 8,
+          bottom: 8,
+          width: 3,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: stripeColor,
+              borderRadius: const BorderRadius.horizontal(right: Radius.circular(2)),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -316,7 +378,7 @@ class FilePanel extends StatelessWidget {
               borderRadius: BorderRadius.circular(VeRadius.md),
             ),
             child: Text(
-              SamplePreview.outputPath(d.containerProfile?.ext),
+              renderAsPathLabel(d.containerProfile?.ext),
               style: t.text.mono.copyWith(fontSize: 12.5, height: 1.4),
             ),
           ),

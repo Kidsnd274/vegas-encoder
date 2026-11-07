@@ -66,9 +66,12 @@ void main() {
         installation: installation('gyan-8.1'),
         lengthSec: 600,
       );
-      expect(m.source.frameSize, '1920×1080');
-      expect(m.source.frameRate, '29.97 fps');
+      expect(m.source.frameSize, 'Live pipe input');
+      expect(m.source.frameRate, 'Project size & frame rate');
       expect(m.source.pixelFormat, 'P010, 10-bit 4:2:0');
+      expect(m.source.audio, '32-bit float PCM');
+      expect(m.source.stripVideo, '10-bit P010 pipe');
+      expect(m.source.stripAudio, '32-bit float pipe');
       expect(m.source.depth, 10);
       expect(m.video!.encoder, 'x264');
       expect(m.video!.detail, 'CRF 18, slow');
@@ -82,8 +85,8 @@ void main() {
       expect(m.audio!.detail, '320 kb/s');
       expect(m.container.label, 'MP4');
       expect(m.container.detail, 'Fast start');
-      expect(m.fileName, 'Sample project.mp4');
-      expect(m.contextLabel, 'Preview with: 1920×1080, 29.97 fps, 48 kHz stereo, 10 minutes');
+      expect(m.fileName, 'Render As (.mp4)');
+      expect(m.contextLabel, 'Uncompressed video and audio pipes from VEGAS into FFmpeg');
     });
 
     test('a 10-bit encode that keeps the pixel format has no pip', () {

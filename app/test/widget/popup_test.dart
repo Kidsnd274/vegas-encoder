@@ -192,31 +192,35 @@ void main() {
       expect(result()!.action, 'apply');
     });
 
-    testWidgets('the template, its origin and the VEGAS facts in the strip', (tester) async {
+    testWidgets('the template, its origin and the VEGAS pipes in the strip', (tester) async {
       await pump(tester);
       expect(find.text('YouTube 4K upload (Lakeside)'), findsOneWidget);
       expect(rich('From YouTube upload, H.264, revision 5. 2 changes in this template'), findsOneWidget);
       expect(find.text('Show changes'), findsOneWidget);
       expect(rich('Rename in VEGAS to change the saved template name.'), findsOneWidget);
       final m = strip(tester);
-      expect(m.source.frameSize, '3840×2160', reason: 'the project VEGAS shared');
-      expect(m.source.stripVideo, '29.97 fps, 10-bit');
+      expect(m.source.frameSize, 'Live pipe input');
+      expect(m.source.stripVideo, '10-bit P010 pipe');
       expect(m.marks[SignalNode.video]!.changed, isTrue, reason: 'CRF 17, slower: changed in this template');
       expect(m.marks[SignalNode.audio]!.libraryRevision, 6, reason: 'the library changed the audio bitrate');
       expect(find.text('Library has revision 6'), findsOneWidget);
       expect(find.text('Vegas Encoder, editing a VEGAS render template'), findsOneWidget);
     });
 
-    testWidgets('project facts VEGAS didn’t share are “Set by the project”; the preview is a sample', (tester) async {
+    testWidgets('From VEGAS shows the video and audio pipes without sample project dimensions', (tester) async {
       final context = b0.context.toJson()..['media'] = null;
       await pump(tester, request: withRequest({'context': context}));
       final m = strip(tester);
-      expect(m.source.frameSize, 'Set by the project');
-      expect(m.source.stripVideo, startsWith('Sample: '));
+      expect(m.source.frameSize, 'Live pipe input');
+      expect(m.source.stripVideo, '10-bit P010 pipe');
       await tap(tester, find.text('From VEGAS').first);
-      expect(find.text('Set by the project'), findsWidgets);
-      expect(rich('VEGAS didn’t share this project’s settings. The command and checks use a sample:'), findsOneWidget);
-      expect(container(tester).read(popupEditorProvider)!.compiled.ok, isTrue, reason: 'still compiled, on the sample');
+      expect(find.text('Video pipe'), findsOneWidget);
+      expect(find.text('Audio pipe'), findsOneWidget);
+      expect(
+        find.text('Vegas Encoder receives the project’s exact dimensions, frame rate, and audio layout as soon as the render starts.'),
+        findsOneWidget,
+      );
+      expect(container(tester).read(popupEditorProvider)!.compiled.ok, isTrue, reason: 'still compiled');
     });
 
     testWidgets('a missing request is shown, and closing it is a Cancel with no result', (tester) async {

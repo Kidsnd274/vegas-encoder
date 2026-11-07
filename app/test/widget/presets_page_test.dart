@@ -85,7 +85,7 @@ void main() {
     expect(find.text('Encodes the frames'), findsOneWidget, reason: 'the video node is selected first');
     expect(inCommand(find.text('Checks')), findsOneWidget);
 
-    await tester.tap(find.text('Sample project.mp4'));
+    await tester.tap(find.text('Render As (.mp4)'));
     await tester.pumpAndSettle();
     expect(find.byType(SizeQualityCard), findsOneWidget);
     expect(find.text('About 53.7\u00A0MB per minute, typically 32.2\u00A0MB to 85.9\u00A0MB.'), findsOneWidget);
@@ -94,7 +94,7 @@ void main() {
       findsOneWidget,
       reason: 'B0 has no total for a typed length',
     );
-    expect(find.text(r'D:\Renders\Sample project.mp4'), findsOneWidget);
+    expect(find.text('Chosen in VEGAS Render As (.mp4)'), findsOneWidget);
 
     await tester.tap(find.text('320 kb/s').first);
     await tester.pumpAndSettle();
@@ -106,10 +106,11 @@ void main() {
     expect(find.text('Joins the streams into one file'), findsOneWidget);
     expect(find.text('Can’t hold H.264'), findsWidgets, reason: 'WebM can\'t hold H.264');
 
-    await tester.tap(find.text('29.97 fps').first);
+    await tester.tap(find.text('Live pipe input').first);
     await tester.pumpAndSettle();
-    expect(find.text('What the project delivers'), findsOneWidget);
-    expect(find.text('29.97 fps (30000/1001)'), findsOneWidget);
+    expect(find.text('Piped from VEGAS when rendering'), findsOneWidget);
+    expect(find.text('Video pipe'), findsOneWidget);
+    expect(find.text('Audio pipe'), findsOneWidget);
   });
 
   testWidgets('an edit marks the preset and explains the preview core; Revert and Undo', (tester) async {
@@ -203,7 +204,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Audio is off. The file has video only.'), findsOneWidget);
     expect(inHeader('Edited'), findsOneWidget);
-    await tester.tap(find.text('29.97 fps').first);
+    await tester.tap(find.text('Live pipe input').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Audio is off. The file has video only.'));
     await tester.pumpAndSettle();
@@ -492,7 +493,7 @@ void main() {
       tester,
       settings: MachineSettings(uiState: AppUiState(lastSizeLengthText: '1:30', setupDismissed: true)),
     );
-    await tester.tap(find.text('Sample project.mp4'));
+    await tester.tap(find.text('Render As (.mp4)'));
     await tester.pumpAndSettle();
     expect(fieldWith('1:30'), findsOneWidget, reason: 'the remembered text, not 10:00');
     await tester.enterText(fieldWith('1:30'), '20:');

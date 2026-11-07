@@ -22,8 +22,10 @@ void main() {
   }
 
   final states = <String, Future<void> Function(WidgetTester)>{
+    // From VEGAS node: separated Video pipe and Audio pipe cards.
+    'source': (tester) => node(tester, 'Live pipe input'),
     // File node: the size card with the core's rate and range; no total in B0.
-    'file': (tester) => node(tester, 'Sample project.mp4'),
+    'file': (tester) => node(tester, 'Render As (.mp4)'),
     // ProRes: 4:2:2 conversion pip, PCM 24-bit lossless audio.
     'audio': (tester) async {
       await select(tester, 'ProRes 422 HQ for editing');
