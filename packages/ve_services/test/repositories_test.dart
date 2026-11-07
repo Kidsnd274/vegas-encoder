@@ -264,9 +264,13 @@ Future<void> main(List<String> args) async {
       initialPresets.every((p) {
         final recipe = p.recipe;
         return p.revision ==
-            (recipe.category == 'web' && recipe.id != 'vp9-webm' ? 3 : 2);
+            (recipe.id == 'av1-small'
+                ? 4
+                : recipe.category == 'web' && recipe.id != 'vp9-webm'
+                ? 3
+                : 2);
       }),
-      'only changed presets advance to revision 3',
+      'only changed presets advance: AV1 (CPU) to revision 4, other delivery presets to 3',
     );
     final builtin = initialPresets.first;
     check(
