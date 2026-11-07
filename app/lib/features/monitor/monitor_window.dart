@@ -116,7 +116,11 @@ class _MonitorWindowState extends ConsumerState<MonitorWindow> {
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      // Leaving near the end of the countdown never closes the window at once.
+      onExit: (_) => setState(() {
+        _hovered = false;
+        if (_closeIn case final left? when left < 3) _closeIn = 3;
+      }),
       child: ColoredBox(
         color: c.surface,
         child: Column(
