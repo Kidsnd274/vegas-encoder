@@ -64,7 +64,8 @@ Each candidate is identified by:
 - **content identity:** SHA-256 of `ffmpeg.exe`, plus the sorted SHA-256 of sibling
   `av*`/`sw*`/`postproc*` DLLs for shared builds; file size and mtime for a fast
   unchanged check;
-- **ffprobe** beside it: present, with a matching version.
+- **ffprobe** beside it: present, with a matching version;
+- **minimum version:** FFmpeg 4.4 (libavformat 58.76) or newer.
 
 The **default installation** is stored in `machine.json` and used by every render.
 A preset never names a path. History records which FFmpeg actually ran (path,

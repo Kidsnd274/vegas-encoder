@@ -11,8 +11,9 @@ class WindowsFFmpegHelpParser implements FFmpegHelpParser {
   @override
   int get version => ffmpegParserVersion;
   static const _flags = r'[EDFVASXRBT.P]{11}';
+  // FFmpeg 7.1+ pads array types inside the brackets, e.g. `[<int>     ]`.
   final _option = RegExp(
-    r'^\s{2,}-([^\s]+)\s+(\[?<[^>]+>\]?)\s*(' + _flags + r')\s*(.*)$',
+    r'^\s{2,}-([^\s]+)\s+(\[<[^>]+>\s*\]|<[^>]+>)\s*(' + _flags + r')\s*(.*)$',
   );
   final _constant = RegExp(
     r'^\s{5,}(\S+)\s+(?:(\S+)\s+)?(' + _flags + r')\s*(.*)$',
@@ -93,7 +94,7 @@ class WindowsFFmpegHelpParser implements FFmpegHelpParser {
           current = {
             'name': name,
             'aliases': <String>[],
-            'type': match[2]!.replaceAll(RegExp(r'[<>\[\]]'), ''),
+            'type': match[2]!.replaceAll(RegExp(r'[<>\[\]\s]'), ''),
             'flags': match[3],
             'description': description.trim(),
             'min': bounds?[1],
@@ -186,7 +187,10 @@ class WindowsFFmpegHelpParser implements FFmpegHelpParser {
     // Filter AVOptions omit the leading '-' used by encoder AVOptions.
     // Reuse the literal option parser rather than maintaining another AVOption grammar.
     final optionsText = normalized.replaceAllMapped(
-      RegExp(r'^(\s{2,})([^\s-][^\s]*)\s+(\[?<[^>]+>\]?)', multiLine: true),
+      RegExp(
+        r'^(\s{2,})([^\s-][^\s]*)\s+(\[<[^>]+>\s*\]|<[^>]+>)',
+        multiLine: true,
+      ),
       (m) => '${m[1]}-${m[2]} ${m[3]}',
     );
     final options = parseOptions(optionsText);
@@ -222,8 +226,10 @@ class WindowsFFmpegHelpParser implements FFmpegHelpParser {
         'Missing FFmpeg encoder-list header.',
       );
     final entries = <String, Object?>{};
+    // Builds such as --enable-small can print rows without a description; the
+    // separators must not cross into the next row.
     for (final m in RegExp(
-      r'^\s+([VAS][A-Z.]{5})\s+(\S+)\s+(.*)$',
+      r'^[ \t]+([VAS][A-Z.]{5})[ \t]+(\S+)[ \t]*(.*)$',
       multiLine: true,
     ).allMatches(text.replaceAll('\r', ''))) {
       if (m[2] == '=') continue;
@@ -251,7 +257,7 @@ class WindowsFFmpegHelpParser implements FFmpegHelpParser {
       );
     final entries = <String, Object?>{};
     for (final m in RegExp(
-      r'^\s+([D.Ed ]*E[D.Ed ]*)\s+(\S+)\s+(.*)$',
+      r'^[ \t]+([D.Ed ]*E[D.Ed ]*)[ \t]+(\S+)[ \t]*(.*)$',
       multiLine: true,
     ).allMatches(text.replaceAll('\r', ''))) {
       if (m[2] == '=') continue;

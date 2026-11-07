@@ -833,8 +833,10 @@ WindowsFFmpegCandidateFinder accepts explicit iniPaths/environment for other roo
 Candidate failures are exposed through discovery.scanProblems. Nothing downloads
 FFmpeg, edits PATH or chooses a default automatically.
 
-Identification requires Windows x64 PE executables, FFprobe beside FFmpeg, and
-matching full version/configuration/loaded-library facts. SHA-256 covers FFmpeg and
+Identification requires Windows x64 PE executables, FFprobe beside FFmpeg,
+matching full version/configuration/loaded-library facts, and FFmpeg 4.4 or newer
+(libavformat 58.76+, the first release with the `-stats_period` every compiled
+command uses); older builds fail with `FFMPEG-UNSUPPORTED`. SHA-256 covers FFmpeg and
 sorted sibling av*/sw*/postproc* DLLs plus parser version; extensions retain their
 file stats and FFprobe hash/stats. Reads/list/watch use stats for health without
 executing FFmpeg or hashing entire binaries. Explicit probe/test operations rehash

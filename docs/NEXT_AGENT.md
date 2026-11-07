@@ -11,6 +11,15 @@ No separate worktree or permanent ownership split was introduced. Read [AGENTS.m
 [status](STATUS.md) and relevant contracts/specs. Former workstream handoffs are
 history; their old locations, ownership splits and queues do not apply.
 
+## Pending on branch `ffmpeg-parser-compat`
+
+The owner requested this FFmpeg-version parsing work in a separate worktree,
+`C:\Users\Samuel Tee\repos\vegas-encoder-ffmpeg-compat`. Before merging, run
+`scripts/etc/Test-B3Services.ps1` with a Dart SDK (not available when written),
+and decide with the owner whether to bump `ffmpegParserVersion` together with the
+next exporter release. Real-output 4.4, 6.1 and 7.1 fixtures would close the
+remaining coverage gap. See [status](STATUS.md#current-progress).
+
 ## Current queue: older VEGAS release qualification
 
 The 0.2.0+2 logs from VEGAS 2026.0.3.189 and Sony VEGAS 13.0.0.453 confirm

@@ -9,6 +9,19 @@ import 'ffmpeg_identity.dart';
 import 'ffmpeg_parser.dart';
 import 'process_runner.dart';
 
+/// Compiled commands use `-stats_period`, which FFmpeg 4.4 (libavformat
+/// 58.76) introduced; older builds would be listed and then fail every render.
+void requireSupportedFFmpeg(JsonMap metadata) {
+  final libavformat = jsonMap(metadata['libraries'])['libavformat'] as String;
+  final parts = libavformat.split('.').map(int.parse).toList();
+  if (parts[0] < 58 || (parts[0] == 58 && parts[1] < 76))
+    throw ServiceException(
+      'FFMPEG-UNSUPPORTED',
+      'FFmpeg 4.4 or newer is required; this build has libavformat '
+          '$libavformat.',
+    );
+}
+
 class FFmpegCandidate {
   const FFmpegCandidate(this.path, this.source);
   final String path;
@@ -239,6 +252,7 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
     ], cancellation: token);
     version.requireSuccess('FFmpeg identity');
     final metadata = parser.parseVersion(version.stdout + version.stderr);
+    requireSupportedFFmpeg(metadata);
     final ffprobe = joinPath(File(resolved).parent.path, 'ffprobe.exe');
     if (!await File(ffprobe).exists())
       throw const ServiceException(

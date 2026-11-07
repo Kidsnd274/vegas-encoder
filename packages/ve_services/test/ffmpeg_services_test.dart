@@ -126,6 +126,76 @@ Future<void> main(List<String> args) async {
     ),
     'HELP-PARSE',
   );
+  final listTyped = parser.parseOptions('''AVCodecContext AVOptions:
+  -side_data_prefer_packet [<int>     ].D.VAS..... Comma-separated list
+  -view_ids_available [<unsigned>].D.V..XR... Available view IDs
+  -layouts           [<channel_layout>]E...A...... Layouts (default "stereo")
+     stereo          3            E...A...... Stereo
+  -b                 <int64>      E..VA...... set bitrate (from 0 to I64_MAX) (default 200000)
+''');
+  check(
+    listTyped.map((o) => '${o.name}:${o.data['type']}').join(',') ==
+        'side_data_prefer_packet:int,view_ids_available:unsigned,'
+            'layouts:channel_layout,b:int64',
+    'padded FFmpeg 7.1+ list types parse with their element type',
+  );
+  check(
+    listTyped[2].data['defaultValue'] == 'stereo' &&
+        (listTyped[2].data['constants'] as List).length == 1 &&
+        listTyped[0].data['flags'] == '.D.VAS.....',
+    'list-typed options keep flags, defaults and constants',
+  );
+  final listFilter = parser.parseFilterHelp('''Filter buffersink
+buffersink AVOptions:
+   pixel_formats     [<pix_fmt> ]..FV....... array of supported pixel formats
+   colorspaces       [<int>     ]..FV....... array of supported color spaces
+''', 'buffersink');
+  check(
+    jsonMaps(
+          listFilter['options'],
+        ).map((o) => '${o['name']}:${o['type']}').join(',') ==
+        'pixel_formats:pix_fmt,colorspaces:int',
+    'list-typed filter options parse without a dash',
+  );
+  final smallEncoders = parser.parseEncoders('''Encoders:
+ V..... = Video
+ ------
+ V....D a64multi             Multicolor charset for Commodore 64 (codec a64_multi)
+ A....D aac                  \r
+ A....D ac3
+ V....D libx264              (codec h264)
+''');
+  check(
+    smallEncoders.keys.join(',') == 'a64multi,aac,ac3,libx264' &&
+        jsonMap(smallEncoders['aac'])['description'] == '' &&
+        jsonMap(smallEncoders['libx264'])['codec'] == 'h264',
+    'encoder rows without descriptions do not swallow the next row',
+  );
+  final smallMuxers = parser.parseMuxers('''Formats:
+ D.. = Demuxing supported
+ .E. = Muxing supported
+ ---
+  E  3g2${' ' * 13}
+  E  mp4
+ DE  mov             QuickTime / MOV
+''');
+  check(
+    smallMuxers.keys.join(',') == '3g2,mp4,mov' &&
+        jsonMap(smallMuxers['3g2'])['description'] == '' &&
+        jsonMap(smallMuxers['mov'])['flags'] == 'DE',
+    'muxer rows without descriptions do not swallow the next row',
+  );
+  JsonMap libavformat(String version) => {
+    'libraries': {'libavformat': version},
+  };
+  requireSupportedFFmpeg(libavformat('58.76.100'));
+  requireSupportedFFmpeg(libavformat('59.27.100'));
+  for (final old in ['58.45.100', '57.83.100']) {
+    await rejects(() async {
+      requireSupportedFFmpeg(libavformat(old));
+      return null;
+    }, 'FFMPEG-UNSUPPORTED');
+  }
   final catalog = jsonMap(
     jsonDecode(
       await File('../../schema/ffmpeg/windows-builds.v1.json').readAsString(),
@@ -164,9 +234,17 @@ Future<void> main(List<String> args) async {
       await File(fixture('b3-$name-muxers.txt')).readAsString(),
     );
     check(muxers.length == [178, 190, 189][i], '$name muxer count');
-    final options = parser.parseOptions(
+    final allOptions = parser.parseOptions(
       await File(fixture('b3-$name-generic.txt')).readAsString(),
     );
+    // The B1 catalog capture predates padded list-type support.
+    check(
+      allOptions.any((o) => o.name == 'side_data_prefer_packet') == (i > 0),
+      '$name list-typed generic options are retained',
+    );
+    final options = allOptions
+        .where((o) => o.name != 'side_data_prefer_packet')
+        .toList();
     final expected = jsonMaps(builds[i]['genericOptions']);
     check(options.length == expected.length, '$name generic option count');
     for (var n = 0; n < options.length; n++) {

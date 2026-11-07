@@ -7,6 +7,21 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**FFmpeg help parsing across versions (branch `ffmpeg-parser-compat`).** The
+service parser now accepts FFmpeg 7.1+ padded list types (`[<int>     ]`),
+which it previously dropped, and `-encoders`/`-muxers` rows without a
+description (`--enable-small` builds), which previously hid the following row.
+Discovery rejects builds older than FFmpeg 4.4 (libavformat 58.76) with
+`FFMPEG-UNSUPPORTED`. The 4.4/`-stats_period` boundary was not rechecked
+against primary documentation (no Node/Context7 on the working machine). The
+parser revision stays 4: bumping it invalidates exporter caches, so it should
+ship with a matched exporter release. Validation: the new regexes were replayed
+in Python against all committed fixtures (unchanged except the intended
+`side_data_prefer_packet` addition) and a live gyan 2025-10-27 `-h full`
+(7,593 typed option lines, none missed). The Dart service suite
+(`scripts/etc/Test-B3Services.ps1`) was not run; no Dart SDK was available.
+Real-output fixtures still cover only 5.1.2 and 2026 master builds.
+
 **AV1 (CPU) live pipe stall.** With installed exporter `0.2.0+2` and FFmpeg
 `N-128435-g7798de15f86-gdb8537d8cc7+2` (SVT-AV1 4.3.0), owner logs from
 VEGAS 2026.0.3.189 and Sony VEGAS 13.0.0.453 show FFmpeg opening both streams
