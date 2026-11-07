@@ -349,7 +349,11 @@ class FakeProgress final : public Counted<ISfProgress> {
   }
   HRESULT STDMETHODCALLTYPE SetPosition(LONGLONG p) override {
     Caller();
-    if (position != p) callsAtPosition_ = 0;
+    if (position != p) {
+      // Middle frames only: startup (frame 0) and finishing (frame total) wait legitimately.
+      if (position > 0 && position < total) { ++midFrames; if (callsAtPosition_ <= 2) ++quietMidFrames; }
+      callsAtPosition_ = 0;
+    }
     callsAtPosition_++;
     position = p;
     positions++;
@@ -362,7 +366,7 @@ class FakeProgress final : public Counted<ISfProgress> {
     return FailNow(7) ? E_ACCESSDENIED : S_OK;
   }
   HRESULT STDMETHODCALLTYPE Slot8(LONG) override { return S_OK; }
-  LONGLONG total = -1, position = -1, positions = 0, checks = 0;
+  LONGLONG total = -1, position = -1, positions = 0, checks = 0, midFrames = 0, quietMidFrames = 0;
 
  private:
   bool FailNow(int slot) const {
@@ -522,6 +526,7 @@ RecipeHostResult ExerciseRecipeHost(const RenderTestOptions& o,
   result.lockErrors = video.lockErrors; result.samples = audio.samples; result.reads = audio.reads; result.tokenErrors = audio.tokenErrors;
   result.callerThreadErrors = video.callerThreadErrors + audio.callerThreadErrors + progress.callerThreadErrors;
   result.progressCalls = progress.positions + progress.checks;
+  result.midFrames = progress.midFrames; result.quietMidFrames = progress.quietMidFrames;
   if (video.ref != 1 || audio.ref != 1 || progress.ref != 1) ++result.lockErrors;
   return result;
 }

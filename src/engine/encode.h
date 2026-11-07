@@ -23,6 +23,7 @@ struct EncodeRate {
 struct EncodeStats {
   DWORD pid = 0, exitCode = STILL_ACTIVE;
   uint64_t videoBytes = 0, audioBytes = 0, videoHighWater = 0, audioHighWater = 0, videoQueueLimit = 0, audioQueueLimit = 0;
+  uint64_t videoBuffersAllocated = 0;  // new video buffers TakeBuffer had to allocate
   bool published = false;
   std::wstring command, stderrPath, tempPath;
 };
@@ -40,6 +41,7 @@ class FfmpegEncoder {
   // Before Start: size the audio queue by time (bytes per second x 60 s).
   void SetAudioBytesPerSecond(uint64_t bytesPerSecond);
   bool EndedEarly() const;
+  std::vector<BYTE> TakeBuffer(bool audio, size_t size);
   struct CommandPlan { std::vector<std::wstring> argv; bool audioInput = false; };
   // The factory compiles after unique pipe/temp names are allocated, before spawn.
   // argv excludes the executable. The core owns every command/domain decision.

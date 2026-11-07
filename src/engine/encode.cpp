@@ -100,6 +100,14 @@ struct FfmpegEncoder::Impl {
   // Last proof that FFmpeg is working: an input write completed, or frame/out_time_us/total_size advanced.
   std::atomic<ULONGLONG> activity{0};
   std::atomic<long long> lastFrame{-1};
+  std::atomic<uint64_t> videoBuffersAllocated{0};
+  // Finished input buffers come back here (bounded: queue depth + 2); ownership moves only.
+  std::mutex poolMutex;
+  std::vector<std::vector<BYTE>> pool[2];
+  void Recycle(size_t index, std::vector<BYTE>&& buffer) {
+    std::lock_guard<std::mutex> lock(poolMutex);
+    if (pool[index].size() < (index ? 8u : 10u)) pool[index].push_back(std::move(buffer));
+  }
   bool withAudio = false, tempOwned = false, finished = false, started = false;
 
   // Size the audio queue by time, not by block count: an encoder's lookahead can
@@ -239,6 +247,7 @@ struct FfmpegEncoder::Impl {
             pipe.blocks--;
           }
           pipe.changed.notify_all();
+          Recycle(index, std::move(data));
         }
       }
     } catch (...) { Fail(E_OUTOFMEMORY, "pipe writer exception"); }
@@ -454,8 +463,9 @@ bool FfmpegEncoder::Submit(bool audio, std::vector<BYTE> data, const Poll& poll)
   auto& pipe = p.pipes[audio ? 1 : 0];
   if (data.empty()) return true;
   if (data.size() > pipe.limit || (audio && !p.withAudio)) { p.Fail(E_INVALIDARG, "input exceeds pipe queue limit"); return false; }
-  for (;;) {
-    if (!poll() || p.failed || p.stopping) return false;
+  // The caller polls once per frame; poll here only while waiting for queue space (every 100 ms).
+  for (bool waited = false;; waited = true) {
+    if ((waited && !poll()) || p.failed || p.stopping) return false;
     if (p.endedEarly) return true;  // FFmpeg already finished; the caller stops fetching input.
     if (p.Exited()) { p.InputClosed(); return p.endedEarly; }
     {
@@ -525,6 +535,21 @@ bool FfmpegEncoder::Publish() {
 }
 void FfmpegEncoder::SetAudioBytesPerSecond(uint64_t bytesPerSecond) { p_->audioBytesPerSecond = bytesPerSecond; }
 bool FfmpegEncoder::EndedEarly() const { return p_->endedEarly; }
+std::vector<BYTE> FfmpegEncoder::TakeBuffer(bool audio, size_t size) {
+  auto& p = *p_;
+  {
+    std::lock_guard<std::mutex> lock(p.poolMutex);
+    auto& pool = p.pool[audio ? 1 : 0];
+    for (auto it = pool.begin(); it != pool.end(); ++it) if (it->capacity() >= size) {
+      auto buffer = std::move(*it);
+      pool.erase(it);
+      buffer.resize(size);  // within capacity: no allocation, and no fill for a same-size frame
+      return buffer;
+    }
+  }
+  if (!audio) p.videoBuffersAllocated++;
+  return std::vector<BYTE>(size);
+}
 void FfmpegEncoder::RetainPartial() { p_->tempOwned = false; }
 void FfmpegEncoder::Abort() { p_->Abort(); }
 HRESULT FfmpegEncoder::Error() const { std::lock_guard<std::mutex> lock(p_->errorMutex); return p_->error; }
@@ -534,6 +559,7 @@ EncodeStats FfmpegEncoder::Stats() const {
   s.videoBytes = p_->pipes[0].written; s.audioBytes = p_->pipes[1].written;
   s.videoHighWater = p_->pipes[0].highWater; s.audioHighWater = p_->pipes[1].highWater;
   s.videoQueueLimit = 64u * 1024 * 1024; s.audioQueueLimit = p_->AudioLimit();
+  s.videoBuffersAllocated = p_->videoBuffersAllocated;
   return s;
 }
 }  // namespace vegas_encoder

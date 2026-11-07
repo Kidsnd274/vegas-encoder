@@ -41,6 +41,7 @@ struct RecipeHostResult {
   LONGLONG served = 0, released = 0, outstanding = 0, lockErrors = 0;
   LONGLONG samples = 0, reads = 0, tokenErrors = 0, callerThreadErrors = 0;
   LONGLONG progressCalls = 0;  // SetPosition + CheckCancel
+  LONGLONG midFrames = 0, quietMidFrames = 0;  // middle frames, and those with at most 2 SetPosition calls
 };
 // Reuses the same measured fake stream fixtures without enabling the gated
 // production template/recipe adapter. Callback executes on this caller thread.

@@ -141,6 +141,12 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
         "adapter preserves success/cancellation/host error HRESULT and returns encoder failures as failures");
   Check(host.served == host.released && !host.outstanding && !host.lockErrors && !host.callerThreadErrors && !host.tokenErrors,
         "adapter copies/releases frames and keeps all host calls on caller thread");
+  if (success) {
+    // At most two SetPosition/CheckCancel pairs per unblocked frame; frames waiting on FFmpeg may poll more.
+    if (host.quietMidFrames * 4 < host.midFrames * 3)
+      fprintf(stderr,"%ls: %lld of %lld middle frames used at most two progress polls\n",name,host.quietMidFrames,host.midFrames);
+    Check(host.midFrames > 0 && host.quietMidFrames * 4 >= host.midFrames * 3,"unblocked frames poll VEGAS progress at most twice");
+  }
   if (expected == E_INVALIDARG) {
     Check((host.served == 0 || projectAspect != 1.0) && !std::filesystem::exists(output),"preflight failure is rejected before encoding");
     // Contracts 3.1/3.2: a render that stops before FFmpeg starts still explains itself.

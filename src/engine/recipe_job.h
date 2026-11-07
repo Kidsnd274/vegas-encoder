@@ -36,6 +36,8 @@ class RecipeJob {
   EncodeStats Stats() const { return encoder_.Stats(); } // only after stop/finish
   // FFmpeg finished successfully before all input was sent (for example -t). Stop fetching host frames, then Finish.
   bool EndedEarly() const { return encoder_.EndedEarly(); }
+  // A frame/sample buffer of exactly size bytes, reused from the writers when possible.
+  std::vector<BYTE> TakeBuffer(bool audio, size_t size) { return encoder_.TakeBuffer(audio,size); }
   const ve::Json& Compiled() const { return compiled_; }
   const ve::Json& Record() const { return record_; }
   const std::string& Id() const { return id_; }
@@ -70,6 +72,8 @@ struct PreflightFailure {
   bool cancelled = false;
 };
 void WritePreflightRecord(const PreflightFailure& failure);
+// Full identity hashes performed in this process (test observation for the hash cache).
+size_t IdentityHashCountForTests();
 // Pure fact comparison, independently exercised with malformed/mismatched probes.
 ve::Json VerifyProbe(const ve::Json& probe, const ve::Json& expectedStreams, const std::string& outputContainerId = {});
 // C5's nullable video facts come only from a successfully compiled, scoped

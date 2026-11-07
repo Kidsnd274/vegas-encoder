@@ -1,9 +1,11 @@
 #include "recipe_job.h"
 #include "../support/diagnostics.h"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cctype>
 #include <filesystem>
+#include <map>
 
 namespace vegas_encoder {
 namespace {
@@ -104,6 +106,43 @@ bool ProbeChild(const std::wstring& exe, const std::vector<std::wstring>& args, 
   WaitForSingleObject(process.h,2000); DWORD code = STILL_ACTIVE; GetExitCodeProcess(process.h,&code);
   if (code != 0) { if (failure.empty()) failure = "FFprobe returned a failing exit code"; return false; }
   return ok;
+}
+// Per-process identity hash cache. A file whose volume, index, size or write time
+// changed is hashed again, so a replaced FFmpeg is still refused.
+struct FileKey {
+  DWORD volume = 0; uint64_t index = 0, size = 0, written = 0;
+  bool operator==(const FileKey& other) const { return volume == other.volume && index == other.index && size == other.size && written == other.written; }
+};
+bool ReadFileKey(const std::wstring& path, FileKey& key) {
+  Handle file; file.h = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                  nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  BY_HANDLE_FILE_INFORMATION info{};
+  if (file.h == INVALID_HANDLE_VALUE || !GetFileInformationByHandle(file.h,&info)) return false;
+  key.volume = info.dwVolumeSerialNumber;
+  key.index = (uint64_t(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
+  key.size = (uint64_t(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
+  key.written = (uint64_t(info.ftLastWriteTime.dwHighDateTime) << 32) | info.ftLastWriteTime.dwLowDateTime;
+  return true;
+}
+std::atomic<size_t> identityHashes{0};
+std::mutex identityMutex;
+std::map<std::wstring,std::pair<FileKey,std::string>> identityCache;
+std::string IdentityHash(const std::wstring& path, const std::function<bool()>& poll) {
+  FileKey before;
+  const bool keyed = ReadFileKey(path,before);
+  if (keyed) {
+    std::lock_guard<std::mutex> lock(identityMutex);
+    const auto found = identityCache.find(path);
+    if (found != identityCache.end() && found->second.first == before) return found->second.second;
+  }
+  ++identityHashes;
+  auto hash = Sha256File(path,poll);
+  FileKey after;
+  if (keyed && hash.size() == 64 && ReadFileKey(path,after) && after == before) {
+    std::lock_guard<std::mutex> lock(identityMutex);
+    identityCache[path] = {before,hash};
+  }
+  return hash;
 }
 ve::Json Verification(const std::string& state, const std::string& message) {
   return {{"state",state},{"message",message},{"expectedCodecs",ve::Json::array()},{"actualCodecs",ve::Json::array()},{"ffprobeVersion",nullptr}};
@@ -228,6 +267,7 @@ ve::Json LiveVideoFacts(const ve::Json& compiled) {
     facts["pixelFormatConversionReducesPrecision"] = video.at("inputBits").get<int64_t>() > video.at("outputBits").get<int64_t>();
   return facts;
 }
+size_t IdentityHashCountForTests() { return identityHashes; }
 void WritePreflightRecord(const PreflightFailure& f) {
   const auto id = NewJobId(), now = JobUtcNow(), output = Utf8(f.output.c_str());
   const auto status = f.cancelled ? "cancelled" : "failed";
@@ -282,7 +322,7 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
     // Exact selected executable/shared DLL identities are retained. Refuse changed
     // bytes instead of silently running another installation or probing on Render.
     const auto& identity = installation.at("identity");
-    auto hash = [&](const std::wstring& file) { return Sha256File(file,[&] { return Check(poll); }); };
+    auto hash = [&](const std::wstring& file) { return IdentityHash(file,[&] { return Check(poll); }); };
     if (!SameHash(ve::Str(identity,"sha256"),hash(Widen(ve::Str(installation,"path"))))) throw std::runtime_error("Selected FFmpeg identity changed.");
     if (identity.contains("libraries")) for (auto it = identity.at("libraries").begin(); it != identity.at("libraries").end(); ++it) {
       if (it.key().find_first_of("/\\:") != std::string::npos || it.key() == "." || it.key() == "..") throw std::runtime_error("Invalid shared library identity path.");

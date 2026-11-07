@@ -708,15 +708,23 @@ class RenderFile final : public ISfRenderFile {
       }
       if (ok) {
         t = NowMs();
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+        // Reuse buffers the pipe writers finished with: no per-frame allocation and zero fill.
+        if (recipeJob) owned = recipeJob->TakeBuffer(false, (size_t)packed);
+        else owned.resize((size_t)packed);
+#else
         owned.resize((size_t)packed);
+#endif
         const BYTE* data = reinterpret_cast<const BYTE*>((uintptr_t)(tok.pData + (uint64_t)tok.offset));
-        for (size_t y = 0; y < (size_t)height; y++) {
+        if (!rgb && planes[0] == row) memcpy(owned.data(), data, (size_t)(row * height));
+        else for (size_t y = 0; y < (size_t)height; y++) {
           // Positive-height BI_RGB is bottom-up. FFmpeg expects top-down rows.
           const size_t sourceRow = rgb ? (size_t)height - 1 - y : y;
           memcpy(owned.data() + y * (size_t)row, data + sourceRow * planes[0], (size_t)row);
         }
         if (!rgb) {
-          for (size_t y = 0; y < (size_t)height / 2; y++)
+          if (planes[2] == row) memcpy(owned.data() + (size_t)(row * height), data + planes[1], (size_t)(row * (height / 2)));
+          else for (size_t y = 0; y < (size_t)height / 2; y++)
             memcpy(owned.data() + (size_t)(row * height) + y * (size_t)row,
                    data + planes[1] + y * planes[2], (size_t)row);
         }
@@ -792,9 +800,15 @@ class RenderFile final : public ISfRenderFile {
         if (frame + 1 == r.frameCountReported) endpoint = r.streamLength;
         endpoint = (std::min)(endpoint, r.streamLength);
         while (ok && r.samplesWritten < endpoint) {
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+          // The frame's poll above covers its audio; Submit polls while it waits.
+          LONG want = (LONG)((std::min)(endpoint - r.samplesWritten, (LONGLONG)4096));
+          auto samples = recipeJob->TakeBuffer(true, (size_t)want * fmt.blockAlign);
+#else
           if (!poll(frame)) break;
           LONG want = (LONG)((std::min)(endpoint - r.samplesWritten, (LONGLONG)4096));
           std::vector<BYTE> samples((size_t)want * fmt.blockAlign);
+#endif
           SFMEMORYTOKEN at{};
           at.pData = (ULONGLONG)(uintptr_t)samples.data();
           at.cbData = at.cbAlloc = want * fmt.blockAlign;

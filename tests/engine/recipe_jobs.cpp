@@ -296,7 +296,7 @@ Json Run(const Case& test, const std::wstring& root) {
       SFMEMORYTOKEN token{}; LONG_PTR lock = 0; BYTE info[frameinfo::size]{}; LONG count = 0;
       Require(SUCCEEDED(video->GetRenderFrame(position,&token,&lock,info,&count)),"fake host acquisition");
       host::FrameLease lease(video,lock,held);
-      std::vector<BYTE> frame(static_cast<size_t>(test.width)*test.height*3);
+      auto frame = job.TakeBuffer(false,static_cast<size_t>(test.width)*test.height*3);
       DWORD planes[3]{}; memcpy(planes,info+frameinfo::planeFields,sizeof(planes));
       const auto* source = reinterpret_cast<const BYTE*>(static_cast<uintptr_t>(token.pData+token.offset));
       for (int row = 0; row < test.height; ++row) memcpy(frame.data()+size_t(row)*test.width*2,source+size_t(row)*planes[0],size_t(test.width)*2);
@@ -347,6 +347,7 @@ Json Run(const Case& test, const std::wstring& root) {
           transport.at("videoBytes") == stats.videoBytes && transport.at("audioBytes") == stats.audioBytes &&
           transport.at("videoQueueLimit") == 64u*1024*1024 && transport.at("audioQueueLimit").get<uint64_t>() <= 192u*1024*1024,"C6 transport diagnostics");
   Require(stats.videoHighWater <= 64u*1024*1024 && stats.audioHighWater <= transport.at("audioQueueLimit").get<uint64_t>(),"bounded in-flight pipe queues");
+  if (test.frames >= 300) Require(stats.videoBuffersAllocated <= 12,"frame buffers are reused (at most 12 allocations for 300+ frames)");
   if (!test.reason.empty()) {
     const auto message = ve::Str(job.Record(),"message");
     if (test.partialReason ? message.find(test.reason) == std::string::npos : message != test.reason) fprintf(stderr,"%s message: %s\n",test.name.c_str(),message.c_str());
@@ -617,6 +618,19 @@ int wmain(int argc, wchar_t** argv) {
     Require(ve::Str(summaries.back(),"message").find("FFmpeg: Unrecognized option") != std::string::npos,"the FFmpeg error stays in front of the known hardware context");
     Case knownOk; knownOk.recipe = base; knownOk.installation = Installation(argv[firstBuild]); knownOk.name = "known-hw-failure-ok";
     knownOk.frames = 10; knownOk.failedEncoders = knownFailure; summaries.push_back(Run(knownOk,root));
+    knownOk.name = "buffer-reuse"; knownOk.frames = 300; knownOk.failedEncoders = Json::object(); summaries.push_back(Run(knownOk,root)); // A11
+    // A13: identity hashes are cached per process by path, volume, file index, size and write time.
+    const auto copy = std::filesystem::path(root) / L"identity-ffmpeg.exe";
+    std::filesystem::copy_file(Self(),copy);
+    Case identity = chaos("identity-first","slow",true,10); identity.installation = Installation(copy.wstring(),copy.wstring());
+    summaries.push_back(Run(identity,root));
+    const auto hashed = IdentityHashCountForTests();
+    identity.name = "identity-repeat"; summaries.push_back(Run(identity,root));
+    Require(IdentityHashCountForTests() == hashed,"a second render with unchanged FFmpeg files hashes nothing");
+    { std::ofstream file(copy,std::ios::binary|std::ios::app); file << "changed"; }
+    identity.name = "identity-changed"; identity.success = false; identity.reason = "Selected FFmpeg identity changed";
+    summaries.push_back(Run(identity,root));
+    Require(IdentityHashCountForTests() > hashed,"a rewritten FFmpeg file is hashed again and refused");
     Save(root+L"\\summary.json",{{"checks",checks},{"instrumented",instrumented},{"validation","fake host / real FFmpeg plus controlled child fakes"},{"cases",summaries}});
     printf("B4 PASS: %d checks, %zu cases\n",checks,summaries.size()); return 0;
   } catch (const std::exception& error) { fprintf(stderr,"B4 FAIL after %d checks: %s\n",checks,error.what()); return 1; }
