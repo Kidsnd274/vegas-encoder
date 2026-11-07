@@ -231,6 +231,24 @@ void main() {
       expect((await mine(tester)).single.recipe.video.quality, 20);
     });
 
+    testWidgets('Save on close warns about errors only for the chosen FFmpeg (C13)', (tester) async {
+      await pump(tester);
+      await tester.tap(find.text('FFmpeg 8.1 full (default)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('FFmpeg 8.0 LGPL').last);
+      await tester.pumpAndSettle();
+      await type(tester, fieldWith('18'), '20');
+      final exit = tester.binding.handleRequestAppExit();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('can’t render with FFmpeg 8.0 LGPL'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(await exit, AppExitResponse.cancel, reason: 'Cancel keeps the window open');
+      expect(await mine(tester), isEmpty);
+    });
+
     testWidgets('closing with a draft that has errors stays open and says why', (tester) async {
       await pump(tester);
       await type(tester, extraField(), '-c:v libx265');

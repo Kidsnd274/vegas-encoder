@@ -5,7 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ve_services/ve_services.dart' show DesktopRoute, DesktopWindowBounds, ServiceException;
+import 'package:ve_services/ve_services.dart'
+    show DesktopRoute, DesktopWindowBounds, FFmpegCapabilities, FFmpegInstallation, Issue, ServiceException;
 
 import '../../app/launch.dart';
 import '../../design/components/button.dart';
@@ -15,6 +16,7 @@ import '../../design/tokens.dart';
 import '../../state/app_state.dart';
 import '../../state/desktop_interaction.dart';
 import '../../state/desktop_routes.dart';
+import '../../state/editor.dart' show compileSample, selectedInstallationIdProvider;
 import '../../state/presets.dart';
 import '../../state/services.dart';
 import '../../state/setup_wizard.dart';
@@ -201,13 +203,42 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
       // A draft whose settings have errors isn't saved (owner decision,
       // 2026-10-15): say why and stay open on it.
       final recipe = controller.working(id);
-      final errors = recipe == null ? null : saveErrors(ref.read(veCoreProvider), recipe, const []);
-      if (recipe != null && errors!.settings.isNotEmpty) {
-        controller.select(id);
-        if (mounted) {
-          await checkSave(context, name: recipe.name, settings: errors.settings, ffmpeg: const [], installation: '');
+      // Checked as the editor checks it: compiled for the selected FFmpeg (C13).
+      final installationId = ref.read(selectedInstallationIdProvider);
+      final installation = (ref.read(machineSettingsProvider).value?.installations ?? const <FFmpegInstallation>[])
+          .where((i) => i.id == installationId)
+          .firstOrNull;
+      FFmpegCapabilities? probed;
+      if (installationId != null) {
+        try {
+          probed = await ref.read(capabilitiesProvider(installationId).future);
+        } on Object {
+          probed = null; // Unknown capabilities fall back to the core's defaults.
         }
-        return AppExitResponse.cancel;
+      }
+      if (!mounted) return AppExitResponse.cancel;
+      final compiled = recipe == null
+          ? const <Issue>[]
+          : compileSample(
+                  ref.read(veCoreProvider),
+                  recipe,
+                  ext: ref.read(profilesProvider).containers.where((c) => c.id == recipe.container.format).firstOrNull?.ext,
+                  capabilities: capabilitiesFor(probed, recipe, label: installation?.label ?? ''),
+                ).value?.issues ??
+                const <Issue>[];
+      final errors = recipe == null ? null : saveErrors(ref.read(veCoreProvider), recipe, compiled);
+      if (recipe != null && (errors!.settings.isNotEmpty || errors.ffmpeg.isNotEmpty)) {
+        controller.select(id);
+        if (!mounted) return AppExitResponse.cancel;
+        final check = await checkSave(
+          context,
+          name: recipe.name,
+          settings: errors.settings,
+          ffmpeg: errors.ffmpeg,
+          installation: installation?.label ?? 'this FFmpeg',
+        );
+        // Settings errors never save; FFmpeg-only errors save when the user says so.
+        if (errors.settings.isNotEmpty || check != SaveCheck.save) return AppExitResponse.cancel;
       }
       final SaveOutcome outcome;
       try {
