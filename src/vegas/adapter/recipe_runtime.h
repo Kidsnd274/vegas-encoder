@@ -8,6 +8,7 @@ struct RecipeRuntime {
   std::wstring jobsRoot, monitorApplication;
   bool verifyOutput = true;
   ve::Json hostHwnd = nullptr;
+  ve::Json failedEncoders = ve::Json::object(); // {encoder:{reason,testedAt}} kept from the app's cache
 };
 // Owned C7/C3 snapshots only. No discovery, probes or executable hashing here.
 RecipeRuntime LoadRecipeRuntime();

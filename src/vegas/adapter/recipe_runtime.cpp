@@ -1,9 +1,9 @@
 #include "recipe_runtime.h"
 #include "vegas_encoder.h"
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <filesystem>
-#include <regex>
 
 namespace vegas_encoder {
 namespace {
@@ -118,7 +118,8 @@ RecipeRuntime LoadRecipeRuntime() {
   const auto& installation = result.installation;
   if (!installation.contains("identity") || !installation.at("identity").is_object()) throw std::runtime_error("FFmpeg identity is missing; add the installation again in the app.");
   const auto key = ve::Str(installation.at("identity"),"key");
-  if (!std::regex_match(key,std::regex("[A-Fa-f0-9]{64}"))) throw std::runtime_error("Invalid FFmpeg cache identity.");
+  if (key.size() != 64 || !std::all_of(key.begin(),key.end(),[](unsigned char c) { return std::isxdigit(c) != 0; }))
+    throw std::runtime_error("Invalid FFmpeg cache identity.");
   result.jobsRoot = (fs::path(Root(true)) / L"jobs").wstring();
   result.verifyOutput = Flag(machine,"verifyOutput",true);
   const auto cache = Read((fs::path(Root(true)) / L"cache" / (Widen(key) + L".json")).wstring());
@@ -131,10 +132,15 @@ RecipeRuntime LoadRecipeRuntime() {
     result.capabilities = capabilities;
     // Hardware readiness includes GPU/driver/age checks in the app. Do not label
     // a stored smoke result as currently qualified from this lightweight reader.
+    // A stored failure is kept as context for a later FFmpeg error (decision D8); it never blocks.
     for (const auto& profile : ve::Profiles().at("video")) if (!profile.value("hw",ve::Json(nullptr)).is_null()) {
       const auto name = ve::Str(profile,"id");
-      if (result.capabilities.contains("encoders") && result.capabilities["encoders"].contains(name))
-        result.capabilities["encoders"][name]["availability"] = {{"state","unknown"},{"reason","Hardware readiness is not requalified by the native candidate."}};
+      if (!result.capabilities.contains("encoders") || !result.capabilities["encoders"].contains(name)) continue;
+      auto& encoder = result.capabilities["encoders"][name];
+      const auto previous = encoder.value("availability",ve::Json::object());
+      if (previous.is_object() && ve::Str(previous,"state") == "failed")
+        result.failedEncoders[name] = {{"reason",ve::Str(previous,"reason")},{"testedAt",previous.value("testedAt",ve::Json(nullptr))}};
+      encoder["availability"] = {{"state","unknown"},{"reason","Hardware readiness is not requalified by the native candidate."}};
     }
   }
   HWND window = GetAncestor(GetForegroundWindow(),GA_ROOTOWNER); DWORD pid = 0;

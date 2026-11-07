@@ -742,6 +742,7 @@ class RenderFile final : public ISfRenderFile {
           options.monitorApplication = runtime.monitorApplication;
           options.nativeTarget = true;
           options.stallTimeoutMs = cfg.stallTimeoutMs; options.connectTimeoutMs = cfg.connectTimeoutMs;
+          options.failedEncoders = runtime.failedEncoders;
           ve::Json media{{"video", {{"width", r.width}, {"height", r.height},
               {"fps", ve::Json::array({r.rate.num, r.rate.den})}, {"pixfmt", rgb ? "bgr0" : "p010le"},
               {"sar", "1:1"}, {"frames", r.frameCountReported}}},

@@ -54,6 +54,15 @@ int wmain(int argc, wchar_t** argv) {
     Json caps{{"parser",VE_FFMPEG_PARSER_VERSION},{"identityKey",key},{"installationId","selected"},{"encoders",{{"h264_nvenc",{{"availability",{{"state","available"}}}}}}}};
     Write(cacheFile,{{"cache",1},{"capabilities",caps}});
     Check(LoadRecipeRuntime().capabilities.at("encoders").at("h264_nvenc").at("availability").at("state") == "unknown","native reader does not promote stored hardware readiness");
+    caps["encoders"]["h264_nvenc"]["availability"] = {{"state","failed"},{"reason","No NVENC capable devices found."},{"testedAt","2026-11-01T10:00:00Z"}};
+    Write(cacheFile,{{"cache",1},{"capabilities",caps}});
+    const auto failedRuntime = LoadRecipeRuntime();
+    Check(failedRuntime.capabilities.at("encoders").at("h264_nvenc").at("availability").at("state") == "unknown" &&
+          failedRuntime.failedEncoders.contains("h264_nvenc") &&
+          failedRuntime.failedEncoders.at("h264_nvenc").at("reason") == "No NVENC capable devices found." &&
+          failedRuntime.failedEncoders.at("h264_nvenc").at("testedAt") == "2026-11-01T10:00:00Z",
+          "a failed hardware test warns instead of blocking, and its date and reason are kept");
+    caps["encoders"]["h264_nvenc"]["availability"] = {{"state","available"}};
     caps["filters"] = {{"scale", {{"available", true}, {"algorithms", Json::array({"bicubic", "bilinear", "lanczos", "neighbor"})}}},
                        {"pad", {{"available", true}}}, {"setsar", {{"available", true}}}};
     Write(cacheFile,{{"cache",1},{"capabilities",caps}});

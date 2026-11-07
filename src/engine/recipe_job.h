@@ -16,6 +16,8 @@ struct RecipeJobOptions {
   // Contract 3.5: fail only after StallTimeoutMs without FFmpeg activity; ConnectTimeoutMs bounds pipe connection.
   DWORD stallTimeoutMs = 120000, connectTimeoutMs = 30000, probeTimeoutMs = 120000;
   std::function<std::string()> clock; // Tests inject a stepping clock; production uses JobUtcNow.
+  // {encoder:{reason,testedAt}} from the app's last hardware test (decision D8): context, never a block.
+  ve::Json failedEncoders = ve::Json::object();
 };
 // Immutable, already-selected installation/capability snapshot from C7/C3; B6
 // supplies the real template payload. This engine contains no native host API.

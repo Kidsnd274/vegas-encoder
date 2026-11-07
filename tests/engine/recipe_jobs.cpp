@@ -228,6 +228,7 @@ struct Case {
   bool success = true, verify = true, blockedIndex = false, blockedLive = false, collision = false;
   bool cancelDuringProbe = false, timedCancel = false, invalidRoot = false;
   bool endedEarly = false, clockStep = false;
+  Json failedEncoders = Json::object(); // encoders the app's last hardware test marked failed
   std::string reason; // expected exact (or, with partialReason, contained) C6 message
   bool partialReason = true;
   ULONGLONG maxDuration = 0;
@@ -243,6 +244,7 @@ Json Run(const Case& test, const std::wstring& root) {
   options.stallTimeoutMs = instrumented && test.stallTimeout >= 3000 ? 10000 : test.stallTimeout;
   options.connectTimeoutMs = instrumented && test.connectTimeout >= 3000 ? 10000 : test.connectTimeout;
   options.probeTimeoutMs = test.probeTimeout;
+  options.failedEncoders = test.failedEncoders;
   if (test.clockStep) {
     // The wall clock steps back 5 ms between start and end.
     auto calls = std::make_shared<int>(0);
@@ -405,7 +407,7 @@ Json Run(const Case& test, const std::wstring& root) {
     Require(live.at("outputBitDepth") == videoFacts.at("outputBitDepth") &&
             live.at("pixelFormatConversionReducesPrecision") == videoFacts.at("pixelFormatConversionReducesPrecision"),"C5 atomic live file preserves nullable core video facts");
   } else Require(!job.Store()->Failure().empty(),"status publication failure nonfatal");
-  Json summary{{"case",test.name},{"id",job.Id()},{"success",test.success},{"elapsedMs",duration},{"polls",repolls},{"maxPollGapMs",maxPollGap},
+  Json summary{{"case",test.name},{"id",job.Id()},{"success",test.success},{"message",job.Record()["message"]},{"elapsedMs",duration},{"polls",repolls},{"maxPollGapMs",maxPollGap},
     {"finishOrAbortMs",abortMs},{"workingSetGrowth",peak.load()-baseline},{"videoHighWater",stats.videoHighWater},{"audioHighWater",stats.audioHighWater},
     {"videoBytes",stats.videoBytes},{"audioBytes",stats.audioBytes},{"samples",samples},{"rate",Json::array({test.rate.num,test.rate.den})}};
   Save(path+L"\\summary.json",summary); printf("PASS %s: %llu ms, video queue %llu, audio queue %llu\n",test.name.c_str(),duration,stats.videoHighWater,stats.audioHighWater);
@@ -608,6 +610,13 @@ int wmain(int argc, wchar_t** argv) {
     summaries.push_back(Run(chaos("early-exit-mid-failure","early-exit-mid:30:1",false,60),root));
     Case clock; clock.recipe = base; clock.installation = Installation(argv[firstBuild]); clock.name = "clock-step"; clock.frames = 10; clock.clockStep = true;
     summaries.push_back(Run(clock,root));                                                             // A18
+    const Json knownFailure{{"ffv1",{{"reason","No NVENC capable devices found."},{"testedAt","2026-11-01T10:00:00Z"}}}};
+    chaosCase = chaos("known-hw-failure","exit",false,60); chaosCase.failedEncoders = knownFailure;   // A10
+    chaosCase.reason = "ffv1 also failed its last test on this PC (2026-11-01): No NVENC capable devices found. Test it again on the FFmpeg page or choose another encoder.";
+    summaries.push_back(Run(chaosCase,root));
+    Require(ve::Str(summaries.back(),"message").find("FFmpeg: Unrecognized option") != std::string::npos,"the FFmpeg error stays in front of the known hardware context");
+    Case knownOk; knownOk.recipe = base; knownOk.installation = Installation(argv[firstBuild]); knownOk.name = "known-hw-failure-ok";
+    knownOk.frames = 10; knownOk.failedEncoders = knownFailure; summaries.push_back(Run(knownOk,root));
     Save(root+L"\\summary.json",{{"checks",checks},{"instrumented",instrumented},{"validation","fake host / real FFmpeg plus controlled child fakes"},{"cases",summaries}});
     printf("B4 PASS: %d checks, %zu cases\n",checks,summaries.size()); return 0;
   } catch (const std::exception& error) { fprintf(stderr,"B4 FAIL after %d checks: %s\n",checks,error.what()); return 1; }

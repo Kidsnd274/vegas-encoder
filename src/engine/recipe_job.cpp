@@ -407,7 +407,17 @@ void RecipeJob::Complete(bool success) {
   if (terminal_) return; terminal_ = true;
   const auto stats = encoder_.Stats(); const auto state = success ? "done" : cancelled_ ? "cancelled" : "failed";
   const auto stderrTail = Tail(stats.stderrPath);
-  if (!success && !cancelled_ && encoderFailure_) message_ = EncoderFailureMessage(message_, stderrTail);
+  if (!success && !cancelled_ && encoderFailure_) {
+    message_ = EncoderFailureMessage(message_, stderrTail);
+    const auto encoder = compiled_.contains("summary") ? ve::Str(compiled_.at("summary"),"videoEncoderId") : std::string();
+    if (!encoder.empty() && options_.failedEncoders.is_object() && options_.failedEncoders.contains(encoder)) {
+      const auto& known = options_.failedEncoders.at(encoder);
+      const auto when = ve::Str(known,"testedAt"), reason = ve::Str(known,"reason");
+      message_ += " " + encoder + " also failed its last test on this PC" + (when.size() >= 10 ? " (" + when.substr(0,10) + ")" : "") +
+        (reason.empty() ? "" : ": " + reason) + (reason.empty() || reason.back() == '.' ? " " : ". ") +
+        "Test it again on the FFmpeg page or choose another encoder.";
+    }
+  }
   Phase(state,message_);
   const double elapsed = (GetTickCount64()-started_)/1000.0;
   ve::Json indices = ve::ErrorTokenIndices(compiled_,stderrTail);
