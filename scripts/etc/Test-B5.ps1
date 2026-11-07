@@ -1,12 +1,15 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-  [string] $PythonPath = 'python',
-  [string] $FFmpegPath = 'C:\ffmpeg\bin\ffmpeg.exe',
+  [string] $PythonPath,
+  [string] $FFmpegPath,
   [string] $HostPath,
   [switch] $SkipBuild
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$PythonPath = Resolve-VePython $PythonPath
+$FFmpegPath = Resolve-VeFFmpeg $FFmpegPath
 $b5Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 Push-Location -LiteralPath $b5Root
 try {

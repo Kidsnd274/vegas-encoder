@@ -4,15 +4,18 @@
 param(
   [ValidateSet('All','Build','Package')][string]$Action = 'All',
   [string]$OutputDir,
-  [string]$FlutterPath = $(if (Test-Path -LiteralPath 'L:\flutter\bin\flutter.bat') { 'L:\flutter\bin\flutter.bat' } else { 'flutter.bat' }),
-  [string]$PythonPath = 'python',
+  [string]$FlutterPath,
+  [string]$PythonPath,
   [string]$VcVarsPath,
   [string]$IsccPath
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+. (Join-Path $PSScriptRoot 'etc\Tools.ps1')
 . (Join-Path $PSScriptRoot 'etc\Version.ps1')
 . (Join-Path $PSScriptRoot 'etc\Release-Inputs.ps1')
+$PythonPath = Resolve-VePython $PythonPath
+if ($Action -ne 'Package') { $FlutterPath = Resolve-VeFlutter $FlutterPath }
 $version = Get-VeBuildVersion -PythonPath $PythonPath
 if ($Action -eq 'Build' -and $OutputDir) { throw 'OutputDir is only used by All or Package.' }
 if ($Action -ne 'Build') {

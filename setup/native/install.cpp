@@ -597,8 +597,11 @@ static void inspect(const fs::path& request, const fs::path& output) {
       RegCloseKey(key);
     }
   }
-  for (auto p : {L"C:\\Program Files\\BorisFX\\Vegas Pro 2026", L"C:\\Program Files\\VEGAS\\VEGAS Pro 2026", L"C:\\Program Files\\VEGAS\\VEGAS Pro 23.0",
-    L"C:\\Program Files\\VEGAS\\VEGAS Pro 22.0", L"C:\\Program Files\\VEGAS\\VEGAS Pro 21.0", L"C:\\Program Files\\Sony\\Vegas Pro 13.0"}) candidates.push_back(p);
+  PWSTR programFiles = nullptr;
+  if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_ProgramFiles, 0, nullptr, &programFiles)))
+    for (auto p : {L"BorisFX\\Vegas Pro 2026", L"VEGAS\\VEGAS Pro 2026", L"VEGAS\\VEGAS Pro 23.0",
+      L"VEGAS\\VEGAS Pro 22.0", L"VEGAS\\VEGAS Pro 21.0", L"Sony\\Vegas Pro 13.0"}) candidates.push_back(fs::path(programFiles) / p);
+  CoTaskMemFree(programFiles);
 #endif
   std::map<std::string, Host> found;
   for (auto& c : candidates) try { for (auto& h : hostsIn(plain(c))) found.emplace(h.family, h); } catch (...) {}
@@ -640,9 +643,17 @@ int wmain(int argc, wchar_t** argv) {
     if (op == L"test-sleep") { Sleep(20000); return 0; }
     if (op == L"test-uninstall-parent" || op == L"test-uninstall-child") {
       auto next = plain(ini(request, op == L"test-uninstall-parent" ? L"proxy" : L"helper"));
-      return static_cast<int>(_wspawnl(_P_WAIT, next.c_str(), next.c_str(),
+      // _wspawn joins arguments with spaces, so quote paths that may contain them.
+      auto quoted = [](const fs::path& p) {
+        std::wstring s = p.wstring(), out = L"\"";
+        for (auto c : s) { if (c == L'"') out += L'\\'; out += c; }
+        if (!s.empty() && s.back() == L'\\') out += L'\\';
+        return out + L"\"";
+      };
+      const auto exe = quoted(next), req = quoted(request), res = quoted(result), root = quoted(testRoot);
+      return static_cast<int>(_wspawnl(_P_WAIT, next.c_str(), exe.c_str(),
         op == L"test-uninstall-parent" ? L"test-uninstall-child" : L"uninstall-check",
-        request.c_str(), result.c_str(), testRoot.c_str(), nullptr));
+        req.c_str(), res.c_str(), root.c_str(), nullptr));
     }
 #endif
     if (op == L"inspect") inspect(request, result);

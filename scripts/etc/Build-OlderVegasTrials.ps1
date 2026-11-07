@@ -3,15 +3,16 @@
 param(
   [Parameter(Mandatory)][string]$AppPath,
   [Parameter(Mandatory)][string]$FFmpegPath,
-  [string]$VcVarsPath = 'L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat'
+  [string]$VcVarsPath
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out = Join-Path $repo ('build/test-results/older-vegas-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff'))
 $app = (Resolve-Path -LiteralPath $AppPath).Path
 $ffmpeg = (Resolve-Path -LiteralPath $FFmpegPath).Path
-$vcvars = (Resolve-Path -LiteralPath $VcVarsPath).Path
+$vcvars = Resolve-VeVcVars $VcVarsPath
 for ($ancestor = [IO.DirectoryInfo]$out; $null -ne $ancestor; $ancestor = $ancestor.Parent) {
   if ($ancestor.Exists -and ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
     throw "Output traverses a reparse point: $ancestor"
@@ -27,7 +28,7 @@ function Sources([string[]]$relative) {
 }
 function Invoke-Commands([string]$directory, [string[]]$commands) {
   $batch = Join-Path $directory 'build.cmd'
-  @('@echo off','setlocal','call "%VE_OLDER_VCVARS%" >nul || exit /b 1','cd /d "%~dp0" || exit /b 1') +
+  @('@echo off','setlocal','if defined VE_OLDER_VCVARS (call "%VE_OLDER_VCVARS%" >nul || exit /b 1)','cd /d "%~dp0" || exit /b 1') +
     ($commands | ForEach-Object { $_ + ' || exit /b 1' }) |
     Set-Content -LiteralPath $batch -Encoding ascii
   & cmd /d /c $batch 2>&1 | Tee-Object -FilePath (Join-Path $directory 'build.txt') | Out-Host

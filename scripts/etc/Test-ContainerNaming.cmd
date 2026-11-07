@@ -2,8 +2,8 @@
 setlocal
 set "VE_NAMING_ROOT=%~dp0..\.."
 set "VE_NAMING_VCVARS=%VEGAS_ENCODER_VCVARS%"
-if not defined VE_NAMING_VCVARS set "VE_NAMING_VCVARS=L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
-call "%VE_NAMING_VCVARS%" >nul || exit /b 1
+if not defined VE_NAMING_VCVARS call "%~dp0Find-VcVars.cmd" VE_NAMING_VCVARS || exit /b 1
+if defined VE_NAMING_VCVARS (call "%VE_NAMING_VCVARS%" >nul || exit /b 1)
 set "VE_NAMING_OUT=%VE_NAMING_ROOT%\build\test-results\container-naming"
 if not exist "%VE_NAMING_OUT%" mkdir "%VE_NAMING_OUT%"
 pushd "%VE_NAMING_OUT%" || exit /b 1

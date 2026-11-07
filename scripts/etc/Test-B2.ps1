@@ -1,15 +1,19 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-  [string] $DartPath = 'L:\flutter\bin\cache\dart-sdk\bin\dart.exe',
-  [string] $PythonPath = 'python',
-  [string] $FFmpegPath = 'C:\ffmpeg\bin\ffmpeg.exe',
+  [string] $DartPath,
+  [string] $PythonPath,
+  [string] $FFmpegPath,
   [string] $VcvarsPath = '',
   [switch] $Asan,
   [switch] $Aot,
   [switch] $Encoder
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$DartPath = Resolve-VeDart $DartPath
+$PythonPath = Resolve-VePython $PythonPath
+if ($Encoder) { $FFmpegPath = Resolve-VeFFmpeg $FFmpegPath }
 $veB2Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 function Invoke-B2Check {
   param([string] $Exe,[string[]] $Arguments)
@@ -19,13 +23,14 @@ function Invoke-B2Check {
 Push-Location -LiteralPath $veB2Root
 try {
   Invoke-B2Check $PythonPath @('-I','scripts/etc/Generate-CoreData.py','--check')
-  Invoke-B2Check 'cmd.exe' @('/d','/c',(Join-Path $PSScriptRoot 'build-core.cmd'),$VcvarsPath)
+  # Relative script paths keep cmd.exe's quote handling intact when the checkout path has spaces.
+  Invoke-B2Check 'cmd.exe' @('/d','/c','scripts\etc\build-core.cmd',$VcvarsPath)
   Invoke-B2Check $PythonPath @('-I','scripts/etc/Generate-CoreGoldens.py','--check')
   Invoke-B2Check $PythonPath @('-I','scripts/etc/Test-B1Data.py')
-  Invoke-B2Check 'cmd.exe' @('/d','/c',(Join-Path $PSScriptRoot 'Test-CoreNative.cmd'),$VcvarsPath)
+  Invoke-B2Check 'cmd.exe' @('/d','/c','scripts\etc\Test-CoreNative.cmd',$VcvarsPath)
   if ($Asan) {
     # Explicit quotes retain the empty vcvars argument through cmd.exe.
-    $veAsanCommand = '"' + (Join-Path $PSScriptRoot 'Test-CoreNative.cmd') + '" "' + $VcvarsPath + '" asan'
+    $veAsanCommand = 'scripts\etc\Test-CoreNative.cmd "' + $VcvarsPath + '" asan'
     Invoke-B2Check 'cmd.exe' @('/d','/c',$veAsanCommand)
   }
   Push-Location -LiteralPath (Join-Path $veB2Root 'packages/ve_core')

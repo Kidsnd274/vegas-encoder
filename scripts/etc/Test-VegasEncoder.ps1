@@ -12,11 +12,14 @@ DLL/INI, logs and outputs. Use a fresh evidence directory for every invocation.
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)][string] $EvidenceDir,
-  [string] $FFmpegPath = 'C:\ffmpeg\bin\ffmpeg.exe',
-  [string] $PythonPath = 'python',
+  [string] $FFmpegPath,
+  [string] $PythonPath,
   [switch] $Include1080p
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$FFmpegPath = Resolve-VeFFmpeg $FFmpegPath
+$PythonPath = Resolve-VePython $PythonPath
 $testRepo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 $testDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($EvidenceDir)
 if (Test-Path -LiteralPath $testDir) { throw 'EvidenceDir exists; use a fresh directory.' }

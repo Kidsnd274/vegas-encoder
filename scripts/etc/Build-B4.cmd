@@ -3,8 +3,8 @@ setlocal
 set "VE_B4_ROOT=%~dp0..\.."
 set "VE_B4_VCVARS=%~1"
 if not defined VE_B4_VCVARS set "VE_B4_VCVARS=%VEGAS_ENCODER_VCVARS%"
-if not defined VE_B4_VCVARS set "VE_B4_VCVARS=L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
-call "%VE_B4_VCVARS%" >nul || exit /b 1
+if not defined VE_B4_VCVARS call "%~dp0Find-VcVars.cmd" VE_B4_VCVARS || exit /b 1
+if defined VE_B4_VCVARS (call "%VE_B4_VCVARS%" >nul || exit /b 1)
 set "VE_B4_OUT=%VE_B4_ROOT%\build\b4-tests"
 set "VE_B4_FLAGS=/O2 /Zi"
 set VE_B4_CORE="%VE_B4_ROOT%\build\release\vegas-encoder\core\ve_core_static.lib"

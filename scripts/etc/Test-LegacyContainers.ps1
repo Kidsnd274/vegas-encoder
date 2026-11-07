@@ -3,11 +3,12 @@
 [CmdletBinding()]
 param(
   [string]$OutputDir,
-  [string]$VcVarsPath = 'L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat',
+  [string]$VcVarsPath,
   [string]$AppPath,
   [string]$FFmpegPath
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
 $legacyRepo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $legacyBuild = Join-Path $legacyRepo 'build'
 if (-not $OutputDir) { $OutputDir = Join-Path $legacyBuild ('test-results/legacy-containers-' + (Get-Date -Format 'yyyyMMdd-HHmmssfff')) }
@@ -19,14 +20,14 @@ for ($legacyAncestor = [IO.DirectoryInfo]$OutputDir; $null -ne $legacyAncestor; 
 }
 if (-not $AppPath) { $AppPath = Join-Path $legacyRepo 'build/release/vegas-encoder/app/VegasEncoder.exe' }
 $AppPath = (Resolve-Path -LiteralPath $AppPath).Path
-$VcVarsPath = (Resolve-Path -LiteralPath $VcVarsPath).Path
+$VcVarsPath = Resolve-VeVcVars $VcVarsPath
 if ($FFmpegPath) { $FFmpegPath = (Resolve-Path -LiteralPath $FFmpegPath).Path }
 New-Item -ItemType Directory -Path $OutputDir | Out-Null
 foreach ($legacyPart in @('core','modern','legacy','manual','auto','checks','logs')) { New-Item -ItemType Directory -Path (Join-Path $OutputDir $legacyPart) | Out-Null }
 $legacyCommands = @'
 @echo off
 setlocal
-call "%VE_LEGACY_VCVARS%" >nul || exit /b 1
+if defined VE_LEGACY_VCVARS (call "%VE_LEGACY_VCVARS%" >nul || exit /b 1)
 set "R=%VE_LEGACY_ROOT%"
 set "O=%VE_LEGACY_OUT%"
 cd /d "%O%\core" || exit /b 1

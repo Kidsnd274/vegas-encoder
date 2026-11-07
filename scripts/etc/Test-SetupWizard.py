@@ -5,6 +5,7 @@ detection. Builds the VEGAS integrations page in install, update and maintenance
 variants, then aborts before any install lifecycle code.
 """
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import uuid
@@ -14,7 +15,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--iscc', default=r'C:\Program Files (x86)\Inno Setup 6\ISCC.exe')
+    parser.add_argument('--iscc', default=str(Path(os.environ.get('ProgramFiles(x86)', '')) / 'Inno Setup 6' / 'ISCC.exe'))
     parser.add_argument('--helper', type=Path, default=REPO / 'build/release/vegas-encoder/setup/ve-install.exe')
     args = parser.parse_args()
     fixture = REPO / 'build/test-results' / ('setup-wizard-' + uuid.uuid4().hex)

@@ -1,8 +1,8 @@
 @echo off
 setlocal
 set "VE_SETUP_VCVARS=%VEGAS_ENCODER_VCVARS%"
-if not defined VE_SETUP_VCVARS if exist "L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" set "VE_SETUP_VCVARS=L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
-if defined VE_SETUP_VCVARS (call "%VE_SETUP_VCVARS%" >nul || exit /b 1) else (where cl >nul 2>nul || exit /b 1)
+if not defined VE_SETUP_VCVARS call "%~dp0Find-VcVars.cmd" VE_SETUP_VCVARS || exit /b 1
+if defined VE_SETUP_VCVARS (call "%VE_SETUP_VCVARS%" >nul || exit /b 1)
 set "VE_SETUP_ROOT=%~dp0..\.."
 set "VE_SETUP_OUT=%VE_SETUP_ROOT%\build\release\vegas-encoder\setup"
 set "VE_SETUP_FLAGS="

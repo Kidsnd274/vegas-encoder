@@ -1,12 +1,15 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-  [string] $DartPath = 'L:\flutter\bin\cache\dart-sdk\bin\dart.exe',
-  [string[]] $FFmpegPaths = @('C:\ffmpeg\bin\ffmpeg.exe'),
+  [string] $DartPath,
+  [string[]] $FFmpegPaths,
   [string] $VcVars,
   [switch] $Asan
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$DartPath = Resolve-VeDart $DartPath
+if (-not $FFmpegPaths) { $FFmpegPaths = @(Resolve-VeFFmpeg '') }
 $b4Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 $b4Build = [IO.Path]::GetFullPath((Join-Path $b4Root 'build'))
 $b4Run = Join-Path $b4Build ('test-results\b4-' + [guid]::NewGuid().ToString('N').Substring(0,8))
