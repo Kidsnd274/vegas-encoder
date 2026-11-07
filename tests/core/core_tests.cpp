@@ -35,6 +35,116 @@ void BadJson(const std::string& text, ve_status expected) {
     if (out.data) { const auto error = ve::Json::parse(out.data,out.data+out.length); Check(error.contains("error"),"error envelope"); }
     ve_free(out.data);
 }
+// 0.2.1 fix-plan regressions (B1-B6) collect every failure so each item shows.
+std::vector<std::string> failed;
+void Expect(bool ok, const std::string& message) { ++checks; if (!ok) failed.push_back(message); }
+const ve::Json* FindIssue(const ve::Json& issues, const std::string& id) {
+    for (const auto& issue : issues) if (ve::Str(issue,"id") == id) return &issue;
+    return nullptr;
+}
+size_t Count(const ve::Json& argv, const std::string& text) { return static_cast<size_t>(std::count(argv.begin(),argv.end(),ve::Json(text))); }
+std::string After(const ve::Json& argv, const std::string& flag) {
+    const auto at = std::find(argv.begin(),argv.end(),ve::Json(flag));
+    return at == argv.end() || std::next(at) == argv.end() ? std::string() : std::next(at)->get<std::string>();
+}
+bool Ranged(const ve::Json* issue, const std::string& level, size_t start, size_t end, bool params) {
+    if (!issue || ve::Str(*issue,"level") != level) return false;
+    const auto& at = params ? issue->at("params") : *issue;
+    return at.at("start") == start && at.at("end") == end;
+}
+void FixPlanChecks(const ve::Json& bundle, const ve::Json& request) {
+    const auto compiled = CallJson(ve_compile,request);
+    Expect(Count(compiled.at("argv"),"-nostats") == 1,"B1 generated global options include -nostats once");
+    Expect(After(compiled.at("argv"),"-progress") == "pipe:1","B1 progress still uses -progress pipe:1");
+    auto advanced = request;
+    advanced["recipe"]["command"] = {{"mode","template"},{"template","{inputs} -nostats -c:v libx264 -c:a aac -f mp4 {output}"}};
+    Expect(Count(CallJson(ve_compile,advanced).at("argv"),"-nostats") == 1,"B1 Advanced -nostats is not duplicated");
+    const auto nostats = CallJson(ve_template_lint,{{"text","{inputs} -nostats -c:v libx264 {output}"}}).at("diagnostics");
+    Expect(FindIssue(nostats,"L-GLOBAL") && !FindIssue(nostats,"L-OPTION") && !FindIssue(nostats,"L-VALUE"),"B1 lint knows -nostats as an always-added switch");
+
+    const std::string shorter = "This option can stop the render before the end of the VEGAS timeline. The output will be shorter.";
+    const std::string prefix = u8"{inputs} -metadata title=编码😀 ";
+    for (const std::string option : {"-t","-to","-frames","-frames:v","-vframes","-aframes","-fs"}) {
+        const auto text = prefix + option + " 5 -c:v libx264 {output}";
+        const auto lint = CallJson(ve_template_lint,{{"text",text}}).at("diagnostics");
+        const auto issue = FindIssue(lint,"L-DURATION-LIMIT");
+        Expect(Ranged(issue,"warn",ve::Utf16Offset(text,prefix.size()),ve::Utf16Offset(text,prefix.size() + option.size() + 2),false) && ve::Str(*issue,"message") == shorter,"B2 L-DURATION-LIMIT warning and UTF-16 range for " + option);
+        Expect(!FindIssue(lint,"L-OPTION"),"B2 " + option + " is a known option");
+    }
+    const auto shortestText = prefix + "-shortest -c:v libx264 {output}";
+    Expect(Ranged(FindIssue(CallJson(ve_template_lint,{{"text",shortestText}}).at("diagnostics"),"L-SHORTEST"),"warn",ve::Utf16Offset(shortestText,prefix.size()),ve::Utf16Offset(shortestText,prefix.size() + 9),false),"B2 L-SHORTEST warning");
+    for (const auto& [field,extra,id] : {std::tuple{"video","-t 5","V-EXTRA-DURATION"},{"video","-frames:v 100","V-EXTRA-DURATION"},{"video","-fs 10M","V-EXTRA-DURATION"},{"audio","-aframes 100","V-EXTRA-DURATION"},{"video","-shortest","V-EXTRA-SHORTEST"}}) {
+        auto basic = request;
+        (std::string(field) == "video" ? basic["recipe"]["video"] : basic["recipe"]["audio"][0])["extra"] = extra;
+        const auto issues = CallJson(ve_recipe_validate,basic).at("issues");
+        const auto issue = FindIssue(issues,id);
+        Expect(Ranged(issue,"warn",0,std::string(extra).size(),true) && ve::Str(*issue,"field") == (std::string(field) == "video" ? "video.extra" : "audio[0].extra") && !ve::HasErrors(issues),std::string("B2 ") + id + " warning for " + extra);
+        Expect(!ve::HasErrors(CallJson(ve_compile,basic).at("issues")),std::string("B2 length-limiting Extra still compiles: ") + extra);
+    }
+
+    for (const auto* text : {"{inputs} -c:v libx264 -f flv rtmp://host/live {output}","{inputs} -i https://example.com/logo.png -c:v libx264 {output}",
+                             "{inputs} -c:v libx264 -metadata comment=srt://host:9000 {output}","{inputs} -c:v libx264 -f tee \"[f=mp4]a.mp4|[f=mpegts]udp:239.0.0.1:1234\" {output}",
+                             "{inputs} -c:v libx264 -metadata comment=ftp://x/y {output}","{inputs} -c:v libx264 -metadata comment=TCP://x:1 {output}"})
+        Expect(FindIssue(CallJson(ve_template_lint,{{"text",text}}).at("diagnostics"),"L-NETWORK") != nullptr,std::string("B3 L-NETWORK for ") + text);
+    for (const auto* text : {"{inputs} -c:v libx264 -attach cover.jpg {output}","-dump_attachment:t out.bin {inputs} -c:v libx264 {output}",
+                             "{inputs} -c:v libx264 -/vf graph.txt {output}","{inputs} -c:v libx264 -filter_script:v graph.txt {output}",
+                             "{inputs} -c:v libx264 -filter_complex_script graph.txt {output}","{inputs} -c:v libx264 -vf movie=logo.png[l];[in][l]overlay {output}",
+                             "{inputs} -c:v libx264 -af amovie=a.wav {output}","{inputs} -c:v libx264 -vf subtitles=subs.srt {output}",
+                             "{inputs} -c:v libx264 -vf scale=1280:720,ass=subs.ass {output}","{inputs} -c:v libx264 -vf drawtext=textfile=t.txt:fontsize=20 {output}"})
+        Expect(FindIssue(CallJson(ve_template_lint,{{"text",text}}).at("diagnostics"),"L-FILE-ACCESS") != nullptr,std::string("B3 L-FILE-ACCESS for ") + text);
+    const auto ordinary = CallJson(ve_template_lint,{{"text","{inputs} -c:v libx264 -vf scale=1280:720,drawtext=text=hello -metadata \"comment=Note: a:b\" -metadata title=12:30 -progress pipe:1 {output}"}}).at("diagnostics");
+    Expect(!FindIssue(ordinary,"L-NETWORK") && !FindIssue(ordinary,"L-FILE-ACCESS"),"B3 ordinary filters and metadata containing colons are not flagged");
+    for (const auto& [extra,id] : {std::pair{"-metadata comment=https://example.com","V-EXTRA-NETWORK"},{"-vf subtitles=subs.srt","V-EXTRA-FILE"},{"-/vf graph.txt","V-EXTRA-FILE"}}) {
+        auto basic = request; basic["recipe"]["video"]["extra"] = extra;
+        const auto issues = CallJson(ve_recipe_validate,basic).at("issues");
+        Expect(FindIssue(issues,id) && ve::Str(*FindIssue(issues,id),"level") == "warn" && !ve::HasErrors(issues),std::string("B3 ") + id + " warning only for " + extra);
+    }
+
+    auto rate = request; rate["recipe"]["video"]["mode"] = "abr"; rate["recipe"]["video"]["extra"] = "-b:a 128k";
+    auto rateResult = CallJson(ve_compile,rate);
+    Expect(After(rateResult.at("argv"),"-b:v") == "12000k" && rateResult.at("overriddenFields").empty(),"B4 -b:a in Video Extra keeps the generated -b:v and overrides nothing");
+    Expect(FindIssue(rateResult.at("issues"),"V-EXTRA-WRONG-STREAM") != nullptr,"B4 V-EXTRA-WRONG-STREAM warns for -b:a in Video Extra");
+    auto profile = request; profile["recipe"]["video"]["extra"] = "-profile:a aac_low";
+    Expect(CallJson(ve_compile,profile).at("resolved").at("profile") == compiled.at("resolved").at("profile"),"B4 -profile:a in Video Extra does not change the resolved video profile");
+    auto quoted = request; quoted["recipe"]["video"]["extra"] = "-flags \"-global_header\"";
+    const auto quotedResult = CallJson(ve_compile,quoted);
+    bool quotedValue = false;
+    for (const auto& token : quotedResult.at("display")) if (ve::Str(token,"field") == "video.extra" && ve::Str(token,"text") == "-global_header") quotedValue = token.contains("isOption") && token.at("isOption") == false;
+    Expect(quotedValue && quotedResult.at("overriddenFields").empty() && !ve::HasErrors(quotedResult.at("issues")),"B4 quoted dash word is a value in compile, as in lint");
+    quoted["recipe"]["video"]["extra"] = "-metadata \"-crf\"";
+    const auto quotedCrf = CallJson(ve_compile,quoted);
+    Expect(After(quotedCrf.at("argv"),"-crf") == "18" && quotedCrf.at("overriddenFields").empty(),"B4 quoted option name value does not override the generated option");
+    auto chroma = request; chroma["recipe"]["schema"] = 2; chroma["recipe"]["audio"][0]["extra"] = "-pix_fmt yuv444p";
+    chroma["recipe"]["video"]["filters"] = ve::Json::array({{{"type","resize"},{"enabled",true},{"width",1281},{"height",720},{"backend","scale"},{"algorithm","bicubic"},{"fit","pad"}}});
+    const auto chromaIssues = CallJson(ve_compile,chroma).at("issues");
+    Expect(FindIssue(chromaIssues,"V-FILTER-ALIGNMENT") != nullptr,"B4 audio Extra pixel format leaves resize alignment conservative (2x2)");
+    const auto wrong = FindIssue(chromaIssues,"V-EXTRA-WRONG-STREAM");
+    Expect(wrong && ve::Str(*wrong,"field") == "audio[0].extra" && ve::Str(*wrong,"level") == "warn","B4 lint warns about a video option in Audio Extra");
+
+    for (const auto& [num,den] : {std::pair{48000,1001},{25,2},{240000,1001}}) {
+        auto rational = request; rational["media"]["video"]["fps"] = {num,den};
+        const auto result = CallJson(ve_compile,rational);
+        Expect(!ve::HasErrors(result.at("issues")) && After(result.at("argv"),"-r") == std::to_string(num) + "/" + std::to_string(den),"B6 core accepts and emits " + std::to_string(num) + "/" + std::to_string(den));
+    }
+
+#if defined(__SANITIZE_ADDRESS__)
+    const int rounds = 20;
+#else
+    const int rounds = 1000;
+#endif
+    const auto started = std::chrono::steady_clock::now(); size_t compiles = 0;
+    for (const auto& fixture : bundle.at("fixtures")) {
+        const ve::Json each{{"recipe",fixture.at("recipe")},{"media",fixture.at("media")},{"paths",fixture.at("paths")}};
+        for (int i = 0; i < rounds; ++i, ++compiles) ve::Compile(each);
+    }
+    const auto micros = std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now() - started).count() / static_cast<double>(compiles);
+    std::cout << "B5 compile benchmark: " << compiles << " compiles of the built-in fixtures, " << micros << " us each.\n";
+    if (!failed.empty()) {
+        std::string text = std::to_string(failed.size()) + " fix-plan regression(s):";
+        for (const auto& message : failed) text += "\n  - " + message;
+        throw std::runtime_error(text);
+    }
+}
 }
 int main(int argc, char** argv) {
     try {
@@ -530,6 +640,7 @@ int main(int argc, char** argv) {
             if (ve::Str(token,"role") == "output") outputChip = true;
         }
         Check(inputChip && outputChip,"completed locked macros survive unfinished quote");
+        FixPlanChecks(bundle,request);
         std::cout << "Native/static core: " << checks << " ownership, bounds, quoting, payload, fuzz and concurrency checks passed. No host or encoder process.\n";
         return 0;
     } catch (const std::exception& e) { std::cerr << "CORE TEST FAILED: " << e.what() << '\n'; return 1; }

@@ -5,6 +5,7 @@
     "yt-h264": [
       "-hide_banner",
       "-nostdin",
+      "-nostats",
       "-loglevel",
       "info",
       "-stats_period",
@@ -74,6 +75,7 @@
     "yt-hevc-nv": [
       "-hide_banner",
       "-nostdin",
+      "-nostats",
       "-loglevel",
       "info",
       "-stats_period",
@@ -151,6 +153,7 @@
     "av1-small": [
       "-hide_banner",
       "-nostdin",
+      "-nostats",
       "-loglevel",
       "info",
       "-stats_period",
@@ -218,6 +221,7 @@
     "prores-hq": [
       "-hide_banner",
       "-nostdin",
+      "-nostats",
       "-loglevel",
       "info",
       "-stats_period",
@@ -279,6 +283,7 @@
     "dnxhr-hq": [
       "-hide_banner",
       "-nostdin",
+      "-nostats",
       "-loglevel",
       "info",
       "-stats_period",
@@ -338,6 +343,7 @@
     "ffv1-master": [
       "-hide_banner",
       "-nostdin",
+      "-nostats",
       "-loglevel",
       "info",
       "-stats_period",
@@ -405,6 +411,7 @@
     [
       "-hide_banner",
       "-nostdin",
+      "-nostats",
       "-loglevel",
       "info",
       "-stats_period",

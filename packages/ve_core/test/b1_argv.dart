@@ -3,6 +3,7 @@ const b1CoreArgv = <List<String>> [
   [
     "-hide_banner",
     "-nostdin",
+    "-nostats",
     "-loglevel",
     "info",
     "-stats_period",
@@ -72,6 +73,7 @@ const b1CoreArgv = <List<String>> [
   [
     "-hide_banner",
     "-nostdin",
+    "-nostats",
     "-loglevel",
     "info",
     "-stats_period",
@@ -149,6 +151,7 @@ const b1CoreArgv = <List<String>> [
   [
     "-hide_banner",
     "-nostdin",
+    "-nostats",
     "-loglevel",
     "info",
     "-stats_period",
@@ -216,6 +219,7 @@ const b1CoreArgv = <List<String>> [
   [
     "-hide_banner",
     "-nostdin",
+    "-nostats",
     "-loglevel",
     "info",
     "-stats_period",
@@ -277,6 +281,7 @@ const b1CoreArgv = <List<String>> [
   [
     "-hide_banner",
     "-nostdin",
+    "-nostats",
     "-loglevel",
     "info",
     "-stats_period",
@@ -336,6 +341,7 @@ const b1CoreArgv = <List<String>> [
   [
     "-hide_banner",
     "-nostdin",
+    "-nostats",
     "-loglevel",
     "info",
     "-stats_period",
@@ -401,6 +407,7 @@ const b1CoreArgv = <List<String>> [
   [
     "-hide_banner",
     "-nostdin",
+    "-nostats",
     "-loglevel",
     "info",
     "-stats_period",

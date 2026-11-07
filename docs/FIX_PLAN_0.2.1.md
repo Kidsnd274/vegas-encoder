@@ -14,6 +14,11 @@ they follow those decisions exactly.
 
 ## Phase 0 record (lead, 2026-11-07)
 
+- **Execution.** Background subagents could not run commands or edit files in this
+  harness (tools needing approval are denied in the background). At the owner's
+  direction the lead implements A, B and C itself in the original checkout on
+  `fix/0.2.1`, in the order B, A, C. The three worktrees were created but are
+  unused; they stay until the owner approves their removal.
 - **Decisions.** D1 to D10 in section 2 are final. No default was replaced (D3, D6
   and D9 use the recommended default).
 - **Branch.** `fix/0.2.1` from `master` `5c59138`. Before the baseline the owner

@@ -306,9 +306,16 @@ DWORD WINAPI EditorSessionTask::Worker(void* context) {
         for (;;) {
           if (state->cancelled) {
             transport.Cancel();
-            // Destruction owns termination without waiting. A slow OS launch
-            // can finish after the page is gone; it never acquires a host HWND.
+            // This worker may block: wait up to 5 s for the terminated editor so its
+            // session folder (request.json holds the preset) is removed, not retained.
+            // A slow OS launch can finish after the page is gone; it never acquires a host HWND.
             result.diagnostic = "Editor startup/session cancelled; result discarded.";
+            for (const auto deadline = GetTickCount64() + 5000; GetTickCount64() < deadline; Sleep(25))
+              if (auto exit = transport.Poll()) {
+                result.cleanupComplete = exit->cleanupComplete;
+                if (!exit->cleanupComplete) result.diagnostic += " Session cleanup incomplete; directory retained.";
+                break;
+              }
             break;
           }
           if (auto exit = transport.Poll()) { result = std::move(*exit); break; }
