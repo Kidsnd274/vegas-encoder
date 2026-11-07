@@ -171,6 +171,28 @@ void CheckMedia(const Json& media) {
             throw Error(VE_INVALID_ARGUMENT,"MEDIA","Invalid delivered audio facts.");
     }
 }
+Json AudioRates(const Json& audio, const Json& audioProfile, const std::string& container, const Json& capabilities) {
+    const auto detail = EncoderOptions(capabilities,Str(audio,"encoder"));
+    Json rates = detail && detail->contains("sampleRates") && !detail->at("sampleRates").empty() ? detail->at("sampleRates") : audioProfile.value("rates",Json::array());
+    // FFmpeg's MXF muxer writes 48 kHz audio only.
+    if (container == "mxf") rates = rates.empty() || Includes(rates,Json(48000)) ? Json::array({48000}) : Json::array();
+    return rates;
+}
+Json ResampleTarget(const Json& audio, const Json& audioProfile, const std::string& container, const Json& media, const Json& capabilities) {
+    if (!Bool(audio,"enabled",true) || (audio.contains("sampleRate") && audio.at("sampleRate").is_number()) ||
+        !media.is_object() || !media.contains("audio") || !media.at("audio").is_object() || !media.at("audio").contains("rate")) return nullptr;
+    const auto source = media.at("audio").at("rate");
+    const auto rates = AudioRates(audio,audioProfile,container,capabilities);
+    if (rates.empty() || Includes(rates,source)) return nullptr;
+    if (Includes(rates,Json(48000))) return 48000;
+    Json best = nullptr; const double from = source.get<double>();
+    for (const auto& rate : rates) if (rate.is_number()) {
+        const double distance = std::abs(rate.get<double>() - from);
+        if (best.is_null() || distance < std::abs(best.get<double>() - from) ||
+            (distance == std::abs(best.get<double>() - from) && rate.get<double>() > best.get<double>())) best = rate;
+    }
+    return best;
+}
 Json Validate(const Json& request, const Json* capabilities, const Json* structural) {
     const auto& r = request.at("recipe"); Json issues = structural ? *structural : Structural(r);
     if (HasErrors(issues)) return issues;
@@ -262,11 +284,22 @@ Json Validate(const Json& request, const Json* capabilities, const Json* structu
         stream(a,res.at("audioProfile"),"audio","audio[0]");
         if (!media.is_null() && (!media.contains("audio") || media.at("audio").is_null())) issues.push_back(Issue("V-AUDIO-INPUT","error","audio[0].enabled","This source has no audio stream; turn audio off."));
         else {
-            const auto rate = a.contains("sampleRate") && a.at("sampleRate").is_number() ? a.at("sampleRate") : !media.is_null() ? media.at("audio").at("rate") : Json(nullptr);
+            const bool chosen = a.contains("sampleRate") && a.at("sampleRate").is_number();
+            const auto rate = chosen ? a.at("sampleRate") : !media.is_null() ? media.at("audio").at("rate") : Json(nullptr);
             const auto& profile = res.at("audioProfile");
-            const auto detail = EncoderOptions(caps,Str(a,"encoder"));
-            const auto rates = detail && detail->contains("sampleRates") && !detail->at("sampleRates").empty() ? detail->at("sampleRates") : profile.value("rates",Json::array());
-            if (!rate.is_null() && !rates.empty() && !Includes(rates,rate)) issues.push_back(Issue("V-RATE","error","audio[0].sampleRate","This encoder does not support the selected audio sample rate.",{{"rate",rate}}));
+            const auto format = Str(c,"format");
+            const auto rates = AudioRates(a,profile,format,caps);
+            if (chosen && !rates.empty() && !Includes(rates,rate))
+                issues.push_back(Issue("V-RATE","error","audio[0].sampleRate",format == "mxf" ? "MXF files need 48000 Hz audio." :
+                                       "This encoder does not support the selected audio sample rate.",{{"rate",rate}}));
+            else if (const auto target = ResampleTarget(a,profile,format,media,caps); !target.is_null()) {
+                // Decision D11: "source" audio the stream can't take is resampled, and says so.
+                const auto from = std::to_string(std::llround(rate.get<double>())), to = std::to_string(std::llround(target.get<double>()));
+                const bool encoderTakesSource = Includes(AudioRates(a,profile,"",caps),rate) || AudioRates(a,profile,"",caps).empty();
+                issues.push_back(Issue("V-RATE-RESAMPLED","info","audio[0].sampleRate","Audio is resampled from " + from + " Hz to " + to + " Hz because " +
+                    (format == "mxf" && encoderTakesSource ? std::string("MXF files need 48000 Hz audio.") :
+                     Str(profile,"label",Str(a,"encoder")) + " doesn't support " + from + " Hz."),{{"rate",rate},{"target",target}}));
+            }
         }
     }
     if (Str(c,"format") == "mp4" && Bool(c,"faststart")) issues.push_back(Issue("V-FASTSTART","info","container.faststart","Fast start rewrites the file after encoding so playback can begin before download finishes."));

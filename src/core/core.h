@@ -26,6 +26,11 @@ Json Issue(const std::string& id, const std::string& level, const std::string& f
            const std::string& message, Json params = Json::object(), Json refs = Json::array());
 bool HasErrors(const Json& issues);
 Json Structural(const Json& recipe);
+// Decision D11: the sample rates an audio encoder and container accept (empty: any),
+// and the rate a "source" recipe resamples to when the project's rate is not one of
+// them (48000 when accepted, else the nearest accepted rate); null when no resampling.
+Json AudioRates(const Json& audio, const Json& audioProfile, const std::string& container, const Json& capabilities);
+Json ResampleTarget(const Json& audio, const Json& audioProfile, const std::string& container, const Json& media, const Json& capabilities);
 // structural: an already computed Structural(recipe), reused instead of recomputed.
 Json Validate(const Json& request, const Json* capabilities = nullptr, const Json* structural = nullptr);
 Json Normalize(const Json& request);

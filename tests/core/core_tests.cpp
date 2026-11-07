@@ -127,6 +127,41 @@ void FixPlanChecks(const ve::Json& bundle, const ve::Json& request) {
         Expect(!ve::HasErrors(result.at("issues")) && After(result.at("argv"),"-r") == std::to_string(num) + "/" + std::to_string(den),"B6 core accepts and emits " + std::to_string(num) + "/" + std::to_string(den));
     }
 
+    // Decision D11: "source" audio the encoder or container can't take resamples to 48 kHz with a note.
+    // Output options only: the raw audio input also carries -ar.
+    auto outputAr = [](const ve::Json& argv) {
+        size_t start = 0;
+        for (size_t i = 0; i < argv.size(); ++i) if (argv[i] == "-i") start = i + 2;
+        for (size_t i = start; i + 1 < argv.size(); ++i) if (argv[i] == "-ar") return argv[i+1].get<std::string>();
+        return std::string();
+    };
+    auto fixtureRequest = [&](const char* id) {
+        for (const auto& f : bundle.at("fixtures")) if (ve::Str(f.at("recipe"),"id") == id)
+            return ve::Json{{"recipe",f.at("recipe")},{"media",f.at("media")},{"paths",f.at("paths")}};
+        throw std::runtime_error(std::string("missing fixture ") + id);
+    };
+    for (const auto* id : {"av1-small","dnxhr-hq","ffv1-master"}) {
+        auto at44 = fixtureRequest(id); at44["media"]["audio"]["rate"] = 44100;
+        const auto result = CallJson(ve_compile,at44);
+        const auto note = FindIssue(result.at("issues"),"V-RATE-RESAMPLED");
+        Expect(!ve::HasErrors(result.at("issues")) && outputAr(result.at("argv")) == "48000" && note && ve::Str(*note,"level") == "info" &&
+               ve::Str(*note,"message").rfind("Audio is resampled from 44100 Hz to 48000 Hz because ",0) == 0,
+               std::string("D11 a 44.1 kHz project resamples to 48 kHz with ") + id);
+    }
+    auto opus = fixtureRequest("av1-small"); opus["media"]["audio"]["rate"] = 44100;
+    const auto opusResult = CallJson(ve_compile,opus);
+    Expect(outputAr(opusResult.at("argv")) == "48000" && FindIssue(opusResult.at("issues"),"V-RATE-RESAMPLED") &&
+           ve::Str(*FindIssue(opusResult.at("issues"),"V-RATE-RESAMPLED"),"message").find("Opus doesn't support 44100 Hz.") != std::string::npos,
+           "D11 Opus at 44.1 kHz resamples to 48 kHz and names the encoder");
+    auto mxf = fixtureRequest("dnxhr-hq"); mxf["media"]["audio"]["rate"] = 44100;
+    const auto mxfResult = CallJson(ve_compile,mxf);
+    const auto mxfNote = FindIssue(mxfResult.at("issues"),"V-RATE-RESAMPLED");
+    Expect(mxfNote && ve::Str(*mxfNote,"message").find("MXF files need 48000 Hz audio.") != std::string::npos,"D11 MXF at 44.1 kHz explains the container rule");
+    opus["recipe"]["audio"][0]["sampleRate"] = 44100;
+    Expect(FindIssue(CallJson(ve_compile,opus).at("issues"),"V-RATE") != nullptr,"D11 an explicitly chosen unsupported rate stays an error");
+    const auto at48 = CallJson(ve_compile,fixtureRequest("av1-small"));
+    Expect(outputAr(at48.at("argv")).empty() && !FindIssue(at48.at("issues"),"V-RATE-RESAMPLED"),"D11 a supported project rate is not resampled");
+
 #if defined(__SANITIZE_ADDRESS__)
     const int rounds = 20;
 #else

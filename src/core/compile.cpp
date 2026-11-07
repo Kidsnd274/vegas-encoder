@@ -131,7 +131,7 @@ void ReadStream(const Json& tokens, Json& resolved, bool video) {
     }
     if (unknownVideoFormatScope) { resolved["pixfmt"] = ""; resolved["depth"] = 0; }
 }
-Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
+Json Basic(const Json& r, const Json& media, Json& res, Json& overridden, const Json& caps) {
     const auto& v = r.at("video"); const auto& a = r.at("audio")[0]; const auto& c = r.at("container");
     // ordered_json object storage can move when reflected values add keys to res.
     // Keep profiles owned across ReadStream instead of borrowing its object entries.
@@ -192,6 +192,8 @@ Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
         } else if (amode == "vbr") Pair(audio,"audio","audio[0].vbr",Str(ap.value("vbr",Json::object()),"flag","-q:a"),Num(a,"vbr",Num(ap.value("vbr",Json::object()),"def")));
         if (ap.contains("level")) Pair(audio,"audio","audio[0].level",Str(ap.at("level"),"flag","-compression_level"),Num(a,"level",Num(ap.at("level"),"def")));
         if (a.contains("sampleRate") && a.at("sampleRate").is_number()) Pair(audio,"audio","audio[0].sampleRate","-ar",a.at("sampleRate"));
+        else if (const auto target = ResampleTarget(a,ap,Str(c,"format"),media,caps); !target.is_null())
+            Pair(audio,"audio","audio[0].sampleRate","-ar",target); // Decision D11: "source" resamples to a rate the stream accepts.
         if (Str(a,"channels","source") != "source") Pair(audio,"audio","audio[0].channels","-ac",Str(a,"channels") == "mono" ? 1 : 2);
         Extra(audio,Str(a,"extra"),"audio[0].extra",overridden); ReadStream(audio,res,false);
     } else Push(audio,"audio","audio[0].enabled",{"-an"});
@@ -447,6 +449,8 @@ static Json CompileInternal(const Json& request, const Json* capabilities, Json*
     if (!paths.is_object() || Str(paths,"ffmpeg","ffmpeg").empty() || Str(paths,"videoPipe").empty() || Str(paths,"output").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Executable, video pipe and output path must be nonempty strings.");
     const auto shape = structural ? *structural : Structural(r);
     Json issues = Validate(request,capabilities,&shape); const auto exe = Str(paths,"ffmpeg","ffmpeg");
+    const Json noCaps = nullptr;
+    const Json& caps = capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCaps;
     Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr},{"outputContainerId",nullptr},{"outputExtension",nullptr},{"filterControl","structured"},{"videoGeometry",nullptr}};
     if (HasErrors(shape)) return result;
     result["filterControl"] = FilterControl(r); result["videoGeometry"] = VideoGeometry(r,media);
@@ -462,7 +466,7 @@ static Json CompileInternal(const Json& request, const Json* capabilities, Json*
     const bool advanced = Str(r.at("command"),"mode") == "template";
     if (!advanced) {
         for (const auto& token : input) tokens.push_back(token);
-        const auto basic = Basic(r,media,res,result["overriddenFields"]); for (const auto& token : basic) tokens.push_back(token);
+        const auto basic = Basic(r,media,res,result["overriddenFields"],caps); for (const auto& token : basic) tokens.push_back(token);
         std::string seed;
         // Preserve the tagging policy when {inputs} is expanded in Advanced,
         // where inactive Basic fields deliberately do not alter the source.
@@ -524,8 +528,6 @@ static Json CompileInternal(const Json& request, const Json* capabilities, Json*
         }
         result["resolved"] = nullptr;
     }
-    const Json noCaps = nullptr;
-    const Json& caps = capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCaps;
     // Validate actual emitted generated values against this build's private help.
     // Extra text was linted in Validate; it keeps its own spans and issue fields.
     if (!advanced && caps.is_object()) for (size_t i = 0; i + 1 < tokens.size(); ++i) {
