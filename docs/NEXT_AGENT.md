@@ -13,6 +13,9 @@ history; their old locations, ownership splits and queues do not apply.
 
 ## Current queue: older VEGAS release qualification
 
+**0.2.1 bug-fix release (in progress on branch `fix/0.2.1`):** follow
+[FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md).
+
 The 0.2.0+2 logs from VEGAS 2026.0.3.189 and Sony VEGAS 13.0.0.453 confirm
 FFmpeg startup and exposed a separate AV1 (CPU) live pipe stall. The updated
 built-in starter (revision 4) stores the workaround `-svtav1-params lp=3` in

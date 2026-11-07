@@ -15,6 +15,8 @@ REPO = Path(__file__).resolve().parents[2]
 HELPER = REPO / 'build/test-results/setup-helper/ve-install.exe'
 APP = 'vegas-encoder.app.windows-x64'
 CORE = 'vegas-encoder.core.vegas2026.windows-x64'
+# The last published release; the current version.json release must upgrade it.
+PREVIOUS_RELEASE = '0.2.0+3'
 
 
 def sha(path):
@@ -451,6 +453,21 @@ class SetupTests(unittest.TestCase):
         self.save_package()
         self.install()
         self.package['version'] = '0.1.7+1'
+        self.save_package()
+        answer = self.call('prepare', success=False)
+        self.assertIn('Uninstall it before installing this older version', answer['message'])
+
+    def test_current_release_upgrades_previous_and_refuses_downgrade(self):
+        release = json.loads((REPO / 'version.json').read_text(encoding='utf-8'))['release']
+        current = f"{release['version']}+{release['build']}"
+        self.package['version'] = PREVIOUS_RELEASE
+        self.save_package()
+        self.install()
+        self.package['version'] = current
+        self.save_package()
+        self.install()
+        self.assertEqual(self.record(APP)['version'], current)
+        self.package['version'] = PREVIOUS_RELEASE
         self.save_package()
         answer = self.call('prepare', success=False)
         self.assertIn('Uninstall it before installing this older version', answer['message'])

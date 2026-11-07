@@ -12,6 +12,65 @@ work is split between a **lead agent** and up to **three subagents** (section 1)
 All owner decisions are recorded in section 2. Subagents cannot ask questions, so
 they follow those decisions exactly.
 
+## Phase 0 record (lead, 2026-11-07)
+
+- **Decisions.** D1 to D10 in section 2 are final. No default was replaced (D3, D6
+  and D9 use the recommended default).
+- **Branch.** `fix/0.2.1` from `master` `5c59138`. Before the baseline the owner
+  merged `from-vegas-display` (`45c5f76`, live VEGAS pipe streams in the editor)
+  into `fix/0.2.1`; the baseline includes it.
+- **Lead toolchain.** Flutter 3.47.9 (Dart 3.13.7; the plan names 3.47.7), VS 18
+  MSVC 14.51, Python 3.14. FFmpeg and FFprobe `N-128435-g7798de15f86-gdb8537d8cc7+2`
+  (the owner's AV1-stall build) are the only FFmpeg on the lead PC. No Inno Setup,
+  Node or VEGAS is installed there.
+- **Checkout paths with spaces** now build and test (owner-approved):
+  `native_toolchain_c` 0.19.2 → 0.19.3 (the upstream fix for MSVC builds from paths
+  with spaces; the app lock also moves `meta` 1.18.3 → 1.19.0). `Test-B2.ps1` calls
+  `cmd` with relative script paths, and the setup helper's test-only respawn quotes
+  its arguments.
+- **Fresh checkout prep.** Run `dart pub get` in `packages/ve_core` and
+  `packages/ve_services` before the Dart runners, and
+  `cmd /d /c scripts\etc\Build-SetupHelper.cmd test` before `Test-Setup.py`.
+- **L0.6.** `scripts/etc/Tools.ps1` and `scripts/etc/Find-VcVars.cmd` resolve every
+  tool from the parameter, then `VEGAS_ENCODER_*`, then `PATH` (MSVC: an active x64
+  developer prompt, then `vswhere`). See `scripts/README.md`.
+  `Test-NoMachinePaths.py --scope scripts` passes; the full scope fails until L4
+  (150 lines in 46 files). Its drive-letter allowlist also covers `tests/**` (native
+  test fixtures) and the two generated B0 fixture Dart files.
+- **L0.4.** Release 0.2.1+1 (file version 0.2.1.1), core 0.3.1. A new
+  `Test-Setup.py` case checks the upgrade from 0.2.0+3 and the downgrade block; it
+  failed before the bump and passes after.
+- **Pre-existing failures found by the baseline:**
+  - Fixed in Phase 0: the AV1 (CPU) built-in's `updatedAt` was not UTC, so copies
+    of it failed to load (`library_watch_test`); `Generate-ServiceBuiltins.py` now
+    refuses non-UTC timestamps. `repositories_test` still expected AV1 (CPU) at
+    revision 3. The setup helper's ancestor test failed on paths with spaces.
+  - Still open, **for A**: `Test-VegasEncoder.ps1` (fiohost, fixed-profile DLL)
+    fails on FFmpeg N-128435, because the fixed-profile command in
+    `src/engine/encode.cpp` passes `-thread_queue_size` before each `-i`, which
+    this FFmpeg rejects ("cannot be applied to input url"). It passed on a gyan
+    2025-10-27 build. The core already dropped this flag (core test "live inputs
+    do not reintroduce rejected queue flags").
+
+**Results after Phase 0** (real FFmpeg N-128435 where FFmpeg is used; fakes or the
+fake host everywhere else; no real VEGAS):
+
+| Suite | Result |
+| --- | --- |
+| Versions, generated built-ins, scripts path check | pass (8 version tests) |
+| `Build-Release.ps1 -Action Build` | pass; app `0.2.1+1`, all four exporter DLLs 0.2.1.1 |
+| `Test-B2.ps1 -Asan` | pass: 3,182 core checks (normal and ASan), 180 B1 data, 246 FFI ×2 |
+| `Test-B4.ps1 -Asan` | pass: 32,645–32,672 checks, 27 cases (timing-dependent count), 369 record checks; normal and ASan |
+| `Test-B6.ps1 -Asan` | pass: 523 snapshot, 97 transport, 485 page, monitor cadence; normal and ASan |
+| `Test-VegasEncoder.ps1` (fiohost) | **fail** (pre-existing, above; for A) |
+| `Test-LegacyContainers.ps1 -FFmpegPath` | pass: 335 naming, 417 legacy, 184 manual, 443 automatic, 34 runtime, 120 container renders, 179 automatic-name renders |
+| `Build-OlderVegasTrials.ps1` | pass: 22, 21 and 13 each 478 callback + 179 render checks + wrong-host rejection |
+| ve_core / ve_services Dart runners | pass: 177; 89, 15, 12, 99 (library watch), 26 |
+| `Test-B3Services.ps1` / `Test-B3Repositories.ps1` / `Test-B3Runtime.ps1` | pass: 4,469 / 170 / 67 (11 synthetic encodes, 3 unavailable-encoder refusals) |
+| `flutter analyze` / `flutter test` | clean / 700 pass |
+| `Test-Setup.py` / `Test-ReleaseInputs.ps1` | 48 / 15 pass |
+| `Test-RenderMatrix.ps1` | not yet (A creates it in T3) |
+
 ---
 
 ## 0. Read this first (every agent)
@@ -406,9 +465,9 @@ Situations the render matrix must cover:
       (user-profile paths are still flagged there).
     - Its `--scope scripts` mode checks `scripts/**` and `setup/**` only; the
       default mode checks everything.
-    - It fails now (the scripts default to `L:\…`, and docs name the checkout's
-      location and user name).
-  - **Fix the scripts**: replace every `L:\…` default (Flutter, Dart, vcvars,
+    - It fails now (the scripts default to paths on the `L:` drive, and docs
+      name the checkout's location and user name).
+  - **Fix the scripts**: replace every `L:` drive default (Flutter, Dart, vcvars,
     FFmpeg) with this lookup order: parameter, then environment variable
     (`VEGAS_ENCODER_FLUTTER`; the existing `VEGAS_ENCODER_VCVARS` and
     `VEGAS_ENCODER_PYTHON`; new `VEGAS_ENCODER_FFMPEG`), then `PATH`. For MSVC,
