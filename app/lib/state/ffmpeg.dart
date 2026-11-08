@@ -117,7 +117,13 @@ class FFmpegController extends Notifier<FFmpegState> {
 
   FFmpegDiscovery get _discovery => ref.read(ffmpegDiscoveryProvider);
 
-  void select(String id) => state = state.copyWith(selectedId: id, selectedEncoder: null);
+  void select(String id) {
+    _selections++;
+    state = state.copyWith(selectedId: id, selectedEncoder: null);
+  }
+
+  /// Counts selections, so [add] never overrides a card chosen while it ran (C1).
+  int _selections = 0;
   void setKind(EncoderKind kind) => state = state.copyWith(kind: kind, selectedEncoder: null);
   void setFilter(CapabilityFilter filter) => state = state.copyWith(filter: filter);
   void setQuery(String query) => state = state.copyWith(query: query);
@@ -147,9 +153,11 @@ class FFmpegController extends Notifier<FFmpegState> {
   /// records it), checks it and shows it. Discovery's failure (not FFmpeg, no
   /// ffprobe beside it…) reaches the caller as a [ServiceException].
   Future<FFmpegInstallation> add(String executablePath) async {
+    final before = _selections;
     final installation = await _discovery.add(executablePath);
     if (!ref.mounted) return installation;
-    select(installation.id);
+    // Show the new card only if the user hasn't picked another meanwhile.
+    if (_selections == before) select(installation.id);
     await probe(installation);
     return installation;
   }
