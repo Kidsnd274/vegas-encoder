@@ -325,6 +325,7 @@ class _LibraryRow extends StatelessWidget {
             if (e.advanced) 'Advanced',
             if (e.dirty) 'unsaved changes',
             if (e.errors.isNotEmpty) e.errors.length == 1 ? 'an error' : '${e.errors.length} errors',
+            if (e.externalAccess.isNotEmpty) 'reads other files or uses the network',
             e.line,
             if (e.favorite) 'favorite',
           ].join(', '),
@@ -371,6 +372,13 @@ class _LibraryRow extends StatelessWidget {
                                 VeTooltip(
                                   message: e.errors.join('\n'),
                                   child: VeIcon(VeIcons.error, color: c.error, size: 14),
+                                ),
+                              ],
+                              if (e.externalAccess.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                VeTooltip(
+                                  message: e.externalAccess.join('\n'),
+                                  child: VeIcon(VeIcons.warning, color: c.warning, size: 14),
                                 ),
                               ],
                               if (e.dirty) ...[

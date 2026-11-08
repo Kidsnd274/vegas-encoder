@@ -14,6 +14,7 @@ import '../../state/desktop_interaction.dart';
 import '../../state/history.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
+import '../presets/save_check.dart' show confirmImport, externalAccess;
 import 'display.dart';
 import 'job_detail.dart';
 import 'job_list.dart';
@@ -59,6 +60,9 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with VeToastHost {
       ref.read(desktopInteractionProvider).run(() => _openAsPresetGuarded(record));
 
   Future<void> _openAsPresetGuarded(JobRecord record) async {
+    // Decision D3: settings that read other files or use the network ask first.
+    final findings = externalAccess(ref.read(veCoreProvider), record.recipe);
+    if (!await confirmImport(context, name: record.templateName, findings: findings) || !mounted) return;
     final Preset? created;
     try {
       created = await ref.read(presetsControllerProvider.notifier).createFromJob(record);

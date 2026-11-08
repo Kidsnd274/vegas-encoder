@@ -32,7 +32,23 @@ class PresetTransfer {
 
   Future<String> shareString(String id) async =>
       'vepreset:1:${base64Url.encode(utf8.encode(await library.exportPreset(id)))}';
-  Future<Preset> importShareString(String text, {required String newId}) async {
+  Future<Preset> importShareString(String text, {required String newId}) async =>
+      library.importPreset(_shareJson(text), newId: newId);
+
+  /// The preset in a share string, read with the import's checks but not
+  /// saved, so the app can warn first (C9).
+  Future<Preset> peekShareString(String text) async =>
+      Preset.fromJson(decodeJson(_shareJson(text)));
+
+  /// The preset in a caller-selected file, read but not saved (C9).
+  Future<Preset> peekFile(String selectedPath) async {
+    final data = await readJson(selectedPath);
+    if (data == null)
+      throw const ServiceException('NOT-FOUND', 'Preset file is missing.');
+    return Preset.fromJson(data);
+  }
+
+  String _shareJson(String text) {
     if (!text.startsWith('vepreset:1:')) {
       throw const ServiceException(
         'SHARE-VERSION',
@@ -46,10 +62,7 @@ class PresetTransfer {
       );
     }
     try {
-      return await library.importPreset(
-        utf8.decode(base64Url.decode(text.substring(11))),
-        newId: newId,
-      );
+      return utf8.decode(base64Url.decode(text.substring(11)));
     } on FormatException {
       throw const ServiceException(
         'SHARE-INVALID',
@@ -113,6 +126,14 @@ class FakePresetTransfer extends PresetTransfer {
     safeId(newId);
     final text = exported[selectedPath] ?? files[selectedPath];
     return _importFile(text == null ? null : decodeJson(text), newId: newId);
+  }
+
+  @override
+  Future<Preset> peekFile(String selectedPath) async {
+    final text = exported[selectedPath] ?? files[selectedPath];
+    if (text == null)
+      throw const ServiceException('NOT-FOUND', 'Preset file is missing.');
+    return Preset.fromJson(decodeJson(text));
   }
 
   @override

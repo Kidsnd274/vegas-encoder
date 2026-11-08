@@ -9,6 +9,7 @@ import '../../state/editor.dart';
 import '../../state/presets.dart';
 import '../../state/services.dart';
 import 'display.dart';
+import 'save_check.dart' show externalAccessIds;
 
 /// One row in the library (UI_SPEC §2, Library). Its name, ID and search
 /// text are worked out once (`Preset.recipe` copies the recipe each time).
@@ -24,6 +25,7 @@ class LibraryEntry {
     this.problem,
     this.problemDetail,
     this.errors = const [],
+    this.externalAccess = const [],
   });
 
   final Preset preset;
@@ -48,6 +50,10 @@ class LibraryEntry {
   /// The core's error messages for the chosen FFmpeg; the row shows an error
   /// mark (UI_SPEC §2, Errors). Empty when the core couldn't check it.
   final List<String> errors;
+
+  /// Decision D3: the core's findings that this preset reads other files, adds
+  /// inputs or outputs, or uses the network; the row keeps a warning mark.
+  final List<String> externalAccess;
 
   late final Recipe _recipe = preset.recipe;
   late final String id = _recipe.id;
@@ -200,6 +206,10 @@ LibraryEntry libraryEntry(
     errors: [
       for (final i in compiled?.issues ?? const <Issue>[])
         if (i.level == IssueLevel.error) i.message,
+    ],
+    externalAccess: [
+      for (final i in compiled?.issues ?? const <Issue>[])
+        if (externalAccessIds.contains(i.id)) i.message,
     ],
   );
 }

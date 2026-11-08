@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
@@ -263,6 +264,46 @@ void main() {
       await tester.tap(find.text('Save anyway'));
       await tester.pumpAndSettle();
       expect(await mine(tester), hasLength(1), reason: 'Save anyway saves');
+    });
+
+    testWidgets('importing a preset that reads other files asks first (C9, D3)', (tester) async {
+      await pump(tester);
+      await type(tester, extraField(), '-attach cover.jpg');
+      await save(tester);
+      final saved = (await mine(tester)).single;
+      final share = 'vepreset:1:${base64Url.encode(utf8.encode(jsonEncode(saved.data)))}';
+
+      Future<void> importShare() async {
+        await tester.tap(find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Add a preset'));
+        await tester.pumpAndSettle();
+        expect(find.text('Import share string…'), findsOneWidget);
+        await tester.tap(find.text('Import share string…'));
+        // The field starts from the clipboard, read before the dialog opens.
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await tester.pumpAndSettle();
+        expect(find.text('Import share string'), findsOneWidget);
+        await tester.enterText(find.byType(TextField).last, share);
+        await tester.pumpAndSettle();
+        expect(find.text('Import'), findsWidgets);
+        await tester.tap(find.text('Import').last);
+        await tester.pumpAndSettle();
+      }
+
+      await importShare();
+      expect(find.text('“${saved.recipe.name}” reads other files or uses the network'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(await mine(tester), hasLength(1), reason: 'Cancel imports nothing');
+
+      await importShare();
+      await tester.tap(find.text('Import').last);
+      await tester.pumpAndSettle();
+      expect(await mine(tester), hasLength(2), reason: 'Import adds it');
+      expect(
+        find.bySemanticsLabel(RegExp('reads other files or uses the network')),
+        findsWidgets,
+        reason: 'the library rows keep the warning',
+      );
     });
 
     testWidgets('a recipe without length limits saves without asking (C16)', (tester) async {

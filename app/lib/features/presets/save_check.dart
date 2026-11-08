@@ -102,6 +102,53 @@ Future<SaveCheck> confirmShorter(BuildContext context, List<Issue> limits, {Stri
   return choice ?? SaveCheck.cancel;
 }
 
+/// Contract 3.4: findings that mean a recipe reads outside files, adds inputs
+/// or outputs, or uses the network.
+const externalAccessIds = {'L-INPUT', 'L-OUTPUTS', 'L-NETWORK', 'L-FILE-ACCESS', 'V-EXTRA-NETWORK', 'V-EXTRA-FILE'};
+
+/// The core's external-access findings for [recipe], in its own words: its
+/// checks in Basic, its template's lint in Advanced (decision D3).
+List<String> externalAccess(VeCore core, Recipe recipe) {
+  final found = <String>{};
+  for (final i in CoreResult.run(() => core.validate(recipe)).value ?? const <Issue>[]) {
+    if (externalAccessIds.contains(i.id)) found.add(i.message);
+  }
+  if (recipe.command.mode == 'template') {
+    for (final d in CoreResult.run(() => core.lint(recipe.command.template)).value ?? const <Diagnostic>[]) {
+      if (externalAccessIds.contains(d.id)) found.add(d.message);
+    }
+  }
+  return found.toList();
+}
+
+/// Decision D3: importing a preset that touches outside files or the network
+/// asks first, listing what the core found. Import keeps the warning in Checks.
+Future<bool> confirmImport(BuildContext context, {required String name, required List<String> findings}) async {
+  if (findings.isEmpty) return true;
+  final t = VeTokens.of(context);
+  final choice = await showVeDialog<bool>(
+    context,
+    title: '“$name” reads other files or uses the network',
+    message: 'Import it only if you trust where it came from. The warning stays in its checks.',
+    content: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final f in findings.take(4))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text('• $f', style: t.text.small.copyWith(color: t.colors.text2, height: 1.4)),
+          ),
+        if (findings.length > 4) Text('and ${findings.length - 4} more.', style: t.text.small.copyWith(color: t.colors.muted)),
+      ],
+    ),
+    actions: const [
+      VeDialogAction('Import', true),
+      VeDialogAction('Cancel', false, variant: VeButtonVariant.primary),
+    ],
+  );
+  return choice ?? false;
+}
+
 /// The first few errors as the core words them, then how many more.
 class _ErrorList extends StatelessWidget {
   const _ErrorList(this.issues);
