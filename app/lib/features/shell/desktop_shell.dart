@@ -227,7 +227,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                 ).value?.issues ??
                 const <Issue>[];
       final errors = recipe == null ? null : saveErrors(ref.read(veCoreProvider), recipe, compiled);
-      if (recipe != null && (errors!.settings.isNotEmpty || errors.ffmpeg.isNotEmpty)) {
+      if (recipe != null && (errors!.settings.isNotEmpty || errors.ffmpeg.isNotEmpty || errors.limits.isNotEmpty)) {
         controller.select(id);
         if (!mounted) return AppExitResponse.cancel;
         final check = await checkSave(
@@ -236,6 +236,7 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
           settings: errors.settings,
           ffmpeg: errors.ffmpeg,
           installation: installation?.label ?? 'this FFmpeg',
+          limits: errors.limits,
         );
         // Settings errors never save; FFmpeg-only errors save when the user says so.
         if (errors.settings.isNotEmpty || check != SaveCheck.save) return AppExitResponse.cancel;

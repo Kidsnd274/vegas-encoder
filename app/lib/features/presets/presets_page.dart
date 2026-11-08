@@ -151,6 +151,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
       settings: errors.settings,
       ffmpeg: errors.ffmpeg,
       installation: installation?.label ?? 'this FFmpeg',
+      limits: errors.limits,
     );
     if (!mounted) return false;
     if (check == SaveCheck.showSetting) _showField(errors.settings.first.field);

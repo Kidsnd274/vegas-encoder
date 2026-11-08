@@ -70,6 +70,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Fix the errors before saving'), findsOneWidget);
     },
+    // Decision D4: an option that can stop the render early asks before saving.
+    'save_shorter': (tester) async {
+      EditableText.debugDeterministicCursor = true;
+      addTearDown(() => EditableText.debugDeterministicCursor = false);
+      final extra = find.descendant(of: find.byType(ExtraArgumentsField), matching: find.byType(TextField));
+      await tester.enterText(extra, '-t 5');
+      await tester.pumpAndSettle();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('The output may be shorter than the timeline'), findsOneWidget);
+    },
     // File node at the default 10:00: the core's total and its range for 10:00.
     'file': (tester) async {
       await tester.tap(find.text('Render As (.mp4)').first);

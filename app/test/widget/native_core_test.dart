@@ -249,6 +249,30 @@ void main() {
       expect(await mine(tester), isEmpty);
     });
 
+    testWidgets('an option that can stop the render early asks before saving (C16, D4)', (tester) async {
+      await pump(tester);
+      await type(tester, extraField(), '-t 5');
+      await save(tester);
+      expect(find.text('The output may be shorter than the timeline'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(await mine(tester), isEmpty, reason: 'Cancel keeps editing');
+      expect(editor(tester).dirty, isTrue);
+
+      await save(tester);
+      await tester.tap(find.text('Save anyway'));
+      await tester.pumpAndSettle();
+      expect(await mine(tester), hasLength(1), reason: 'Save anyway saves');
+    });
+
+    testWidgets('a recipe without length limits saves without asking (C16)', (tester) async {
+      await pump(tester);
+      await type(tester, fieldWith('18'), '19');
+      await save(tester);
+      expect(find.text('The output may be shorter than the timeline'), findsNothing);
+      expect(await mine(tester), hasLength(1));
+    });
+
     testWidgets('closing with a draft that has errors stays open and says why', (tester) async {
       await pump(tester);
       await type(tester, extraField(), '-c:v libx265');
