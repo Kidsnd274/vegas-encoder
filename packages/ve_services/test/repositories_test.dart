@@ -855,6 +855,34 @@ Future<void> main(List<String> args) async {
       );
     }
     await jobs.rebuildIndex();
+    // C5: an unchanged index is not reread; appended lines show on the next list.
+    {
+      final sample = (await jobs.list()).single.toJson();
+      final big = StringBuffer();
+      for (var i = 0; i < 5000; i++) {
+        final id = '00000000-0000-4000-8000-${i.toRadixString(16).padLeft(12, '0')}';
+        big.writeln(jsonEncode({...sample, 'id': id, 'recordFile': '$id.json'}));
+      }
+      await File(indexPath).writeAsString(big.toString());
+      final timer = Stopwatch()..start();
+      final first = await jobs.list();
+      timer.stop();
+      final reads = jobs.indexReads;
+      final second = await jobs.list();
+      check(
+        first.length == 5000 && identical(first, second) && jobs.indexReads == reads,
+        'an unchanged 5,000-line index returns the same list without reading',
+      );
+      check(timer.elapsedMilliseconds < 200, 'a 5,000-line index parses in under 200 ms (${timer.elapsedMilliseconds} ms)');
+      const extra = '00000000-0000-4000-8000-ffffffffffff';
+      await File(indexPath).writeAsString(
+        '${jsonEncode({...sample, 'id': extra, 'recordFile': '$extra.json'})}\n',
+        mode: FileMode.append,
+      );
+      final grown = await jobs.list();
+      check(grown.length == 5001 && grown.any((e) => e.id == extra), 'an appended line is visible on the next list');
+      await jobs.rebuildIndex();
+    }
     // Contract 3.1: optional 0.2.1 fields, preflight records and clock skew.
     Future<JobRecord?> readBack(String id, JsonMap data) async {
       final file = joinPath(paths.jobs, '$id.json');
