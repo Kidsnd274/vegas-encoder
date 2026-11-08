@@ -50,7 +50,7 @@ policy, STATUS.md). The app finds candidates and the user picks a default.
 
 | Source checked on first run and on "Scan again" | Typical path |
 | --- | --- |
-| Previous Vegas Encoder INI `FFmpegPath` | `C:\ffmpeg\bin\ffmpeg.exe` |
+| Previous Vegas Encoder INI `FFmpegPath` | the fixed-profile default in `config/vegas-encoder.ini` |
 | `PATH` entries | any |
 | winget (Gyan.FFmpeg, BtbN) | `%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg_*\ffmpeg-*\bin\` and `…\WinGet\Links\` |
 | Scoop | `%USERPROFILE%\scoop\apps\ffmpeg\current\bin\`. Resolve the `.shim` file to the real exe. |

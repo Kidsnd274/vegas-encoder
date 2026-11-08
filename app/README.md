@@ -2,7 +2,7 @@
 
 The Flutter app: the desktop library app, the VEGAS popup editor and the render
 progress window, all from one `VegasEncoder.exe`. Windows x64 only. Work from
-`L:\repos\vegas-encoder\app` with one agent owning app and platform together.
+`app/` in this checkout, with one agent owning app and platform together.
 Current [status](../docs/STATUS.md), [queue](../docs/NEXT_AGENT.md) and
 [workflow](../docs/product/WORKSTREAMS.md) supersede the old split-agent handoff.
 Historical spike results: [app history](../docs/product/workstreams/app.md).
@@ -11,7 +11,7 @@ Behaviour: [UI_SPEC.md](../docs/product/UI_SPEC.md). Look:
 
 ## Build and run
 
-Flutter is at `L:\flutter` (3.47.7). From `app/`:
+Flutter comes from `VEGAS_ENCODER_FLUTTER` or PATH (3.47.7). From `app/`:
 
 ```powershell
 flutter pub get

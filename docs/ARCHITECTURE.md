@@ -1,7 +1,7 @@
 # Vegas Encoder architecture
 
 Current continuation (2026-10-16): one agent owns app and platform integration in
-`L:\repos\vegas-encoder`. Follow AGENTS.md, STATUS and NEXT_AGENT. The original
+the original checkout. Follow AGENTS.md, STATUS and NEXT_AGENT. The original
 foundation-only scope below is historical and does not prohibit current app work.
 
 Original plan: 2026-10-10 (Asia/Singapore). Direction: user-requested product with an
@@ -41,7 +41,7 @@ VEGAS projects, events, tracks, or the timeline.
 Use sibling repositories, each with its own Git history:
 
 ```text
-L:\repos\
+<repositories folder>\
 ├── vegas-ffmpeg-frameserver\   existing investigation
 └── vegas-encoder\            Vegas Encoder product
 ```

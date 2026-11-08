@@ -21,6 +21,8 @@ DRIVE = re.compile(r'(?<![A-Za-z0-9\\])[A-Za-z]:\\')
 # <name>, %USERNAME%, $env:USERNAME or {user} are not user names.
 PROFILE = re.compile(r'(?i)(?:\\+|(?<![A-Za-z0-9])[A-Za-z]:/+)Users(?:\\+|/+)(?![<%${*])([^\\/\s"\'<>`|;,)\]]+)')
 SHARED_PROFILES = {'public', 'default'}
+# Fictional users of the B0 design fixtures and app tests; not real accounts.
+SAMPLE_PROFILES = {'editor', 'me', 'owner', 'ana'}
 
 SCOPES = {
     'scripts': ('scripts/**', 'setup/**'),
@@ -37,9 +39,24 @@ DRIVE_ALLOWED = (
     'schema/fixtures/**',
     'packages/ve_core/lib/src/fixture_data.dart',
     'packages/ve_services/lib/src/service_fixture_data.dart',
-    # Historical records.
+    # Fictional sample paths shown by the app and the design mock-ups (the
+    # sample project's render folder), not paths on any PC.
+    'docs/product/design/**',
+    'app/lib/state/preview.dart',
+    'app/lib/features/gallery/samples.dart',
+    'app/lib/features/monitor/display.dart',
+    'app/lib/features/ffmpeg/display.dart',
+    'app/tool/spikes/WindowProbe.cs',
+    # The fixed-profile exporter's documented default FFmpeg location.
+    'config/vegas-encoder.ini',
+    'src/vegas/adapter/vegas_encoder.h',
+    # Historical records, kept as recorded (decision D7).
     'docs/product/workstreams/**',
+    'docs/product/research/**',
     'docs/experiments/**',
+    'docs/B6_TRIAL.md',
+    'docs/B7_INSTALLER_INPUTS.md',
+    'docs/CONTAINER_TRIAL.md',
     'evidence/**',
 )
 
@@ -73,7 +90,7 @@ def scan_text(text, drive_allowed):
     """Yield (line number, kind, excerpt) for each refused path in text."""
     for number, line in enumerate(text.splitlines(), 1):
         for match in PROFILE.finditer(line):
-            if match[1].lower() not in SHARED_PROFILES:
+            if match[1].lower() not in SHARED_PROFILES | SAMPLE_PROFILES:
                 yield number, 'user-profile path', line.strip()[:160]
                 break
         else:

@@ -2,7 +2,7 @@
 
 For current product trials, installed candidate/rollback and owner-deferred checks,
 use [STATUS](STATUS.md) and [B6_TRIAL](B6_TRIAL.md). One agent now develops app and
-platform from the original `L:\repos\vegas-encoder` folder; see NEXT_AGENT.
+platform from the original checkout; see NEXT_AGENT.
 The foundation candidates/procedures below are historical, not the current install
 or a request to repeat completed/deferred qualification.
 
@@ -30,7 +30,7 @@ The prior working `0.1.1-config-proof` installation is backed up in
 restoration instructions. To restore it with VEGAS closed:
 
 ```powershell
-.\scripts\Install-VegasEncoder.ps1 -VegasDir 'C:\Program Files\BorisFX\Vegas Pro 2026' -Update -BuildDir 'L:\repos\vegas-encoder\build\rollback-before-foundation-closeout'
+.\scripts\Install-VegasEncoder.ps1 -VegasDir '<VEGAS 2026 folder>' -Update -BuildDir '<checkout>\build\rollback-before-foundation-closeout'
 ```
 
 The installer owns only the product folder and discovery file. It refuses running

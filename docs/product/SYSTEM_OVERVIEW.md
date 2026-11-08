@@ -1,7 +1,7 @@
 # System overview: what is built, in what, and how it fits
 
 Updated: 2026-10-17 (Asia/Singapore). App and platform now have one agent in the
-original `L:\repos\vegas-encoder` checkout, on `master`.
+original checkout, on `master`.
 See [workflow](WORKSTREAMS.md) and the current [queue](../NEXT_AGENT.md).
 This describes the system
 **as built**: the languages, the folders, how each part becomes a binary and how the

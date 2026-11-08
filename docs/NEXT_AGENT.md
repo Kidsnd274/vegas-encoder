@@ -2,7 +2,7 @@
 
 Updated: 2026-11-06 (Asia/Singapore).
 
-Work in **`L:\repos\vegas-encoder`**, currently on **`master`**.
+Work in **the original checkout**, currently on **`master`**.
 The original folder remains the only development checkout. The earlier explicitly
 requested parallel pass is complete; default to one agent here unless the owner
 requests delegation again. Preserve existing changes and this single queue.
@@ -180,7 +180,7 @@ exporter is now uninstalled and its six saved VEGAS test templates, normal app
 settings/cache/sessions and legacy logs are archived for a clean installer test.
 The owner will test Setup; it has not been run by this cleanup. Backup, exact
 path mappings and restoration instructions are under
-`C:\Users\Samuel Tee\AppData\Local\VegasEncoderInstallerTestBackup\20261018-clean-start`.
+`%LOCALAPPDATA%\VegasEncoderInstallerTestBackup\20261018-clean-start`.
 STATUS records verified absent active paths and unchanged unrelated templates.
 Preserve that backup and all existing candidate/isolated-profile/rollback folders.
 Earlier installed-trial statements below describe history, not current deployment.

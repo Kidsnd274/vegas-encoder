@@ -517,7 +517,7 @@ Lint errors turn Apply off.
 | Probing | Per-installation progress ("Reading encoders… 18 of 25"); results stream in |
 | Ready | Version, build, license class, source, path (copyable), probe time, ffprobe present |
 | Changed on disk | "This FFmpeg changed since it was checked." **Scan again** |
-| Missing | "C:\ffmpeg\bin\ffmpeg.exe isn't there any more." **Remove** / **Locate…** |
+| Missing | "<folder>\ffmpeg.exe isn't there any more." **Remove** / **Locate…** |
 | No ffprobe | "ffprobe.exe must be next to ffmpeg.exe so renders can be checked." |
 | Hardware test failed | Encoder row shows **Failed test on this PC**, the reason, and the raw stderr line on expand |
 | LGPL build | License class "LGPL: no x264/x265"; affected presets are listed |

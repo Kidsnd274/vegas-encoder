@@ -240,7 +240,7 @@ their helper requests. Inno has not initialized the `app` constant during
 For unattended deployment:
 
 ```text
-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /VEGAS=2026 /VEGASDIR2026="C:\Program Files\BorisFX\Vegas Pro 2026"
+setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /VEGAS=2026 /VEGASDIR2026="%ProgramFiles%\BorisFX\Vegas Pro 2026"
 ```
 
 - `/VEGAS=existing` (the default) keeps exactly the installed integrations;
@@ -291,9 +291,9 @@ bundle in an **elevated** terminal to recover. Create a UTF-16 INI request:
 ```powershell
 $request = "$env:TEMP\ve-recovery-request.ini"
 $result = "$env:TEMP\ve-recovery-result.ini"
-"[setup]`r`ntransaction=C:\ProgramData\VegasEncoder\Setup\{transaction-guid}`r`n" |
+"[setup]`r`ntransaction=%ProgramData%\VegasEncoder\Setup\{transaction-guid}`r`n" |
   Set-Content -LiteralPath $request -Encoding unicode
-& 'L:\path\to\bundle\installer\ve-install.exe' rollback $request $result
+& '<bundle>\installer\ve-install.exe' rollback $request $result
 Get-Content -LiteralPath $result
 ```
 

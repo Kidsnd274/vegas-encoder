@@ -4,15 +4,14 @@
 dark palette. Edit this vector source, then run from any working directory:
 
 ```bat
-L:\repos\vegas-encoder\scripts\export_app_icons.bat
+scripts\export_app_icons.bat
 ```
 
 The command needs Python 3 and Inkscape. It finds Inkscape on PATH, in the standard
-Program Files folder, or at this development PC's existing `L:\Program Files`
-installation. Override discovery when needed:
+Program Files folder. Override discovery when needed:
 
 ```bat
-scripts\export_app_icons.bat --inkscape "C:\Tools\Inkscape\bin\inkscape.com"
+scripts\export_app_icons.bat --inkscape "<Inkscape folder>\bin\inkscape.com"
 scripts\export_app_icons.bat --check
 ```
 
