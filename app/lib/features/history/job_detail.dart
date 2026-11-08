@@ -141,7 +141,8 @@ class _Record extends StatelessWidget {
               icon: VeIcons.copy,
               size: VeButtonSize.small,
               tooltip: 'Ctrl+Shift+C',
-              onPressed: () => onCopyCommand(r),
+              // A preflight record has no command to copy.
+              onPressed: r.isPreflight ? null : () => onCopyCommand(r),
             ),
             VeButton(
               label: 'Open folder',
@@ -169,12 +170,17 @@ class _Record extends StatelessWidget {
         if (outcome != JobOutcome.succeeded) ...[
           const _Heading('How it stopped'),
           _Facts([
-            ('FFmpeg exit code', r.ffmpegExitCode?.toString() ?? 'None: FFmpeg didn’t exit on its own'),
+            (
+              'FFmpeg exit code',
+              r.ffmpegExitCode?.toString() ??
+                  (r.isPreflight ? 'None: the render stopped before FFmpeg started' : 'None: FFmpeg didn’t exit on its own'),
+            ),
             if (r.hresult.isNotEmpty) ('Result code', r.hresult),
           ]),
         ],
         const _Heading('Output'),
         _PathBox(r.outputPath, label: 'Output file', onCopy: () => onCopy(r.outputPath, 'Path copied')),
+        ...outputNotes(r).map((note) => Padding(padding: const EdgeInsets.only(top: 6), child: Text(note, style: p))),
         if (r.retainedPartialPath case final partial?) ...[
           const SizedBox(height: 8),
           Text('The unfinished file was kept for checking:', style: p),
@@ -203,7 +209,10 @@ class _Record extends StatelessWidget {
           if (v.ffprobeVersion case final probe?) ('ffprobe', probe),
         ]),
         const _Heading('Command'),
-        _CommandBlock(r),
+        if (commandParts(r).isEmpty)
+          Text('No command ran: the render stopped before FFmpeg started.', style: p)
+        else
+          _CommandBlock(r),
         if (marked != null) ...[
           const SizedBox(height: 6),
           Row(

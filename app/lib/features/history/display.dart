@@ -134,9 +134,16 @@ String logSummary({required int totalLines, required int shownLines, required bo
 /// One sentence for how the render went:
 /// "Rendered 12:43 in 24:46, 0.51× realtime, 9.84 GB."
 /// "Failed after 0:03. FFmpeg exited with code 1 before reading any frames."
+/// "Stopped before encoding started. Change the Render As filename…" for a
+/// preflight record (C6 `stage`). A clock that stepped back leaves the time
+/// unknown (C11).
 String resultSentence(core.JobRecord r) {
-  final took = VeFormat.duration(r.elapsedSec);
+  final elapsed = r.knownElapsedSec;
+  final took = elapsed == null ? 'an unknown time' : VeFormat.duration(elapsed);
   String withMessage(String lead) => r.message.isEmpty ? '$lead.' : '$lead. ${_sentence(r.message)}';
+  if (r.isPreflight) {
+    return withMessage(r.status == 'cancelled' ? 'Cancelled before encoding started' : 'Stopped before encoding started');
+  }
   switch (JobOutcome.of(r.status)) {
     case JobOutcome.succeeded:
       final length = r.media?.durationSec;
@@ -155,6 +162,18 @@ String resultSentence(core.JobRecord r) {
       return withMessage('Ended after $took (status “${r.status}”)');
   }
 }
+
+/// What else the record says about the output (C6 `requestedOutputPath`,
+/// `replacedExisting`, `endedEarly`), one sentence each.
+List<String> outputNotes(core.JobRecord r) => [
+  if (r.requestedOutputPath case final requested?)
+    'Render As asked for ${fileName(requested)}. That name was taken, so this render used the next free name.',
+  if (r.replacedExisting) 'This render replaced an existing file with the same name.',
+  if (r.endedEarly) 'FFmpeg finished before the end of the timeline, as the preset asked, so the output is shorter.',
+];
+
+/// The last part of a Windows path.
+String fileName(String path) => path.split(RegExp(r'[\\/]')).last;
 
 String _sentence(String text) {
   final t = text.trim();

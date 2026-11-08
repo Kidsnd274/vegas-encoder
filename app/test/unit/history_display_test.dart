@@ -60,6 +60,43 @@ void main() {
     expect(sizeLabel(jobs['j-1039']!), 'No file');
   });
 
+  group('0.2.1 record facts (C15)', () {
+    test('a preflight failure says it stopped before encoding, with its reason', () {
+      final r = JobRecord.fromJson({
+        ...jobs['j-1039']!.data,
+        'stage': 'preflight',
+        'media': null,
+        'ffmpeg': null,
+        'argv': <String>[],
+        'message': 'Change the Render As filename to end in .mkv.',
+      });
+      expect(resultSentence(r), 'Stopped before encoding started. Change the Render As filename to end in .mkv.');
+      expect(commandParts(r), isEmpty, reason: 'no command ran');
+    });
+
+    test('a clock that stepped back leaves the time unknown', () {
+      final r = jobs['j-1039']!;
+      final skewed = r.copyWith(endedAt: DateTime.parse(r.startedAt).subtract(const Duration(seconds: 1)).toUtc().toIso8601String());
+      expect(resultSentence(skewed.copyWith(message: '')), 'Failed after an unknown time.');
+    });
+
+    test('the output notes name the requested file, a replacement and an early finish', () {
+      final r = JobRecord.fromJson({
+        ...jobs['j-1042']!.data,
+        'outputPath': r'D:\Renders\Lakeside (2).mp4',
+        'requestedOutputPath': r'D:\Renders\Lakeside.mp4',
+      });
+      expect(outputNotes(r), [
+        'Render As asked for Lakeside.mp4. That name was taken, so this render used the next free name.',
+      ]);
+      expect(outputNotes(JobRecord.fromJson({...jobs['j-1042']!.data, 'replacedExisting': true})), [
+        'This render replaced an existing file with the same name.',
+      ]);
+      expect(outputNotes(JobRecord.fromJson({...jobs['j-1042']!.data, 'endedEarly': true})).single, contains('shorter'));
+      expect(outputNotes(jobs['j-1042']!), isEmpty, reason: 'older records have none of these');
+    });
+  });
+
   group('encoder', () {
     test('the catalog’s name for the recipe’s video encoder', () {
       expect(encoderLabel(jobs['j-1042']!, catalog), 'x264');

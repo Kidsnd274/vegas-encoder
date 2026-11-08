@@ -8,7 +8,7 @@ import 'package:ve_services/ve_services.dart';
 
 import '../../design/components/wire_progress.dart' show VeWireTone;
 import '../../design/format.dart';
-import '../history/display.dart' show ratioLabel, resultSentence;
+import '../history/display.dart' show outputNotes, ratioLabel, resultSentence;
 
 /// What the window's bar and labels are about.
 enum MonitorPhase {
@@ -192,7 +192,7 @@ String endSentence(LiveRenderStatus s, JobRecord? record) {
       'skipped' => 'The output wasn’t checked (Settings).',
       _ => null,
     };
-    return check == null ? sentence : '$sentence $check';
+    return [sentence, ?check, ...outputNotes(record)].join(' ');
   }
   final took = VeFormat.duration(s.elapsedSec);
   return switch (phase) {

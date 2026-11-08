@@ -6,7 +6,7 @@
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ve_services/ve_services.dart' show FakeJobRepository;
+import 'package:ve_services/ve_services.dart' show FakeJobRepository, JobRecord;
 import 'package:vegas_encoder/features/history/job_detail.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
@@ -16,8 +16,19 @@ import '../helpers.dart';
 import '../history_doubles.dart';
 
 void main() {
-  Future<FakeJobRepository> open(WidgetTester tester, {Size view = const Size(1440, 900), int skipped = 0}) async {
-    final jobs = await summarisedJobs()..skippedIndexLines = skipped;
+  Future<FakeJobRepository> open(
+    WidgetTester tester, {
+    Size view = const Size(1440, 900),
+    int skipped = 0,
+    JobRecord Function(JobRecord newest)? newest,
+  }) async {
+    var records = await summarisedRecords();
+    if (newest != null) {
+      records.sort((a, b) => b.startedAt.compareTo(a.startedAt));
+      records = [newest(records.first), ...records.skip(1)];
+    }
+    final jobs = FakeJobRepository(records: records, logs: {'j-1039': failedLog, 'j-1042': longLog})
+      ..skippedIndexLines = skipped;
     await pumpApp(
       tester,
       view: view,
@@ -75,6 +86,40 @@ void main() {
           tester.platformDispatcher.platformBrightnessTestValue = brightness;
           await open(tester, view: view);
           await act(tester);
+          await expectGolden('history_${name}_$theme');
+        });
+      });
+      // C15: what 0.2.1 records add, on the newest render.
+      final facts = <String, JobRecord Function(JobRecord)>{
+        'preflight': (r) => JobRecord.fromJson({
+          ...r.data,
+          'stage': 'preflight',
+          'status': 'failed',
+          'media': null,
+          'ffmpeg': null,
+          'argv': <String>[],
+          'commandLine': null,
+          'errorTokenIndices': <int>[],
+          'published': false,
+          'sizeBytes': 0,
+          'ffmpegExitCode': null,
+          'logFile': null,
+          'stderrTail': '',
+          'message': 'Change the Render As filename to end in .mp4.',
+          'verification': {'state': 'skipped', 'message': 'The render stopped before encoding started.'},
+        }),
+        'next_free_name': (r) => JobRecord.fromJson({
+          ...r.data,
+          'outputPath': r.outputPath.replaceFirst('.mp4', ' (2).mp4'),
+          'requestedOutputPath': r.outputPath,
+        }),
+        'replaced': (r) => JobRecord.fromJson({...r.data, 'replacedExisting': true}),
+      };
+      facts.forEach((name, edit) {
+        testWidgets('history_$name', (tester) async {
+          addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+          tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          await open(tester, newest: edit);
           await expectGolden('history_${name}_$theme');
         });
       });

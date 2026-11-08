@@ -52,7 +52,11 @@ class _HistoryPageState extends ConsumerState<HistoryPage> with VeToastHost {
     if (mounted) showToast(toast);
   }
 
-  void _copyCommand(JobRecord record) => unawaited(_copy(commandLine(record), 'Command copied'));
+  void _copyCommand(JobRecord record) {
+    // A preflight record has no command (the render stopped before FFmpeg started).
+    if (record.isPreflight) return;
+    unawaited(_copy(commandLine(record), 'Command copied'));
+  }
 
   /// "Open settings as new preset": a preset in Mine with the settings this
   /// render used, opened in Presets.
