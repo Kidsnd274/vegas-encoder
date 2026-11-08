@@ -643,6 +643,37 @@ Future<void> main(List<String> args) async {
       'missing capability cache',
     );
     await cache.write(cap);
+    // C6: five idle ticks parse each file once and read the GPU at most once.
+    {
+      final firstCap = await cache.read(cap.identityKey);
+      final parsesAfterFirst = cache.parses;
+      var sameCap = true;
+      for (var tick = 0; tick < 5; tick++) {
+        sameCap = sameCap && identical(await cache.read(cap.identityKey), firstCap);
+      }
+      check(sameCap && cache.parses == parsesAfterFirst, 'an unchanged capability file is parsed once (${cache.parses - parsesAfterFirst} extra)');
+      final machine = FileMachineSettingsRepository(paths: paths);
+      final firstMachine = await machine.read();
+      final machineParses = machine.parses;
+      var sameMachine = true;
+      for (var tick = 0; tick < 5; tick++) {
+        sameMachine = sameMachine && identical(await machine.read(), firstMachine);
+      }
+      check(sameMachine && machine.parses == machineParses, 'an unchanged machine.json is parsed once');
+      final gpu = _CountingGpu();
+      final hardwareCap = cap.copyWith(
+        hardware: {
+          'hevc_nvenc': {'state': 'ok', 'testedAt': '2026-10-14T00:00:00Z', 'gpu': 'gpu-1'},
+        },
+      );
+      await cache.write(hardwareCap);
+      final aware = GpuAwareCapabilityCache(backend: cache, gpu: gpu);
+      for (var tick = 0; tick < 5; tick++) {
+        await aware.read(cap.identityKey);
+      }
+      check(gpu.reads <= 1, 'five idle ticks read the GPU at most once (${gpu.reads})');
+      await cache.write(cap);
+    }
     final cached = (await FileCapabilityCache(
       paths: paths,
     ).read(cap.identityKey))!;
@@ -1345,5 +1376,15 @@ Future<void> worker(List<String> args) async {
     print('RESULT:saved');
   } on ServiceException catch (e) {
     print('RESULT:${e.code}');
+  }
+}
+
+/// Counts GPU reads (C6).
+class _CountingGpu implements GpuIdentity {
+  int reads = 0;
+  @override
+  Future<GpuSnapshot> read() async {
+    reads++;
+    return GpuSnapshot(fingerprint: 'gpu-1', cacheable: true);
   }
 }

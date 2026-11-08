@@ -19,10 +19,29 @@ class FileMachineSettingsRepository implements MachineSettingsRepository {
   FileMachineSettingsRepository({ServicePaths? paths})
     : paths = paths ?? ServicePaths.windows();
   final ServicePaths paths;
+
+  /// How often [read] parsed machine.json (C6: an unchanged file is parsed once).
+  int parses = 0;
+  ({int size, DateTime modified, MachineSettings value})? _last;
+
   @override
   Future<MachineSettings> read() async {
+    final stat = await File(paths.machine).stat();
+    final last = _last;
+    if (stat.type == FileSystemEntityType.file &&
+        last != null &&
+        last.size == stat.size &&
+        last.modified == stat.modified)
+      return last.value;
     final data = await readJson(paths.machine);
-    return data == null ? MachineSettings() : decodeMachine(data);
+    if (data == null) {
+      _last = null;
+      return MachineSettings();
+    }
+    parses++;
+    final value = decodeMachine(data);
+    _last = (size: stat.size, modified: stat.modified, value: value);
+    return value;
   }
 
   @override
@@ -513,14 +532,33 @@ class FileCapabilityCache implements CapabilityCache {
   final ServicePaths paths;
   final int parserVersion;
   String _file(String key) => joinPath(paths.cache, '${safeId(key)}.json');
+
+  /// How often [read] parsed a cache file (C6: an unchanged file is parsed once).
+  int parses = 0;
+  final Map<String, ({int size, DateTime modified, FFmpegCapabilities? value})> _read = {};
+
   @override
   Future<FFmpegCapabilities?> read(String identityKey) async {
-    final data = await readJson(_file(identityKey));
-    if (data == null) return null;
+    final path = _file(identityKey);
+    final stat = await File(path).stat();
+    final last = _read[identityKey];
+    if (stat.type == FileSystemEntityType.file &&
+        last != null &&
+        last.size == stat.size &&
+        last.modified == stat.modified)
+      return last.value;
+    final data = await readJson(path);
+    if (data == null) {
+      _read.remove(identityKey);
+      return null;
+    }
+    parses++;
     major(data, 'cache');
     final value = decodeCapabilities(objectField(data, 'capabilities'));
     if (value.identityKey != identityKey) invalid('Cache identity mismatch.');
-    return value.parser == parserVersion ? value : null;
+    final result = value.parser == parserVersion ? value : null;
+    _read[identityKey] = (size: stat.size, modified: stat.modified, value: result);
+    return result;
   }
 
   @override

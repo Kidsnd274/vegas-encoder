@@ -39,16 +39,36 @@ class GpuAwareCapabilityCache implements CapabilityCache {
   final FileCapabilityCache backend;
   final GpuIdentity gpu;
   final DateTime Function() now;
+
+  // C6: one GPU query per minute while idle. A probe or hardware test (a new
+  // cache file, or a write or invalidate here) reads the GPU again.
+  static const gpuLifetime = Duration(seconds: 60);
+  GpuSnapshot? _snapshot;
+  DateTime? _snapshotAt;
+  final Map<String, FFmpegCapabilities?> _lastBackend = {};
+
+  /// Forget the GPU snapshot (explicit Scan or Refresh).
+  void invalidateGpu() => _snapshotAt = null;
+
+  Future<GpuSnapshot?> _gpuSnapshot() async {
+    final at = _snapshotAt;
+    if (at != null && now().difference(at) < gpuLifetime) return _snapshot;
+    try {
+      _snapshot = await gpu.read();
+    } on ServiceException {
+      _snapshot = null; // results remain unknown
+    }
+    _snapshotAt = now();
+    return _snapshot;
+  }
+
   @override
   Future<FFmpegCapabilities?> read(String key) async {
     final value = await backend.read(key);
+    if (!identical(_lastBackend[key], value) && _lastBackend.containsKey(key)) invalidateGpu();
+    _lastBackend[key] = value;
     if (value == null || value.hardware.isEmpty) return value;
-    GpuSnapshot? snapshot;
-    try {
-      snapshot = await gpu.read();
-    } on ServiceException {
-      /* results remain unknown */
-    }
+    final snapshot = await _gpuSnapshot();
     final hardware = <String, Object?>{};
     final encoders = value.encoders;
     for (final entry in value.hardware.entries) {
@@ -77,9 +97,16 @@ class GpuAwareCapabilityCache implements CapabilityCache {
   }
 
   @override
-  Future<void> write(FFmpegCapabilities value) => backend.write(value);
+  Future<void> write(FFmpegCapabilities value) {
+    invalidateGpu();
+    return backend.write(value);
+  }
+
   @override
-  Future<void> invalidate(String key) => backend.invalidate(key);
+  Future<void> invalidate(String key) {
+    invalidateGpu();
+    return backend.invalidate(key);
+  }
 }
 
 class WindowsHardwareTests implements HardwareTests {
