@@ -13,19 +13,14 @@ history; their old locations, ownership splits and queues do not apply.
 
 ## Current queue: older VEGAS release qualification
 
-**0.2.1 bug-fix release (in progress on branch `fix/0.2.1`):** follow
-[FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md).
-
-The 0.2.0+2 logs from VEGAS 2026.0.3.189 and Sony VEGAS 13.0.0.453 confirm
-FFmpeg startup and exposed a separate AV1 (CPU) live pipe stall. The updated
-built-in starter (revision 4) stores the workaround `-svtav1-params lp=3` in
-Video Extra arguments. The owner confirmed the fix with 0.2.0+3. Real-host
-logs show AV1/Opus publication and sampled verification on both hosts with
-the supplied November FFmpeg build.
-The test installer is
-`dist/VegasEncoder-0.2.0.3-windows-x64-setup-20261106-112027936.exe`.
-See [status](STATUS.md#current-progress) for the comparison
-builds, other preset results and limits.
+**Next: the owner's real-VEGAS checklist for 0.2.1 (L6).** The 0.2.1 fixes are
+implemented on branch `fix/0.2.1` (version 0.2.1+1), with every offline suite
+and the fake-host render matrix passing; see [status](STATUS.md#current-progress).
+Follow step L6 of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) on VEGAS 2026.0.3.189,
+23.0.0.278, 22.0.0.248, 21.0.0.108 and Sony 13.0.0.453. Render AV1 (CPU)
+revision 5, which no longer carries `-svtav1-params lp=3`, first on 2026 and
+Sony 13. Packaging an installer, removing the three idle `fix/0.2.1-a/-b/-c`
+worktrees, and merging into `master` each wait for the owner.
 
 The owner confirmed the RGB render fix in Sony 13 build 453. Logs show MP4 and
 WebM publication. Independent decode is pending. The trial's old app path causes

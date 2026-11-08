@@ -1267,6 +1267,55 @@ or pin setting. Unknown keys survive at all three new model levels. Null explici
 clears the saved state; older machine.json files need no migration. KeepOnTop remains
 false by default.
 
+## 0.2.1 additions (2026-11-08, additive)
+
+All new record fields are optional, so older records stay readable.
+
+**C6 job record.**
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `stage` | `"preflight"` or `"encode"` (absent means `"encode"`) | `"preflight"`: the render stopped before FFmpeg started. |
+| `requestedOutputPath` | string, present only when it differs from `outputPath` | The path VEGAS asked for. `outputPath` is always the file written (for example a legacy `name (2).ext`). |
+| `replacedExisting` | bool (absent means false) | A destination VEGAS confirmed was replaced. |
+| `endedEarly` | bool (absent means false) | FFmpeg exited 0 before every VEGAS frame was sent (for example `-t`). The render succeeded. |
+| `transport` | `{videoHighWater, audioHighWater, videoBytes, audioBytes, videoQueueLimit, audioQueueLimit}`, integers ≥ 0 | Queue diagnostics. |
+
+- **Preflight records:**
+  - `status` is `failed` or `cancelled`;
+  - `media` and `ffmpeg` may be null and `argv` is `[]`;
+  - `verification.state` is `skipped`;
+  - not published, `sizeBytes` 0, `ffmpegExitCode` and `logFile` null.
+- **Clock skew:** writers clamp `endedAt >= startedAt`. Readers never reject a skewed record; `JobRecord.knownElapsedSec` is null instead.
+- **C5 live status:** a preflight failure writes a terminal `failed` or `cancelled` file with `message` set to the reason.
+
+**C3 services.**
+- `PresetLibrary.availableId(name)` returns a safe ID that is free among current presets and retained history, compared case-insensitively. `freePresetId(name, taken)` is the shared rule.
+- `LibraryHealth.problems()` returns `List<LibraryProblem {path, code, message}>`: the preset files the latest `list()` skipped. One bad file never empties the library.
+- `JobIndexHealth.skippedIndexLines` is the number of malformed index lines the latest `list()` skipped; blank and `\r` lines don't count. `rebuildIndex()` rewrites the index from the records.
+- Stars and pins for every preset live in the `preferences.json` overlay, keyed by lowercase ID. Writing them never changes a revision or adds history. Reads use the overlay first, then the `.vepreset` value.
+- `PresetTransfer.peekShareString(text)` and `peekFile(path)` read a preset with the import's checks without saving it, so the app can warn first.
+- Probe timeouts: identity and `-version` 30 s; full lists and `-h full` 60 s; one encoder's or filter's help 30 s.
+
+**Core issue IDs.**
+
+| ID | Level | Meaning |
+| --- | --- | --- |
+| `L-DURATION-LIMIT` / `V-EXTRA-DURATION` | warn | `-t`, `-to`, `-frames*`, `-vframes`, `-aframes`, `-fs` (Advanced / Basic Extra) |
+| `L-SHORTEST` / `V-EXTRA-SHORTEST` | warn | `-shortest` |
+| `L-NETWORK` / `V-EXTRA-NETWORK` | warn | URL or protocol arguments, including `tee` targets |
+| `L-FILE-ACCESS` / `V-EXTRA-FILE` | warn | Options and filters that read or write other files |
+| `V-EXTRA-WRONG-STREAM` | warn | An option with the other stream's specifier, for example `-b:a` in Video Extra |
+| `V-RATE-RESAMPLED` | info | Decision D11: with `sampleRate: "source"`, a project rate the encoder or container can't take is resampled. The target is 48000 Hz when accepted, else the nearest accepted rate, and the core emits `-ar`. An explicitly chosen unsupported rate stays `V-RATE` (error). MXF accepts only 48000 Hz. |
+
+The app's external-access set is `L-INPUT`, `L-OUTPUTS`, `L-NETWORK`,
+`L-FILE-ACCESS`, `V-EXTRA-NETWORK` and `V-EXTRA-FILE`. Generated commands now
+include `-nostats`.
+
+**Native INI keys.** `StallTimeoutMs` defaults to 120000 and `ConnectTimeoutMs`
+to 30000. The older `PipeTimeoutMs` and `FinishTimeoutMs` are read as deprecated
+aliases for `StallTimeoutMs`, and the log says which value was used.
+
 ## App handoff / validation
 
 Path dependencies from app/: `../packages/ve_core`, `../packages/ve_services`.

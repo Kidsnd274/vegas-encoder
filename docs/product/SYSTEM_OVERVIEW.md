@@ -117,9 +117,12 @@ An edit in the app goes like this:
    whether the container can hold each stream) and a summary.
 4. The screens redraw from that: the command column, Checks, the diagram, the read-outs.
 
-That round trip takes about 3–4 ms on this PC with real capability data (the §9.3 budget
-is 4 ms). Advanced mode adds lint and completion calls; it is slower today (25–32 ms per
-keystroke) because each call sends the full capability map, which platform is fixing.
+That round trip takes a median of 1.3 ms (p95 2.0 ms) on this PC with real capability
+data (the §9.3 budget is 4 ms). An Advanced keystroke takes a median of 1.5 ms (p95 2.7 ms)
+for its lint, compile and Basic compile. The editor compiles once per keystroke, remembering
+the output extension and reusing the Basic compile while only the command changes.
+Measured with `app/tool/budgets` in the flutter test VM on 2026-11-08, an upper bound for the
+release build.
 
 ### The app and the system
 

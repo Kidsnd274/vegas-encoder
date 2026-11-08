@@ -1,52 +1,64 @@
 # Vegas Encoder status
 
-Updated: 2026-11-06 (Asia/Singapore). The owner confirms the optional uninstall-data
+Updated: 2026-11-08 (Asia/Singapore). The owner confirms the optional uninstall-data
 prompt works. The development trial was removed on 2026-10-18 for clean installer
 testing. The separate approved VEGAS 23 trial below was inspected on 2026-11-05;
 the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
-**AV1 (CPU) live pipe stall.** With installed exporter `0.2.0+2` and FFmpeg
-`N-128435-g7798de15f86-gdb8537d8cc7+2` (SVT-AV1 4.3.0), owner logs from
-VEGAS 2026.0.3.189 and Sony VEGAS 13.0.0.453 show FFmpeg opening both streams
-for 1080p at 30000/1001, then stalling. Both hosts submitted 145 video frames
-before the 10-second pipe deadline and published no file. FFmpeg reported
-three output frames on 2026 (P010) and one on 13 (BGR0).
+**0.2.1 fix pass (branch `fix/0.2.1`, version 0.2.1+1, 2026-11-08).** Every item
+of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) except the owner's real-VEGAS checklist (L6)
+is implemented. Fixes and tests were committed one item at a time. No installer was
+packaged and nothing was installed. All results below used fakes, the fake host
+(fiohost) or real FFmpeg on this PC, never real VEGAS.
 
-A synthetic replay through the production Windows pipe transport reproduced
-the failure with both pixel formats. The October gyan `615b07170e` and BtbN
-`24e860f6d3` builds and the 2024 snapshot `N-115847-gb7a971f4bb-g7c95c7de4a+2`
-also stalled on P010. Gyan 5.1.2 and 6.0 completed the same P010 replay.
-On the November build, the other 11 built-in presets
-completed 300-frame P010 renders with full video and audio decode, including
-all three NVENC presets. Adding `-svtav1-params lp=3` under Video Extra
-arguments completed and fully decoded 900 frames with audio on both input
-formats. The other preset results still need real-host confirmation. The
-audit isolated the stall to the tested live audio/video
-interaction with SVT-AV1 at its default parallelism; it did not isolate a
-single upstream change.
+**AV1 (CPU) live pipe stall: root cause and fix.** With 0.2.0+2, AV1 (CPU) stalled
+after a few output frames on VEGAS 2026.0.3.189 (P010) and Sony 13.0.0.453 (BGR0).
+The cause was in the transport, not FFmpeg:
+- SVT-AV1 reads hundreds of video frames ahead before it writes;
+- the fixed-size audio queue filled first;
+- the render thread then blocked on audio, while FFmpeg waited for more video.
 
-The AV1 (CPU) built-in starter now carries the mitigation in its editable
-Video Extra arguments field at revision 4, shared by the app and native
-templates. Saved snapshots keep their prior settings until explicitly edited
-or updated from the library. The revised starter compiled, completed and fully
-decoded 300 frames with P010 input and Opus on the November snapshot, both
-October builds and gyan 5.1.2 and 6.0. The older SVT-AV1 libraries treat
-`lp=3` as a logical processor setting. The isolated native template suite
-and all 11 built-in preset widget/golden tests passed. The Video Extra
-arguments field and command preview were reviewed in both themes. This
-change is packaged in test candidate `0.2.0+3`, built from the current
-working tree. The 39-file bundle and Setup checksums verified, and all 99
-packaging and detection checks passed against local files and fake targets.
-The owner then confirmed that the AV1 (CPU) render works. The installed
-2026 and Sony 13 DLL hashes match the test candidate. With the November
-FFmpeg snapshot and `lp=3`, VEGAS 2026.0.3.189 (P010) and Sony VEGAS
-13.0.0.453 (BGR0) each published a 300-frame 1080p AV1/Opus WebM with
-480,480 audio sample frames, FFmpeg exit 0 and successful sampled FFprobe
-verification. The outputs were unavailable for a separate full decode.
-This confirms the tested render path on those two hosts. Broader installer
-lifecycle and render qualification remain open.
+The 0.2.0+3 starter avoided this with `-svtav1-params lp=3`. 0.2.1 sizes the audio
+queue by time (A1), so a 300-frame-lookahead fake child no longer deadlocks.
+It also fails a render only when FFmpeg stops making progress (A3). AV1 (CPU) is
+therefore back to revision 5, with no extra arguments. On the fake host with real
+FFmpeg (N-128435 and BtbN n8.1.3), revision 5 rendered and fully decoded 900 frames
+with audio at 1080p 29.97 and 2160p 25. BGR0 input was not exercised this way,
+because the fake host serves the built-ins' P010.
+
+**Other 0.2.1 behaviour.**
+- Renders accept any project rate and channel count. "Source" audio that the encoder
+  or container can't take is resampled to 48 kHz, with a note (decision D11).
+- Renders that stop before FFmpeg starts record why.
+- FFmpeg finishing early (for example `-t`) succeeds.
+- Re-rendering replaces a file VEGAS confirmed; older hosts write `name (2).ext` (D1).
+- Commands add `-nostats`. New warnings cover options that shorten a render, and
+  arguments that read files or use the network. Saving or applying the first asks;
+  importing the second asks (D3, D4).
+- One bad preset file or History line no longer empties the list; banners say so.
+- Deleting a preset frees its name. Stars no longer bump a revision.
+- The app idles and types more cheaply: an Advanced keystroke takes 1.5 ms median.
+
+**Results.**
+
+| Suite | Result |
+| --- | --- |
+| Core, normal and ASan | 3,248 checks; FFI 246 checks ×2 |
+| Engine, normal and ASan | 46 cases, about 30,100 checks |
+| Native page, ASan | 523 / 99 / 486 checks |
+| fiohost (fixed-profile DLL) | pass |
+| Legacy containers, older hosts 22/21/13 | pass |
+| Dart packages | 177; 89 + library watch 99 + inspection 26 |
+| B3 services / repositories / runtime | 4,470 / 189 / 67 |
+| App | analyze clean; 728 tests, light and dark goldens |
+| Setup / release inputs | pass |
+| Path checker (all files) | 0 problem lines |
+| Render matrix `-Quick` (N-128435) | 36 passed, 12 skipped (NVENC unavailable here) |
+
+The fake-host results don't qualify real VEGAS. The owner's checklist is step L6
+of the plan.
 
 Two optional Vulkan encoders also fail the generic NV12 hardware probe on
 this PC. A one-frame CLI test succeeded with `yuv422p10le` for
