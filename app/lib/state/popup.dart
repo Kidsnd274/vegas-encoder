@@ -461,14 +461,7 @@ final popupEditorProvider = Provider<EditorData?>((ref) {
     capabilities: capabilities,
     lint: advanced ? CoreResult.run(() => core.lint(recipe.command.template, capabilities: capabilities)) : null,
     basic: advanced
-        ? CoreResult.run(
-            () => core.compile(
-              asBasic,
-              media: media,
-              paths: paths,
-              capabilities: capabilitiesFor(probed, asBasic, label: label),
-            ),
-          )
+        ? () => basicCompile(core, asBasic, media, paths, capabilitiesFor(probed, asBasic, label: label))
         : null,
   );
 });

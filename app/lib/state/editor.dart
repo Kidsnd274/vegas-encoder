@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
@@ -53,20 +55,34 @@ final _sampleCompiles =
   JsonMap? target,
   bool mediaIsSample = false,
 }) {
-  final extension = recipe.command.mode == 'template' ? null : basicExtension;
+  // C8: an Advanced edit starts from the extension its last compile reported,
+  // so a keystroke compiles once; only a changed container compiles again.
+  final advanced = recipe.command.mode == 'template';
+  final extension = advanced ? _advancedExtensions[recipe.id] : basicExtension;
   var paths = SamplePreview.paths(extension);
   if (mediaIsSample && recipe.schema >= 2) paths = paths.copyWith(mediaIsSample: true);
   if (target != null) paths = paths.copyWith(target: target);
   var result = CoreResult.run(() => core.compile(recipe, media: media, paths: paths, capabilities: capabilities));
   final activeExtension = result.value?.outputExtension;
-  if (activeExtension != null && activeExtension != extension) {
+  // A compile that reports no extension after a remembered one is redone without it.
+  if (activeExtension != extension && (activeExtension != null || (advanced && result.value != null))) {
     paths = SamplePreview.paths(activeExtension);
     if (mediaIsSample && recipe.schema >= 2) paths = paths.copyWith(mediaIsSample: true);
     if (target != null) paths = paths.copyWith(target: target);
     result = CoreResult.run(() => core.compile(recipe, media: media, paths: paths, capabilities: capabilities));
   }
+  if (advanced) {
+    if (activeExtension != null) {
+      _advancedExtensions[recipe.id] = activeExtension;
+    } else if (result.value != null) {
+      _advancedExtensions.remove(recipe.id);
+    }
+  }
   return (paths: paths, result: result);
 }
+
+/// The last output extension each recipe's Advanced compile reported (C8).
+final _advancedExtensions = <String, String>{};
 
 /// [recipe] compiled by [core] for the documented sample, with [ext] as the
 /// output's extension.
@@ -128,7 +144,7 @@ class EditorData {
     required this._total,
     this.capabilities,
     this.lint,
-    this.basic,
+    this._basic,
     this.preview = PreviewMedia.sample,
   });
 
@@ -173,8 +189,9 @@ class EditorData {
 
   /// Advanced mode: the same recipe compiled as Basic, for what switching back
   /// would render and for replacing the command with the Basic settings
-  /// (`advancedTemplate`). Null in Basic mode.
-  final CoreResult<CompileResult>? basic;
+  /// (`advancedTemplate`). Null in Basic mode. Compiled when first read (C8).
+  late final CoreResult<CompileResult>? basic = _basic?.call();
+  final CoreResult<CompileResult> Function()? _basic;
 
   /// The command, not the Basic settings, renders (`command.mode` template).
   bool get advanced => recipe.command.mode == 'template';
@@ -258,14 +275,30 @@ final editorProvider = Provider<EditorData?>((ref) {
     capabilities: capabilities,
     lint: advanced ? CoreResult.run(() => core.lint(recipe.command.template, capabilities: capabilities)) : null,
     basic: advanced
-        ? CoreResult.run(
-            () => core.compile(
-              asBasic,
-              media: media,
-              paths: paths,
-              capabilities: capabilitiesFor(probed, asBasic, label: label),
-            ),
-          )
+        ? () => basicCompile(core, asBasic, media, paths, capabilitiesFor(probed, asBasic, label: label))
         : null,
   );
 });
+
+/// The "as Basic" compile, reused while only the Advanced command changes:
+/// the Basic settings it compiles don't include the command text (C8).
+CoreResult<CompileResult> basicCompile(
+  VeCore core,
+  Recipe asBasic,
+  MediaDescription media,
+  CompilePaths paths,
+  CoreCapabilities? capabilities,
+) {
+  final json = asBasic.toJson();
+  final command = Map<String, Object?>.of(json['command'] as Map<String, Object?>)..remove('template');
+  final key = jsonEncode({...json, 'command': command, '#paths': paths.toJson(), '#media': media.toJson()});
+  final last = _lastBasic;
+  if (last != null && last.key == key && identical(last.core, core) && identical(last.capabilities, capabilities)) {
+    return last.result;
+  }
+  final result = CoreResult.run(() => core.compile(asBasic, media: media, paths: paths, capabilities: capabilities));
+  _lastBasic = (key: key, core: core, capabilities: capabilities, result: result);
+  return result;
+}
+
+({String key, VeCore core, CoreCapabilities? capabilities, CoreResult<CompileResult> result})? _lastBasic;
