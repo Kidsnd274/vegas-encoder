@@ -34,7 +34,8 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Tools.ps1')
 if ($Quick -eq $Full) { throw 'Choose exactly one of -Quick or -Full.' }
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
-$builds = @(if ($FFmpegPath) { $FFmpegPath | ForEach-Object { Resolve-VeFFmpeg $_ } } else { Resolve-VeFFmpeg '' })
+# pwsh -File passes a list as one string, so ';' also separates builds.
+$builds = @(if ($FFmpegPath) { $FFmpegPath | ForEach-Object { $_ -split ';' } | Where-Object { $_ } | ForEach-Object { Resolve-VeFFmpeg $_ } } else { Resolve-VeFFmpeg '' })
 if ($Quick) { $builds = @($builds[0]) }
 $python = Resolve-VePython $PythonPath
 $dll = if ($DllPath) { (Resolve-Path -LiteralPath $DllPath).Path } else { Join-Path $repo 'build\release\vegas-encoder\plugin\vegas-encoder.dll' }
@@ -107,12 +108,18 @@ if ($presets.Count -ne $builtins.Count) { throw "Found $($presets.Count) preset 
 
 $results = [Collections.Generic.List[object]]::new()
 foreach ($ffmpeg in $builds) {
+  # Encoders this build lacks are skipped; hardware ones must also open on this PC.
+  $listed = (& $ffmpeg -hide_banner -encoders 2>$null | Out-String)
   $available = @{}
   foreach ($preset in $presets) {
-    $encoder = [string]$preset.recipe.video.encoder
-    if ($encoder -notmatch '_(nvenc|qsv|amf)$' -or $available.ContainsKey($encoder)) { continue }
-    & $ffmpeg -hide_banner -v error -f lavfi -i 'color=s=256x256:d=0.04' -frames:v 1 -c:v $encoder -f null - 2>$null | Out-Null
-    $available[$encoder] = $LASTEXITCODE -eq 0
+    foreach ($encoder in @([string]$preset.recipe.video.encoder, [string]$preset.recipe.audio[0].encoder)) {
+      if (-not $encoder -or $available.ContainsKey($encoder)) { continue }
+      $available[$encoder] = $listed -match "(?m)^\s*\S+\s+$([regex]::Escape($encoder))\s"
+      if ($available[$encoder] -and $encoder -match '_(nvenc|qsv|amf)$') {
+        & $ffmpeg -hide_banner -v error -f lavfi -i 'color=s=256x256:d=0.04' -frames:v 1 -c:v $encoder -f null - 2>$null | Out-Null
+        $available[$encoder] = $LASTEXITCODE -eq 0
+      }
+    }
   }
   foreach ($profile in $profiles) { foreach ($shape in $shapes) { foreach ($audio in $audios) { foreach ($length in $lengths) { foreach ($preset in $presets) {
     $recipe = $preset.recipe; $container = [string]$recipe.container.format
@@ -122,8 +129,10 @@ foreach ($ffmpeg in $builds) {
     $row = [ordered]@{ case = $name; ffmpeg = Split-Path -Leaf (Split-Path -Parent (Split-Path -Parent $ffmpeg)); profile = $profile; preset = $recipe.name
       shape = $shape.label; audio = $audio.label; frames = $length; status = 'pass'; reason = ''; elapsedSec = 0 }
     $encoder = [string]$recipe.video.encoder
-    if ($available.ContainsKey($encoder) -and -not $available[$encoder]) {
-      $row.status = 'skipped'; $row.reason = "$encoder is unavailable in this FFmpeg build"; $results.Add([pscustomobject]$row); continue
+    $missing = @($encoder, [string]$recipe.audio[0].encoder) | Where-Object { $_ -and $available.ContainsKey($_) -and -not $available[$_] }
+    if ($missing) {
+      $row.status = 'skipped'; $row.reason = "$($missing -join ', ') unavailable in this FFmpeg build"; $results.Add([pscustomobject]$row)
+      Write-Output ('{0,-7} {1} {2}' -f 'SKIPPED', $name, $row.reason); continue
     }
     $started = Get-Date
     try {
