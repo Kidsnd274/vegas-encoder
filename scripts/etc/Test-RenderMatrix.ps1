@@ -144,6 +144,18 @@ foreach ($ffmpeg in $builds) {
       $run = Invoke-Fiohost $case $arguments
       $run.text | Set-Content -LiteralPath (Join-Path (Join-Path $root $name) 'fiohost.txt') -Encoding utf8
       $output = Join-Path $case.out "render-1.$(if ($container -eq 'mkv') { 'mkv' } else { $container })"
+      # A host with no audio stream: a preset with audio on must refuse clearly, before encoding.
+      if (-not $audio.rate -and [bool]$recipe.audio[0].enabled) {
+        $stopped = Get-ChildItem -LiteralPath (Join-Path (Join-Path $root $name) 'logs') -Filter '*.log' -ErrorAction SilentlyContinue |
+          Select-String -Pattern 'render stopped: failed \((.*)\)' | Select-Object -Last 1
+        $why = if ($stopped) { $stopped.Matches[0].Groups[1].Value } else { '' }
+        if ($run.exit -eq 0 -or (Test-Path -LiteralPath $output) -or $why -notmatch 'no audio stream') { throw "expected the no-audio refusal, got exit $($run.exit): $why" }
+        $row.reason = "refused as expected: $why"
+        $row.elapsedSec = [math]::Round(((Get-Date) - $started).TotalSeconds, 1)
+        $results.Add([pscustomobject]$row)
+        Write-Output ('{0,-7} {1} {2}' -f 'PASS', $name, $row.reason)
+        continue
+      }
       if ($run.exit -ne 0 -or -not (Test-Path -LiteralPath $output)) {
         # fiohost can exit before the asynchronous record writer finishes; the live status already has the reason.
         $files = @(Get-ChildItem -LiteralPath (Join-Path $case.data 'Local\jobs') -Filter '*.json' -ErrorAction SilentlyContinue)

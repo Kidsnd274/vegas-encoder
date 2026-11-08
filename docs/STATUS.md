@@ -55,7 +55,9 @@ because the fake host serves the built-ins' P010.
 | App | analyze clean; 728 tests, light and dark goldens |
 | Setup / release inputs | pass |
 | Path checker (all files) | 0 problem lines |
-| Render matrix `-Quick` (N-128435) | 36 passed, 12 skipped (NVENC unavailable here) |
+| Render matrix `-Quick`, N-128435 / BtbN n8.1.3 / gyan 9.0.2 essentials | 36 / 36 / 32 passed, 0 failed; skipped: NVENC here, and AV1 on gyan essentials (no `libsvtav1`) |
+| Render matrix `-Full`, 60-frame rows, N-128435 | 360 passed, 0 failed, 120 skipped (NVENC): modern and legacy-name profiles, 4 shapes, 44.1/48 kHz stereo, mono, 5.1 and the no-audio refusal |
+| AV1 (CPU) revision 5, 900 frames, 1080p 29.97 and 2160p 25 | passed on N-128435 and BtbN n8.1.3 |
 
 The fake-host results don't qualify real VEGAS. The owner's checklist is step L6
 of the plan.

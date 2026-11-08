@@ -620,8 +620,20 @@ int RunRenderTest(ISfRenderFileClass* rc, ISfHostAllocator* alloc, const RenderT
     printf("Render hr=0x%08lx frames served %lld released %lld outstanding %lld; audio reads %lld samples %lld\n", hr,
            video.served, video.released, video.outstanding, audio.reads, audio.samples);
     wchar_t name[0x104] = L"";
-    if (SUCCEEDED(hr))
-      Check(file->GetFileName(name, 0x104) == S_OK && wcscmp(name, path) == 0, "GetFileName returns the SetFile path");
+    if (SUCCEEDED(hr)) {
+      // Legacy automatic names (LEGACY_NAMING.md): a ".vencoder" request reports
+      // the file actually written, same folder and stem with the recipe's extension.
+      const std::wstring requested = path;
+      const bool automatic = requested.size() > 9 && _wcsicmp(requested.c_str() + requested.size() - 9, L".vencoder") == 0;
+      const bool named = file->GetFileName(name, 0x104) == S_OK;
+      if (automatic) {
+        const std::wstring stem = requested.substr(0, requested.size() - 9);
+        Check(named && _wcsnicmp(name, stem.c_str(), stem.size()) == 0 && GetFileAttributesW(name) != INVALID_FILE_ATTRIBUTES,
+              "GetFileName returns the written file for a legacy automatic name");
+      } else {
+        Check(named && wcscmp(name, path) == 0, "GetFileName returns the SetFile path");
+      }
+    }
     Check(file->CloseFile() == S_OK, "CloseFile");
     file->Release();
     if (injectStop && (o.expectFailure || failureSlot)) {
