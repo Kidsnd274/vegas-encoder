@@ -81,7 +81,11 @@ std::optional<std::string> ShowOpenFileDialog(HWND owner,
          filter_pattern.c_str()},
         {L"Programs", L"*.exe"},
     };
-    dialog->SetFileTypes(2, filters);
+    // "Programs (*.exe)" belongs only to executable pickers (the FFmpeg one),
+    // never to preset import (C12).
+    const bool executable = filter_pattern.size() >= 4 &&
+        _wcsicmp(filter_pattern.c_str() + filter_pattern.size() - 4, L".exe") == 0;
+    dialog->SetFileTypes(executable ? 2 : 1, filters);
     dialog->SetFileTypeIndex(1);
   }
 
