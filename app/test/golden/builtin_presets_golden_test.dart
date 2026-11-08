@@ -170,11 +170,11 @@ void main() {
       await expectGolden('builtins_hevc_$theme');
     });
 
-    testWidgets('CPU AV1 starter shows its parallelism argument $theme', (tester) async {
+    testWidgets('CPU AV1 starter has no extra arguments $theme', (tester) async {
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       tester.platformDispatcher.platformBrightnessTestValue = brightness;
       final preset = builtins.singleWhere((p) => p.recipe.id == 'av1-small');
-      expect(preset.revision, 4);
+      expect(preset.revision, 5);
       await pumpApp(
         tester,
         core: core,
@@ -189,7 +189,7 @@ void main() {
       await tester.ensureVisible(extra);
       await tester.pumpAndSettle();
       final input = find.descendant(of: extra, matching: find.byType(EditableText));
-      expect(tester.widget<EditableText>(input).controller.text, '-svtav1-params lp=3');
+      expect(tester.widget<EditableText>(input).controller.text, '', reason: 'L2: no lp=3 workaround');
       await expectGolden('builtins_av1_cpu_$theme');
     });
 

@@ -201,11 +201,11 @@
     },
     {
       "vepreset": 1,
-      "revision": 4,
+      "revision": 5,
       "favorite": false,
       "pinned": false,
       "builtin": true,
-      "updatedAt": "2026-11-05T16:00:00Z",
+      "updatedAt": "2026-11-08T00:00:00Z",
       "origin": null,
       "requires": {
         "encoders": [],
@@ -216,7 +216,7 @@
         "schema": 1,
         "id": "av1-small",
         "name": "AV1 (CPU)",
-        "notes": "Uses SVT-AV1 parallelism level 3 to avoid stalls with live VEGAS audio and video. Edit it under Video Extra arguments.",
+        "notes": "Software AV1 with SVT-AV1: CRF 32, preset 6, 10-bit video and Opus audio in WebM. Follows project dimensions and frame rate.",
         "tags": [
           "Web",
           "Small"
@@ -240,7 +240,7 @@
           "depth": 10,
           "gopSec": 2,
           "color": "bt709",
-          "extra": "-svtav1-params lp=3"
+          "extra": ""
         },
         "audio": [
           {

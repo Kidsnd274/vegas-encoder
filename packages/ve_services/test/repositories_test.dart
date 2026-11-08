@@ -265,12 +265,17 @@ Future<void> main(List<String> args) async {
         final recipe = p.recipe;
         return p.revision ==
             (recipe.id == 'av1-small'
-                ? 4
+                ? 5
                 : recipe.category == 'web' && recipe.id != 'vp9-webm'
                 ? 3
                 : 2);
       }),
-      'only changed presets advance: AV1 (CPU) to revision 4, other delivery presets to 3',
+      'only changed presets advance: AV1 (CPU) to revision 5, other delivery presets to 3',
+    );
+    // L2: the A1 transport fix makes the AV1 lp=3 workaround unnecessary.
+    check(
+      initialPresets.firstWhere((p) => p.recipe.id == 'av1-small').recipe.video.extra.isEmpty,
+      'AV1 (CPU) has no extra arguments',
     );
     final builtin = initialPresets.first;
     check(
