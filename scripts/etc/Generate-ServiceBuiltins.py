@@ -6,6 +6,7 @@ VEGAS template IDs and GUIDs are persistent identities; retired IDs stay unused.
 import argparse
 import json
 from pathlib import Path
+import re
 from uuid import UUID
 
 root = Path(__file__).resolve().parent.parent.parent
@@ -18,6 +19,10 @@ presets = source['presets']
 by_id = {p['recipe']['id']: p for p in presets}
 assert len(by_id) == len(presets), 'Duplicate built-in ID.'
 assert all(p['builtin'] and p['revision'] >= 1 for p in presets)
+for p in presets:
+    # The services reader accepts only UTC timestamps (C3), so copies of a built-in must stay readable.
+    assert re.fullmatch(r'\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z', p['updatedAt']), \
+        f"{p['recipe']['id']}: updatedAt must be a UTC timestamp ending in Z."
 guids = [UUID(p['guid']) for p in source['vegas']]
 assert len(set(guids)) == len(guids), 'Duplicate VEGAS GUID.'
 assert len({p['presetId'] for p in source['vegas']}) == len(source['vegas'])

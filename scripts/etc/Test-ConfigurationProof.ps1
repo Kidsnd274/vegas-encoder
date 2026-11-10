@@ -10,10 +10,13 @@ or VEGAS launch. Output must be a fresh directory under build/test-results.
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)][string] $OutputDir,
-  [string] $FFmpegPath = 'C:\ffmpeg\bin\ffmpeg.exe',
-  [string] $PythonPath = 'python'
+  [string] $FFmpegPath,
+  [string] $PythonPath
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$FFmpegPath = Resolve-VeFFmpeg $FFmpegPath
+$PythonPath = Resolve-VePython $PythonPath
 $proofRepo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 $proofRoot = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputDir)
 $proofAllowed = [IO.Path]::GetFullPath((Join-Path $proofRepo 'build\test-results')) + [IO.Path]::DirectorySeparatorChar

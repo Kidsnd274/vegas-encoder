@@ -19,10 +19,29 @@ class FileMachineSettingsRepository implements MachineSettingsRepository {
   FileMachineSettingsRepository({ServicePaths? paths})
     : paths = paths ?? ServicePaths.windows();
   final ServicePaths paths;
+
+  /// How often [read] parsed machine.json (C6: an unchanged file is parsed once).
+  int parses = 0;
+  ({int size, DateTime modified, MachineSettings value})? _last;
+
   @override
   Future<MachineSettings> read() async {
+    final stat = await File(paths.machine).stat();
+    final last = _last;
+    if (stat.type == FileSystemEntityType.file &&
+        last != null &&
+        last.size == stat.size &&
+        last.modified == stat.modified)
+      return last.value;
     final data = await readJson(paths.machine);
-    return data == null ? MachineSettings() : decodeMachine(data);
+    if (data == null) {
+      _last = null;
+      return MachineSettings();
+    }
+    parses++;
+    final value = decodeMachine(data);
+    _last = (size: stat.size, modified: stat.modified, value: value);
+    return value;
   }
 
   @override
@@ -101,7 +120,7 @@ Future<_LibraryMetadata> _libraryMetadata(
 }
 
 class FilePresetLibrary
-    implements PresetLibrary, PresetPreferences, PresetLocations {
+    implements PresetLibrary, PresetPreferences, PresetLocations, LibraryHealth {
   FilePresetLibrary({
     required VeCore core,
     ServicePaths? paths,
@@ -127,7 +146,13 @@ class FilePresetLibrary
   late final _listedBuiltins = _builtins
       .map(_requirements)
       .toList(growable: false);
-  Map<String, ({_PresetStamp stamp, Preset preset})> _listedFiles = {};
+  Map<String, ({_PresetStamp stamp, Preset preset, Preset shown})> _listedFiles = {};
+  List<LibraryProblem> _problems = const [];
+  @override
+  Future<List<LibraryProblem>> problems() async {
+    await list();
+    return _problems;
+  }
   _PresetStamp? _listedPreferencesStamp;
   JsonMap? _listedPreferences;
   List<Preset>? _listedSnapshot;
@@ -187,7 +212,27 @@ class FilePresetLibrary
     final preset = decodePreset(data, _core);
     if (preset.recipe.id.toLowerCase() != id.toLowerCase() || preset.builtin)
       invalid('Preset file identity mismatch.');
-    return _requirements(preset);
+    return _withOverlay(
+      _requirements(preset),
+      objectField(await _preferences(), 'presets'),
+      null,
+    );
+  }
+
+  /// Contract 3.3: stars and pins come from the preferences overlay (lowercase
+  /// ID), then from the preset itself. [prior] is reused when unchanged, so
+  /// watchers see identical snapshots.
+  Preset _withOverlay(Preset base, JsonMap overlays, Preset? prior) {
+    final overlay = jsonMap(
+      overlays[base.recipe.id.toLowerCase()] ?? <String, Object?>{},
+    );
+    final favorite = overlay['favorite'] as bool? ?? base.favorite;
+    final pinned = overlay['pinned'] as bool? ?? base.pinned;
+    if (prior != null && prior.favorite == favorite && prior.pinned == pinned)
+      return prior;
+    return favorite == base.favorite && pinned == base.pinned
+        ? base
+        : base.copyWith(favorite: favorite, pinned: pinned);
   }
 
   @override
@@ -229,8 +274,9 @@ class FilePresetLibrary
         paths.preferences,
         metadataJson,
       );
-      final entries = <String, ({_PresetStamp stamp, Preset preset})>{};
+      final entries = <String, ({_PresetStamp stamp, Preset preset, Preset shown})>{};
       final result = <Preset>[];
+      final problems = <LibraryProblem>[];
       JsonMap preferences;
       if (_listedPreferencesStamp == metadata.preferences &&
           _listedPreferences != null) {
@@ -259,27 +305,36 @@ class FilePresetLibrary
         final key = stamp.path.toLowerCase();
         final cached = _listedFiles[key];
         if (cached != null && cached.stamp == stamp) {
-          entries[key] = cached;
-          result.add(cached.preset);
+          final shown = _withOverlay(cached.preset, overlays, cached.shown);
+          entries[key] = (stamp: stamp, preset: cached.preset, shown: shown);
+          result.add(shown);
           continue;
         }
-        final name = File(stamp.path).uri.pathSegments.last;
-        final id = name.substring(0, name.length - '.vepreset'.length);
-        safeId(id);
-        if (_builtin(id) != null)
-          invalid('User file shadows a built-in preset.');
         // Do not reuse an old successful entry after observing a malformed edit,
         // even if a later repair restores its original size/timestamps.
         _listedFiles.remove(key);
-        final data = await readJson(stamp.path);
-        if (data == null) continue; // Removed between enumeration and open.
-        final decoded = decodePreset(data, _core);
-        if (decoded.recipe.id.toLowerCase() != id.toLowerCase() ||
-            decoded.builtin)
-          invalid('Preset file identity mismatch.');
-        final preset = _requirements(decoded);
-        entries[key] = (stamp: stamp, preset: preset);
-        result.add(preset);
+        try {
+          final name = File(stamp.path).uri.pathSegments.last;
+          final id = name.substring(0, name.length - '.vepreset'.length);
+          safeId(id);
+          if (_builtin(id) != null)
+            invalid('User file shadows a built-in preset.');
+          final data = await readJson(stamp.path);
+          if (data == null) continue; // Removed between enumeration and open.
+          final decoded = decodePreset(data, _core);
+          if (decoded.recipe.id.toLowerCase() != id.toLowerCase() ||
+              decoded.builtin)
+            invalid('Preset file identity mismatch.');
+          final preset = _requirements(decoded);
+          final shown = _withOverlay(preset, overlays, null);
+          entries[key] = (stamp: stamp, preset: preset, shown: shown);
+          result.add(shown);
+        } on ServiceException catch (e) {
+          // Contract 3.3: one bad file is a problem, never an empty library.
+          problems.add(LibraryProblem(path: stamp.path, code: e.code, message: e.message));
+        } on FileSystemException catch (e) {
+          problems.add(LibraryProblem(path: stamp.path, code: 'FILE-READ', message: e.message));
+        }
       }
       if (epoch != _listEpoch)
         continue; // An own write won while reads awaited.
@@ -296,6 +351,7 @@ class FilePresetLibrary
       _listedPreferences = preferences;
       _listedMetadataJson = metadataJson;
       _listedEpoch = epoch;
+      _problems = List.unmodifiable(problems);
       return _listedSnapshot = same ? old : List<Preset>.unmodifiable(result);
     }
     throw const ServiceException(
@@ -391,6 +447,18 @@ class FilePresetLibrary
   }
 
   @override
+  Future<String> availableId(String name) async {
+    final taken = [for (final preset in await list()) preset.recipe.id];
+    final history = Directory(joinPath(paths.library, '.history'));
+    if (await history.exists()) {
+      await for (final entity in history.list(followLinks: false)) {
+        if (entity is Directory) taken.add(entity.uri.pathSegments.where((s) => s.isNotEmpty).last);
+      }
+    }
+    return freePresetId(name, taken);
+  }
+
+  @override
   Future<void> delete(
     String id, {
     required int expectedRevision,
@@ -415,24 +483,7 @@ class FilePresetLibrary
     final current = await _current(id);
     if (current == null)
       throw const ServiceException('NOT-FOUND', 'Preset not found.');
-    if (!current.builtin) {
-      // Preference writes change only the latest metadata, never a stale UI draft.
-      final saved = current.copyWith(
-        favorite: favorite ?? current.favorite,
-        pinned: pinned ?? current.pinned,
-        revision: current.revision + 1,
-        updatedAt: _now(),
-      );
-      decodeJson(jsonEncode(saved.data));
-      await atomicWrite(
-        _history(id, current.revision),
-        jsonEncode(current.data),
-      );
-      await atomicWrite(_file(id), jsonEncode(saved.data));
-      _invalidateList(id);
-      await _prune(id);
-      return saved;
-    }
+    // Built-ins and user presets alike: the overlay never bumps a revision or adds history.
     final data = await _preferences();
     final entries = objectField(data, 'presets');
     final key = current.recipe.id.toLowerCase();
@@ -481,14 +532,33 @@ class FileCapabilityCache implements CapabilityCache {
   final ServicePaths paths;
   final int parserVersion;
   String _file(String key) => joinPath(paths.cache, '${safeId(key)}.json');
+
+  /// How often [read] parsed a cache file (C6: an unchanged file is parsed once).
+  int parses = 0;
+  final Map<String, ({int size, DateTime modified, FFmpegCapabilities? value})> _read = {};
+
   @override
   Future<FFmpegCapabilities?> read(String identityKey) async {
-    final data = await readJson(_file(identityKey));
-    if (data == null) return null;
+    final path = _file(identityKey);
+    final stat = await File(path).stat();
+    final last = _read[identityKey];
+    if (stat.type == FileSystemEntityType.file &&
+        last != null &&
+        last.size == stat.size &&
+        last.modified == stat.modified)
+      return last.value;
+    final data = await readJson(path);
+    if (data == null) {
+      _read.remove(identityKey);
+      return null;
+    }
+    parses++;
     major(data, 'cache');
     final value = decodeCapabilities(objectField(data, 'capabilities'));
     if (value.identityKey != identityKey) invalid('Cache identity mismatch.');
-    return value.parser == parserVersion ? value : null;
+    final result = value.parser == parserVersion ? value : null;
+    _read[identityKey] = (size: stat.size, modified: stat.modified, value: result);
+    return result;
   }
 
   @override

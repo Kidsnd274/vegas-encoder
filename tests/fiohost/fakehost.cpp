@@ -81,8 +81,8 @@ class Counted : public I {
 
 class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
  public:
-  FakeVideo(LONGLONG frames, LONG w, LONG h, DWORD compression, double fps)
-      : frames_(frames), w_(w), h_(h), compression_(compression), fps_(fps) {
+  FakeVideo(LONGLONG frames, LONG w, LONG h, DWORD compression, double fps, double par = 1.0)
+      : frames_(frames), w_(w), h_(h), compression_(compression), fps_(fps), par_(par) {
     bool p010 = compression == MAKEFOURCC('P', '0', '1', '0');
     stride0_ = p010 ? w * 2 : w * 4;
     plane1_ = p010 ? stride0_ * h : 0;
@@ -164,7 +164,7 @@ class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
     DWORD vex[4] = {64, 0xFFFFFFFF, 0, 0};
     memcpy(fi + frameinfo::vex, vex, sizeof vex);
     memcpy(fi + frameinfo::fps, &fps_, 8);
-    memcpy(fi + frameinfo::pixelAspect, &one, 8);
+    memcpy(fi + frameinfo::pixelAspect, &par_, 8);
     BITMAPINFOHEADER h{};
     h.biSize = sizeof h;
     h.biWidth = w_;
@@ -235,7 +235,7 @@ class FakeVideo final : public Counted<ISfReadVideoRenderStream> {
   LONG_PTR lastLock_ = 0;
   LONG w_, h_;
   DWORD compression_;
-  double fps_;
+  double fps_, par_;
   LONG stride0_, plane1_, stride1_, size_;
   std::vector<BYTE> buf_;
 };
@@ -349,7 +349,11 @@ class FakeProgress final : public Counted<ISfProgress> {
   }
   HRESULT STDMETHODCALLTYPE SetPosition(LONGLONG p) override {
     Caller();
-    if (position != p) callsAtPosition_ = 0;
+    if (position != p) {
+      // Middle frames only: startup (frame 0) and finishing (frame total) wait legitimately.
+      if (position > 0 && position < total) { ++midFrames; if (callsAtPosition_ <= 2) ++quietMidFrames; }
+      callsAtPosition_ = 0;
+    }
     callsAtPosition_++;
     position = p;
     positions++;
@@ -362,7 +366,7 @@ class FakeProgress final : public Counted<ISfProgress> {
     return FailNow(7) ? E_ACCESSDENIED : S_OK;
   }
   HRESULT STDMETHODCALLTYPE Slot8(LONG) override { return S_OK; }
-  LONGLONG total = -1, position = -1, positions = 0, checks = 0;
+  LONGLONG total = -1, position = -1, positions = 0, checks = 0, midFrames = 0, quietMidFrames = 0;
 
  private:
   bool FailNow(int slot) const {
@@ -513,14 +517,16 @@ bool ConfigureAndReload(ISfRenderFileClass* renderClass, ISfHostAllocator* alloc
 RecipeHostResult ExerciseRecipeHost(const RenderTestOptions& o,
   const std::function<HRESULT(ISfReadVideoRenderStream*,ISfReadAudioStream*,ISfProgress*)>& render) {
   const double fps = o.deliveredFps ? o.deliveredFps : o.fps;
-  FakeVideo video(o.frames,o.width,o.height,o.recipeVideoCompression,fps);
-  FakeAudio audio(48000,2,SFAUDIO_FORMAT_FLOAT32,static_cast<LONGLONG>(llround(o.frames*48000/fps)),fps,o.shortRead);
+  FakeVideo video(o.frames,o.width,o.height,o.recipeVideoCompression,fps,o.pixelAspect);
+  FakeAudio audio(o.sampleRate,o.channels,SFAUDIO_FORMAT_FLOAT32,static_cast<LONGLONG>(llround(o.frames*double(o.sampleRate)/fps)),fps,o.shortRead);
   FakeProgress progress(o.cancelAt,o.progressFailureSlot,o.progressFailureAt,o.progressFailureCall,nullptr);
   RecipeHostResult result;
   result.returned = render(&video,o.videoOnly ? nullptr : &audio,&progress);
   result.served = video.served; result.released = video.released; result.outstanding = video.outstanding;
   result.lockErrors = video.lockErrors; result.samples = audio.samples; result.reads = audio.reads; result.tokenErrors = audio.tokenErrors;
   result.callerThreadErrors = video.callerThreadErrors + audio.callerThreadErrors + progress.callerThreadErrors;
+  result.progressCalls = progress.positions + progress.checks;
+  result.midFrames = progress.midFrames; result.quietMidFrames = progress.quietMidFrames;
   if (video.ref != 1 || audio.ref != 1 || progress.ref != 1) ++result.lockErrors;
   return result;
 }
@@ -614,8 +620,20 @@ int RunRenderTest(ISfRenderFileClass* rc, ISfHostAllocator* alloc, const RenderT
     printf("Render hr=0x%08lx frames served %lld released %lld outstanding %lld; audio reads %lld samples %lld\n", hr,
            video.served, video.released, video.outstanding, audio.reads, audio.samples);
     wchar_t name[0x104] = L"";
-    if (SUCCEEDED(hr))
-      Check(file->GetFileName(name, 0x104) == S_OK && wcscmp(name, path) == 0, "GetFileName returns the SetFile path");
+    if (SUCCEEDED(hr)) {
+      // Legacy automatic names (LEGACY_NAMING.md): a ".vencoder" request reports
+      // the file actually written, same folder and stem with the recipe's extension.
+      const std::wstring requested = path;
+      const bool automatic = requested.size() > 9 && _wcsicmp(requested.c_str() + requested.size() - 9, L".vencoder") == 0;
+      const bool named = file->GetFileName(name, 0x104) == S_OK;
+      if (automatic) {
+        const std::wstring stem = requested.substr(0, requested.size() - 9);
+        Check(named && _wcsnicmp(name, stem.c_str(), stem.size()) == 0 && GetFileAttributesW(name) != INVALID_FILE_ATTRIBUTES,
+              "GetFileName returns the written file for a legacy automatic name");
+      } else {
+        Check(named && wcscmp(name, path) == 0, "GetFileName returns the SetFile path");
+      }
+    }
     Check(file->CloseFile() == S_OK, "CloseFile");
     file->Release();
     if (injectStop && (o.expectFailure || failureSlot)) {

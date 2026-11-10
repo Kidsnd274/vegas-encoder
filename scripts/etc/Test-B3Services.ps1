@@ -1,7 +1,9 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([string] $DartPath = 'L:\flutter\bin\cache\dart-sdk\bin\dart.exe')
+param([string] $DartPath)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$DartPath = Resolve-VeDart $DartPath
 $b3ServicesRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 $b3ServicesBuild = [IO.Path]::GetFullPath((Join-Path $b3ServicesRoot 'build'))
 $b3ServicesOutput = [IO.Path]::GetFullPath((Join-Path $b3ServicesBuild 'b3-services'))

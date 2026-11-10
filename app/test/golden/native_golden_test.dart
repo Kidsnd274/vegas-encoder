@@ -7,6 +7,8 @@
 // Images: test/golden/goldens/presets_native_<state>_<light|dark>.png and
 // core_unavailable_<light|dark>.png
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +16,7 @@ import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/features/presets/panels/extra_field.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
+import 'package:vegas_encoder/state/recipe_edit.dart';
 import 'package:vegas_encoder/state/services.dart';
 
 import '../helpers.dart';
@@ -69,6 +72,35 @@ void main() {
       await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
       await tester.pumpAndSettle();
       expect(find.text('Fix the errors before saving'), findsOneWidget);
+    },
+    // Decision D3: a shared preset that reads another file asks before it is imported.
+    'import_warning': (tester) async {
+      final base = (await tester.runAsync(() => FakePresetLibrary().get('yt-h264')))!;
+      final shared = base.copyWith(builtin: false, recipe: base.recipe.withVideo((v) => v.copyWith(extra: '-attach cover.jpg')));
+      final share = 'vepreset:1:${base64Url.encode(utf8.encode(jsonEncode(shared.data)))}';
+      await tester.tap(find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Add a preset'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Import share string…'));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, share);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Import').last);
+      await tester.pumpAndSettle();
+      expect(find.text('“YouTube upload, H.264” reads other files or uses the network'), findsOneWidget);
+    },
+    // Decision D4: an option that can stop the render early asks before saving.
+    'save_shorter': (tester) async {
+      EditableText.debugDeterministicCursor = true;
+      addTearDown(() => EditableText.debugDeterministicCursor = false);
+      final extra = find.descendant(of: find.byType(ExtraArgumentsField), matching: find.byType(TextField));
+      await tester.enterText(extra, '-t 5');
+      await tester.pumpAndSettle();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('The output may be shorter than the timeline'), findsOneWidget);
     },
     // File node at the default 10:00: the core's total and its range for 10:00.
     'file': (tester) async {

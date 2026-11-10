@@ -1,9 +1,9 @@
 #include "recipe_runtime.h"
 #include "vegas_encoder.h"
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <filesystem>
-#include <regex>
 
 namespace vegas_encoder {
 namespace {
@@ -103,6 +103,37 @@ ve::Json DefaultRecipeSnapshot() {
   if (ve::HasErrors(normalized.at("issues"))) throw std::runtime_error("Candidate default recipe failed native normalization.");
   return {{"recipe",normalized.at("recipe")},{"origin",nullptr},{"vegasPrefs",ve::Json::object()},{"writtenBy",kVersion}};
 }
+uintptr_t ChooseHostWindow(const HostWindowCandidate& foreground, const std::vector<HostWindowCandidate>& topLevel, DWORD process) {
+  if (foreground.handle && foreground.process == process) return foreground.handle;
+  const HostWindowCandidate* best = nullptr;
+  for (const auto& window : topLevel)
+    if (window.handle && window.process == process && window.visible && !window.owned && (!best || window.area > best->area)) best = &window;
+  return best ? best->handle : 0;
+}
+namespace {
+HostWindowCandidate Candidate(HWND window) {
+  HostWindowCandidate candidate; RECT bounds{};
+  candidate.handle = reinterpret_cast<uintptr_t>(window);
+  GetWindowThreadProcessId(window,&candidate.process);
+  candidate.visible = IsWindowVisible(window) != FALSE;
+  candidate.owned = GetWindow(window,GW_OWNER) != nullptr;
+  if (GetWindowRect(window,&bounds)) candidate.area = LONGLONG(bounds.right - bounds.left) * (bounds.bottom - bounds.top);
+  return candidate;
+}
+BOOL CALLBACK CollectWindow(HWND window, LPARAM list) {
+  reinterpret_cast<std::vector<HostWindowCandidate>*>(list)->push_back(Candidate(window)); return TRUE;
+}
+// Only non-messaging calls (no GetWindowText/SendMessage) run here on Render's thread.
+ve::Json HostWindow() {
+  const auto foreground = GetAncestor(GetForegroundWindow(),GA_ROOTOWNER);
+  const auto current = foreground ? Candidate(foreground) : HostWindowCandidate{};
+  std::vector<HostWindowCandidate> windows;
+  if (current.process != GetCurrentProcessId()) EnumWindows(CollectWindow,reinterpret_cast<LPARAM>(&windows));
+  const auto chosen = ChooseHostWindow(current,windows,GetCurrentProcessId());
+  return chosen ? ve::Json(std::to_string(chosen)) : ve::Json(nullptr);
+}
+}
+std::wstring RecipeJobsRoot() { return (fs::path(Root(true)) / L"jobs").wstring(); }
 RecipeRuntime LoadRecipeRuntime() {
   RecipeRuntime result;
   const auto machine = Read((fs::path(Root(false)) / L"machine.json").wstring());
@@ -117,7 +148,8 @@ RecipeRuntime LoadRecipeRuntime() {
   const auto& installation = result.installation;
   if (!installation.contains("identity") || !installation.at("identity").is_object()) throw std::runtime_error("FFmpeg identity is missing; add the installation again in the app.");
   const auto key = ve::Str(installation.at("identity"),"key");
-  if (!std::regex_match(key,std::regex("[A-Fa-f0-9]{64}"))) throw std::runtime_error("Invalid FFmpeg cache identity.");
+  if (key.size() != 64 || !std::all_of(key.begin(),key.end(),[](unsigned char c) { return std::isxdigit(c) != 0; }))
+    throw std::runtime_error("Invalid FFmpeg cache identity.");
   result.jobsRoot = (fs::path(Root(true)) / L"jobs").wstring();
   result.verifyOutput = Flag(machine,"verifyOutput",true);
   const auto cache = Read((fs::path(Root(true)) / L"cache" / (Widen(key) + L".json")).wstring());
@@ -130,15 +162,18 @@ RecipeRuntime LoadRecipeRuntime() {
     result.capabilities = capabilities;
     // Hardware readiness includes GPU/driver/age checks in the app. Do not label
     // a stored smoke result as currently qualified from this lightweight reader.
+    // A stored failure is kept as context for a later FFmpeg error (decision D8); it never blocks.
     for (const auto& profile : ve::Profiles().at("video")) if (!profile.value("hw",ve::Json(nullptr)).is_null()) {
       const auto name = ve::Str(profile,"id");
-      if (result.capabilities.contains("encoders") && result.capabilities["encoders"].contains(name))
-        result.capabilities["encoders"][name]["availability"] = {{"state","unknown"},{"reason","Hardware readiness is not requalified by the native candidate."}};
+      if (!result.capabilities.contains("encoders") || !result.capabilities["encoders"].contains(name)) continue;
+      auto& encoder = result.capabilities["encoders"][name];
+      const auto previous = encoder.value("availability",ve::Json::object());
+      if (previous.is_object() && ve::Str(previous,"state") == "failed")
+        result.failedEncoders[name] = {{"reason",ve::Str(previous,"reason")},{"testedAt",previous.value("testedAt",ve::Json(nullptr))}};
+      encoder["availability"] = {{"state","unknown"},{"reason","Hardware readiness is not requalified by the native candidate."}};
     }
   }
-  HWND window = GetAncestor(GetForegroundWindow(),GA_ROOTOWNER); DWORD pid = 0;
-  if (window && GetWindowThreadProcessId(window,&pid) && pid == GetCurrentProcessId())
-    result.hostHwnd = std::to_string(reinterpret_cast<uintptr_t>(window));
+  result.hostHwnd = HostWindow();
   if (Flag(machine,"progressWindow",true)) {
     try { AppReady(); result.monitorApplication = Cfg().appPath; }
     catch (const std::exception& error) { Log("monitor unavailable (render continues): %s",error.what()); }

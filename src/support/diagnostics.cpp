@@ -30,10 +30,9 @@ LARGE_INTEGER LoadCounter() {
 }
 
 std::wstring ModuleDir() {
-  wchar_t path[MAX_PATH] = L"";
-  GetModuleFileNameW(g_module, path, MAX_PATH);
-  wchar_t* slash = wcsrchr(path, L'\\');
-  if (slash) *slash = 0;
+  auto path = ModuleFileName(g_module);
+  const auto slash = path.find_last_of(L'\\');
+  if (slash != std::wstring::npos) path.resize(slash);
   return path;
 }
 
@@ -52,9 +51,7 @@ DWORD IniNumber(const std::wstring& ini, const wchar_t* key, DWORD def) {
 Config LoadConfig() {
   Config c;
   c.iniPath = ModuleDir() + L"\\vegas-encoder.ini";
-  wchar_t local[MAX_PATH] = L"";
-  GetEnvironmentVariableW(L"LOCALAPPDATA", local, MAX_PATH);
-  std::wstring defLog = std::wstring(local) + L"\\vegas-encoder";
+  std::wstring defLog = EnvironmentValue(L"LOCALAPPDATA") + L"\\vegas-encoder";
   c.logDir = IniString(c.iniPath, L"LogDir", defLog.c_str());
   c.access = IniNumber(c.iniPath, L"Access", c.access);
   c.streamTypes = IniNumber(c.iniPath, L"StreamTypes", c.streamTypes);
@@ -72,8 +69,14 @@ Config LoadConfig() {
   c.validMode = c.encode || mode == L"raw";
   c.ffmpegPath = IniString(c.iniPath, L"FFmpegPath", c.ffmpegPath.c_str());
   c.showEncoderErrors = IniNumber(c.iniPath, L"ShowEncoderErrors", 1) != 0;
-  c.pipeTimeoutMs = IniNumber(c.iniPath, L"PipeTimeoutMs", c.pipeTimeoutMs);
-  c.finishTimeoutMs = IniNumber(c.iniPath, L"FinishTimeoutMs", c.finishTimeoutMs);
+  // Contract 3.5: PipeTimeoutMs/FinishTimeoutMs are deprecated aliases for StallTimeoutMs.
+  const DWORD unset = 0xFFFFFFFFu;
+  const DWORD stall = IniNumber(c.iniPath, L"StallTimeoutMs", unset), pipe = IniNumber(c.iniPath, L"PipeTimeoutMs", unset),
+              finish = IniNumber(c.iniPath, L"FinishTimeoutMs", unset);
+  c.stallTimeoutSource = stall != unset ? "StallTimeoutMs" : finish != unset ? "FinishTimeoutMs (deprecated)" : pipe != unset ? "PipeTimeoutMs (deprecated)" : "default";
+  if (stall != unset) c.stallTimeoutMs = stall;
+  else if (finish != unset || pipe != unset) c.stallTimeoutMs = (std::max)(finish != unset ? finish : 0u, pipe != unset ? pipe : 0u);
+  c.connectTimeoutMs = IniNumber(c.iniPath, L"ConnectTimeoutMs", c.connectTimeoutMs);
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
   c.appPath = IniString(c.iniPath, L"AppPath", L"");
 #endif
@@ -88,10 +91,9 @@ void OpenLogLocked() {
   g_logTried = true;
   const Config& c = Cfg();
   CreateDirectoryW(c.logDir.c_str(), nullptr);
-  wchar_t exe[MAX_PATH] = L"";
-  GetModuleFileNameW(nullptr, exe, MAX_PATH);
-  const wchar_t* base = wcsrchr(exe, L'\\');
-  base = base ? base + 1 : exe;
+  const auto exe = ModuleFileName(nullptr);
+  const auto slash = exe.find_last_of(L'\\');
+  const auto base = slash == std::wstring::npos ? exe : exe.substr(slash + 1);
   SYSTEMTIME st;
   GetLocalTime(&st);
   wchar_t stamp[64];
@@ -113,8 +115,9 @@ void OpenLogLocked() {
           Utf8(c.iniPath.c_str()).c_str(), c.access, c.streamTypes, c.caps, c.pluginFlags,
           c.writeVideo, c.writeAudio, c.probeGetters, c.detailCalls);
   fflush(g_log);
-  fprintf(g_log, "output mode=%s legacyContainers=%d legacyManualNames=%d legacyAutoNames=%d FFmpegPath=%s pipeTimeoutMs=%lu finishTimeoutMs=%lu\n",
-          c.encode ? "ffmpeg" : "raw", c.legacyContainers, c.legacyManualNames, c.legacyAutoNames, Utf8(c.ffmpegPath.c_str()).c_str(), c.pipeTimeoutMs, c.finishTimeoutMs);
+  fprintf(g_log, "output mode=%s legacyContainers=%d legacyManualNames=%d legacyAutoNames=%d FFmpegPath=%s stallTimeoutMs=%lu (from %s) connectTimeoutMs=%lu\n",
+          c.encode ? "ffmpeg" : "raw", c.legacyContainers, c.legacyManualNames, c.legacyAutoNames, Utf8(c.ffmpegPath.c_str()).c_str(),
+          c.stallTimeoutMs, c.stallTimeoutSource, c.connectTimeoutMs);
   fflush(g_log);
 }
 
@@ -245,11 +248,28 @@ std::string JsonEscape(const std::string& s) {
   return out;
 }
 
-std::string ModulePath(HMODULE m) {
-  wchar_t path[MAX_PATH] = L"";
-  GetModuleFileNameW(m, path, MAX_PATH);
-  return Utf8(path);
+std::wstring ModuleFileName(HMODULE module, DWORD initialLength) {
+  // GetModuleFileNameW truncates silently (ERROR_INSUFFICIENT_BUFFER); grow to the Windows limit.
+  for (DWORD length = (std::max)(initialLength, (DWORD)2); length <= 32768; length *= 2) {
+    std::wstring path(length, L'\0');
+    SetLastError(ERROR_SUCCESS);
+    const DWORD written = GetModuleFileNameW(module, path.data(), length);
+    if (!written) return {};
+    if (written < length && GetLastError() != ERROR_INSUFFICIENT_BUFFER) { path.resize(written); return path; }
+  }
+  return {};
 }
+std::wstring EnvironmentValue(const wchar_t* name) {
+  for (int attempt = 0; attempt < 3; ++attempt) {
+    const DWORD length = GetEnvironmentVariableW(name, nullptr, 0);
+    if (!length) return {};
+    std::wstring value(length, L'\0');
+    const DWORD written = GetEnvironmentVariableW(name, value.data(), length);
+    if (written < length) { value.resize(written); return value; }
+  }
+  return {};
+}
+std::string ModulePath(HMODULE m) { return Utf8(ModuleFileName(m).c_str()); }
 
 std::string FileVersion(const std::string& path) {
   std::wstring w = Widen(path);

@@ -8,6 +8,7 @@ documented in docs/NATIVE_PROGRESS.md, not inferred by this byte check.
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import struct
 import subprocess
@@ -104,7 +105,7 @@ def inspect(data):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--host', type=Path,
-                        default=Path(r'C:\Program Files\BorisFX\Vegas Pro 2026\vegas2026.exe'))
+                        default=Path(os.environ.get('ProgramFiles', '')) / 'BorisFX' / 'Vegas Pro 2026' / 'vegas2026.exe')
     parser.add_argument('--dumpbin', type=Path)
     args = parser.parse_args()
     try:

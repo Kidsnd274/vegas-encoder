@@ -1,11 +1,14 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-  [string] $DartPath = 'L:\flutter\bin\cache\dart-sdk\bin\dart.exe',
+  [string] $DartPath,
   [string] $CachedViewRoot,
-  [string[]] $FFmpegPaths = @('C:\ffmpeg\bin\ffmpeg.exe')
+  [string[]] $FFmpegPaths
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$DartPath = Resolve-VeDart $DartPath
+if (-not $CachedViewRoot -and -not $FFmpegPaths) { $FFmpegPaths = @(Resolve-VeFFmpeg '') }
 $b3RuntimeRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 $b3RuntimeBuild = [IO.Path]::GetFullPath((Join-Path $b3RuntimeRoot 'build'))
 $b3RuntimeBundleName = if ($CachedViewRoot) { 'b3-views' } else { 'b3-runtime' }

@@ -1,5 +1,6 @@
 #include "core.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <map>
 #include <set>
@@ -23,8 +24,37 @@ const std::map<std::string,std::string> generic{
     {"aspect","Display aspect ratio"},{"sample_fmt","Audio sample format"},{"channel_layout","Audio channel layout"},
     {"disposition","Stream disposition"},{"max_muxing_queue_size","Muxer queue size"},{"write_tmcd","Write timecode"},
     {"timecode","Start timecode"},{"vtag","Video codec tag"},{"atag","Audio codec tag"},{"crf","Constant rate factor"},
-    {"qp","Quantizer"},{"i","Input file"},{"filter","Filter graph"},{"flags","Codec flags"},{"flags2","Additional codec flags"}};
-const std::set<std::string> switches{"hide_banner","nostdin","y","n","vn","an","shortest","stats"};
+    {"qp","Quantizer"},{"i","Input file"},{"filter","Filter graph"},{"flags","Codec flags"},{"flags2","Additional codec flags"},
+    {"nostats","Hide periodic statistics"},{"to","Stop at position"},{"frames","Stop after a number of frames"},
+    {"vframes","Stop after a number of video frames"},{"aframes","Stop after a number of audio frames"},{"fs","Stop at file size"},
+    {"attach","Attach a file"},{"dump_attachment","Extract an attachment to a file"},{"filter_script","Filter graph read from a file"},
+    {"filter_complex_script","Complex filter graph read from a file"}};
+const std::string shorterMessage = "This option can stop the render before the end of the VEGAS timeline. The output will be shorter.";
+// URL or protocol arguments, including tee targets ("[f=flv]rtmp://...|udp:...").
+bool Network(const std::string& text) {
+    std::string lower = text;
+    std::transform(lower.begin(),lower.end(),lower.begin(),[](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (lower.find("://") != std::string::npos) return true;
+    for (const auto* protocol : {"http:","https:","ftp:","ftps:","sftp:","tcp:","udp:","rtp:","rtsp:","rtmp:","rtmps:","rtmpt:","srt:","rist:","tls:","mms:","mmsh:","ipfs:","ipns:","icecast:","gopher:"})
+        for (auto at = lower.find(protocol); at != std::string::npos; at = lower.find(protocol,at + 1))
+            if (at == 0 || lower[at-1] == '|' || lower[at-1] == ']' || lower[at-1] == '=') return true;
+    return false;
+}
+// Filters whose arguments name files: movie, amovie, subtitles, ass, drawtext textfile.
+bool FileFilter(const std::string& graph) {
+    for (size_t start = 0; start <= graph.size();) {
+        auto end = graph.find_first_of(",;",start); if (end == std::string::npos) end = graph.size();
+        auto part = graph.substr(start,end - start);
+        while (!part.empty() && (part.front() == ' ' || part.front() == '[')) {
+            if (part.front() == ' ') { part.erase(0,1); continue; }
+            const auto close = part.find(']'); if (close == std::string::npos) break; part.erase(0,close + 1);
+        }
+        const auto name = part.substr(0,part.find('='));
+        if (name == "movie" || name == "amovie" || name == "subtitles" || name == "ass" || (name == "drawtext" && part.find("textfile=") != std::string::npos)) return true;
+        start = end + 1;
+    }
+    return false;
+}
 bool GenericValue(const std::string& key, const std::string& value) {
     if (key == "g" || key == "ar" || key == "ac" || key == "bf" || key == "refs" || key == "threads") {
         try { size_t used = 0; const auto n = std::stoll(value,&used); return used == value.size() && n >= ((key == "g" || key == "ar" || key == "ac") ? 1 : 0) && n <= 2147483647; }
@@ -83,15 +113,11 @@ Json Suggestion(const std::string& value, const std::string& description, const 
 }
 std::map<std::string,std::string> Encoders(const std::vector<Word>& words) {
     std::map<std::string,std::string> encoders;
-    for (size_t i = 0; i < words.size(); ++i) {
-        if (!IsOption(words[i].text) || switches.count(OptionKey(words[i].text))) continue;
-        if (i + 1 >= words.size() || (IsOption(words[i+1].text) && !words[i+1].quoted)) continue;
-        if (OptionKey(words[i].text) == "c") {
-            const auto kind = Kind(words[i].text);
-            if (!kind.empty()) encoders[kind] = words[i+1].text;
-            else { encoders["video"] = words[i+1].text; encoders["audio"] = words[i+1].text; }
-        }
-        ++i;
+    for (const auto& pair : PairOptions(words)) {
+        if (pair.key != "c" || !pair.HasValue()) continue;
+        const auto kind = Kind(pair.name); const auto& encoder = words[pair.value].text;
+        if (!kind.empty()) encoders[kind] = encoder;
+        else { encoders["video"] = encoder; encoders["audio"] = encoder; }
     }
     return encoders;
 }
@@ -107,7 +133,7 @@ Json TokenMetadata(const std::vector<Word>& words, const Json& caps) {
     const auto encoders = Encoders(words);
     const std::set<std::string> video{"crf","qp","cq","g","bf","refs","pix_fmt","vf","r","s","aspect","vtag","color_primaries","color_trc","colorspace","color_range","vn"};
     const std::set<std::string> audio{"ar","ac","af","sample_fmt","channel_layout","atag","an"};
-    const std::set<std::string> global{"hide_banner","nostdin","loglevel","stats","progress","stats_period","y","n"};
+    const std::set<std::string> global{"hide_banner","nostdin","nostats","loglevel","stats","progress","stats_period","y","n"};
     const std::set<std::string> mux{"f","movflags","max_muxing_queue_size","shortest"};
     // Reverse scope pass keeps metadata linear at the 16384-word limit.
     std::vector<bool> inputScope(words.size()); bool beforeInput = false;
@@ -144,7 +170,7 @@ Json TokenMetadata(const std::vector<Word>& words, const Json& caps) {
                 }
             }
             if (stage != "global" && inputScope[index]) stage = "input";
-            value = !switches.count(key) && index + 1 < words.size() &&
+            value = !IsSwitch(key) && index + 1 < words.size() &&
                 (!IsOption(words[index+1].text) || words[index+1].quoted) && words[index+1].text != "{inputs}" && words[index+1].text != "{output}";
             valueStage = stage;
         }
@@ -180,23 +206,42 @@ Json Lint(const Json& request, const Json* capabilities) {
     }
     size_t inputsPosition = text.size(); for (const auto& word : words) if (word.text == "{inputs}") inputsPosition = word.start;
     size_t outputs = 0;
+    const auto pairs = PairOptions(words);
+    std::vector<const OptionPair*> optionAt(words.size(),nullptr); std::vector<bool> valueWord(words.size(),false);
+    for (const auto& pair : pairs) { optionAt[pair.option] = &pair; if (pair.HasValue()) valueWord[pair.value] = true; }
+    const std::string ownStream = Str(request,"kind","video"), otherStream = ownStream == "video" ? "audio" : "video";
+    const std::string networkMessage = "This argument makes FFmpeg use a network address.";
     for (size_t i = 0; i < words.size(); ++i) {
-        const auto& word = words[i];
-        if (!IsOption(word.text)) {
+        if (valueWord[i]) continue;
+        const auto& word = words[i]; const auto* pair = optionAt[i];
+        if (!pair) {
             if (word.text == "{output}") ++outputs;
             else if (!extra && word.text != "{inputs}" && !(i == 0 && (word.text == "ffmpeg" || word.text == "ffmpeg.exe"))) ++outputs;
             else if (extra) emit("V-EXTRA-ARGUMENT","error",word.start,word.end,"Extra arguments must be stream options and their values.");
+            if (Network(word.text)) emit(extra ? "V-EXTRA-NETWORK" : "L-NETWORK","warn",word.start,word.end,networkMessage);
             continue;
         }
-        const auto key = OptionKey(word.text); const auto kind = Kind(word.text);
-        const bool hasValue = i + 1 < words.size() && (!IsOption(words[i+1].text) || words[i+1].quoted) && !switches.count(key);
-        const Word* next = hasValue ? &words[i+1] : nullptr;
-        if (extra && (key == "c" || key == "i" || key == "f" || key == "map" || key == "vn" || key == "an" || key == "progress")) emit("V-EXTRA-OWNED","error",word.start,next ? next->end : word.end,"Use the stream/container controls or Advanced mode for this option.");
-        if (!extra && (key == "hide_banner" || key == "nostdin")) emit("L-GLOBAL","hint",word.start,word.end,"Vegas Encoder always adds this option.");
+        const auto& key = pair->key; const auto kind = Kind(pair->name);
+        const Word* next = pair->HasValue() ? &words[pair->value] : nullptr;
+        const auto end = next ? next->end : word.end;
+        if (extra && (key == "c" || key == "i" || key == "f" || key == "map" || key == "vn" || key == "an" || key == "progress")) emit("V-EXTRA-OWNED","error",word.start,end,"Use the stream/container controls or Advanced mode for this option.");
+        if (key == "t" || key == "to" || key == "frames" || key == "vframes" || key == "aframes" || key == "fs") emit(extra ? "V-EXTRA-DURATION" : "L-DURATION-LIMIT","warn",word.start,end,shorterMessage,{{"option",word.text}});
+        if (key == "shortest") emit(extra ? "V-EXTRA-SHORTEST" : "L-SHORTEST","warn",word.start,end,shorterMessage,{{"option",word.text}});
+        if (next && Network(next->text)) emit(extra ? "V-EXTRA-NETWORK" : "L-NETWORK","warn",word.start,end,networkMessage,{{"option",word.text}});
+        if (pair->fromFile || key == "attach" || key == "dump_attachment" || key == "filter_script" || key == "filter_complex_script" ||
+            (next && (key == "vf" || key == "af" || key == "filter" || key == "filter_complex" || key == "lavfi") && FileFilter(next->text)))
+            emit(extra ? "V-EXTRA-FILE" : "L-FILE-ACCESS","warn",word.start,end,"This argument makes FFmpeg read or write a file outside the render.",{{"option",word.text}});
+        if (extra) {
+            static const std::set<std::string> videoOnly{"pix_fmt","vf","r","s","aspect","crf","g","bf","refs","color_primaries","color_trc","colorspace","color_range","vtag","vframes"};
+            static const std::set<std::string> audioOnly{"ar","ac","af","sample_fmt","channel_layout","atag","aframes"};
+            if (pair->stream == otherStream || (pair->stream.empty() && (ownStream == "audio" ? videoOnly : audioOnly).count(key)))
+                emit("V-EXTRA-WRONG-STREAM","warn",word.start,end,"This option affects the " + otherStream + " stream. Put it in " + (otherStream == "video" ? "Video" : "Audio") + " Extra arguments.",{{"option",word.text},{"stream",otherStream}});
+        }
+        if (!extra && (key == "hide_banner" || key == "nostdin" || key == "nostats")) emit("L-GLOBAL","hint",word.start,word.end,"Vegas Encoder always adds this option.");
         if (!extra && (key == "y" || key == "n")) emit("L-OVERWRITE","hint",word.start,word.end,"Vegas Encoder publishes a temporary file and handles overwrite itself.");
         if (!extra && key == "i") emit("L-INPUT","warn",word.start,next ? next->end : word.end,"Extra inputs follow the VEGAS inputs: normally index 2, or index 1 without generated audio.");
         if (!extra && key == "i" && word.start < inputsPosition) emit("L-INPUT-ORDER","error",word.start,next ? next->end : word.end,"Place extra inputs after {inputs} so the VEGAS inputs keep indexes 0 and 1.");
-        if (!switches.count(key) && !next) emit("L-VALUE","error",word.start,word.end,"This option needs a value.");
+        if (!IsSwitch(key) && !next) emit("L-VALUE","error",word.start,word.end,"This option needs a value.");
         bool known = generic.count(key) != 0; const Json* option = nullptr; const Json* choice = nullptr; std::string owner;
         for (const auto& [candidate,encoder] : encoders) {
             if (!kind.empty() && candidate != kind) continue;
@@ -214,7 +259,6 @@ Json Lint(const Json& request, const Json* capabilities) {
         }
         const auto paramsOwner = key == "x264-params" ? "libx264" : key == "x265-params" ? "libx265" : key == "svtav1-params" ? "libsvtav1" : "";
         if (*paramsOwner && encoders.count("video") && encoders.at("video") != paramsOwner) emit("L-OPTION-OWNER","warn",word.start,word.end,std::string(word.text) + " applies to " + paramsOwner + ".");
-        if (hasValue) ++i;
     }
     if (!extra && outputs > 1) emit("L-OUTPUTS","warn",0,text.size(),"Only {output} is published and cleaned up; other output files are left as FFmpeg writes them.");
     return diagnostics;

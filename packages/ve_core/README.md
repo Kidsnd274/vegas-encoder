@@ -46,7 +46,7 @@ Its capability-specific display highlights use `CoreFixture.compileIssues`.
 
 Run `scripts/etc/Test-B2.ps1 -Asan -Aot -Encoder` from the repository root for focused
 native/static, real FFI, sanitizer, AOT-bundle and synthetic-encoder checks. Encoder
-checks use the existing `C:\ffmpeg\bin\ffmpeg.exe` by default, with FFprobe beside it,
+checks use `-FFmpegPath`, then `VEGAS_ENCODER_FFMPEG`, then PATH, with FFprobe beside it,
 and write only ignored build/test-results/. `scripts/etc/Test-B0.ps1` retains model/fake
 and fixture checks. Read [third-party notices](THIRD_PARTY_NOTICES.md) for the pinned
 MIT/BSD source and build dependencies; no project license is selected.

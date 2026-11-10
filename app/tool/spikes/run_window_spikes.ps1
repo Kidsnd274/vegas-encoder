@@ -31,7 +31,7 @@ $exe = Join-Path $app "build\windows\x64\runner\$Configuration\VegasEncoder.exe"
 if ($ApplicationPath) { $exe = (Resolve-Path -LiteralPath $ApplicationPath).Path }
 if (-not (Test-Path $exe)) { throw "Build first: flutter build windows --$($Configuration.ToLower())  ($exe not found)" }
 
-$csc = Get-ChildItem -Path "${env:ProgramFiles}\Microsoft Visual Studio", 'L:\Program Files\Microsoft Visual Studio' -Filter csc.exe -Recurse -ErrorAction SilentlyContinue |
+$csc = Get-ChildItem -Path "${env:ProgramFiles}\Microsoft Visual Studio", "${env:ProgramFiles(x86)}\Microsoft Visual Studio" -Filter csc.exe -Recurse -ErrorAction SilentlyContinue |
   Where-Object { $_.FullName -match 'Roslyn\\csc\.exe$' } | Select-Object -First 1
 if (-not $csc) { throw 'Roslyn csc.exe (Visual Studio) not found.' }
 

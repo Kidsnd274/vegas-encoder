@@ -1,7 +1,7 @@
 # B6 recipe bytes, editor bridge and opt-in native candidate
 
 Current workflow (2026-10-16): one agent continues app/platform integration in
-`L:\repos\vegas-encoder`; see NEXT_AGENT and STATUS for the current queue/evidence.
+the original checkout; see NEXT_AGENT and STATUS for the current queue/evidence.
 Installed/staged candidates remain at their original paths. Immediate reopen with
 the template-name fix is owner-confirmed, and reopened notes match the seeded
 preset. Exact large-template restart sequence and host capacity remain unqualified.

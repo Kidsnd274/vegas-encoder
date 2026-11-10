@@ -79,7 +79,7 @@ status line during a real render, run with the owner. Keep it or drop it on the 
 
 ## P2: Flutter skeleton
 
-1. `app/` on the installed Flutter (3.47.7 / Dart 3.13.5 at `L:\flutter`, the version
+1. `app/` on the installed Flutter (3.47.7 / Dart 3.13.5 from `VEGAS_ENCODER_FLUTTER`, the version
    the owner intends; upgrading is the owner's call). Core is built through
    `packages/ve_core` build hooks, with the CMake fallback if the C++ spike fails. Run
    the TECH_ARCHITECTURE §9.4 Windows spikes:

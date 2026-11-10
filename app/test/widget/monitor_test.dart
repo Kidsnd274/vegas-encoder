@@ -171,6 +171,22 @@ void main() {
       expect(closed(m.window), isTrue);
     });
 
+    testWidgets('leaving near the end of the countdown leaves at least 3 s (C14)', (tester) async {
+      final m = await pump(tester, status: liveSample(RenderState.done), record: await recordFor(RenderState.done));
+      await tester.pump(const Duration(seconds: 9));
+      expect(find.text('Closes in 1 s'), findsOneWidget);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(190, 150));
+      await tester.pump();
+      await mouse.removePointer();
+      await tester.pump();
+      expect(find.text('Closes in 3 s'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
+      expect(closed(m.window), isFalse, reason: 'at least 3 s after the pointer leaves');
+      await tester.pump(const Duration(seconds: 1));
+      expect(closed(m.window), isTrue);
+    });
+
     testWidgets('Open folder shows the file in Explorer; Close closes', (tester) async {
       final m = await pump(tester, status: liveSample(RenderState.done), record: await recordFor(RenderState.done));
       await tester.tap(find.widgetWithText(VeButton, 'Open folder'));

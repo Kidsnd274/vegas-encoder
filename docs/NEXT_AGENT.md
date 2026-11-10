@@ -2,7 +2,7 @@
 
 Updated: 2026-11-06 (Asia/Singapore).
 
-Work in **`L:\repos\vegas-encoder`**, currently on **`master`**.
+Work in **the original checkout**, currently on **`master`**.
 The original folder remains the only development checkout. The earlier explicitly
 requested parallel pass is complete; default to one agent here unless the owner
 requests delegation again. Preserve existing changes and this single queue.
@@ -11,26 +11,24 @@ No separate worktree or permanent ownership split was introduced. Read [AGENTS.m
 [status](STATUS.md) and relevant contracts/specs. Former workstream handoffs are
 history; their old locations, ownership splits and queues do not apply.
 
-## Pending on branch `ffmpeg-parser-compat`
+## Merged: FFmpeg parser compatibility and 0.2.1
 
-The owner requested this FFmpeg-version parsing work in a separate worktree,
-`C:\Users\Samuel Tee\repos\vegas-encoder-ffmpeg-compat`. The B3 service suite
-passes there (4,514 checks). `ffmpegParserVersion` is now 5, so the next
-release must ship the app and exporters together. Release fixtures 4.4 to 9.0.2 are committed; a
-`--enable-small` or shared-DLL build is still uncovered. See [status](STATUS.md#current-progress).
+The FFmpeg-version parsing work (branch `ffmpeg-parser-compat`) and the 0.2.1
+fixes (branch `fix/0.2.1`) are both merged into `master` at owner request.
+`ffmpegParserVersion` is 5, so the release must ship the app and exporters
+together. Release fixtures 4.4 to 9.0.2 are committed; a `--enable-small` or
+shared-DLL build is still uncovered. See [status](STATUS.md#current-progress).
 
 ## Current queue: older VEGAS release qualification
 
-The 0.2.0+2 logs from VEGAS 2026.0.3.189 and Sony VEGAS 13.0.0.453 confirm
-FFmpeg startup and exposed a separate AV1 (CPU) live pipe stall. The updated
-built-in starter (revision 4) stores the workaround `-svtav1-params lp=3` in
-Video Extra arguments. The owner confirmed the fix with 0.2.0+3. Real-host
-logs show AV1/Opus publication and sampled verification on both hosts with
-the supplied November FFmpeg build.
-The test installer is
-`dist/VegasEncoder-0.2.0.3-windows-x64-setup-20261106-112027936.exe`.
-See [status](STATUS.md#current-progress) for the comparison
-builds, other preset results and limits.
+**Next: the owner's real-VEGAS checklist for 0.2.1 (L6).** Version 0.2.1+1 is on
+`master`, with every offline suite and the fake-host render matrix passing; see
+[status](STATUS.md#current-progress).
+Follow step L6 of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) on VEGAS 2026.0.3.189,
+23.0.0.278, 22.0.0.248, 21.0.0.108 and Sony 13.0.0.453. Render AV1 (CPU)
+revision 5, which no longer carries `-svtav1-params lp=3`, first on 2026 and
+Sony 13. Packaging an installer and removing the merged worktrees
+(`fix/0.2.1-a/-b/-c`, `ffmpeg-parser-compat`, `from-vegas-display`) wait for the owner.
 
 The owner confirmed the RGB render fix in Sony 13 build 453. Logs show MP4 and
 WebM publication. Independent decode is pending. The trial's old app path causes
@@ -185,7 +183,7 @@ exporter is now uninstalled and its six saved VEGAS test templates, normal app
 settings/cache/sessions and legacy logs are archived for a clean installer test.
 The owner will test Setup; it has not been run by this cleanup. Backup, exact
 path mappings and restoration instructions are under
-`C:\Users\Samuel Tee\AppData\Local\VegasEncoderInstallerTestBackup\20261018-clean-start`.
+`%LOCALAPPDATA%\VegasEncoderInstallerTestBackup\20261018-clean-start`.
 STATUS records verified absent active paths and unchanged unrelated templates.
 Preserve that backup and all existing candidate/isolated-profile/rollback folders.
 Earlier installed-trial statements below describe history, not current deployment.

@@ -106,7 +106,8 @@ void main() {
     await controller().toggleFavorite(id);
     await settle();
     expect((await library.get(id))!.favorite, isTrue);
-    expect(state().drafts[id]!.baseRevision, 2, reason: 'our own save is not a change elsewhere');
+    expect(state().drafts[id]!.baseRevision, 1, reason: 'a star is an overlay; it never moves the revision (C3)');
+    expect((await library.get(id))!.revision, 1);
     expect(container.read(editorProvider)!.changedElsewhere, isFalse);
 
     final builtin = (await library.get('av1-small'))!;
@@ -150,6 +151,18 @@ void main() {
     expect(state().selectedId, isNull);
     await controller().delete('yt-h264');
     expect(await library.get('yt-h264'), isNotNull);
+  });
+
+  test('a deleted preset keeps its ID, and the next copy gets a free one (C2)', () async {
+    await controller().duplicate('yt-h264');
+    await settle();
+    final first = state().selectedId!;
+    await controller().delete(first);
+    await controller().duplicate('yt-h264');
+    await settle();
+    final second = state().selectedId!;
+    expect(second, isNot(first), reason: 'the deleted copy\'s history still holds its ID');
+    expect(await library.get(second), isNotNull);
   });
 
   group('editor results', () {

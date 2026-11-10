@@ -3,11 +3,21 @@
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <map>
+#include <mutex>
 #include <regex>
 #include <set>
 
 namespace ve {
 namespace {
+// Schema patterns are compiled once; entries are never removed, so references stay valid.
+const std::regex& Pattern(const std::string& pattern) {
+    static std::mutex lock; static std::map<std::string,std::regex> cache;
+    std::lock_guard<std::mutex> guard(lock);
+    auto found = cache.find(pattern);
+    if (found == cache.end()) found = cache.emplace(pattern,std::regex(pattern)).first;
+    return found->second;
+}
 bool TypeMatches(const Json& value, const std::string& type) {
     if (type == "object") return value.is_object();
     if (type == "array") return value.is_array();
@@ -54,7 +64,7 @@ void SchemaCheck(const Json& value, const Json& schema, const std::string& path,
         const auto text = value.get<std::string>();
         size_t count = 0; for (const auto c : text) if ((static_cast<unsigned char>(c) & 0xc0) != 0x80) ++count;
         if (static_cast<double>(count) < Num(schema,"minLength",0) || static_cast<double>(count) > Num(schema,"maxLength",std::numeric_limits<double>::max())) fail("Text is outside the recipe field's length bounds.");
-        if (schema.contains("pattern") && !std::regex_match(text,std::regex(Str(schema,"pattern")))) fail("Preset ID must use letters, digits, dots, underscores or hyphens, starting with a letter or digit.");
+        if (schema.contains("pattern") && !std::regex_match(text,Pattern(Str(schema,"pattern")))) fail("Preset ID must use letters, digits, dots, underscores or hyphens, starting with a letter or digit.");
     }
     if (value.is_number()) {
         const auto number = value.get<double>();
@@ -161,8 +171,30 @@ void CheckMedia(const Json& media) {
             throw Error(VE_INVALID_ARGUMENT,"MEDIA","Invalid delivered audio facts.");
     }
 }
-Json Validate(const Json& request, const Json* capabilities) {
-    const auto& r = request.at("recipe"); Json issues = Structural(r);
+Json AudioRates(const Json& audio, const Json& audioProfile, const std::string& container, const Json& capabilities) {
+    const auto detail = EncoderOptions(capabilities,Str(audio,"encoder"));
+    Json rates = detail && detail->contains("sampleRates") && !detail->at("sampleRates").empty() ? detail->at("sampleRates") : audioProfile.value("rates",Json::array());
+    // FFmpeg's MXF muxer writes 48 kHz audio only.
+    if (container == "mxf") rates = rates.empty() || Includes(rates,Json(48000)) ? Json::array({48000}) : Json::array();
+    return rates;
+}
+Json ResampleTarget(const Json& audio, const Json& audioProfile, const std::string& container, const Json& media, const Json& capabilities) {
+    if (!Bool(audio,"enabled",true) || (audio.contains("sampleRate") && audio.at("sampleRate").is_number()) ||
+        !media.is_object() || !media.contains("audio") || !media.at("audio").is_object() || !media.at("audio").contains("rate")) return nullptr;
+    const auto source = media.at("audio").at("rate");
+    const auto rates = AudioRates(audio,audioProfile,container,capabilities);
+    if (rates.empty() || Includes(rates,source)) return nullptr;
+    if (Includes(rates,Json(48000))) return 48000;
+    Json best = nullptr; const double from = source.get<double>();
+    for (const auto& rate : rates) if (rate.is_number()) {
+        const double distance = std::abs(rate.get<double>() - from);
+        if (best.is_null() || distance < std::abs(best.get<double>() - from) ||
+            (distance == std::abs(best.get<double>() - from) && rate.get<double>() > best.get<double>())) best = rate;
+    }
+    return best;
+}
+Json Validate(const Json& request, const Json* capabilities, const Json* structural) {
+    const auto& r = request.at("recipe"); Json issues = structural ? *structural : Structural(r);
     if (HasErrors(issues)) return issues;
     const auto& v = r.at("video"); const auto& a = r.at("audio")[0]; const auto& c = r.at("container");
     const auto media = request.value("media",Json(nullptr)); const Json noCaps = nullptr;
@@ -189,9 +221,8 @@ Json Validate(const Json& request, const Json* capabilities) {
     // compilation must check the same final combination, not displaced controls.
     if (withVideo) try {
         const auto words = Tokenize(Str(v,"extra"));
-        for (size_t i = 0; i + 1 < words.size(); ++i) if (IsOption(words[i].text) && !IsOption(words[i+1].text)) {
-            ReflectVideoFormatOption(res,OptionKey(words[i].text),words[i+1].text); ++i;
-        }
+        for (const auto& pair : PairOptions(words))
+            if (pair.HasValue() && pair.stream != "audio") ReflectVideoFormatOption(res,pair.key,words[pair.value].text);
     } catch (const Error&) {} // Extra lint reports malformed text below.
     auto stream = [&](const Json& settings, const Json& profile, const std::string& kind, const std::string& field) {
         const auto encoder = Str(settings,"encoder");
@@ -253,11 +284,22 @@ Json Validate(const Json& request, const Json* capabilities) {
         stream(a,res.at("audioProfile"),"audio","audio[0]");
         if (!media.is_null() && (!media.contains("audio") || media.at("audio").is_null())) issues.push_back(Issue("V-AUDIO-INPUT","error","audio[0].enabled","This source has no audio stream; turn audio off."));
         else {
-            const auto rate = a.contains("sampleRate") && a.at("sampleRate").is_number() ? a.at("sampleRate") : !media.is_null() ? media.at("audio").at("rate") : Json(nullptr);
+            const bool chosen = a.contains("sampleRate") && a.at("sampleRate").is_number();
+            const auto rate = chosen ? a.at("sampleRate") : !media.is_null() ? media.at("audio").at("rate") : Json(nullptr);
             const auto& profile = res.at("audioProfile");
-            const auto detail = EncoderOptions(caps,Str(a,"encoder"));
-            const auto rates = detail && detail->contains("sampleRates") && !detail->at("sampleRates").empty() ? detail->at("sampleRates") : profile.value("rates",Json::array());
-            if (!rate.is_null() && !rates.empty() && !Includes(rates,rate)) issues.push_back(Issue("V-RATE","error","audio[0].sampleRate","This encoder does not support the selected audio sample rate.",{{"rate",rate}}));
+            const auto format = Str(c,"format");
+            const auto rates = AudioRates(a,profile,format,caps);
+            if (chosen && !rates.empty() && !Includes(rates,rate))
+                issues.push_back(Issue("V-RATE","error","audio[0].sampleRate",format == "mxf" ? "MXF files need 48000 Hz audio." :
+                                       "This encoder does not support the selected audio sample rate.",{{"rate",rate}}));
+            else if (const auto target = ResampleTarget(a,profile,format,media,caps); !target.is_null()) {
+                // Decision D11: "source" audio the stream can't take is resampled, and says so.
+                const auto from = std::to_string(std::llround(rate.get<double>())), to = std::to_string(std::llround(target.get<double>()));
+                const bool encoderTakesSource = Includes(AudioRates(a,profile,"",caps),rate) || AudioRates(a,profile,"",caps).empty();
+                issues.push_back(Issue("V-RATE-RESAMPLED","info","audio[0].sampleRate","Audio is resampled from " + from + " Hz to " + to + " Hz because " +
+                    (format == "mxf" && encoderTakesSource ? std::string("MXF files need 48000 Hz audio.") :
+                     Str(profile,"label",Str(a,"encoder")) + " doesn't support " + from + " Hz."),{{"rate",rate},{"target",target}}));
+            }
         }
     }
     if (Str(c,"format") == "mp4" && Bool(c,"faststart")) issues.push_back(Issue("V-FASTSTART","info","container.faststart","Fast start rewrites the file after encoding so playback can begin before download finishes."));

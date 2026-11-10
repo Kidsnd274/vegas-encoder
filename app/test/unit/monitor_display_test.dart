@@ -130,6 +130,16 @@ void main() {
       );
     });
 
+    test('done: a replaced file or the next free name is said too (C15)', () {
+      final replaced = JobRecord.fromJson({...done.toJson(), 'replacedExisting': true});
+      expect(
+        endSentence(liveSample(RenderState.done), replaced),
+        endsWith('as set. This render replaced an existing file with the same name.'),
+      );
+      final renamed = JobRecord.fromJson({...done.toJson(), 'requestedOutputPath': r'D:\Renders\Wanted.mp4'});
+      expect(endSentence(liveSample(RenderState.done), renamed), contains('Render As asked for Wanted.mp4.'));
+    });
+
     test('done without its record: what the live file says', () {
       expect(endSentence(liveSample(RenderState.done), null), 'Rendered in 4:07, 2.06× realtime.');
     });

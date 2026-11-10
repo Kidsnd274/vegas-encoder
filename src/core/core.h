@@ -26,9 +26,17 @@ Json Issue(const std::string& id, const std::string& level, const std::string& f
            const std::string& message, Json params = Json::object(), Json refs = Json::array());
 bool HasErrors(const Json& issues);
 Json Structural(const Json& recipe);
-Json Validate(const Json& request, const Json* capabilities = nullptr);
+// Decision D11: the sample rates an audio encoder and container accept (empty: any),
+// and the rate a "source" recipe resamples to when the project's rate is not one of
+// them (48000 when accepted, else the nearest accepted rate); null when no resampling.
+Json AudioRates(const Json& audio, const Json& audioProfile, const std::string& container, const Json& capabilities);
+Json ResampleTarget(const Json& audio, const Json& audioProfile, const std::string& container, const Json& media, const Json& capabilities);
+// structural: an already computed Structural(recipe), reused instead of recomputed.
+Json Validate(const Json& request, const Json* capabilities = nullptr, const Json* structural = nullptr);
 Json Normalize(const Json& request);
 Json Compile(const Json& request, const Json* capabilities = nullptr);
+// Compile with a known Structural result; effective receives the full resolved facts.
+Json CompileResolved(const Json& request, const Json& structural, Json& effective);
 // Pure selected-template display; missing media stays unknown.
 Json SnapshotSummary(const Json& request);
 std::string FilterControl(const Json& recipe);
@@ -58,6 +66,18 @@ size_t Utf8Offset(const std::string& text, size_t utf16Offset);
 std::vector<size_t> Utf16Map(const std::string& text);
 std::string OptionKey(const std::string& option);
 bool IsOption(const std::string& text);
+bool IsSwitch(const std::string& key);
+// "video" or "audio" from an explicit stream specifier (-b:a, -c:v:0); empty otherwise.
+std::string StreamOf(const std::string& option);
+struct OptionPair {
+    size_t option = 0, value = static_cast<size_t>(-1);
+    std::string name, key, stream; // name strips FFmpeg's -/option file-loading form.
+    bool fromFile = false;
+    bool HasValue() const { return value != static_cast<size_t>(-1); }
+};
+// The one option/value pairing rule: quoted words and macros are never options;
+// switches take no value.
+std::vector<OptionPair> PairOptions(const std::vector<Word>& words);
 const Json* FindProfile(const std::string& kind, const std::string& encoder);
 const Json* FindContainer(const std::string& container);
 const Json* EncoderOptions(const Json& capabilities, const std::string& encoder);

@@ -38,10 +38,8 @@ std::vector<std::string> InputColorTags(const Json& recipe) {
     // colorspace transform. A deliberate transform belongs in an explicit filter.
     try {
         const auto words = Tokenize(Str(recipe.at("video"),"extra"));
-        for (size_t i = 0; i + 1 < words.size(); ++i) {
-            const auto key = OptionKey(words[i].text);
-            if (IsOption(words[i].text) && std::find(names.begin(),names.end(),key) != names.end() && !IsOption(words[i+1].text)) values[key] = words[++i].text;
-        }
+        for (const auto& pair : PairOptions(words))
+            if (pair.HasValue() && pair.stream != "audio" && std::find(names.begin(),names.end(),pair.key) != names.end()) values[pair.key] = words[pair.value].text;
     } catch (const Error&) {} // Validate already reports malformed Extra text.
     std::vector<std::string> result;
     for (const auto& name : names) if (values.count(name)) { result.push_back("-" + name); result.push_back(values.at(name)); }
@@ -54,7 +52,14 @@ void Extra(Json& tokens, const std::string& text, const std::string& field, Json
     std::map<std::string, bool> names;
     std::map<std::string, std::string> replaced;
     auto owned = [](const std::string& key) { return key == "c" || key == "i" || key == "f" || key == "map" || key == "vn" || key == "an" || key == "progress"; };
-    for (const auto& word : words) if (IsOption(word.text) && !owned(OptionKey(word.text))) names[OptionKey(word.text)] = true;
+    const std::string other = field == "video.extra" ? "audio" : "video";
+    const auto pairs = PairOptions(words);
+    std::vector<const OptionPair*> optionAt(words.size(),nullptr);
+    for (const auto& pair : pairs) {
+        optionAt[pair.option] = &pair;
+        // An option aimed at the other stream does not replace this stream's controls.
+        if (!owned(pair.key) && pair.stream != other) names[pair.key] = true;
+    }
     Json retained = Json::array();
     for (size_t i = 0; i < tokens.size(); ++i) {
         if (IsOption(Str(tokens[i],"text")) && names.count(OptionKey(Str(tokens[i],"text")))) {
@@ -67,16 +72,16 @@ void Extra(Json& tokens, const std::string& text, const std::string& field, Json
     tokens = std::move(retained);
     std::string replacedField;
     for (size_t i = 0; i < words.size(); ++i) {
-        const auto& word = words[i];
-        if (IsOption(word.text) && owned(OptionKey(word.text))) {
-            if (i + 1 < words.size() && !IsOption(words[i+1].text)) ++i;
+        const auto& word = words[i]; const auto* pair = optionAt[i];
+        if (pair && owned(pair->key)) {
+            if (pair->HasValue()) i = pair->value;
             continue;
         }
-        if (IsOption(word.text)) {
-            const auto source = replaced.find(OptionKey(word.text));
+        if (pair) {
+            const auto source = pair->stream == other ? replaced.end() : replaced.find(pair->key);
             replacedField = source == replaced.end() ? "" : source->second;
         }
-        tokens.push_back(Json{{"text",word.text},{"role","extra"},{"field",field},
+        tokens.push_back(Json{{"text",word.text},{"role","extra"},{"field",field},{"isOption",pair != nullptr},
             {"replacedField",replacedField.empty() ? Json(nullptr) : Json(replacedField)},
             {"sourceStart",offsets[word.start]},{"sourceEnd",offsets[word.end]}});
     }
@@ -97,6 +102,8 @@ void ReadStream(const Json& tokens, Json& resolved, bool video) {
         const auto option = Str(tokens[i],"text"); const auto key = OptionKey(option); const auto value = Str(tokens[i+1],"text");
         if (!IsOption(Str(tokens[i],"text")) || (tokens[i].contains("isOption") && !Bool(tokens[i],"isOption"))) continue;
         const std::string prefix = video ? "video" : "audio";
+        // An explicit specifier for the other stream never describes this one.
+        if (!StreamOf(option).empty() && StreamOf(option) != prefix) continue;
         if (video) {
             ReflectVideoFormatOption(resolved,key,value);
             // Reflection models one video output, not general FFmpeg stream
@@ -124,7 +131,7 @@ void ReadStream(const Json& tokens, Json& resolved, bool video) {
     }
     if (unknownVideoFormatScope) { resolved["pixfmt"] = ""; resolved["depth"] = 0; }
 }
-Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
+Json Basic(const Json& r, const Json& media, Json& res, Json& overridden, const Json& caps) {
     const auto& v = r.at("video"); const auto& a = r.at("audio")[0]; const auto& c = r.at("container");
     // ordered_json object storage can move when reflected values add keys to res.
     // Keep profiles owned across ReadStream instead of borrowing its object entries.
@@ -185,6 +192,8 @@ Json Basic(const Json& r, const Json& media, Json& res, Json& overridden) {
         } else if (amode == "vbr") Pair(audio,"audio","audio[0].vbr",Str(ap.value("vbr",Json::object()),"flag","-q:a"),Num(a,"vbr",Num(ap.value("vbr",Json::object()),"def")));
         if (ap.contains("level")) Pair(audio,"audio","audio[0].level",Str(ap.at("level"),"flag","-compression_level"),Num(a,"level",Num(ap.at("level"),"def")));
         if (a.contains("sampleRate") && a.at("sampleRate").is_number()) Pair(audio,"audio","audio[0].sampleRate","-ar",a.at("sampleRate"));
+        else if (const auto target = ResampleTarget(a,ap,Str(c,"format"),media,caps); !target.is_null())
+            Pair(audio,"audio","audio[0].sampleRate","-ar",target); // Decision D11: "source" resamples to a rate the stream accepts.
         if (Str(a,"channels","source") != "source") Pair(audio,"audio","audio[0].channels","-ac",Str(a,"channels") == "mono" ? 1 : 2);
         Extra(audio,Str(a,"extra"),"audio[0].extra",overridden); ReadStream(audio,res,false);
     } else Push(audio,"audio","audio[0].enabled",{"-an"});
@@ -273,12 +282,21 @@ const Json* ActiveResize(const Json& recipe) {
     return nullptr;
 }
 std::pair<int,int> ResizeAlignment(const Json& recipe) {
-    auto resolved = Resolve(recipe);
-    for (const auto& settings : {recipe.at("video"),recipe.at("audio")[0]}) if (Bool(settings,"enabled",true)) try {
-        const auto words = Tokenize(Str(settings,"extra"));
-        for (size_t i = 0; i + 1 < words.size(); ++i) if (IsOption(words[i].text)) ReflectVideoFormatOption(resolved,OptionKey(words[i].text),words[i+1].text);
-    } catch (const Error&) {}
-    const auto chroma = Str(VideoFormat(Str(resolved,"pixfmt")),"chroma");
+    auto resolved = Resolve(recipe); bool unknown = false;
+    // Same pairing and scope rules as ReadStream: audio Extra is emitted after the
+    // video options, so a pixel format there can supersede the video format.
+    for (const bool video : {true,false}) {
+        const auto& settings = video ? recipe.at("video") : recipe.at("audio")[0];
+        if (Bool(settings,"enabled",true)) try {
+            const auto words = Tokenize(Str(settings,"extra"));
+            for (const auto& pair : PairOptions(words)) {
+                if (!pair.HasValue() || pair.stream == "audio") continue;
+                if (pair.key == "pix_fmt" && (!video || (pair.name != "-pix_fmt" && pair.name != "-pix_fmt:v" && pair.name != "-pix_fmt:v:0"))) unknown = true;
+                else if (video) ReflectVideoFormatOption(resolved,pair.key,words[pair.value].text);
+            }
+        } catch (const Error&) {}
+    }
+    const auto chroma = unknown ? std::string() : Str(VideoFormat(Str(resolved,"pixfmt")),"chroma");
     // Unknown negotiated formats use the conservative 4:2:0 grid; this is an
     // alignment policy, never a claim about their color/precision conversion.
     return chroma == "4:4:4" ? std::pair{1,1} : chroma == "4:2:2" ? std::pair{2,1} : std::pair{2,2};
@@ -425,26 +443,30 @@ Json Macros(const Json& request) {
     for (size_t i = 0; i < result.size(); ++i) result[i]["value"] = values[i];
     return result;
 }
-static Json CompileInternal(const Json& request, const Json* capabilities, Json* effective = nullptr) {
+static Json CompileInternal(const Json& request, const Json* capabilities, Json* effective = nullptr, const Json* structural = nullptr) {
     const auto& r = request.at("recipe"); const auto& media = request.at("media"); const auto& paths = request.at("paths");
     CheckMedia(media);
     if (!paths.is_object() || Str(paths,"ffmpeg","ffmpeg").empty() || Str(paths,"videoPipe").empty() || Str(paths,"output").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Executable, video pipe and output path must be nonempty strings.");
-    Json issues = Validate(request,capabilities); const auto exe = Str(paths,"ffmpeg","ffmpeg");
+    const auto shape = structural ? *structural : Structural(r);
+    Json issues = Validate(request,capabilities,&shape); const auto exe = Str(paths,"ffmpeg","ffmpeg");
+    const Json noCaps = nullptr;
+    const Json& caps = capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCaps;
     Json result{{"executable",exe},{"argv",Json::array()},{"display",Json::array()},{"commandLine",""},{"advancedTemplate",""},{"resolved",nullptr},{"signalPath",nullptr},{"issues",issues},{"summary",Json::object()},{"overriddenFields",Json::array()},{"expectedStreams",nullptr},{"outputContainerId",nullptr},{"outputExtension",nullptr},{"filterControl","structured"},{"videoGeometry",nullptr}};
-    if (HasErrors(Structural(r))) return result;
+    if (HasErrors(shape)) return result;
     result["filterControl"] = FilterControl(r); result["videoGeometry"] = VideoGeometry(r,media);
     const bool audioInput = Bool(r.at("audio")[0],"enabled",true) && media.contains("audio") && !media.at("audio").is_null();
     result["inputStreams"] = audioInput ? Json::array({"video","audio"}) : Json::array({"video"});
     if (audioInput && Str(paths,"audioPipe").empty()) throw Error(VE_INVALID_ARGUMENT,"PATHS","Enabled audio needs a pipe path.");
     bool partialCommand = false;
     Json tokens = Json::array(); Push(tokens,"exe",nullptr,{exe});
-    Push(tokens,"global",nullptr,{"-hide_banner","-nostdin","-loglevel","info","-stats_period","0.2","-progress","pipe:1"});
+    // -nostats keeps periodic statistics out of stderr; -progress still reports.
+    Push(tokens,"global",nullptr,{"-hide_banner","-nostdin","-nostats","-loglevel","info","-stats_period","0.2","-progress","pipe:1"});
     if (Bool(paths,"overwriteOutput")) Push(tokens,"global",nullptr,{"-y"});
     const auto input = InputTokens(r,media,paths); Json res = Resolve(r); res["gopFrames"] = nullptr;
     const bool advanced = Str(r.at("command"),"mode") == "template";
     if (!advanced) {
         for (const auto& token : input) tokens.push_back(token);
-        const auto basic = Basic(r,media,res,result["overriddenFields"]); for (const auto& token : basic) tokens.push_back(token);
+        const auto basic = Basic(r,media,res,result["overriddenFields"],caps); for (const auto& token : basic) tokens.push_back(token);
         std::string seed;
         // Preserve the tagging policy when {inputs} is expanded in Advanced,
         // where inactive Basic fields deliberately do not alter the source.
@@ -473,7 +495,7 @@ static Json CompileInternal(const Json& request, const Json* capabilities, Json*
         for (size_t i = 0; i < words.size(); ++i) {
             const auto& word = words[i];
             if (i == 0 && (word.text == "ffmpeg" || word.text == "ffmpeg.exe")) continue;
-            if (word.text == "-hide_banner" || word.text == "-nostdin") continue;
+            if (word.text == "-hide_banner" || word.text == "-nostdin" || word.text == "-nostats") continue;
             if (word.text == "{inputs}") {
                 for (auto token : input) { token["macros"] = Json::array({"{inputs}"}); token["stage"] = "input"; expandedBytes += Str(token,"text").size(); token["sourceStart"] = offsets[word.start]; token["sourceEnd"] = offsets[word.end]; tokens.push_back(token); }
                 if (expandedBytes > VE_CORE_JSON_LIMIT) throw Error(VE_LIMIT_EXCEEDED,"COMMAND-LIMIT","Expanded command exceeds 1 MiB.");
@@ -506,8 +528,6 @@ static Json CompileInternal(const Json& request, const Json* capabilities, Json*
         }
         result["resolved"] = nullptr;
     }
-    const Json noCaps = nullptr;
-    const Json& caps = capabilities ? *capabilities : request.contains("capabilities") ? request.at("capabilities") : noCaps;
     // Validate actual emitted generated values against this build's private help.
     // Extra text was linted in Validate; it keeps its own spans and issue fields.
     if (!advanced && caps.is_object()) for (size_t i = 0; i + 1 < tokens.size(); ++i) {
@@ -709,6 +729,7 @@ static Json CompileInternal(const Json& request, const Json* capabilities, Json*
     return result;
 }
 Json Compile(const Json& request, const Json* capabilities) { return CompileInternal(request,capabilities); }
+Json CompileResolved(const Json& request, const Json& structural, Json& effective) { return CompileInternal(request,nullptr,&effective,&structural); }
 Json SnapshotSummary(const Json& request) {
     const auto unknown = std::string("Custom / not determined");
     Json result{{"preset","Custom settings"},{"video",unknown},{"resolution",unknown},{"filters",unknown},
@@ -739,7 +760,7 @@ Json SnapshotSummary(const Json& request) {
         std::string text; for (const auto& value : values) if (!value.empty()) { if (!text.empty()) text += " \xC2\xB7 "; text += value; } return text;
     };
     bool customVideoRate = false, customAudioRate = false, customVideoFacts = false, customAudioFacts = false, customGeometry = Bool(resolved,"videoFilter");
-    for (const auto& token : compiled.at("display")) if (Str(token,"role") == "extra" && IsOption(Str(token,"text"))) {
+    for (const auto& token : compiled.at("display")) if (Str(token,"role") == "extra" && IsOption(Str(token,"text")) && Bool(token,"isOption",true)) {
         const auto key = OptionKey(Str(token,"text"));
         if (key == "s" || key == "aspect" || key == "autoscale") customGeometry = true;
         const auto field = Str(token,"field");

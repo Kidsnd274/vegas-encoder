@@ -281,6 +281,14 @@ void AsyncRun(const fs::path& parent, const Json& recipe) {
   const auto teardown=GetTickCount64(); task.reset();
   Check(GetTickCount64()-teardown<100,"page teardown never joins a blocked Windows launch");
   SetEvent(gate->release);
+  // Cancelling an active session waits for the terminated editor, then removes its folder (request.json holds the preset).
+  EditorSessionTask hang(root.wstring(),request,Launch(L"hang"));
+  until=GetTickCount64()+5000;
+  while (!hang.ProcessId() && GetTickCount64()<until) Sleep(10);
+  Check(hang.ProcessId() != 0 && !fs::is_empty(root),"active editor session owns a fresh session folder");
+  hang.Cancel(); exit.reset(); until=GetTickCount64()+6000;
+  while (!exit && GetTickCount64()<until) { exit=hang.Poll(); if (!exit) Sleep(10); }
+  Check(exit && exit->result.is_null() && exit->exitCode != 0 && fs::is_empty(root),"cancelling an active editor session removes its folder within 6 s");
 }
 }
 int wmain(int argc, wchar_t** argv) {

@@ -704,6 +704,32 @@ buffersink AVOptions:
       retested.single.tenBit && fake.calls.length > beforeCachedHardware,
       'forced retest refreshes 10-bit outcome',
     );
+    // C10: identity/version 30 s, lists and -h full 60 s, encoder/filter help 30 s.
+    Duration? expectedTimeout(List<String> arguments) {
+      if (arguments.contains('-version') || arguments.contains('-show_versions'))
+        return const Duration(seconds: 30);
+      if (['-encoders', '-muxers', '-filters'].any(arguments.contains) ||
+          (arguments.contains('-h') && arguments.contains('full')))
+        return const Duration(seconds: 60);
+      if (arguments.contains('-h') &&
+          arguments.any((a) => a.startsWith('encoder=') || a.startsWith('filter=')))
+        return const Duration(seconds: 30);
+      return null; // hardware tests keep their own timeouts
+    }
+
+    final probeTimeouts = [
+      for (var i = 0; i < fake.calls.length; i++)
+        if (expectedTimeout(fake.calls[i].$2) case final expected?)
+          (fake.calls[i].$2.join(' '), fake.timeouts[i], expected),
+    ];
+    final wrongTimeouts = [
+      for (final call in probeTimeouts)
+        if (call.$2 != call.$3) '${call.$1}: ${call.$2.inSeconds} s',
+    ];
+    check(
+      probeTimeouts.isNotEmpty && wrongTimeouts.isEmpty,
+      'probe calls use 30 s for identity and help, 60 s for lists: ${wrongTimeouts.join('; ')}',
+    );
     gpu.snapshot = GpuSnapshot(fingerprint: 'gpu-driver-2', cacheable: true);
     final invalidated = (await services.capabilityCache.read(
       recorded.identity.key,

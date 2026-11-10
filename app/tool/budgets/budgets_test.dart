@@ -57,9 +57,9 @@ void main() {
       settings.copyWith(installations: [installation], defaultFFmpegId: installation.id),
       expectedRevision: settings.revision,
     );
-    // 500 presets: the six built-ins and 494 copies in Mine.
+    // 500 presets: the built-ins and enough copies in Mine to make 500.
     final builtins = await services.library.list();
-    for (var i = 0; i < 494; i++) {
+    for (var i = 0; i < 500 - builtins.length; i++) {
       final source = builtins[i % builtins.length];
       await services.library.save(
         Preset(

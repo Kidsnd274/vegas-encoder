@@ -421,6 +421,46 @@ Product behaviour: [FFMPEG_INTEGRATION.md](FFMPEG_INTEGRATION.md).
    That subset is encoder × container × input format with real VEGAS evidence. The UI
    marks combinations outside it as "Not tested with VEGAS yet": informational, never blocking.
 
+### 8.1 Transport and preflight (0.2.1)
+
+- **Queue sizing.** The audio queue is sized by time, not by a fixed block count.
+  It holds enough audio for FFmpeg's video lookahead, and its limit is the sample
+  rate × block align × the allowed seconds. This removed the SVT-AV1 stall:
+  - the encoder read ahead hundreds of video frames;
+  - meanwhile the old small audio queue filled, so VEGAS's render thread blocked
+    on audio;
+  - so FFmpeg starved on video.
+
+  Each job records the high-water marks and limits (`transport`, C6).
+- **No-progress detection.** A render fails only when FFmpeg stops making progress
+  for `StallTimeoutMs` (default 120 s). Progress means pipe bytes consumed or
+  progress lines. Connecting the pipes has its own `ConnectTimeoutMs` (30 s). Slow
+  encoders and long finishing (fast start, flushing) no longer hit a fixed
+  deadline.
+- **Early exit.** FFmpeg exiting 0 before every frame was sent (for example `-t`)
+  is a successful render with `endedEarly`.
+- **Preflight records.** A render that stops before FFmpeg starts still writes a
+  record (`stage: "preflight"`) and a terminal live status with its reason. Causes
+  include:
+  - a wrong Render As extension;
+  - an unsupported audio format;
+  - non-square pixels;
+  - no FFmpeg.
+- **Audio formats.** The recipe build accepts float32 audio at 1–768000 Hz with
+  1–64 channels (`blockAlign == 4 × channels`). With audio turned off, the audio
+  stream is ignored. A "source" rate the encoder or container can't take is
+  resampled to 48 kHz (decision D11). Examples are Opus, the curated float PCM
+  rates, and MXF.
+- **Destinations (decision D1).**
+  - A modern host's confirmed name is replaced when encoding finishes. A file that
+    appears during encoding is never overwritten.
+  - Legacy automatic names take the first free `name (n).ext`.
+- **Costs.**
+  - Frame buffers are reused.
+  - Progress is polled about once per frame.
+  - FFmpeg identity hashes are cached by file identity.
+  - Live status writes skip the disk flush; records and the index stay durable.
+
 ## 9. Flutter application
 
 ### 9.1 Layers

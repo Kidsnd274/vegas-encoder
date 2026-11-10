@@ -15,14 +15,32 @@ enum SaveCheck { save, cancel, showSetting }
 /// (`VeCore.validate` with no FFmpeg; the library refuses these, C3
 /// `RECIPE-INVALID`); [ffmpeg] are the further errors the core found for the
 /// FFmpeg the checks are for ([compiled], the compile's issues).
-({List<Issue> settings, List<Issue> ffmpeg}) saveErrors(VeCore core, Recipe recipe, List<Issue> compiled) {
+({List<Issue> settings, List<Issue> ffmpeg, List<Issue> limits}) saveErrors(
+  VeCore core,
+  Recipe recipe,
+  List<Issue> compiled,
+) {
   // A core that can't check leaves the decision to the library.
   final own = CoreResult.run(() => core.validate(recipe)).value ?? const <Issue>[];
   final settings = own.where((i) => i.level == IssueLevel.error).toList();
   final known = {for (final i in settings) '${i.id}|${i.field}'};
   final ffmpeg = compiled.where((i) => i.level == IssueLevel.error && !known.contains('${i.id}|${i.field}')).toList();
-  return (settings: settings, ffmpeg: ffmpeg);
+  final seen = <String>{};
+  final limits = [
+    for (final i in lengthLimits([...own, ...compiled]))
+      if (seen.add('${i.id}|${i.field}|${i.message}')) i,
+  ];
+  return (settings: settings, ffmpeg: ffmpeg, limits: limits);
 }
+
+/// Decision D4: options that can stop a render before the end of the timeline.
+const lengthLimitIds = {'L-DURATION-LIMIT', 'V-EXTRA-DURATION', 'L-SHORTEST', 'V-EXTRA-SHORTEST'};
+
+/// The length-limiting warnings in [issues] (contract 3.4).
+List<Issue> lengthLimits(List<Issue> issues) => [
+  for (final i in issues)
+    if (lengthLimitIds.contains(i.id)) i,
+];
 
 /// Presets with errors aren't saved, and the user hears why first (owner
 /// decision, 2026-10-15). Errors in the settings themselves stop the save:
@@ -34,6 +52,7 @@ Future<SaveCheck> checkSave(
   required List<Issue> settings,
   required List<Issue> ffmpeg,
   required String installation,
+  List<Issue> limits = const [],
 }) async {
   if (settings.isNotEmpty) {
     final choice = await showVeDialog<SaveCheck>(
@@ -61,9 +80,73 @@ Future<SaveCheck> checkSave(
         VeDialogAction('Cancel', SaveCheck.cancel, variant: VeButtonVariant.primary),
       ],
     );
-    return choice ?? SaveCheck.cancel;
+    if (choice != SaveCheck.save || !context.mounted) return SaveCheck.cancel;
   }
-  return SaveCheck.save;
+  return confirmShorter(context, limits);
+}
+
+/// Decision D4: options that can end the render before the timeline does
+/// ask first. The core's own words name each option.
+Future<SaveCheck> confirmShorter(BuildContext context, List<Issue> limits, {String action = 'Save anyway'}) async {
+  if (limits.isEmpty) return SaveCheck.save;
+  final choice = await showVeDialog<SaveCheck>(
+    context,
+    title: 'The output may be shorter than the timeline',
+    message: 'Choose $action if a shorter output is what you want.',
+    content: _ErrorList(limits),
+    actions: [
+      VeDialogAction(action, SaveCheck.save),
+      const VeDialogAction('Cancel', SaveCheck.cancel, variant: VeButtonVariant.primary),
+    ],
+  );
+  return choice ?? SaveCheck.cancel;
+}
+
+/// Contract 3.4: findings that mean a recipe reads outside files, adds inputs
+/// or outputs, or uses the network.
+const externalAccessIds = {'L-INPUT', 'L-OUTPUTS', 'L-NETWORK', 'L-FILE-ACCESS', 'V-EXTRA-NETWORK', 'V-EXTRA-FILE'};
+
+/// The core's external-access findings for [recipe], in its own words: its
+/// checks in Basic, its template's lint in Advanced (decision D3).
+List<String> externalAccess(VeCore core, Recipe recipe) {
+  final found = <String>{};
+  for (final i in CoreResult.run(() => core.validate(recipe)).value ?? const <Issue>[]) {
+    if (externalAccessIds.contains(i.id)) found.add(i.message);
+  }
+  if (recipe.command.mode == 'template') {
+    for (final d in CoreResult.run(() => core.lint(recipe.command.template)).value ?? const <Diagnostic>[]) {
+      if (externalAccessIds.contains(d.id)) found.add(d.message);
+    }
+  }
+  return found.toList();
+}
+
+/// Decision D3: importing a preset that touches outside files or the network
+/// asks first, listing what the core found. Import keeps the warning in Checks.
+Future<bool> confirmImport(BuildContext context, {required String name, required List<String> findings}) async {
+  if (findings.isEmpty) return true;
+  final t = VeTokens.of(context);
+  final choice = await showVeDialog<bool>(
+    context,
+    title: '“$name” reads other files or uses the network',
+    message: 'Import it only if you trust where it came from. The warning stays in its checks.',
+    content: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final f in findings.take(4))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text('• $f', style: t.text.small.copyWith(color: t.colors.text2, height: 1.4)),
+          ),
+        if (findings.length > 4) Text('and ${findings.length - 4} more.', style: t.text.small.copyWith(color: t.colors.muted)),
+      ],
+    ),
+    actions: const [
+      VeDialogAction('Import', true),
+      VeDialogAction('Cancel', false, variant: VeButtonVariant.primary),
+    ],
+  );
+  return choice ?? false;
 }
 
 /// The first few errors as the core words them, then how many more.

@@ -1,7 +1,7 @@
 # Windows x64 build and output map
 
-Build from `L:\repos\vegas-encoder` using the existing MSVC x64 / Windows SDK,
-PowerShell 7, Python and Flutter SDK (`L:\flutter`). Builds do not install or
+Build from the repository root using the existing MSVC x64 / Windows SDK,
+PowerShell 7, Python and Flutter SDK (`VEGAS_ENCODER_FLUTTER` or PATH). Builds do not install or
 replace the VEGAS exporter. FFmpeg/FFprobe are user-supplied runtime tools;
 they are not bundled product components.
 
@@ -54,7 +54,7 @@ the core reports its runtime stamp through its API.
 Run in PowerShell:
 
 ```powershell
-Set-Location L:\repos\vegas-encoder
+Set-Location <checkout>
 
 .\scripts\Build-Release.ps1
 ```
@@ -88,16 +88,9 @@ source before the final release build for a stable source identity.
 Tool paths are configurable with `-FlutterPath`, `-PythonPath`, `-VcVarsPath` and
 `-IsccPath`. Inno Setup 6.7.1 is the verified compiler; install it separately if
 missing. The default compiler is `%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe`.
-Flutter defaults to the existing `L:\flutter\bin\flutter.bat` when present,
+Flutter comes from `-FlutterPath`, then `VEGAS_ENCODER_FLUTTER`,
 otherwise `flutter.bat` on PATH. MSVC uses the existing build script's detection
 or `VEGAS_ENCODER_VCVARS`. No tool installation or upgrade is performed.
-
-Dart native-asset hooks (`package:native_toolchain_c` 0.19.2) run `cl.exe`
-through `cmd` and fail with `'C:\Program' is not recognized` when the checkout
-path contains a space (for example under `C:\Users\<First Last>`). Map the
-checkout to a drive letter, run `dart pub get` and the script from there, then
-remove the mapping and rerun `dart pub get` from the real path:
-`subst V: "<checkout>"` … `subst V: /D`.
 
 Flutter supports these version overrides in its
 [Windows build documentation](https://docs.flutter.dev/deployment/windows).
@@ -125,7 +118,7 @@ light/dark theme colours. The main README awaits the owner's later icon instruct
 ## Lower-level builds and checks
 
 ```powershell
-Set-Location L:\repos\vegas-encoder
+Set-Location <checkout>
 python -I scripts/etc/Generate-Versions.py
 python -I scripts/etc/Generate-CoreData.py
 python -I scripts/etc/Generate-ServiceBuiltins.py
@@ -154,7 +147,7 @@ python -I scripts/etc/Test-Versions.py
 ## Runtime files and installer inputs
 
 The complete app runtime is under
-`L:\repos\vegas-encoder\build\release\vegas-encoder\app\`:
+`build\release\vegas-encoder\app\`:
 
 ```text
 VegasEncoder.exe
@@ -181,7 +174,7 @@ The exporter build folder also contains `vegas-encoder.ini`, a matching
 diagnostic files. The development INI must be rendered for the intended app path.
 
 The latest prepared bundle is
-`L:\repos\vegas-encoder\build\release-inputs-scripts-layout\`
+`build\release-inputs-scripts-layout\`
 (earlier bundles are preserved):
 
 | Directory/file | Purpose |

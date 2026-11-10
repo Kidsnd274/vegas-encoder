@@ -117,9 +117,10 @@ String? readLibraryDirectoryMetadata(String directory) {
     directory,
   ).absolute.uri.normalizePath().toFilePath();
   final path = normalized.toNativeUtf16(allocator: calloc);
-  Pointer<Uint8> buffer = nullptr;
   try {
-    buffer = calloc<Uint8>(1048576);
+    // C6: one buffer per isolate, reused without zero-filling; the native
+    // call reports how many bytes it wrote.
+    final buffer = _metadataBuffer;
     final length = _libraryMetadata(
       path.cast<Uint16>(),
       normalized.length,
@@ -134,7 +135,9 @@ String? readLibraryDirectoryMetadata(String directory) {
       );
     return utf8.decode(buffer.asTypedList(length));
   } finally {
-    if (buffer != nullptr) calloc.free(buffer);
     calloc.free(path);
   }
 }
+
+/// Lives as long as the isolate, which ends with the process or its worker.
+final Pointer<Uint8> _metadataBuffer = malloc<Uint8>(1048576);

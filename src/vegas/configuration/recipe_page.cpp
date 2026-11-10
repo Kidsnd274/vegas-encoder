@@ -284,6 +284,7 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
   void RestoreOwner(bool returnForeground = false) noexcept {
     const auto owner = owner_; const bool enable = ownerDisabled_;
     owner_ = nullptr; ownerDisabled_ = false;
+    if (enable && options_.ownerReturned) BestEffortDiagnostic([&] { options_.ownerReturned(returnForeground); });
     if (enable && IsWindow(owner) && GetWindowThreadProcessId(owner, nullptr) == thread_) {
       ReturnRecipeOwner(owner,button_,returnForeground);
     }
@@ -345,8 +346,8 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
     if (!editor_) return;
     try {
       DWORD foregroundProcess = 0;
-      const auto foreground = GetForegroundWindow();
-      if (foreground) GetWindowThreadProcessId(foreground,&foregroundProcess);
+      if (options_.foregroundProcess) foregroundProcess = options_.foregroundProcess();
+      else if (const auto foreground = GetForegroundWindow()) GetWindowThreadProcessId(foreground,&foregroundProcess);
       const bool editorForeground = foregroundProcess && foregroundProcess == editor_->ProcessId();
       auto exit = editor_->Poll();
       if (!exit) {
@@ -357,13 +358,21 @@ class RecipePage final : public sfio::ISfFileIOPropertyPage {
         return;
       }
       KillTimer(window_, kPollEditor);
-      if (options_.validateRecipe && exit->exitCode == 0 && exit->result.is_object() &&
-          ve::Str(exit->result, "action") == "apply" && exit->result.contains("recipe"))
-        options_.validateRecipe(exit->result.at("recipe"));
-      const auto outcome = draft_->FinishEdit(exit->result, exit->exitCode);
       const auto action = ve::Str(exit->result,"action");
+      // Decided before validation, so a rejected Apply still returns VEGAS to the front.
       const bool returnForeground = !exit->exitCode && (action == "apply" || action == "cancel") &&
           (editorForeground || editorHadForeground_ || foregroundProcess == GetCurrentProcessId());
+      if (options_.validateRecipe && exit->exitCode == 0 && exit->result.is_object() && action == "apply" && exit->result.contains("recipe")) {
+        try { options_.validateRecipe(exit->result.at("recipe")); }
+        catch (const std::exception& error) {
+          editor_.reset();
+          BestEffortDiagnostic([&] { if (draft_->Editing()) (void)draft_->FinishEdit(nullptr, 1); });
+          RestoreOwner(returnForeground); SyncButton();
+          Status(L"Editor changes were rejected: " + Widen(error.what()) + L" The previous settings are preserved.");
+          return;
+        }
+      }
+      const auto outcome = draft_->FinishEdit(exit->result, exit->exitCode);
       editor_.reset(); RestoreOwner(returnForeground); SyncButton();
       if (outcome.disposition == EditDisposition::applied) {
         RefreshSummary();

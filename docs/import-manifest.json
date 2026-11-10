@@ -1,7 +1,7 @@
 {
   "project": "Vegas Encoder",
   "utc": "2026-10-10T13:55:56.510656+00:00",
-  "researchPath": "L:\\repos\\vegas-ffmpeg-frameserver",
+  "researchPath": "../vegas-ffmpeg-frameserver",
   "researchHead": "791baa32a3358d1b9c93bada45be2aeca07caf6b",
   "uncommittedSource": true,
   "productIdentities": {

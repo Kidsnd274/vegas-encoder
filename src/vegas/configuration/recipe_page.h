@@ -20,6 +20,10 @@ struct RecipePageOptions {
   // Shared native-target preflight. Throw to preserve the previous draft.
   std::function<void(const ve::Json&)> validateRecipe;
   bool automaticOutputExtension = false;
+  // Test hooks; production leaves both empty. foregroundProcess replaces the
+  // foreground-window lookup; ownerReturned observes the owner-return decision.
+  std::function<DWORD()> foregroundProcess;
+  std::function<void(bool returnForeground)> ownerReturned;
 };
 
 // Creator UI thread only, including final Release. Native bridge ownership is

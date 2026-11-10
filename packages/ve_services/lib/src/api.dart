@@ -60,6 +60,24 @@ abstract interface class CapabilityCache {
   Future<void> invalidate(String identityKey);
 }
 
+/// The first of `base`, `base-2`, `base-3`… for [name] (`^[a-z0-9][a-z0-9-]*$`,
+/// at most 48 characters) that is not in [taken], compared case-insensitively.
+String freePresetId(String name, Iterable<String> taken) {
+  var base = name
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  if (base.isEmpty) base = 'preset';
+  if (base.length > 48)
+    base = base.substring(0, 48).replaceAll(RegExp(r'-+$'), '');
+  final used = {for (final id in taken) id.toLowerCase()};
+  var candidate = base;
+  for (var n = 2; used.contains(candidate); n++) {
+    candidate = '$base-$n';
+  }
+  return candidate;
+}
+
 abstract interface class PresetLibrary {
   Future<List<Preset>> list();
   Stream<List<Preset>> watch();
@@ -69,8 +87,34 @@ abstract interface class PresetLibrary {
   /// read-only. A duplicate is a new ID with origin "builtin/<id>".
   Future<Preset> save(Preset preset, {int? expectedRevision});
   Future<void> delete(String id, {required int expectedRevision});
+
+  /// A safe ID from [name] that is free among current presets **and** retained
+  /// history (a deleted preset keeps its history), compared case-insensitively.
+  Future<String> availableId(String name);
   Future<Preset> importPreset(String jsonText, {required String newId});
   Future<String> exportPreset(String id);
+}
+
+/// A library file that couldn't be read (contract 3.3). [code] is the service
+/// error code (for example `INVALID-DATA`); [path] is the file.
+class LibraryProblem {
+  const LibraryProblem({required this.path, required this.code, required this.message});
+  final String path, code, message;
+}
+
+/// One unreadable preset file never empties the library: it is listed here instead.
+abstract interface class LibraryHealth {
+  /// The files the latest [PresetLibrary.list] skipped (reads the list first).
+  Future<List<LibraryProblem>> problems();
+}
+
+/// One malformed job index line never empties History: it is skipped and counted.
+abstract interface class JobIndexHealth {
+  /// Malformed lines the latest [JobRepository.list] skipped (blank and `\r` lines are not counted).
+  int get skippedIndexLines;
+
+  /// Rewrites the index from the job records (History's Rebuild index).
+  Future<void> rebuildIndex();
 }
 
 /// Stars/pins on built-ins are stored as user metadata without changing recipes

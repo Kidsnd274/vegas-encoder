@@ -2,12 +2,8 @@
 setlocal
 set "VE_BUILD_VCVARS=%~1"
 if not defined VE_BUILD_VCVARS set "VE_BUILD_VCVARS=%VEGAS_ENCODER_VCVARS%"
-if not defined VE_BUILD_VCVARS if exist "L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" set "VE_BUILD_VCVARS=L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
-if defined VE_BUILD_VCVARS (
-  call "%VE_BUILD_VCVARS%" >nul || exit /b 1
-) else (
-  where cl >nul 2>nul || (echo Run from an x64 MSVC developer prompt or pass vcvars64.bat. & exit /b 1)
-)
+if not defined VE_BUILD_VCVARS call "%~dp0Find-VcVars.cmd" VE_BUILD_VCVARS || exit /b 1
+if defined VE_BUILD_VCVARS (call "%VE_BUILD_VCVARS%" >nul || exit /b 1)
 set "VE_BUILD_ROOT=%~dp0..\.."
 set "VE_BUILD_PYTHON=%VEGAS_ENCODER_PYTHON%"
 if not defined VE_BUILD_PYTHON set "VE_BUILD_PYTHON=python"

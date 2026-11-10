@@ -12,6 +12,7 @@ import 'package:vegas_encoder/features/ffmpeg/installation_card.dart';
 import 'package:vegas_encoder/features/presets/presets_page.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
+import 'package:vegas_encoder/state/ffmpeg.dart' show ffmpegControllerProvider;
 import 'package:vegas_encoder/state/presets.dart';
 import 'package:vegas_encoder/state/services.dart';
 
@@ -156,6 +157,45 @@ void main() {
     expect(find.text('FFmpeg 8.1 portable: 2 video and 1 audio encoders not ready'), findsOneWidget);
     final saved = await tester.runAsync(machine.read);
     expect(saved!.revision, 0, reason: 'discovery records the installation in C7 itself (B3)');
+  });
+
+  testWidgets('after Add FFmpeg…, the older cards can still be selected (C1)', (tester) async {
+    await open(tester);
+    window.pickedFile = addedPath;
+    await tester.tap(find.text('Add FFmpeg…'));
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(tester.element(find.byType(InstallationCard).first));
+    String? selected() => container.read(ffmpegControllerProvider).selectedId;
+    final added = selected();
+    expect(added, isNotNull, reason: 'the new card is selected');
+
+    await tester.tap(find.text('FFmpeg 7.1.1').first);
+    await tester.pumpAndSettle();
+    expect(selected(), 'manual-7.1', reason: 'the older card takes the click');
+    await tester.ensureVisible(find.text('FFmpeg 8.1 portable').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FFmpeg 8.1 portable').first);
+    await tester.pumpAndSettle();
+    expect(selected(), added);
+    await tester.ensureVisible(find.text('FFmpeg 7.1.1').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('FFmpeg 7.1.1').first);
+    await tester.pumpAndSettle();
+    expect(selected(), 'manual-7.1', reason: 'switching keeps working');
+  });
+
+  testWidgets('a card chosen while Add FFmpeg… is still adding stays chosen (C1)', (tester) async {
+    await open(tester);
+    final container = ProviderScope.containerOf(tester.element(find.byType(InstallationCard).first));
+    final controller = container.read(ffmpegControllerProvider.notifier);
+    final adding = tester.runAsync(() async {
+      final pending = controller.add(addedPath);
+      controller.select('manual-7.1'); // the user clicks the old card meanwhile
+      await pending;
+    });
+    await adding;
+    await tester.pumpAndSettle();
+    expect(container.read(ffmpegControllerProvider).selectedId, 'manual-7.1');
   });
 
   testWidgets('Add FFmpeg… says why discovery refused a file', (tester) async {

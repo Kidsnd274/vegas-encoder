@@ -105,8 +105,10 @@ String? indexSpeed(core.JobIndexEntry e) => e.realtime == null ? null : ratioLab
 /// counted). Indexes outside `argv` are ignored.
 List<({String text, bool error})> commandParts(core.JobRecord r) {
   final marked = r.errorTokenIndices.toSet();
+  final ffmpeg = r.ffmpeg;
+  if (ffmpeg == null) return const []; // A preflight record: no command ran.
   return [
-    (text: quoteArgument(r.ffmpeg.path), error: false),
+    (text: quoteArgument(ffmpeg.path), error: false),
     for (var i = 0; i < r.argv.length; i++) (text: quoteArgument(r.argv[i]), error: marked.contains(i)),
   ];
 }
@@ -132,12 +134,19 @@ String logSummary({required int totalLines, required int shownLines, required bo
 /// One sentence for how the render went:
 /// "Rendered 12:43 in 24:46, 0.51× realtime, 9.84 GB."
 /// "Failed after 0:03. FFmpeg exited with code 1 before reading any frames."
+/// "Stopped before encoding started. Change the Render As filename…" for a
+/// preflight record (C6 `stage`). A clock that stepped back leaves the time
+/// unknown (C11).
 String resultSentence(core.JobRecord r) {
-  final took = VeFormat.duration(r.elapsedSec);
+  final elapsed = r.knownElapsedSec;
+  final took = elapsed == null ? 'an unknown time' : VeFormat.duration(elapsed);
   String withMessage(String lead) => r.message.isEmpty ? '$lead.' : '$lead. ${_sentence(r.message)}';
+  if (r.isPreflight) {
+    return withMessage(r.status == 'cancelled' ? 'Cancelled before encoding started' : 'Stopped before encoding started');
+  }
   switch (JobOutcome.of(r.status)) {
     case JobOutcome.succeeded:
-      final length = r.media.durationSec;
+      final length = r.media?.durationSec;
       final ratio = realtimeRatio(r);
       final parts = [
         length == null ? 'Rendered in $took' : 'Rendered ${VeFormat.duration(length)} in $took',
@@ -153,6 +162,18 @@ String resultSentence(core.JobRecord r) {
       return withMessage('Ended after $took (status “${r.status}”)');
   }
 }
+
+/// What else the record says about the output (C6 `requestedOutputPath`,
+/// `replacedExisting`, `endedEarly`), one sentence each.
+List<String> outputNotes(core.JobRecord r) => [
+  if (r.requestedOutputPath case final requested?)
+    'Render As asked for ${fileName(requested)}. That name was taken, so this render used the next free name.',
+  if (r.replacedExisting) 'This render replaced an existing file with the same name.',
+  if (r.endedEarly) 'FFmpeg finished before the end of the timeline, as the preset asked, so the output is shorter.',
+];
+
+/// The last part of a Windows path.
+String fileName(String path) => path.split(RegExp(r'[\\/]')).last;
 
 String _sentence(String text) {
   final t = text.trim();
@@ -175,7 +196,10 @@ String shortHash(String hash) =>
 /// `commandLine`). An older record without it: the executable, then its
 /// arguments, each quoted the way the Windows C runtime reads them back, so a
 /// copied command can be pasted into a terminal.
-String commandLine(core.JobRecord r) => r.commandLine ?? [r.ffmpeg.path, ...r.argv].map(quoteArgument).join(' ');
+String commandLine(core.JobRecord r) {
+  final ffmpeg = r.ffmpeg;
+  return r.commandLine ?? (ffmpeg == null ? '' : [ffmpeg.path, ...r.argv].map(quoteArgument).join(' '));
+}
 
 /// Quotes one argument for the Windows C runtime's parser: an argument with
 /// no space, tab, newline or quote stays as it is; otherwise it goes in double

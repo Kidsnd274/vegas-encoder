@@ -7,6 +7,7 @@
 #include "../fiohost/fakehost.h"
 #include <cstdio>
 #include <filesystem>
+#include <tuple>
 #include <fstream>
 #include <atomic>
 #include <thread>
@@ -60,10 +61,12 @@ Json Installation(const std::wstring& ffmpeg) {
     {"identity", {{"sha256", hash}, {"key", hash}, {"libraries", libraries}}},
     {"extensions", {{"ffprobeIdentity", {{"sha256", Sha256File(probe)}}}}}};
 }
+// Project facts the conformed template and the fake streams deliver (T2).
+DWORD projectRate = 48000; WORD projectChannels = 2; double projectAspect = 1.0;
 Tpl Template(const Json& recipe) {
   auto value = Tpl::Make(L"Immutable recipe", L"B6 adapter test", 0);
   value.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
-  value.SetAudio(tpl::audioRender, Float32Record(48000, 2));
+  value.SetAudio(tpl::audioRender, Float32Record(projectRate, projectChannels));
   return configuration::CreateRecipeTemplate(value, GUID_VegasEncoderType,
     {{"recipe", recipe}, {"origin", nullptr}, {"vegasPrefs", Json::object()}, {"writtenBy", "b6-adapter-test"}, {"extensions", Json::object()}});
 }
@@ -97,9 +100,14 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
   const auto extension = legacyAutomaticNames ? configuration::RecipeOutputExtension(recipe) :
     pathExtension ? std::wstring(pathExtension) : container ? Widen(ve::Str(*container,"ext")) : L".mkv";
   const auto requested = folder + L"\\" + (suffixOnlyName ? L"" : L"render") + (pathExtension ? pathExtension : extension);
-  const auto output = legacyAutomaticNames ? ResolveRecipeDestination(recipe,requested) : requested;
+  const auto resolved = legacyAutomaticNames ? ResolveRecipeDestination(recipe,requested) : requested;
+  // Decision D1: VEGAS 2026 checked this exact name, so an existing file is replaced. Legacy automatic
+  // names change the suffix VEGAS checked, so they never replace and take the first free "name (n)".
+  const auto output = legacyAutomaticNames && existing ?
+    (std::filesystem::path(resolved).parent_path() / (std::filesystem::path(resolved).stem().wstring() + L" (2)" +
+                                                      std::filesystem::path(resolved).extension().wstring())).wstring() : resolved;
   const bool success = expected == S_OK;
-  if (existing) { std::ofstream file{std::filesystem::path(output)}; file << "preserve destination"; }
+  if (existing) { std::ofstream file{std::filesystem::path(resolved)}; file << "preserve destination"; }
   if (nominalExisting) { Check(requested != output,"nominal-collision fixture must use a different actual path"); std::ofstream file{std::filesystem::path(requested)}; file << "preserve nominal"; }
   auto value = Template(recipe);
   ISfRenderFile* raw = nullptr;
@@ -118,6 +126,7 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
 #endif
   options.fps = 30000.0 / 1001; options.cancelAt = cancelAt; options.progressFailureSlot = failureSlot;
   options.progressFailureAt = 8; options.shortRead = 257;
+  options.sampleRate = projectRate; options.channels = projectChannels; options.pixelAspect = projectAspect;
   RenderDeadline deadline;
   const auto began = GetTickCount64();
   const auto host = ExerciseRecipeHost(options, [&](ISfReadVideoRenderStream* video, ISfReadAudioStream* audio, ISfProgress* progress) {
@@ -137,9 +146,22 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
         "adapter preserves success/cancellation/host error HRESULT and returns encoder failures as failures");
   Check(host.served == host.released && !host.outstanding && !host.lockErrors && !host.callerThreadErrors && !host.tokenErrors,
         "adapter copies/releases frames and keeps all host calls on caller thread");
+  if (success) {
+    // At most two SetPosition/CheckCancel pairs per unblocked frame; frames waiting on FFmpeg may poll more.
+    if (host.quietMidFrames * 4 < host.midFrames * 3)
+      fprintf(stderr,"%ls: %lld of %lld middle frames used at most two progress polls\n",name,host.quietMidFrames,host.midFrames);
+    Check(host.midFrames > 0 && host.quietMidFrames * 4 >= host.midFrames * 3,"unblocked frames poll VEGAS progress at most twice");
+  }
   if (expected == E_INVALIDARG) {
-    Check(host.served == 0 && !std::filesystem::exists(output),"suffix mismatch is rejected before acquiring frames");
-    return nullptr;
+    Check((host.served == 0 || projectAspect != 1.0) && !std::filesystem::exists(output),"preflight failure is rejected before encoding");
+    // Contracts 3.1/3.2: a render that stops before FFmpeg starts still explains itself.
+    const auto record = Record(selected.jobsRoot);
+    Check(ve::Str(record,"stage") == "preflight" && record.at("status") == "failed" && record.at("argv").empty() &&
+          record.at("published") == false && record.at("sizeBytes") == 0 && record.at("ffmpegExitCode").is_null() &&
+          record.at("logFile").is_null() && !ve::Str(record,"message").empty(),"preflight failure writes a C6 record with its reason");
+    const auto live = Read(std::filesystem::path(selected.jobsRoot) / (Widen(ve::Str(record,"id")) + L".live.json"));
+    Check(live.at("state") == "failed" && live.at("message") == record.at("message"),"preflight failure writes a terminal live status");
+    return record;
   }
   const auto record = Record(selected.jobsRoot);
   Check(record.at("outputPath") == Utf8(output.c_str()),"C6 preserves exact selected destination");
@@ -152,6 +174,13 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
     const auto temporary = std::filesystem::path(Widen(record.at("argv").back().get<std::string>()));
     Check(temporary.parent_path() == std::filesystem::path(output).parent_path() && temporary.extension() == extension &&
       temporary.filename().wstring().find(L".ve-partial-") != std::wstring::npos,"unique temporary stays beside destination and retains final extension");
+    if (existing) {
+      std::ifstream file{std::filesystem::path(resolved)}; const std::string bytes((std::istreambuf_iterator<char>(file)), {});
+      if (legacyAutomaticNames)
+        Check(bytes == "preserve destination" && record.at("requestedOutputPath") == Utf8(requested.c_str()) && !record.contains("replacedExisting"),
+              "legacy automatic names keep the existing file and render to the first free name");
+      else Check(bytes != "preserve destination" && record.value("replacedExisting",false) == true,"a confirmed existing destination is replaced");
+    }
   }
   else if (existing) {
     std::ifstream file{std::filesystem::path(output)}; const std::string bytes((std::istreambuf_iterator<char>(file)), {});
@@ -167,7 +196,10 @@ Json Run(const std::wstring& root, const wchar_t* name, Json recipe, HRESULT exp
   return record;
 }
 } // namespace
-namespace vegas_encoder { RecipeRuntime LoadRecipeRuntime() { return selected; } }
+namespace vegas_encoder {
+RecipeRuntime LoadRecipeRuntime() { return selected; }
+std::wstring RecipeJobsRoot() { return selected.jobsRoot; }
+}
 
 int wmain(int argc, wchar_t** argv) {
   try {
@@ -215,7 +247,7 @@ int wmain(int argc, wchar_t** argv) {
         Run(root,L"recovery",recipe,S_OK,-1,0,false,false,false,L".vencoder");
       } else Run(root,L"mismatched-suffix",recipe,E_INVALIDARG,-1,0,false,false,false,L".mp4");
       Run(root,L"suffix-only-name",recipe,S_OK,-1,0,false,false,false,L".mkv",true);
-      Run(root,L"existing-destination",recipe,HRESULT_FROM_WIN32(ERROR_FILE_EXISTS),-1,0,false,true,false,legacyAutomaticNames ? L".vencoder" : nullptr);
+      Run(root,L"existing-destination",recipe,S_OK,-1,0,false,true,false,legacyAutomaticNames ? L".vencoder" : nullptr);
       printf("Native %s PASS: %d checks / short fake-host real-FFmpeg renders across five containers, output paths and existing destination. No VEGAS.\n",legacyAutomaticNames ? "automatic names" : "containers",checks);
       return 0;
     }
@@ -232,6 +264,24 @@ int wmain(int argc, wchar_t** argv) {
     advanced["command"]["template"] = "{inputs} -c:v ffv1 -c:a pcm_f32le {output}";
     Run(root, L"unknown-container", advanced, E_FAIL);
     Run(root, L"recovery", recipe, S_OK);
+    // Projects that are not 48 kHz stereo: the template carries the project's audio format.
+    auto aac = recipe; aac["audio"][0]["encoder"] = "aac"; aac["audio"][0]["mode"] = "bitrate"; aac["audio"][0]["bitrateK"] = 192;
+    for (const auto& [name, rate, channels] : {std::tuple{L"audio-44100-stereo", DWORD(44100), WORD(2)},
+                                               std::tuple{L"audio-48000-mono", DWORD(48000), WORD(1)},
+                                               std::tuple{L"audio-48000-5.1", DWORD(48000), WORD(6)}}) {
+      projectRate = rate; projectChannels = channels;
+      const auto record = Run(root, name, aac, S_OK);
+      Check(record.at("media").at("audio").at("rate") == rate && record.at("media").at("audio").at("channels") == channels,
+            "C6 media records the project's audio rate and channel count");
+    }
+    projectRate = 44100; projectChannels = 2;
+    Run(root, L"audio-44100-video-only", noAudio, S_OK);
+    projectRate = 48000; projectChannels = 2;
+    projectAspect = 1.2121;
+    const auto nonSquare = Run(root, L"non-square", recipe, E_INVALIDARG);
+    Check(ve::Str(nonSquare,"message").find("non-square pixels (pixel aspect 1.2121)") != std::string::npos,
+          "non-square project explains the pixel aspect requirement");
+    projectAspect = 1.0;
     auto badFilter = recipe; badFilter["video"]["extra"] = "-vf vegas_encoder_deliberate_failure";
     const auto filterFailure = Run(root, L"bad-filter", badFilter, E_FAIL, -1, 0, false, false, true);
     Check(ve::Str(filterFailure,"message").find("No such filter: 'vegas_encoder_deliberate_failure'") != std::string::npos,
@@ -240,7 +290,7 @@ int wmain(int argc, wchar_t** argv) {
     const auto failedLive = Read(std::filesystem::path(root) / L"bad-filter" / L"jobs" / (failedId + L".live.json"));
     Check(failedLive.at("message") == filterFailure.at("message"), "C5 and C6 share the actionable failure message");
     Run(root, L"after-filter-failure", recipe, S_OK);
-    Run(root, L"existing-destination", recipe, HRESULT_FROM_WIN32(ERROR_FILE_EXISTS), -1, 0, false, true);
+    Run(root, L"existing-destination", recipe, S_OK, -1, 0, false, true);
     auto empty = Tpl::Make(L"Not a recipe", L"", 0); empty.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
     ISfRenderFile* rejected = nullptr;
     Check(CreateRenderFile(empty.Ptr(), &rejected) == E_INVALIDARG && !rejected, "Create rejects absent recipe instead of using proof settings");

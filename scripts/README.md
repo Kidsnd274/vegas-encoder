@@ -19,6 +19,27 @@ contains the entry points for routine builds, packaging and manual maintenance.
 .\scripts\Get-VegasTargets.ps1
 ```
 
+## Tools
+
+Scripts find each tool from the script's parameter, then an environment
+variable, then `PATH`. Nothing defaults to a machine-specific location.
+
+| Tool | Parameter | Environment variable |
+| --- | --- | --- |
+| Flutter | `-FlutterPath` | `VEGAS_ENCODER_FLUTTER` (`flutter.bat`) |
+| Dart | `-DartPath` | The Dart SDK inside `VEGAS_ENCODER_FLUTTER`'s Flutter |
+| Python 3 | `-PythonPath` | `VEGAS_ENCODER_PYTHON` |
+| MSVC x64 | `-VcVarsPath`, or the first argument of a `.cmd` script | `VEGAS_ENCODER_VCVARS` (`vcvars64.bat`); then an active x64 developer prompt, then `vswhere` |
+| FFmpeg | `-FFmpegPath` / `-FFmpegPaths` | `VEGAS_ENCODER_FFMPEG` (FFprobe must sit beside it) |
+
+The shared lookup is `etc/Tools.ps1` (PowerShell) and `etc/Find-VcVars.cmd`
+(batch). In a fresh checkout, run `dart pub get` in `packages/ve_core` and
+`packages/ve_services` before the Dart test runners, and build the test setup
+helper with `cmd /d /c scripts\etc\Build-SetupHelper.cmd test` before
+`python -I scripts/etc/Test-Setup.py`. `python -I scripts/etc/Test-NoMachinePaths.py`
+refuses machine-specific absolute paths in committed files (`--scope scripts`
+checks `scripts/` and `setup/` only).
+
 `etc/` contains supporting build scripts, shared version/receipt functions,
 generators, test runners and retained trial/diagnostic utilities. Developers
 can still invoke them explicitly; they are not routine entry points. For example:

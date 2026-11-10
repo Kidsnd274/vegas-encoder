@@ -1,12 +1,15 @@
 #Requires -Version 7.0
 [CmdletBinding()]
 param(
-  [string] $DartPath = 'L:\flutter\bin\cache\dart-sdk\bin\dart.exe',
-  [string] $PythonPath = 'python',
+  [string] $DartPath,
+  [string] $PythonPath,
   [string] $NodePath = 'node',
   [string] $VcvarsPath = ''
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$DartPath = Resolve-VeDart $DartPath
+$PythonPath = Resolve-VePython $PythonPath
 $b0Root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 function Invoke-B0Check {
   param([string] $Exe, [string[]] $Arguments)

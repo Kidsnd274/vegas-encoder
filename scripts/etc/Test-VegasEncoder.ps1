@@ -12,11 +12,14 @@ DLL/INI, logs and outputs. Use a fresh evidence directory for every invocation.
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)][string] $EvidenceDir,
-  [string] $FFmpegPath = 'C:\ffmpeg\bin\ffmpeg.exe',
-  [string] $PythonPath = 'python',
+  [string] $FFmpegPath,
+  [string] $PythonPath,
   [switch] $Include1080p
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$FFmpegPath = Resolve-VeFFmpeg $FFmpegPath
+$PythonPath = Resolve-VePython $PythonPath
 $testRepo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
 $testDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($EvidenceDir)
 if (Test-Path -LiteralPath $testDir) { throw 'EvidenceDir exists; use a fresh directory.' }
@@ -144,17 +147,18 @@ try {
   Test-StoppedOutput -CaseDir $badRate -Status failed
   $early = Invoke-TestHost -Name early-exit -Extra @('--expect-failure') -Exe $testFfprobe
   Test-StoppedOutput -CaseDir $early -Status failed
-  $existing = Invoke-TestHost -Name existing-destination -Extra @('--expect-failure') -ExistingDestination
+  # Decision D1: VEGAS 2026 confirmed this exact name, so rendering again replaces the file.
+  $existing = Invoke-TestHost -Name existing-destination -ExistingDestination
   $existingBytes = [IO.File]::ReadAllBytes((Join-Path $existing 'output\render-1.mkv'))
-  if (($existingBytes -join ',') -ne '1,2,3,4,5') { throw 'Existing destination changed' }
+  if (($existingBytes -join ',') -eq '1,2,3,4,5' -or $existingBytes.Length -le 20) { throw 'Confirmed existing destination was not replaced' }
   $existingResult = Get-Content -Raw -LiteralPath (Join-Path $existing 'output\render-1.mkv.vegas-encoder.json') | ConvertFrom-Json
-  if ($existingResult.render.status -ne 'failed' -or $existingResult.encoder.published) { throw 'Overwrite refusal failed' }
+  if ($existingResult.render.status -ne 'ok' -or -not $existingResult.encoder.published) { throw 'Re-render to the same name failed' }
   if ($existingResult.video.locks_outstanding -ne 0 -or
       ($existingResult.encoder.pid -gt 0 -and (Get-Process -Id $existingResult.encoder.pid -ErrorAction SilentlyContinue)) -or
       ($existingResult.encoder.temporary_output -and (Test-Path -LiteralPath $existingResult.encoder.temporary_output))) {
-    throw 'Existing-destination failure left a lock, child or partial output'
+    throw 'Existing-destination render left a lock, child or partial output'
   }
-  Write-Output 'PASS destination: existing file preserved'
+  Write-Output 'PASS destination: re-render to the same name replaces the confirmed file'
   $unicode = Invoke-TestHost -Name 'space Unicode 测试'
   Test-CompletedOutput -CaseDir $unicode -Reference $rawManifest
   if ($Include1080p) {

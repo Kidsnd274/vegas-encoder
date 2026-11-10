@@ -120,13 +120,15 @@ Json Estimate(const Json& request) {
     Json result{{"available",false},{"approx",false},{"videoKbps",0},{"audioKbps",0},{"bytesPerMinute",0},
                 {"totalBytes",nullptr},{"minBytesPerMinute",nullptr},{"maxBytesPerMinute",nullptr},
                 {"minTotalBytes",nullptr},{"maxTotalBytes",nullptr},{"explanation","No size estimate for this recipe."}};
-    if (HasErrors(Structural(r)) || Str(r.at("command"),"mode") == "template") return result;
+    const auto shape = Structural(r);
+    if (HasErrors(shape) || Str(r.at("command"),"mode") == "template") return result;
     // Same compiler resolves defaults and Extra arguments; estimates never have a second resolver.
-    const auto compiled = Compile(Json{{"recipe",r},{"media",media},{"paths",{{"ffmpeg","ffmpeg"},{"videoPipe","video"},{"audioPipe","audio"},{"output","output"},{"project",""}}}});
+    Json base;
+    const auto compiled = CompileResolved(Json{{"recipe",r},{"media",media},{"paths",{{"ffmpeg","ffmpeg"},{"videoPipe","video"},{"audioPipe","audio"},{"output","output"},{"project",""}}}},shape,base);
     if (HasErrors(compiled.at("issues")) || compiled.at("resolved").is_null()) return result;
-    const auto& res = compiled.at("resolved"); const auto base = Resolve(r);
+    const auto& res = compiled.at("resolved");
     const auto videoMode = Str(res,"videoMode");
-    for (const auto& token : compiled.at("display")) if (Str(token,"role") == "extra" && IsOption(Str(token,"text"))) {
+    for (const auto& token : compiled.at("display")) if (Str(token,"role") == "extra" && IsOption(Str(token,"text")) && Bool(token,"isOption",true)) {
         const auto key = OptionKey(Str(token,"text"));
         if (key == "vf" || key == "af" || key == "filter_complex" || key == "t" || key == "rc" ||
             (key == "crf" && videoMode != "crf") || (key == "cq" && videoMode != "cq") || (key == "qp" && videoMode != "cqp")) {

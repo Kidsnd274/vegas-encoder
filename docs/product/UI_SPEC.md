@@ -517,7 +517,7 @@ Lint errors turn Apply off.
 | Probing | Per-installation progress ("Reading encoders… 18 of 25"); results stream in |
 | Ready | Version, build, license class, source, path (copyable), probe time, ffprobe present |
 | Changed on disk | "This FFmpeg changed since it was checked." **Scan again** |
-| Missing | "C:\ffmpeg\bin\ffmpeg.exe isn't there any more." **Remove** / **Locate…** |
+| Missing | "<folder>\ffmpeg.exe isn't there any more." **Remove** / **Locate…** |
 | No ffprobe | "ffprobe.exe must be next to ffmpeg.exe so renders can be checked." |
 | Hardware test failed | Encoder row shows **Failed test on this PC**, the reason, and the raw stderr line on expand |
 | LGPL build | License class "LGPL: no x264/x265"; affected presets are listed |
@@ -835,7 +835,7 @@ performance rule: TECH_ARCHITECTURE §5.6. Built in F6; as built:
 | Progress | A video-wire bar with a round head; percentage (rounded down, so 100% means every frame went to FFmpeg) and "Frame 9,607 of 22,873". With no total: no fill, "Rendering", "Frame 9,607" |
 | Figures | Encoding fps, speed (× realtime), bitrate, size so far, final size ("about"; the engine's estimate, `estimatedFinalBytes`) and time left with the total. A figure the engine hasn't written shows a dash; the app computes none of them |
 | Finishing | "Finishing" then "Checking", with the frame count. The engine doesn't say whether a fast-start index is being written, so the window doesn't either |
-| Done | The result sentence as in History, plus the output check: "Rendered 12:43 in 4:07, 3.09× realtime, 2.93 GB. Output checked: h264 and aac, as set." (from the job record, C6). Without the record, "Rendered in 4:07, 2.06× realtime." **Open folder** (Explorer, file selected) and **Close**. "Closes in 10 s", counting; while the pointer is over the window, "Stays open while the pointer is here", and the count resumes when it leaves |
+| Done | The result sentence as in History, plus the output check: "Rendered 12:43 in 4:07, 3.09× realtime, 2.93 GB. Output checked: h264 and aac, as set." (from the job record, C6). Without the record, "Rendered in 4:07, 2.06× realtime." **Open folder** (Explorer, file selected) and **Close**. "Closes in 10 s", counting; while the pointer is over the window, "Stays open while the pointer is here", and the count resumes when it leaves, with at least 3 s left |
 | Failed | A prominent error-coloured **Why it failed** panel with the engine's causal message (for example, "FFmpeg: No such filter: '…'"). Shows C5 immediately, then the matching C6 message when available; never infers a cause from stderr or replaces it with trailing warnings. Long messages scroll from the beginning without truncation. **Show in History** opens the desktop app on that job; launch errors appear separately from the render cause. **Show log** reveals the full FFmpeg log in Explorer (disabled when unavailable). **Close** dismisses the window. Explicitly says **Stays open until you close it**; a failure cancels any existing auto-close countdown (owner, 2026-10-16) |
 | Cancelled | "Cancelled in VEGAS after 1:12."; closes after 5 s, with the same pointer rule |
 | No news | While starting or encoding, 30 s without a new status: the footer says "No news from the render for 30 s. If VEGAS stopped, close this." It never ends the render or closes the window; a new status clears it. Not shown while checking the output (ffprobe can take minutes) |
@@ -845,3 +845,27 @@ performance rule: TECH_ARCHITECTURE §5.6. Built in F6; as built:
 
 B5's outcome: the owner dropped custom text in VEGAS's render dialog, so this window
 is the only place the encode statistics show.
+
+## 13. 0.2.1 additions (2026-11-08)
+
+- **Length-limiting options (decision D4).** Saving a preset, or applying in the VEGAS popup, when the core reports `L-DURATION-LIMIT`, `V-EXTRA-DURATION`, `L-SHORTEST` or `V-EXTRA-SHORTEST` asks first.
+  - Title: "The output may be shorter than the timeline".
+  - Message: "Choose Save anyway (or Apply anyway) if a shorter output is what you want."
+  - The dialog lists the core's messages, with **Save anyway** or **Apply anyway**, and **Cancel** (primary). Cancel keeps editing.
+  - The warning stays in Checks.
+- **Imports that touch other files or the network (decision D3).** Importing from a share string, a file or History's "Open settings as new preset" asks first when the recipe has a finding in the external-access set.
+  - Title: "“Name” reads other files or uses the network".
+  - Message: "Import it only if you trust where it came from. The warning stays in its checks."
+  - The dialog lists up to four findings, with **Import** and **Cancel** (primary). Cancel imports nothing.
+  - The library row then keeps a warning mark, with the findings in its tooltip.
+- **Library banner.** One unreadable preset file never empties the library. Above the list: "1 preset file couldn’t be read: name: reason", with **Show in folder**.
+- **History banner.** Malformed index lines are skipped: "N lines of the render history couldn’t be read. Rebuild index reads every render record again." with **Rebuild index**.
+- **History detail and progress window.**
+  - A render that stopped before FFmpeg started says "Stopped before encoding started. <reason>". Its command reads "No command ran: the render stopped before FFmpeg started.", and Copy command is disabled.
+  - Under the output path, and after the progress window's done sentence, one sentence each when it applies:
+    - "Render As asked for <name>. That name was taken, so this render used the next free name."
+    - "This render replaced an existing file with the same name."
+    - "FFmpeg finished before the end of the timeline, as the preset asked, so the output is shorter."
+  - An unknown elapsed time (the clock stepped back) reads "after an unknown time".
+- **FFmpeg page.** After Add FFmpeg…, the new card is selected only if no other card was chosen while it was being added. Every card can be selected at any time.
+- **Progress window countdown.** When the pointer leaves, the countdown resumes with at least 3 s left.

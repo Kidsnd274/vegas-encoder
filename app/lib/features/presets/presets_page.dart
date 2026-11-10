@@ -151,6 +151,7 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
       settings: errors.settings,
       ffmpeg: errors.ffmpeg,
       installation: installation?.label ?? 'this FFmpeg',
+      limits: errors.limits,
     );
     if (!mounted) return false;
     if (check == SaveCheck.showSetting) _showField(errors.settings.first.field);
@@ -305,12 +306,21 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
     );
     if (text == null || !mounted) return;
     await _write('import it', () async {
+      final peek = await ref.read(presetTransferProvider).peekShareString(text.trim());
+      if (!mounted || !await _confirmImport(peek)) return;
       final created = await _controller.importShareString(text);
       if (mounted) {
         setState(() => _libraryOpen = false);
         _showToast('Imported “${created.recipe.name}” into Mine');
       }
     });
+  }
+
+  /// Decision D3: a preset that reads other files or uses the network asks
+  /// before it is imported. Cancel imports nothing.
+  Future<bool> _confirmImport(Preset peek) {
+    final recipe = presetRecipe(peek);
+    return confirmImport(context, name: recipe.name, findings: externalAccess(ref.read(veCoreProvider), recipe));
   }
 
   /// The Open dialog supplies the path; ve_services reads and validates it.
@@ -323,6 +333,8 @@ class _PresetsPageState extends ConsumerState<PresetsPage> {
           .pickFile(title: 'Import preset', filterName: 'Vegas Encoder preset', filterPattern: '*.vepreset');
       if (path == null || !mounted) return;
       await _write('import the preset', () async {
+        final peek = await ref.read(presetTransferProvider).peekFile(path);
+        if (!mounted || !await _confirmImport(peek)) return;
         final created = await _controller.importFile(path);
         if (mounted) {
           setState(() => _libraryOpen = false);

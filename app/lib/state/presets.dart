@@ -266,7 +266,7 @@ class PresetsController extends Notifier<PresetsState> implements RecipeEditor {
         updatedAt: template.updatedAt,
         requires: template.requires,
         recipe: template.recipe.copyWith(
-          id: uniqueId(name, _presets.map((p) => p.recipe.id).toSet()),
+          id: await _library.availableId(name),
           name: name,
           notes: '',
           tags: const <String>[],
@@ -290,7 +290,7 @@ class PresetsController extends Notifier<PresetsState> implements RecipeEditor {
     final newName = names.contains(name) ? copyName(name, names) : name;
     final created = await ref
         .read(presetTransferProvider)
-        .fromJob(job, newId: uniqueId(newName, _presets.map((p) => p.recipe.id).toSet()), name: newName);
+        .fromJob(job, newId: await _library.availableId(newName), name: newName);
     await _refresh();
     if (!ref.mounted) return created;
     state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
@@ -307,7 +307,7 @@ class PresetsController extends Notifier<PresetsState> implements RecipeEditor {
   Future<Preset> importShareString(String text) async {
     final created = await ref
         .read(presetTransferProvider)
-        .importShareString(text.trim(), newId: uniqueId('imported preset', _presets.map((p) => p.recipe.id).toSet()));
+        .importShareString(text.trim(), newId: await _library.availableId('imported preset'));
     await _refresh();
     if (!ref.mounted) return created;
     state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
@@ -320,7 +320,7 @@ class PresetsController extends Notifier<PresetsState> implements RecipeEditor {
   Future<Preset> importFile(String selectedPath) async {
     final created = await ref
         .read(presetTransferProvider)
-        .importFrom(selectedPath, newId: uniqueId('imported preset', _presets.map((p) => p.recipe.id).toSet()));
+        .importFrom(selectedPath, newId: await _library.availableId('imported preset'));
     await _refresh();
     if (!ref.mounted) return created;
     state = state.copyWith(selectedId: created.recipe.id, query: '', filter: LibraryFilter.all, favoritesOnly: false);
@@ -330,9 +330,9 @@ class PresetsController extends Notifier<PresetsState> implements RecipeEditor {
   /// Saves [recipe] as a new preset in Mine copied from [source], with the
   /// origin C3 defines for a copy: `builtin/<id>`, or `preset/<id>@<revision>`
   /// (the revision the edit started from).
-  Future<Preset> _create(Preset source, Recipe recipe, {String? name}) {
+  Future<Preset> _create(Preset source, Recipe recipe, {String? name}) async {
     final newName = name ?? copyName(recipe.name, _presets.map((p) => p.recipe.name).toSet());
-    final newId = uniqueId(newName, _presets.map((p) => p.recipe.id).toSet());
+    final newId = await _library.availableId(newName);
     final id = source.recipe.id;
     final revision = state.drafts[id]?.baseRevision ?? source.revision;
     return _library.save(
@@ -406,14 +406,7 @@ String copyName(String name, Set<String> taken) {
   return candidate;
 }
 
-/// A recipe ID from a name (`^[A-Za-z0-9][A-Za-z0-9._-]*$`), unique in [taken].
-String uniqueId(String name, Set<String> taken) {
-  var base = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
-  if (base.isEmpty) base = 'preset';
-  if (base.length > 48) base = base.substring(0, 48).replaceAll(RegExp(r'-+$'), '');
-  var candidate = base;
-  for (var n = 2; taken.contains(candidate); n++) {
-    candidate = '$base-$n';
-  }
-  return candidate;
-}
+/// A recipe ID from a name (`^[A-Za-z0-9][A-Za-z0-9._-]*$`), unique in [taken]
+/// case-insensitively. Saving uses [PresetLibrary.availableId], which also
+/// skips IDs a deleted preset's history still holds.
+String uniqueId(String name, Set<String> taken) => freePresetId(name, taken);

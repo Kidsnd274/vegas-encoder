@@ -1,13 +1,27 @@
 # Vegas Encoder status
 
-Updated: 2026-11-06 (Asia/Singapore). The owner confirms the optional uninstall-data
+Updated: 2026-11-08 (Asia/Singapore). The owner confirms the optional uninstall-data
 prompt works. The development trial was removed on 2026-10-18 for clean installer
 testing. The separate approved VEGAS 23 trial below was inspected on 2026-11-05;
 the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
-**FFmpeg help parsing across versions (branch `ffmpeg-parser-compat`).** The
+**0.2.1 fix pass (branch `fix/0.2.1`, version 0.2.1+1, 2026-11-08).** Every item
+of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) except the owner's real-VEGAS checklist (L6)
+is implemented. Fixes and tests were committed one item at a time. No installer was
+packaged and nothing was installed. All results below used fakes, the fake host
+(fiohost) or real FFmpeg on this PC, never real VEGAS.
+
+**Merged into `master` (2026-11-11)** with the FFmpeg parser work below, at
+parser revision 5. After the merge, from a checkout path containing a space:
+B3 services 4,515, repositories 189 and real-FFmpeg runtime 67 checks; app
+analyze clean and 728 tests with light and dark goldens; `Build-Release.ps1
+-Action Build` (app `0.2.1+1`, DLL `0.2.1.1`); render matrix `-Quick` on
+N-128435, 36 passed, 0 failed, 12 skipped (NVENC). The other suites in the table
+were not re-run after the merge.
+
+**FFmpeg help parsing across versions (branch `ffmpeg-parser-compat`, merged with 0.2.1).** The
 service parser now accepts the padded list types FFmpeg 7.0+ prints
 (`[<int>     ]`), which it previously dropped, and `-encoders`/`-muxers` rows
 without a description (`--enable-small` builds), which previously hid the
@@ -35,50 +49,58 @@ than 4.4 was tested. With Dart 3.13.7 and MSVC 19.51 (VS 2026 Community),
 `scripts/etc/Test-B3Services.ps1` passed: analysis clean, 4,514 checks (parser
 fixtures, fake FFmpeg processes, real Windows process/timeout/pool and DXGI
 helper; no VEGAS). It ran from a `subst` drive because the checkout path
-contains a space (see docs/BUILDING.md).
+contains a space; `native_toolchain_c` 0.19.3 from 0.2.1 removes that need.
 The test now also expects the constants the B1 catalog misattributed to
 `discard_damaged_percentage` on `side_data_prefer_packet`.
 
-**AV1 (CPU) live pipe stall.** With installed exporter `0.2.0+2` and FFmpeg
-`N-128435-g7798de15f86-gdb8537d8cc7+2` (SVT-AV1 4.3.0), owner logs from
-VEGAS 2026.0.3.189 and Sony VEGAS 13.0.0.453 show FFmpeg opening both streams
-for 1080p at 30000/1001, then stalling. Both hosts submitted 145 video frames
-before the 10-second pipe deadline and published no file. FFmpeg reported
-three output frames on 2026 (P010) and one on 13 (BGR0).
+**AV1 (CPU) live pipe stall: root cause and fix.** With 0.2.0+2, AV1 (CPU) stalled
+after a few output frames on VEGAS 2026.0.3.189 (P010) and Sony 13.0.0.453 (BGR0).
+The cause was in the transport, not FFmpeg:
+- SVT-AV1 reads hundreds of video frames ahead before it writes;
+- the fixed-size audio queue filled first;
+- the render thread then blocked on audio, while FFmpeg waited for more video.
 
-A synthetic replay through the production Windows pipe transport reproduced
-the failure with both pixel formats. The October gyan `615b07170e` and BtbN
-`24e860f6d3` builds and the 2024 snapshot `N-115847-gb7a971f4bb-g7c95c7de4a+2`
-also stalled on P010. Gyan 5.1.2 and 6.0 completed the same P010 replay.
-On the November build, the other 11 built-in presets
-completed 300-frame P010 renders with full video and audio decode, including
-all three NVENC presets. Adding `-svtav1-params lp=3` under Video Extra
-arguments completed and fully decoded 900 frames with audio on both input
-formats. The other preset results still need real-host confirmation. The
-audit isolated the stall to the tested live audio/video
-interaction with SVT-AV1 at its default parallelism; it did not isolate a
-single upstream change.
+The 0.2.0+3 starter avoided this with `-svtav1-params lp=3`. 0.2.1 sizes the audio
+queue by time (A1), so a 300-frame-lookahead fake child no longer deadlocks.
+It also fails a render only when FFmpeg stops making progress (A3). AV1 (CPU) is
+therefore back to revision 5, with no extra arguments. On the fake host with real
+FFmpeg (N-128435 and BtbN n8.1.3), revision 5 rendered and fully decoded 900 frames
+with audio at 1080p 29.97 and 2160p 25. BGR0 input was not exercised this way,
+because the fake host serves the built-ins' P010.
 
-The AV1 (CPU) built-in starter now carries the mitigation in its editable
-Video Extra arguments field at revision 4, shared by the app and native
-templates. Saved snapshots keep their prior settings until explicitly edited
-or updated from the library. The revised starter compiled, completed and fully
-decoded 300 frames with P010 input and Opus on the November snapshot, both
-October builds and gyan 5.1.2 and 6.0. The older SVT-AV1 libraries treat
-`lp=3` as a logical processor setting. The isolated native template suite
-and all 11 built-in preset widget/golden tests passed. The Video Extra
-arguments field and command preview were reviewed in both themes. This
-change is packaged in test candidate `0.2.0+3`, built from the current
-working tree. The 39-file bundle and Setup checksums verified, and all 99
-packaging and detection checks passed against local files and fake targets.
-The owner then confirmed that the AV1 (CPU) render works. The installed
-2026 and Sony 13 DLL hashes match the test candidate. With the November
-FFmpeg snapshot and `lp=3`, VEGAS 2026.0.3.189 (P010) and Sony VEGAS
-13.0.0.453 (BGR0) each published a 300-frame 1080p AV1/Opus WebM with
-480,480 audio sample frames, FFmpeg exit 0 and successful sampled FFprobe
-verification. The outputs were unavailable for a separate full decode.
-This confirms the tested render path on those two hosts. Broader installer
-lifecycle and render qualification remain open.
+**Other 0.2.1 behaviour.**
+- Renders accept any project rate and channel count. "Source" audio that the encoder
+  or container can't take is resampled to 48 kHz, with a note (decision D11).
+- Renders that stop before FFmpeg starts record why.
+- FFmpeg finishing early (for example `-t`) succeeds.
+- Re-rendering replaces a file VEGAS confirmed; older hosts write `name (2).ext` (D1).
+- Commands add `-nostats`. New warnings cover options that shorten a render, and
+  arguments that read files or use the network. Saving or applying the first asks;
+  importing the second asks (D3, D4).
+- One bad preset file or History line no longer empties the list; banners say so.
+- Deleting a preset frees its name. Stars no longer bump a revision.
+- The app idles and types more cheaply: an Advanced keystroke takes 1.5 ms median.
+
+**Results.**
+
+| Suite | Result |
+| --- | --- |
+| Core, normal and ASan | 3,248 checks; FFI 246 checks ×2 |
+| Engine, normal and ASan | 46 cases, about 30,100 checks |
+| Native page, ASan | 523 / 99 / 486 checks |
+| fiohost (fixed-profile DLL) | pass |
+| Legacy containers, older hosts 22/21/13 | pass |
+| Dart packages | 177; 89 + library watch 99 + inspection 26 |
+| B3 services / repositories / runtime | 4,470 / 189 / 67 |
+| App | analyze clean; 728 tests, light and dark goldens |
+| Setup / release inputs | pass |
+| Path checker (all files) | 0 problem lines |
+| Render matrix `-Quick`, N-128435 / BtbN n8.1.3 / gyan 9.0.2 essentials | 36 / 36 / 32 passed, 0 failed; skipped: NVENC here, and AV1 on gyan essentials (no `libsvtav1`) |
+| Render matrix `-Full`, 60-frame rows, N-128435 | 360 passed, 0 failed, 120 skipped (NVENC): modern and legacy-name profiles, 4 shapes, 44.1/48 kHz stereo, mono, 5.1 and the no-audio refusal |
+| AV1 (CPU) revision 5, 900 frames, 1080p 29.97 and 2160p 25 | passed on N-128435 and BtbN n8.1.3 |
+
+The fake-host results don't qualify real VEGAS. The owner's checklist is step L6
+of the plan.
 
 Two optional Vulkan encoders also fail the generic NV12 hardware probe on
 this PC. A one-frame CLI test succeeded with `yuv422p10le` for
@@ -97,7 +119,7 @@ passed 34 checks each in modern and legacy naming modes, service fixtures passed
 later real-host logs above confirm FFmpeg launch with build 2 on 2026 and 13.
 
 **0.2.0 FFmpeg probe and VEGAS dashboard.** The FFmpeg capability parser accepts
-two- and three-column filter lists. The supplied `C:\ffmpeg\bin\ffmpeg.exe`
+two- and three-column filter lists. The supplied FFmpeg (`VEGAS_ENCODER_FFMPEG`)
 (`N-128435-g7798de15f86-gdb8537d8cc7+2`) and matching FFprobe passed the full
 probe with `scale`, `pad` and `setsar`. The isolated runtime suite passed 76
 checks, including 14 synthetic preset encodes with readback and full decode.
@@ -238,7 +260,7 @@ the new C7 `uiState.setupDismissed` (app-only; the DLL ignores it); the FFmpeg
 screen's Run setup… reopens the wizard. See [UI_SPEC §5a](product/UI_SPEC.md#5a-first-run-setup).
 Release version is now **0.1.8** (app `0.1.8+1`, file version `0.1.8.1`) through
 `version.json` and the generated outputs. This was built on branch `setup-wizard`
-in the owner-requested worktree `L:\repos\vegas-encoder-setup-wizard`, from
+in the owner-requested sibling `vegas-encoder-setup-wizard` worktree, from
 `707301a`, committed as `3758d5c` and merged into master at owner request on
 2026-11-04. Integration retains core `0.3.0-filters`, schema maximum 2 and both
 `AppUiState.videoFiltersExpanded` and `setupDismissed`.
@@ -423,7 +445,7 @@ Encoder `.sft2` test templates, normal roaming settings, local cache/sessions
 and legacy diagnostic logs outside their active paths. Exact installed files,
 ownership manifest and discovery config were backed up and hash-verified first.
 Backup and restoration instructions:
-`C:\Users\Samuel Tee\AppData\Local\VegasEncoderInstallerTestBackup\20261018-clean-start\RESTORE.txt`;
+`%LOCALAPPDATA%\VegasEncoderInstallerTestBackup\20261018-clean-start\RESTORE.txt`;
 the adjacent `reset-manifest.json` records the original paths. All six active
 installation/data/template paths are confirmed absent; the 12 unrelated VEGAS
 templates/favorites files are hash-verified unchanged. No setup app/uninstaller
@@ -712,7 +734,7 @@ the isolated profile disables the progress window, only VEGAS's generic error
 was visible; this does not qualify live failure presentation for this trial.
 The owner then changed audio to AAC and reports success. C6 job
 `C24475AA-4C26-420B-9D5C-C4E1C5D81795` records S_OK, successful publication and
-passed sampled verification for `C:\Users\Samuel Tee\Desktop\test_video\test_mp4.mp4`.
+passed sampled verification for `%USERPROFILE%\Desktop\test_video\test_mp4.mp4`.
 Agent readback counts **182 video frames, 1920×1080, 30000/1001 fps**, H.264
 10-bit 4:2:0 and 48 kHz stereo AAC; full video/audio decode passes without errors.
 This used the modified default recipe with **faststart:true**. The output has
@@ -722,13 +744,13 @@ prior snapshot saved in the candidate rollback folder. VEGAS error-text integrat
 is left separate at the owner's direction. Performance comparison and extra
 failure-recovery trials remain deferred. The owner also confirms MOV rendered
 correctly. C6 job `0DA59B34-CD66-4153-A21B-08267D4CA81E` published
-`C:\Users\Samuel Tee\Desktop\test_video\test_mov.mov`; agent full video/audio
+`%USERPROFILE%\Desktop\test_video\test_mov.mov`; agent full video/audio
 decode passes. Readback is **ProRes LT**, 10-bit 4:2:2, 1920×1080, 30000/1001 fps,
 182 frames, with 48 kHz stereo 24-bit PCM (6.073 seconds). This was the owner's
 modified-default recipe, not the prepared HQ preset; other ProRes profiles are
 not thereby qualified. The owner also confirms WebM completed. C6 job
 `67F333E0-FE7A-4024-A9EA-BCB27C14E98E` succeeded and published
-`C:\Users\Samuel Tee\Desktop\test_video\test_vp9.webm`; FFmpeg exited 0,
+`%USERPROFILE%\Desktop\test_video\test_vp9.webm`; FFmpeg exited 0,
 sampled verification passed and C5 ended `done` at 182/182 frames. Agent full
 video/audio decode passes. Readback: **VP9 Profile 2, 10-bit 4:2:0**, 1920×1080,
 30000/1001 fps, 182 frames, 48 kHz stereo Opus, 6.080 seconds, 726,231 bytes.
@@ -922,14 +944,14 @@ package and test source changes already match the unified original checkout;
 its patch also matches the earlier consolidation backup exactly. Unified commit
 `bec50ef` records the workflow/documentation/Advanced-golden version; merge
 `01c4756` joins the platform history with an identical consolidated tree. Development is
-on local `master` in `L:\repos\vegas-encoder`; the retained platform branch is
+on local `master` in the original checkout; the retained platform branch is
 advanced to the same merged result so both folders are clean. No remote push,
 installed replacement, worktree deletion or new qualification. Existing 558 app
 tests/native build/3,055 core checks cover the unchanged implementation; only
 workflow/commit-status docs and the local scratch ignore rule changed afterward.
 
 **Unified development (2026-10-16):** owner consolidated app and platform under
-one agent in the original `L:\repos\vegas-encoder` checkout, on local branch
+one agent in the original checkout, on local branch
 `codex/unified-integration`. Master `86aefaf` already included committed app
 `493f146` and platform `7a8493a`; the clean app worktree had no missing edits.
 The platform's 32 modified files and two new goldens were transferred and
@@ -1111,7 +1133,7 @@ qualification follows from this focus feedback.
 
 The first cancellation attempt was blocked before encoding by missing default
 FFmpeg selection (zero frames/samples, no published output). The trial profile
-already selects the existing `C:\ffmpeg\bin\ffmpeg.exe`; the normal user profile
+already selects the existing FFmpeg; the normal user profile
 has no installations/default. This is consistent with a non-trial VEGAS launch.
 The subsequent trial retry above succeeded. Ordinary launches need their own
 desktop-app default selection; the two profiles remain separate.
@@ -1448,7 +1470,7 @@ gyan FFmpeg 5.1.2. This is offline/fake-host validation, not a new real VEGAS te
 the owner authorized committing/merging B3/B4 from ws/platform. Next platform work is B5
 status-line analysis and gated B6 adapter/monitor integration with the owner.
 App F7 wires the real providers and measures its budgets. Approved B1 downloads stay
-in this worktree's ignored build/; existing `C:\ffmpeg` gyan 5.1.2 is untouched.
+in this worktree's ignored build/; existing gyan 5.1.2 FFmpeg is untouched.
 No installation or PATH change. Workstream split:
 [docs/product/WORKSTREAMS.md](product/WORKSTREAMS.md).
 
@@ -1488,7 +1510,7 @@ The fake-host on/off/save/reload/repeat/cancel/failure suite also passes again a
 `build/test-results/configuration-proof-visibility-fix/`.
 
 The user's real `diagnostic_on.mkv` / `diagnostic_off.mkv` renders in
-`C:/Users/Samuel Tee/Desktop/test_video/` now verify that the setting reaches
+`%USERPROFILE%/Desktop/test_video/` now verify that the setting reaches
 Render on the corrected installed build and VEGAS 2026.0.3.189 (same PID 6692).
 Only the on sidecar contains `configuration_proof: {extra_report: true,
 proof_version: 1}`; the off sidecar omits it. Both report S_OK, encoder exit zero,
@@ -1640,7 +1662,7 @@ in the investigation repository.
 
 ## Next task
 
-Continue in `L:\repos\vegas-encoder` on `master` with one agent
+Continue in the original checkout on `master` with one agent
 owning both app and platform. Follow the single ordered queue in
 [NEXT_AGENT.md](NEXT_AGENT.md). Preset import and the 16 shared starters are
 implemented; rebuild matched installer inputs after source changes settle,

@@ -159,6 +159,12 @@ void Run(const fs::path& root, const Json& recipe, const std::wstring& mode) {
   options.validateRecipe = [](const Json& candidate) {
     if (candidate.at("container").at("format") != "mkv") throw std::runtime_error("This candidate requires MKV.");
   };
+  int foregroundReturns = 0, ownerReturns = 0;
+  if (mode == L"unsupported") {
+    // The editor finished while this process held the foreground.
+    options.foregroundProcess = [] { return GetCurrentProcessId(); };
+    options.ownerReturned = [&](bool returnForeground) { ++ownerReturns; if (returnForeground) ++foregroundReturns; };
+  }
   IPropertyPage* page = nullptr;
   Check(CreateNativeRecipePage(nullptr, options, &page) == E_POINTER &&
         CreateNativeRecipePage(&allocator, options, nullptr) == E_POINTER, "page factory rejects missing allocator/output");
@@ -264,6 +270,8 @@ void Run(const fs::path& root, const Json& recipe, const std::wstring& mode) {
       Check(page->IsPageDirty() == S_FALSE && holder.saved.b == original, "cancel/error/unsupported recipe preserves clean draft and store");
       if (mode != L"hang") Check(Summary(dialog) == originalSummary, "cancel/crash/rejection/launch failure preserves prior summary");
       if (mode == L"unsupported") Check(Status(dialog).find(L"requires MKV") != std::wstring::npos, "native candidate constraint explains rejected editor result");
+      if (mode == L"unsupported") Check(ownerReturns == 1 && foregroundReturns == 1 && Status(dialog).find(L"Editor changes were rejected") != std::wstring::npos,
+                                        "rejected Apply from a foreground editor returns VEGAS to the front and says the changes were rejected");
     }
   }
   Check(page->SetObjects(0, nullptr) == S_OK && page->SetPageSite(nullptr) == S_OK,

@@ -1,6 +1,6 @@
 #include "core.h"
+#include <algorithm>
 #include <cstring>
-#include <regex>
 
 namespace ve {
 namespace {
@@ -32,7 +32,7 @@ Json PayloadFailure(const std::string& code, const std::string& message) {
 bool HandleValid(const Json& value) {
     if (!value.is_string()) return false;
     const auto handle = value.get<std::string>();
-    if (handle.empty() || handle.size() > 20 || !std::regex_match(handle,std::regex("[0-9]+"))) return false;
+    if (handle.empty() || handle.size() > 20 || !std::all_of(handle.begin(),handle.end(),[](char c) { return c >= '0' && c <= '9'; })) return false;
     const auto first = handle.find_first_not_of('0');
     if (first == std::string::npos) return false;
     const auto trimmed = handle.substr(first);

@@ -322,7 +322,11 @@ class FakeCapabilityCache implements CapabilityCache {
 }
 
 class FakePresetLibrary
-    implements PresetLibrary, PresetPreferences, PresetLocations {
+    implements PresetLibrary, PresetPreferences, PresetLocations, LibraryHealth {
+  /// Problems [problems] reports; tests set these (contract 3.3).
+  List<LibraryProblem> problemsForTest = const [];
+  @override
+  Future<List<LibraryProblem>> problems() async => problemsForTest;
   FakePresetLibrary({List<Preset>? presets, String Function()? now})
     : _store = _Store(
         List.unmodifiable(
@@ -371,6 +375,13 @@ class FakePresetLibrary
         'REVISION-CONFLICT',
         'Updated elsewhere: reload or save as new.',
       );
+    // Like the file library: a deleted preset's history keeps its ID (case-insensitive).
+    if (existing == null &&
+        _history.keys.any((k) => k.toLowerCase() == preset.recipe.id.toLowerCase()))
+      throw const ServiceException(
+        'REVISION-CONFLICT',
+        'This ID has retained history. Save with a new ID.',
+      );
     if (existing != null) {
       final history = _history.putIfAbsent(preset.recipe.id, () => []);
       history.add(existing);
@@ -404,8 +415,16 @@ class FakePresetLibrary
         'REVISION-CONFLICT',
         'Updated elsewhere: reload first.',
       );
+    // Deletion keeps the last version as history, as the file library does.
+    _history.putIfAbsent(id, () => []).add(existing);
     _store.set(List.unmodifiable(_store.value.where((v) => v.recipe.id != id)));
   }
+
+  @override
+  Future<String> availableId(String name) async => freePresetId(name, [
+    for (final preset in _store.value) preset.recipe.id,
+    ..._history.keys,
+  ]);
 
   @override
   Future<Preset> importPreset(String jsonText, {required String newId}) async {
@@ -446,15 +465,7 @@ class FakePresetLibrary
     final current = _store.value.where((p) => p.recipe.id == id).firstOrNull;
     if (current == null)
       throw const ServiceException('NOT-FOUND', 'Preset not found.');
-    if (!current.builtin) {
-      return save(
-        current.copyWith(
-          favorite: favorite ?? current.favorite,
-          pinned: pinned ?? current.pinned,
-        ),
-        expectedRevision: current.revision,
-      );
-    }
+    // Like the file library's overlay: no revision bump and no history (contract 3.3).
     final saved = current.copyWith(
       favorite: favorite ?? current.favorite,
       pinned: pinned ?? current.pinned,
@@ -506,7 +517,18 @@ class FakeMachineSettingsRepository implements MachineSettingsRepository {
   Future<void> dispose() => _store.dispose();
 }
 
-class FakeJobRepository implements JobRepository, JobLogs {
+class FakeJobRepository implements JobRepository, JobLogs, JobIndexHealth {
+  /// Malformed index lines to report; tests set this (contract 3.3).
+  @override
+  int skippedIndexLines = 0;
+  /// How often [rebuildIndex] ran; rebuilding clears [skippedIndexLines].
+  int rebuilds = 0;
+  @override
+  Future<void> rebuildIndex() async {
+    rebuilds++;
+    skippedIndexLines = 0;
+  }
+
   FakeJobRepository({
     List<JobRecord>? records,
     Map<String, String> logs = const {},
@@ -532,7 +554,7 @@ class FakeJobRepository implements JobRepository, JobLogs {
         outputPath: r.outputPath,
         encoderSummary: r.data['encoderSummary'] as String?,
         project: r.project,
-        durationSec: r.durationSec ?? r.media.durationSec,
+        durationSec: r.durationSec ?? r.media?.durationSec,
         elapsedSec: r.elapsedSec,
         realtime: r.realtime,
         sizeBytes: r.sizeBytes,

@@ -1,9 +1,11 @@
 #include "recipe_job.h"
 #include "../support/diagnostics.h"
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cctype>
 #include <filesystem>
+#include <map>
 
 namespace vegas_encoder {
 namespace {
@@ -23,6 +25,22 @@ bool AbsoluteExe(const std::string& text) {
 bool SameHash(const std::string& recorded, const std::string& actual) {
   return recorded.size() == 64 && actual.size() == 64 && _stricmp(recorded.c_str(),actual.c_str()) == 0;
 }
+// FFmpeg's periodic statistics ("frame= ... fps= ...", "size= ... time= ...") end in \r, not \n.
+bool StatsLine(const std::string& line) {
+  const auto first = line.find_first_not_of(" \t");
+  if (first == std::string::npos) return false;
+  return line.compare(first,6,"frame=") == 0 || (line.compare(first,5,"size=") == 0 && line.find("time=") != std::string::npos);
+}
+std::string DropStats(const std::string& text) {
+  std::string kept;
+  for (size_t begin = 0; begin < text.size();) {
+    const auto end = text.find_first_of("\r\n",begin);
+    const auto line = text.substr(begin,end == std::string::npos ? std::string::npos : end - begin);
+    begin = end == std::string::npos ? text.size() : end + 1;
+    if (!line.empty() && !StatsLine(line)) kept += line + "\n";
+  }
+  return kept;
+}
 std::string Tail(const std::wstring& path) {
   Handle file; file.h = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                   nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -33,7 +51,7 @@ std::string Tail(const std::wstring& path) {
   if (!ReadFile(file.h,bytes.data(),static_cast<DWORD>(bytes.size()),&got,nullptr)) return {};
   bytes.resize(got);
   // Windows Widen/Utf8 replaces invalid/truncated UTF-8; persisted JSON stays valid.
-  return Utf8(Widen(bytes).c_str());
+  return DropStats(Utf8(Widen(bytes).c_str()));
 }
 // Bounded shell-free owned FFprobe. Caller polling happens on this thread only.
 // stderr shares stdout: any error diagnostic makes the JSON readback fail closed.
@@ -89,6 +107,43 @@ bool ProbeChild(const std::wstring& exe, const std::vector<std::wstring>& args, 
   if (code != 0) { if (failure.empty()) failure = "FFprobe returned a failing exit code"; return false; }
   return ok;
 }
+// Per-process identity hash cache. A file whose volume, index, size or write time
+// changed is hashed again, so a replaced FFmpeg is still refused.
+struct FileKey {
+  DWORD volume = 0; uint64_t index = 0, size = 0, written = 0;
+  bool operator==(const FileKey& other) const { return volume == other.volume && index == other.index && size == other.size && written == other.written; }
+};
+bool ReadFileKey(const std::wstring& path, FileKey& key) {
+  Handle file; file.h = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                  nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  BY_HANDLE_FILE_INFORMATION info{};
+  if (file.h == INVALID_HANDLE_VALUE || !GetFileInformationByHandle(file.h,&info)) return false;
+  key.volume = info.dwVolumeSerialNumber;
+  key.index = (uint64_t(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
+  key.size = (uint64_t(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
+  key.written = (uint64_t(info.ftLastWriteTime.dwHighDateTime) << 32) | info.ftLastWriteTime.dwLowDateTime;
+  return true;
+}
+std::atomic<size_t> identityHashes{0};
+std::mutex identityMutex;
+std::map<std::wstring,std::pair<FileKey,std::string>> identityCache;
+std::string IdentityHash(const std::wstring& path, const std::function<bool()>& poll) {
+  FileKey before;
+  const bool keyed = ReadFileKey(path,before);
+  if (keyed) {
+    std::lock_guard<std::mutex> lock(identityMutex);
+    const auto found = identityCache.find(path);
+    if (found != identityCache.end() && found->second.first == before) return found->second.second;
+  }
+  ++identityHashes;
+  auto hash = Sha256File(path,poll);
+  FileKey after;
+  if (keyed && hash.size() == 64 && ReadFileKey(path,after) && after == before) {
+    std::lock_guard<std::mutex> lock(identityMutex);
+    identityCache[path] = {before,hash};
+  }
+  return hash;
+}
 ve::Json Verification(const std::string& state, const std::string& message) {
   return {{"state",state},{"message",message},{"expectedCodecs",ve::Json::array()},{"actualCodecs",ve::Json::array()},{"ffprobeVersion",nullptr}};
 }
@@ -98,11 +153,11 @@ std::string EncoderFailureMessage(const std::string& fallback, const std::string
   // FFmpeg may finish with secondary queue warnings and "Conversion failed!".
   // Prefer an earlier concrete diagnostic; retain the full stderr in C6/logs.
   for (size_t begin = 0; begin < stderrTail.size();) {
-    const auto end = stderrTail.find('\n', begin);
+    const auto end = stderrTail.find_first_of("\r\n", begin);
     auto line = stderrTail.substr(begin, end == std::string::npos ? end : end - begin);
     begin = end == std::string::npos ? stderrTail.size() : end + 1;
     const auto first = line.find_first_not_of(" \t\r");
-    if (first == std::string::npos) continue;
+    if (first == std::string::npos || StatsLine(line)) continue;
     line.erase(0, first); line.erase(line.find_last_not_of(" \t\r") + 1);
     if (line.front() == '[') {
       const auto prefix = line.find("] ");
@@ -212,6 +267,25 @@ ve::Json LiveVideoFacts(const ve::Json& compiled) {
     facts["pixelFormatConversionReducesPrecision"] = video.at("inputBits").get<int64_t>() > video.at("outputBits").get<int64_t>();
   return facts;
 }
+size_t IdentityHashCountForTests() { return identityHashes; }
+void WritePreflightRecord(const PreflightFailure& f) {
+  const auto id = NewJobId(), now = JobUtcNow(), output = Utf8(f.output.c_str());
+  const auto status = f.cancelled ? "cancelled" : "failed";
+  ve::Json live{{"live",1},{"jobId",id},{"hostHwnd",f.hostHwnd},{"sequence",1},{"updatedAt",now},{"state",status},
+    {"framesDone",0},{"framesTotal",nullptr},{"encodeFps",nullptr},{"speed",nullptr},{"bitrateKbps",nullptr},
+    {"bytesWritten",0},{"elapsedSec",0},{"etaSec",nullptr},{"estimatedFinalBytes",nullptr},{"outputPath",output},
+    {"templateName",f.templateName},{"encoderSummary",""},{"outputBitDepth",nullptr},{"pixelFormatConversionReducesPrecision",nullptr},
+    {"message",f.message},{"ffmpegExitCode",nullptr}};
+  ve::Json record{{"job",1},{"id",id},{"startedAt",now},{"endedAt",now},{"project",f.project},{"templateName",f.templateName},
+    {"outputPath",output},{"status",status},{"stage","preflight"},{"recipe",f.recipe},{"origin",f.origin},
+    {"recipeSha256",f.recipe.is_object() ? ve::Json(RecipeHash(f.recipe)) : ve::Json(nullptr)},{"media",f.media},{"ffmpeg",nullptr},
+    {"argv",ve::Json::array()},{"elapsedSec",0},{"sizeBytes",0},{"avgFps",nullptr},{"ffmpegExitCode",nullptr},{"hresult",Hr(f.hresult)},
+    {"message",f.message},{"stderrTail",""},{"verification",Verification("skipped","The render stopped before encoding started.")},
+    {"timings",ve::Json::object()},{"published",false},{"retainedPartialPath",nullptr},{"commandLine",nullptr},{"encoderSummary",""},
+    {"logFile",nullptr},{"durationSec",nullptr},{"realtime",nullptr},{"errorTokenIndices",ve::Json::array()}};
+  // The writer thread finishes the queued live file and record after the store is released.
+  JobStore::Create(f.jobsRoot,id,f.monitorApplication)->Complete(live,record);
+}
 RecipeJob::RecipeJob() : parser_([this](const ve::Json& metrics) { Progress(metrics); }) {}
 RecipeJob::~RecipeJob() { if (startedOnce_ && !terminal_) Stop(E_ABORT,"Job abandoned before completion."); }
 bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::Json& installation,
@@ -227,7 +301,7 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
   if (ve::HasErrors(ve::Structural(recipe))) { error_ = E_INVALIDARG; message_ = "Malformed recipe snapshot."; return false; }
   try { ve::CheckMedia(media); }
   catch (const std::exception& e) { error_ = E_INVALIDARG; message_ = e.what(); return false; }
-  startedOnce_ = true; id_ = NewJobId(); startedAt_ = JobUtcNow(); started_ = phaseStarted_ = GetTickCount64();
+  startedOnce_ = true; id_ = NewJobId(); startedAt_ = options.clock ? options.clock() : JobUtcNow(); started_ = phaseStarted_ = GetTickCount64();
   verification_ = Verification("skipped","Encoder stopped before output verification.");
   live_ = {{"live",1},{"jobId",id_},{"hostHwnd",options.hostHwnd},{"sequence",0},{"updatedAt",startedAt_},{"state","starting"},
     {"framesDone",0},{"framesTotal",media.at("video").value("frames",ve::Json(nullptr))},{"encodeFps",nullptr},{"speed",nullptr},{"bitrateKbps",nullptr},
@@ -248,7 +322,7 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
     // Exact selected executable/shared DLL identities are retained. Refuse changed
     // bytes instead of silently running another installation or probing on Render.
     const auto& identity = installation.at("identity");
-    auto hash = [&](const std::wstring& file) { return Sha256File(file,[&] { return Check(poll); }); };
+    auto hash = [&](const std::wstring& file) { return IdentityHash(file,[&] { return Check(poll); }); };
     if (!SameHash(ve::Str(identity,"sha256"),hash(Widen(ve::Str(installation,"path"))))) throw std::runtime_error("Selected FFmpeg identity changed.");
     if (identity.contains("libraries")) for (auto it = identity.at("libraries").begin(); it != identity.at("libraries").end(); ++it) {
       if (it.key().find_first_of("/\\:") != std::string::npos || it.key() == "." || it.key() == "..") throw std::runtime_error("Invalid shared library identity path.");
@@ -262,7 +336,10 @@ bool RecipeJob::Start(const ve::Json& recipe, const ve::Json& media, const ve::J
     const auto requiredFilters = ve::Normalize({{"recipe",recipe}}).value("requiredFilters",ve::Json(nullptr));
     if (requiredFilters.is_array() && !requiredFilters.empty() && !capabilities.is_object())
       throw std::runtime_error("Filter support for the selected FFmpeg is not verified. Refresh it on the FFmpeg page before rendering this preset.");
-    const bool ok = encoder_.StartCompiled(Widen(ve::Str(installation,"path")), options.output,log,options.pipeTimeoutMs,options.finishTimeoutMs,
+    encoder_.SetReplaceExisting(options.replaceExisting);
+    if (media.contains("audio") && media.at("audio").is_object())
+      encoder_.SetAudioBytesPerSecond(uint64_t(ve::Num(media.at("audio"),"rate")) * uint64_t(ve::Num(media.at("audio"),"channels")) * 4u);
+    const bool ok = encoder_.StartCompiled(Widen(ve::Str(installation,"path")), options.output,log,options.stallTimeoutMs,options.connectTimeoutMs,
       [&](const std::wstring& video, const std::wstring& audio, const std::wstring& temp) {
         ve::Json paths{{"ffmpeg",installation.at("path")},{"videoPipe",Utf8(video.c_str())},{"audioPipe",Utf8(audio.c_str())},
           {"output",Utf8(temp.c_str())},{"project",options.project},{"liveInputs",true},{"overwriteOutput",true}};
@@ -359,7 +436,8 @@ bool RecipeJob::Finish(const Poll& poll) {
   }
   if (!Check(poll)) { Stop(error_,message_,cancelled_); return false; }
   if (!encoder_.Publish()) { Stop(encoder_.Error(),encoder_.Reason()); return false; }
-  message_ = "Render completed."; Complete(true); return true;
+  message_ = encoder_.EndedEarly() ? "FFmpeg finished early because of an option in the command." : "Render completed.";
+  Complete(true); return true;
 }
 void RecipeJob::Stop(HRESULT hresult, const std::string& message, bool cancelled) {
   if (terminal_ || !startedOnce_) return;
@@ -370,7 +448,17 @@ void RecipeJob::Complete(bool success) {
   if (terminal_) return; terminal_ = true;
   const auto stats = encoder_.Stats(); const auto state = success ? "done" : cancelled_ ? "cancelled" : "failed";
   const auto stderrTail = Tail(stats.stderrPath);
-  if (!success && !cancelled_ && encoderFailure_) message_ = EncoderFailureMessage(message_, stderrTail);
+  if (!success && !cancelled_ && encoderFailure_) {
+    message_ = EncoderFailureMessage(message_, stderrTail);
+    const auto encoder = compiled_.contains("summary") ? ve::Str(compiled_.at("summary"),"videoEncoderId") : std::string();
+    if (!encoder.empty() && options_.failedEncoders.is_object() && options_.failedEncoders.contains(encoder)) {
+      const auto& known = options_.failedEncoders.at(encoder);
+      const auto when = ve::Str(known,"testedAt"), reason = ve::Str(known,"reason");
+      message_ += " " + encoder + " also failed its last test on this PC" + (when.size() >= 10 ? " (" + when.substr(0,10) + ")" : "") +
+        (reason.empty() ? "" : ": " + reason) + (reason.empty() || reason.back() == '.' ? " " : ". ") +
+        "Test it again on the FFmpeg page or choose another encoder.";
+    }
+  }
   Phase(state,message_);
   const double elapsed = (GetTickCount64()-started_)/1000.0;
   ve::Json indices = ve::ErrorTokenIndices(compiled_,stderrTail);
@@ -386,7 +474,9 @@ void RecipeJob::Complete(bool success) {
   const auto retained = !success && GetFileAttributesW(stats.tempPath.c_str()) != INVALID_FILE_ATTRIBUTES ? ve::Json(Utf8(stats.tempPath.c_str())) : ve::Json(nullptr);
   std::lock_guard<std::mutex> lock(liveMutex_);
   live_["ffmpegExitCode"] = stats.pid && stats.exitCode != STILL_ACTIVE ? ve::Json(static_cast<int32_t>(stats.exitCode)) : ve::Json(nullptr);
-  record_ = {{"job",1},{"id",id_},{"startedAt",startedAt_},{"endedAt",JobUtcNow()},{"project",options_.project},
+  auto endedAt = options_.clock ? options_.clock() : JobUtcNow();
+  if (endedAt < startedAt_) endedAt = startedAt_; // A wall-clock step back never makes a record end before it started.
+  record_ = {{"job",1},{"id",id_},{"startedAt",startedAt_},{"endedAt",endedAt},{"project",options_.project},
     {"templateName",options_.templateName},{"outputPath",Utf8(options_.output.c_str())},{"status",success ? "succeeded" : cancelled_ ? "cancelled" : "failed"},
     {"recipe",recipe_},{"origin",origin_},{"recipeSha256",RecipeHash(recipe_)},{"media",media_},{"ffmpeg",installation_},
     {"argv",compiled_.value("argv",ve::Json::array())},{"elapsedSec",elapsed},{"sizeBytes",size},{"avgFps",live_["encodeFps"]},
@@ -394,7 +484,16 @@ void RecipeJob::Complete(bool success) {
     {"verification",verification_},{"timings",timings_},{"published",success},{"retainedPartialPath",retained},
     {"commandLine",compiled_.value("commandLine",ve::Json(nullptr))},{"encoderSummary",live_["encoderSummary"]},
     {"logFile",stats.stderrPath == options_.jobsRoot + L"\\" + Widen(id_) + L".ffmpeg.log" ? ve::Json(id_ + ".ffmpeg.log") : ve::Json(nullptr)},
-    {"durationSec",media_.value("durationSec",ve::Json(nullptr))},{"realtime",live_["speed"]},{"errorTokenIndices",indices}};
+    {"durationSec",media_.value("durationSec",ve::Json(nullptr))},{"realtime",live_["speed"]},{"errorTokenIndices",indices},
+    {"transport",{{"videoHighWater",stats.videoHighWater},{"audioHighWater",stats.audioHighWater},{"videoBytes",stats.videoBytes},
+                  {"audioBytes",stats.audioBytes},{"videoQueueLimit",stats.videoQueueLimit},{"audioQueueLimit",stats.audioQueueLimit}}}};
+  if (success && encoder_.EndedEarly()) record_["endedEarly"] = true;
+  if (success && stats.replacedExisting) record_["replacedExisting"] = true;
+  if (!options_.requestedOutput.empty() && _wcsicmp(options_.requestedOutput.c_str(), options_.output.c_str()) != 0)
+    record_["requestedOutputPath"] = Utf8(options_.requestedOutput.c_str());
+  Log("job %s transport: video %llu bytes (high water %llu of %llu), audio %llu bytes (high water %llu of %llu)%s",id_.c_str(),
+      stats.videoBytes,stats.videoHighWater,stats.videoQueueLimit,stats.audioBytes,stats.audioHighWater,stats.audioQueueLimit,
+      encoder_.EndedEarly() ? ", FFmpeg finished early" : "");
   if (store_) store_->Complete(live_,record_);
 }
 } // namespace vegas_encoder

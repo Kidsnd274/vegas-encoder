@@ -264,9 +264,18 @@ Future<void> main(List<String> args) async {
       initialPresets.every((p) {
         final recipe = p.recipe;
         return p.revision ==
-            (recipe.category == 'web' && recipe.id != 'vp9-webm' ? 3 : 2);
+            (recipe.id == 'av1-small'
+                ? 5
+                : recipe.category == 'web' && recipe.id != 'vp9-webm'
+                ? 3
+                : 2);
       }),
-      'only changed presets advance to revision 3',
+      'only changed presets advance: AV1 (CPU) to revision 5, other delivery presets to 3',
+    );
+    // L2: the A1 transport fix makes the AV1 lp=3 workaround unnecessary.
+    check(
+      initialPresets.firstWhere((p) => p.recipe.id == 'av1-small').recipe.video.extra.isEmpty,
+      'AV1 (CPU) has no extra arguments',
     );
     final builtin = initialPresets.first;
     check(
@@ -526,17 +535,92 @@ Future<void> main(List<String> args) async {
     );
 
     await rejects(() => library.save(mineDuplicate), 'REVISION-CONFLICT');
+    // C2 / contract 3.3: free IDs skip retained history and compare case-insensitively.
+    final freeAfterDelete = await library.availableId('mine copy');
+    check(
+      freeAfterDelete != 'mine-copy' &&
+          (await library.save(
+                mineDuplicate.copyWith(
+                  recipe: mineDuplicate.recipe.copyWith(id: freeAfterDelete),
+                ),
+              ))
+              .recipe
+              .id ==
+              freeAfterDelete,
+      'a deleted preset keeps its ID, and availableId offers a free one that saves',
+    );
+    await library.save(
+      mineDuplicate.copyWith(
+        recipe: mineDuplicate.recipe.copyWith(id: 'My-Preset', name: 'My Preset'),
+      ),
+    );
+    check(
+      await library.availableId('my preset') == 'my-preset-2',
+      'an existing My-Preset makes "my preset" my-preset-2',
+    );
+    final c2Library = FakePresetLibrary(presets: [mineDuplicate]);
+    await c2Library.delete('mine-copy', expectedRevision: mineDuplicate.revision);
+    await rejects(
+      () => c2Library.save(mineDuplicate.copyWith(revision: 0)),
+      'REVISION-CONFLICT',
+    );
+    check(
+      await c2Library.availableId('mine copy') == 'mine-copy-2',
+      'the fake library models retained history like the file library',
+    );
+    // C3 / contract 3.3: stars and pins live in the preferences overlay.
+    Future<int> historyFiles(String id) async {
+      final directory = Directory(joinPath(joinPath(paths.library, '.history'), id));
+      if (!await directory.exists()) return 0;
+      return (await directory.list().where((f) => f.path.endsWith('.vepreset')).toList()).length;
+    }
+
+    final sharedBefore = (await library.get('shared'))!;
+    final historyBefore = await historyFiles('shared');
     for (var i = 0; i < 23; i++) {
       await library.setPreferences('shared', favorite: i.isEven);
     }
+    final sharedStarred = (await library.get('shared'))!;
     check(
-      (await Directory(
-                joinPath(joinPath(paths.library, '.history'), 'shared'),
-              ).list().where((f) => f.path.endsWith('.vepreset')).toList())
-              .length ==
-          20,
-      'metadata changes also bound revision history',
+      sharedStarred.favorite &&
+          sharedStarred.revision == sharedBefore.revision &&
+          await historyFiles('shared') == historyBefore &&
+          (await library.list()).firstWhere((p) => p.recipe.id == 'shared').favorite,
+      'starring a user preset keeps its revision and adds no history',
     );
+    final oldStar = sharedBefore.copyWith(
+      recipe: sharedBefore.recipe.copyWith(id: 'old-star', name: 'Old star'),
+      favorite: true,
+    );
+    await atomicWrite(joinPath(paths.library, 'old-star.vepreset'), jsonEncode(oldStar.copyWith(revision: 1).data));
+    check(
+      (await library.get('old-star'))!.favorite &&
+          (await library.list()).firstWhere((p) => p.recipe.id == 'old-star').favorite,
+      'an older .vepreset with "favorite": true still shows as starred',
+    );
+    await library.setPreferences('old-star', favorite: false);
+    check(
+      !(await library.get('old-star'))!.favorite && (await library.get('old-star'))!.revision == 1,
+      'the overlay wins over the value in the file',
+    );
+    await File(joinPath(paths.library, 'old-star.vepreset')).delete();
+    // C4 / contract 3.3: one bad file never empties the library.
+    final validCount = (await library.list()).length;
+    await File(joinPath(paths.library, 'broken.vepreset')).writeAsString('{"vepreset":');
+    await File(joinPath(paths.library, 'My preset (1).vepreset')).writeAsString(jsonEncode(oldStar.data));
+    final listedWithProblems = await library.list();
+    final problems = await library.problems();
+    check(
+      listedWithProblems.length == validCount &&
+          problems.length == 2 &&
+          problems.any((p) => p.path.endsWith('broken.vepreset')) &&
+          problems.any((p) => p.path.endsWith('My preset (1).vepreset')) &&
+          problems.every((p) => p.code.isNotEmpty && p.message.isNotEmpty),
+      'malformed and badly named files become problems; the valid presets stay listed',
+    );
+    await File(joinPath(paths.library, 'broken.vepreset')).delete();
+    await File(joinPath(paths.library, 'My preset (1).vepreset')).delete();
+    check((await library.problems()).isEmpty, 'problems clear once the files are fixed');
     check(
       await library.location(builtin.recipe.id) == null,
       'built-in has no user file to reveal',
@@ -564,6 +648,37 @@ Future<void> main(List<String> args) async {
       'missing capability cache',
     );
     await cache.write(cap);
+    // C6: five idle ticks parse each file once and read the GPU at most once.
+    {
+      final firstCap = await cache.read(cap.identityKey);
+      final parsesAfterFirst = cache.parses;
+      var sameCap = true;
+      for (var tick = 0; tick < 5; tick++) {
+        sameCap = sameCap && identical(await cache.read(cap.identityKey), firstCap);
+      }
+      check(sameCap && cache.parses == parsesAfterFirst, 'an unchanged capability file is parsed once (${cache.parses - parsesAfterFirst} extra)');
+      final machine = FileMachineSettingsRepository(paths: paths);
+      final firstMachine = await machine.read();
+      final machineParses = machine.parses;
+      var sameMachine = true;
+      for (var tick = 0; tick < 5; tick++) {
+        sameMachine = sameMachine && identical(await machine.read(), firstMachine);
+      }
+      check(sameMachine && machine.parses == machineParses, 'an unchanged machine.json is parsed once');
+      final gpu = _CountingGpu();
+      final hardwareCap = cap.copyWith(
+        hardware: {
+          'hevc_nvenc': {'state': 'ok', 'testedAt': '2026-10-14T00:00:00Z', 'gpu': 'gpu-1'},
+        },
+      );
+      await cache.write(hardwareCap);
+      final aware = GpuAwareCapabilityCache(backend: cache, gpu: gpu);
+      for (var tick = 0; tick < 5; tick++) {
+        await aware.read(cap.identityKey);
+      }
+      check(gpu.reads <= 1, 'five idle ticks read the GPU at most once (${gpu.reads})');
+      await cache.write(cap);
+    }
     final cached = (await FileCapabilityCache(
       paths: paths,
     ).read(cap.identityKey))!;
@@ -743,7 +858,12 @@ Future<void> main(List<String> args) async {
       jsonEncode(job.data),
     );
     await File(indexPath).writeAsString('\n', mode: FileMode.append);
-    await rejects(() => jobs.list(), 'INVALID-DATA');
+    // C4 / contract 3.3: a malformed line is skipped and counted; a CRLF "\r" line is ignored.
+    await File(indexPath).writeAsString('\r\n', mode: FileMode.append);
+    check(
+      (await jobs.list()).single.id == jobId && jobs.skippedIndexLines == 1,
+      'one malformed index line is counted, never fatal, and a "\\r" line is ignored',
+    );
     await jobs.rebuildIndex();
     check(
       (await jobs.list()).single.id == jobId,
@@ -765,9 +885,119 @@ Future<void> main(List<String> args) async {
       await File(indexPath).writeAsString(
         '${jsonEncode({...speedEntry, 'realtime': invalidSpeed})}\n',
       );
-      await rejects(() => jobs.list(), 'INVALID-DATA');
+      check(
+        (await jobs.list()).isEmpty && jobs.skippedIndexLines == 1,
+        'an invalid index entry is skipped and counted',
+      );
     }
     await jobs.rebuildIndex();
+    // C5: an unchanged index is not reread; appended lines show on the next list.
+    {
+      final sample = (await jobs.list()).single.toJson();
+      final big = StringBuffer();
+      for (var i = 0; i < 5000; i++) {
+        final id = '00000000-0000-4000-8000-${i.toRadixString(16).padLeft(12, '0')}';
+        big.writeln(jsonEncode({...sample, 'id': id, 'recordFile': '$id.json'}));
+      }
+      await File(indexPath).writeAsString(big.toString());
+      final timer = Stopwatch()..start();
+      final first = await jobs.list();
+      timer.stop();
+      final reads = jobs.indexReads;
+      final second = await jobs.list();
+      check(
+        first.length == 5000 && identical(first, second) && jobs.indexReads == reads,
+        'an unchanged 5,000-line index returns the same list without reading',
+      );
+      check(timer.elapsedMilliseconds < 200, 'a 5,000-line index parses in under 200 ms (${timer.elapsedMilliseconds} ms)');
+      const extra = '00000000-0000-4000-8000-ffffffffffff';
+      await File(indexPath).writeAsString(
+        '${jsonEncode({...sample, 'id': extra, 'recordFile': '$extra.json'})}\n',
+        mode: FileMode.append,
+      );
+      final grown = await jobs.list();
+      check(grown.length == 5001 && grown.any((e) => e.id == extra), 'an appended line is visible on the next list');
+      await jobs.rebuildIndex();
+    }
+    // Contract 3.1: optional 0.2.1 fields, preflight records and clock skew.
+    Future<JobRecord?> readBack(String id, JsonMap data) async {
+      final file = joinPath(paths.jobs, '$id.json');
+      await atomicWrite(file, jsonEncode(data));
+      try {
+        return await jobs.get(id);
+      } finally {
+        await File(file).delete();
+      }
+    }
+
+    const newFieldsId = '00000000-0000-4000-8000-0000000000a1';
+    final newFields = (await readBack(newFieldsId, {
+      ...job.data,
+      'id': newFieldsId,
+      'logFile': null,
+      'stage': 'encode',
+      'requestedOutputPath': r'C:\Renders\render.vencoder',
+      'replacedExisting': true,
+      'endedEarly': true,
+      'transport': {
+        'videoHighWater': 1382400,
+        'audioHighWater': 115312,
+        'videoBytes': 10368000,
+        'audioBytes': 768000,
+        'videoQueueLimit': 67108864,
+        'audioQueueLimit': 23040000,
+      },
+    }))!;
+    check(
+      newFields.stage == 'encode' &&
+          newFields.requestedOutputPath == r'C:\Renders\render.vencoder' &&
+          newFields.replacedExisting &&
+          newFields.endedEarly &&
+          newFields.transport?['audioQueueLimit'] == 23040000,
+      'job records carry stage, requested path, replacement, early finish and transport facts',
+    );
+    check(
+      !job.replacedExisting && !job.endedEarly && job.stage == 'encode' &&
+          job.requestedOutputPath == null && job.transport == null,
+      'older records read the new facts as absent',
+    );
+    const preflightId = '00000000-0000-4000-8000-0000000000a2';
+    final preflight = (await readBack(preflightId, {
+      ...job.data,
+      'id': preflightId,
+      'stage': 'preflight',
+      'status': 'failed',
+      'media': null,
+      'ffmpeg': null,
+      'argv': <String>[],
+      'commandLine': null,
+      'errorTokenIndices': <int>[],
+      'published': false,
+      'sizeBytes': 0,
+      'ffmpegExitCode': null,
+      'logFile': null,
+      'message': 'Change the Render As filename to end in .mkv.',
+      'verification': {'state': 'skipped', 'message': 'The render stopped before encoding started.'},
+    }))!;
+    check(
+      preflight.isPreflight &&
+          preflight.media == null &&
+          preflight.ffmpeg == null &&
+          preflight.message.contains('.mkv'),
+      'preflight records with no media or FFmpeg are readable',
+    );
+    const skewId = '00000000-0000-4000-8000-0000000000a3';
+    final started = DateTime.parse(job.startedAt);
+    final skewed = (await readBack(skewId, {
+      ...job.data,
+      'id': skewId,
+      'logFile': null,
+      'endedAt': started.subtract(const Duration(milliseconds: 5)).toUtc().toIso8601String(),
+    }))!;
+    check(
+      skewed.knownElapsedSec == null && job.knownElapsedSec == job.elapsedSec,
+      'a record that ends 5 ms before it starts is read, with elapsed time unknown',
+    );
     final fromHistory = await transfers.fromJob(job, newId: 'history-copy');
     check(
       fromHistory.origin == 'job/$jobId',
@@ -776,7 +1006,10 @@ Future<void> main(List<String> args) async {
     final indexBad = (await jobs.list()).single.toJson();
     indexBad['recordFile'] = '../private.json';
     await File(indexPath).writeAsString('${jsonEncode(indexBad)}\n');
-    await rejects(() => jobs.list(), 'INVALID-DATA');
+    check(
+      (await jobs.list()).isEmpty && jobs.skippedIndexLines == 1,
+      'an index entry pointing outside the jobs folder is skipped and counted',
+    );
     await atomicWrite(
       joinPath(paths.jobs, '$jobId.json'),
       jsonEncode(job.copyWith(published: false).data),
@@ -796,11 +1029,11 @@ Future<void> main(List<String> args) async {
       jsonEncode(badMedia),
     );
     await rejects(() => jobs.get(jobId), 'INVALID-DATA');
-    final badDimensions = job.media.video.copyWith(width: -1);
+    final badDimensions = job.media!.video.copyWith(width: -1);
     await atomicWrite(
       joinPath(paths.jobs, '$jobId.json'),
       jsonEncode(
-        job.copyWith(media: job.media.copyWith(video: badDimensions)).data,
+        job.copyWith(media: job.media!.copyWith(video: badDimensions)).data,
       ),
     );
     await rejects(() => jobs.get(jobId), 'INVALID-DATA');
@@ -1148,5 +1381,15 @@ Future<void> worker(List<String> args) async {
     print('RESULT:saved');
   } on ServiceException catch (e) {
     print('RESULT:${e.code}');
+  }
+}
+
+/// Counts GPU reads (C6).
+class _CountingGpu implements GpuIdentity {
+  int reads = 0;
+  @override
+  Future<GpuSnapshot> read() async {
+    reads++;
+    return GpuSnapshot(fingerprint: 'gpu-1', cacheable: true);
   }
 }

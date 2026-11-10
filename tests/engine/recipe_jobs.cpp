@@ -6,7 +6,10 @@
 #include <psapi.h>
 #include <algorithm>
 #include <atomic>
+#include <climits>
 #include <cmath>
+#include <mutex>
+#include <tuple>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -127,6 +130,15 @@ void PureChecks() {
   Require(EncoderFailureMessage("cannot start encoder", "") == "cannot start encoder", "empty stderr preserves startup failure");
   const auto bounded = EncoderFailureMessage("pipe failure", "No such filter: " + std::string(5000, 'x'));
   Require(bounded.size() <= 395 && bounded.substr(bounded.size()-3) == "...", "failure summary bounded independently of full stderr");
+  Require(EncoderFailureMessage("pipe failure", "frame=    1 fps=0.0 q=0.0 size=       0KiB time=00:00:00.03 bitrate=N/A speed=N/A\r"
+    "frame=   20 fps= 19 q=28.0 size=     256KiB time=00:00:00.66 bitrate=3000.0kbits/s speed=0.6x\r"
+    "[vost#0:0/libx264 @ 0x1] Error submitting video frame to the encoder\nConversion failed!\n") == "FFmpeg: Error submitting video frame to the encoder",
+    "carriage-return statistics lines never hide the mid-render FFmpeg error");
+  for (const auto& [fps,num,den] : {std::tuple{48000.0/1001,48000u,1001u},{12.5,25u,2u},{240000.0/1001,240000u,1001u},{50.0,50u,1u},{29.97002997002997,30000u,1001u}}) {
+    const auto rate = EncodeRate::FromDouble(fps);
+    Require(rate.num == num && rate.den == den,"exact rational frame rates (n/1, n/2, n*1000/1001)");
+  }
+  Require(EncodeRate::FromDouble(12.3).num == 0 && EncodeRate::FromDouble(29.9).num == 0 && EncodeRate::FromDouble(241).num == 0,"unqualified rates stay refused");
   std::string unicode = "No such filter: "; for (int i=0;i<200;++i) unicode += "\xe7\x95\x8c";
   const auto unicodeSummary = EncoderFailureMessage("pipe failure", unicode);
   Require(Utf8(Widen(unicodeSummary).c_str()) == unicodeSummary, "bounded summary preserves complete UTF-8 codepoints");
@@ -215,7 +227,13 @@ struct Case {
   LONGLONG cancelAt = -1; int failureSlot = 0;
   bool success = true, verify = true, blockedIndex = false, blockedLive = false, collision = false;
   bool cancelDuringProbe = false, timedCancel = false, invalidRoot = false;
-  DWORD pipeTimeout = 3000, probeTimeout = 3000;
+  bool endedEarly = false, clockStep = false;
+  bool preexisting = false, replaceExisting = false, lockExisting = false; // decision D1
+  Json failedEncoders = Json::object(); // encoders the app's last hardware test marked failed
+  std::string reason; // expected exact (or, with partialReason, contained) C6 message
+  bool partialReason = true;
+  ULONGLONG maxDuration = 0;
+  DWORD stallTimeout = 3000, connectTimeout = 3000, probeTimeout = 3000;
 };
 Json Run(const Case& test, const std::wstring& root) {
   const auto path = root + L"\\" + Widen(test.name); std::filesystem::create_directories(path);
@@ -224,9 +242,21 @@ Json Run(const Case& test, const std::wstring& root) {
   options.hostHwnd = "123456";
   // ASan child initialization/instrumented sleeps use the product's normal pipe
   // bound. Deliberate short timeout cases retain their explicit bounds.
-  options.pipeTimeoutMs = instrumented && test.pipeTimeout >= 3000 ? 10000 : test.pipeTimeout;
+  options.stallTimeoutMs = instrumented && test.stallTimeout >= 3000 ? 10000 : test.stallTimeout;
+  options.connectTimeoutMs = instrumented && test.connectTimeout >= 3000 ? 10000 : test.connectTimeout;
   options.probeTimeoutMs = test.probeTimeout;
-  options.finishTimeoutMs = instrumented ? 30000 : 5000;
+  options.failedEncoders = test.failedEncoders;
+  options.replaceExisting = test.replaceExisting;
+  HANDLE existingLock = INVALID_HANDLE_VALUE;
+  if (test.preexisting) {
+    { std::ofstream file(std::filesystem::path(options.output),std::ios::binary); file << "old destination"; }
+    if (test.lockExisting) existingLock = CreateFileW(options.output.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+  }
+  if (test.clockStep) {
+    // The wall clock steps back 5 ms between start and end.
+    auto calls = std::make_shared<int>(0);
+    options.clock = [calls] { return ++*calls == 1 ? std::string("2026-01-01T00:00:00.010Z") : std::string("2026-01-01T00:00:00.005Z"); };
+  }
   std::filesystem::create_directories(options.jobsRoot);
   if (test.invalidRoot) { options.jobsRoot = path + L"\\root-is-file"; std::ofstream file(std::filesystem::path(options.jobsRoot)); file << "blocked"; }
   Json media{{"video",{{"width",test.width},{"height",test.height},{"fps",Json::array({test.rate.num,test.rate.den})},{"pixfmt","p010le"},{"sar",test.sar},{"frames",test.frames}}},
@@ -236,7 +266,7 @@ Json Run(const Case& test, const std::wstring& root) {
   RenderTestOptions host; host.width = test.width; host.height = test.height; host.frames = test.frames;
   host.fps = double(test.rate.num)/test.rate.den; host.cancelAt = test.cancelAt; host.progressFailureSlot = test.failureSlot;
   host.progressFailureAt = 15; host.videoOnly = !withAudio; host.shortRead = 257;
-  LONGLONG held = 0, samples = 0, endpoint = 0; int repolls = 0;
+  LONGLONG held = 0, samples = 0, endpoint = 0, fetched = 0; int repolls = 0;
   ULONGLONG pollAt = GetTickCount64(), maxPollGap = 0, abortMs = 0;
   const auto began = GetTickCount64(); RecipeJob job; ULONGLONG probeBegan = 0;
   HANDLE indexLock = INVALID_HANDLE_VALUE, liveHandle = INVALID_HANDLE_VALUE; OVERLAPPED overlap{};
@@ -273,7 +303,7 @@ Json Run(const Case& test, const std::wstring& root) {
       SFMEMORYTOKEN token{}; LONG_PTR lock = 0; BYTE info[frameinfo::size]{}; LONG count = 0;
       Require(SUCCEEDED(video->GetRenderFrame(position,&token,&lock,info,&count)),"fake host acquisition");
       host::FrameLease lease(video,lock,held);
-      std::vector<BYTE> frame(static_cast<size_t>(test.width)*test.height*3);
+      auto frame = job.TakeBuffer(false,static_cast<size_t>(test.width)*test.height*3);
       DWORD planes[3]{}; memcpy(planes,info+frameinfo::planeFields,sizeof(planes));
       const auto* source = reinterpret_cast<const BYTE*>(static_cast<uintptr_t>(token.pData+token.offset));
       for (int row = 0; row < test.height; ++row) memcpy(frame.data()+size_t(row)*test.width*2,source+size_t(row)*planes[0],size_t(test.width)*2);
@@ -292,15 +322,18 @@ Json Run(const Case& test, const std::wstring& root) {
         if (test.collision) { std::ofstream file(std::filesystem::path(options.output)); file << "sentinel"; }
       }
       if (!job.Submit(false,std::move(frame),poll)) return job.Error();
+      fetched = position + 1;
+      if (job.EndedEarly()) break;
       if (audio) {
         Require(test.rate.Endpoint(position+1,48000,endpoint),"rational audio endpoint");
-        while (samples < endpoint) {
+        while (samples < endpoint && !job.EndedEarly()) {
           const LONG want = static_cast<LONG>((std::min)(endpoint-samples,LONGLONG(4096)));
           std::vector<BYTE> buffer(size_t(want)*8); SFMEMORYTOKEN out{}; out.pData=reinterpret_cast<ULONGLONG>(buffer.data());
           out.cbData=out.cbAlloc=want*8; out.pid=GetCurrentProcessId(); LONG got = 0;
           Require(SUCCEEDED(audio->Read(samples,&out,want,&got)) && got>0 && got<=want,"short/final S_FALSE audio read");
           buffer.resize(size_t(got)*8); if (!job.Submit(true,std::move(buffer),poll)) return job.Error(); samples += got;
         }
+        if (job.EndedEarly()) break;
       }
     }
     const auto at = GetTickCount64(); const bool done = job.Finish(poll); abortMs=GetTickCount64()-at;
@@ -309,6 +342,13 @@ Json Run(const Case& test, const std::wstring& root) {
   monitoring=false; monitor.join();
   const auto duration = GetTickCount64()-began;
   if (liveHandle != INVALID_HANDLE_VALUE) CloseHandle(liveHandle);
+  if (existingLock != INVALID_HANDLE_VALUE) CloseHandle(existingLock);
+  if (test.preexisting) {
+    std::ifstream file(std::filesystem::path(options.output),std::ios::binary); const std::string bytes((std::istreambuf_iterator<char>(file)),{});
+    Require(test.success ? bytes != "old destination" && job.Record().value("replacedExisting",false) == true
+                         : bytes == "old destination" && !job.Record().contains("replacedExisting"),
+            "a confirmed existing destination is replaced only on success; otherwise it stays intact");
+  }
   if (indexLock != INVALID_HANDLE_VALUE) { UnlockFileEx(indexLock,0,1,0,&overlap); CloseHandle(indexLock); }
   if ((result.returned == S_OK) != test.success) {
     WaitStore(job.Store()); fprintf(stderr,"%s: %s\n%s\n",test.name.c_str(),job.Reason().c_str(),job.Compiled().dump().c_str());
@@ -316,7 +356,22 @@ Json Run(const Case& test, const std::wstring& root) {
   Require((result.returned == S_OK) == test.success,"expected render outcome");
   Require(result.served == result.released && !result.outstanding && !result.lockErrors && !result.callerThreadErrors && !result.tokenErrors,"fake host lifetime/caller thread");
   const auto stats = job.Stats();
-  Require(stats.videoHighWater <= 64u*1024*1024 && stats.audioHighWater <= 2u*1024*1024,"bounded in-flight pipe queues");
+  const auto transport = job.Record().value("transport",Json(nullptr));
+  Require(transport.is_object() && transport.at("videoHighWater") == stats.videoHighWater && transport.at("audioHighWater") == stats.audioHighWater &&
+          transport.at("videoBytes") == stats.videoBytes && transport.at("audioBytes") == stats.audioBytes &&
+          transport.at("videoQueueLimit") == 64u*1024*1024 && transport.at("audioQueueLimit").get<uint64_t>() <= 192u*1024*1024,"C6 transport diagnostics");
+  Require(stats.videoHighWater <= 64u*1024*1024 && stats.audioHighWater <= transport.at("audioQueueLimit").get<uint64_t>(),"bounded in-flight pipe queues");
+  if (test.frames >= 300) Require(stats.videoBuffersAllocated <= 12,"frame buffers are reused (at most 12 allocations for 300+ frames)");
+  if (!test.reason.empty()) {
+    const auto message = ve::Str(job.Record(),"message");
+    if (test.partialReason ? message.find(test.reason) == std::string::npos : message != test.reason) fprintf(stderr,"%s message: %s\n",test.name.c_str(),message.c_str());
+    Require(test.partialReason ? message.find(test.reason) != std::string::npos : message == test.reason,"expected C6 failure message");
+  }
+  if (test.maxDuration) Require(duration < test.maxDuration * (instrumented ? 3 : 1),"stall detected within the stall timeout plus margin");
+  Require(job.Record().value("endedEarly",false) == test.endedEarly,"C6 endedEarly fact");
+  if (test.endedEarly) Require(fetched < test.frames && job.LiveStatus().value("message",std::string()).find("finished early") != std::string::npos,"host frame fetching stops soon after FFmpeg finished early");
+  if (test.clockStep) Require(ve::Str(job.Record(),"endedAt") >= ve::Str(job.Record(),"startedAt"),"endedAt never precedes startedAt");
+  if (test.name == "stats-then-error") Require(ve::Str(job.Record(),"stderrTail").find("frame=") == std::string::npos,"stderr tail omits FFmpeg statistics lines");
   Require(peak.load() <= baseline+160u*1024*1024,"parent additional working set under 160 MiB");
   // Identity hashing/start are not transport polling. First startup poll interval
   // is tracked separately; wait-time polls must remain responsive below 250 ms.
@@ -331,8 +386,8 @@ Json Run(const Case& test, const std::wstring& root) {
           liveStatus["pixelFormatConversionReducesPrecision"] == videoFacts.at("pixelFormatConversionReducesPrecision"),"C5 producer retains native facts through terminal state");
   if (test.success) {
     Require(stats.published && stats.exitCode == 0 && job.Record()["sizeBytes"] > 0,"success means exit/output publication");
-    Require(!withAudio || samples == endpoint,"cumulative fractional samples exact");
-    Require(stats.videoBytes == uint64_t(test.frames)*test.width*test.height*3 && stats.audioBytes == uint64_t(samples)*8,"every owned frame/sample byte reaches input EOF");
+    Require(test.endedEarly || !withAudio || samples == endpoint,"cumulative fractional samples exact");
+    Require(test.endedEarly || (stats.videoBytes == uint64_t(test.frames)*test.width*test.height*3 && stats.audioBytes == uint64_t(samples)*8),"every owned frame/sample byte reaches input EOF");
     if (test.outputWidth > 0) {
       const auto& expected = job.Compiled().at("expectedStreams").at(0);
       Require(expected.at("width") == test.outputWidth && expected.at("height") == test.outputHeight && expected.at("sar") == "1:1",
@@ -348,6 +403,9 @@ Json Run(const Case& test, const std::wstring& root) {
     if (test.cancelAt >= 0 || test.timedCancel || test.cancelDuringProbe) Require(job.Record()["status"] == "cancelled","cancellation remains distinct");
     if (test.failureSlot) Require(job.Record()["status"] == "failed" && job.Error() == E_ACCESSDENIED,"host failure HRESULT preserved");
     if (test.collision) { std::ifstream file(std::filesystem::path(options.output)); std::string text; file>>text; Require(text=="sentinel","destination created during render preserved"); }
+    if (test.collision || test.lockExisting)
+      Require(!job.Record()["retainedPartialPath"].is_null() && ve::Str(job.Record(),"message").find(ve::Str(job.Record(),"retainedPartialPath")) != std::string::npos,
+              "a refused replacement keeps the finished render and names it");
     if (test.name == "child-exit") Require(!job.Record()["errorTokenIndices"].empty(),"native runtime error provenance recorded");
     if (test.name == "resize-unverified")
       Require(job.Reason().find("Refresh") != std::string::npos && stats.videoBytes == 0 && stats.audioBytes == 0,
@@ -367,7 +425,7 @@ Json Run(const Case& test, const std::wstring& root) {
     Require(live.at("outputBitDepth") == videoFacts.at("outputBitDepth") &&
             live.at("pixelFormatConversionReducesPrecision") == videoFacts.at("pixelFormatConversionReducesPrecision"),"C5 atomic live file preserves nullable core video facts");
   } else Require(!job.Store()->Failure().empty(),"status publication failure nonfatal");
-  Json summary{{"case",test.name},{"id",job.Id()},{"success",test.success},{"elapsedMs",duration},{"polls",repolls},{"maxPollGapMs",maxPollGap},
+  Json summary{{"case",test.name},{"id",job.Id()},{"success",test.success},{"message",job.Record()["message"]},{"elapsedMs",duration},{"polls",repolls},{"maxPollGapMs",maxPollGap},
     {"finishOrAbortMs",abortMs},{"workingSetGrowth",peak.load()-baseline},{"videoHighWater",stats.videoHighWater},{"audioHighWater",stats.audioHighWater},
     {"videoBytes",stats.videoBytes},{"audioBytes",stats.audioBytes},{"samples",samples},{"rate",Json::array({test.rate.num,test.rate.den})}};
   Save(path+L"\\summary.json",summary); printf("PASS %s: %llu ms, video queue %llu, audio queue %llu\n",test.name.c_str(),duration,stats.videoHighWater,stats.audioHighWater);
@@ -384,12 +442,75 @@ Json ResizeCapabilities() {
                         {"pad", {{"available", true}, {"options", Json::array({{{"name", "width"}}, {{"name", "height"}}, {{"name", "x"}}, {{"name", "y"}}, {{"name", "color"}}})}}},
                         {"setsar", {{"available", true}, {"options", Json::array({{{"name", "sar"}}})}}}}}};
 }
+// Chaos fake FFmpeg (T1): -progress blocks on stdout, \r statistics on stderr.
+struct ChildIo {
+  std::mutex out; std::atomic<long long> frames{0}, outTime{0}, size{0};
+  void Progress(bool end = false) {
+    std::lock_guard<std::mutex> lock(out);
+    printf("frame=%lld\nout_time_us=%lld\ntotal_size=%lld\nprogress=%s\n",frames.load(),outTime.load(),size.load(),end ? "end" : "continue");
+    fflush(stdout);
+  }
+};
+size_t ReadBytes(HANDLE pipe, size_t want) {
+  std::vector<char> buffer(65536); size_t total = 0; DWORD got = 0;
+  while (total < want && ReadFile(pipe,buffer.data(),DWORD((std::min)(buffer.size(),want-total)),&got,nullptr) && got) total += got;
+  return total;
+}
+[[noreturn]] void Quit(const std::wstring& output, int code) {
+  { std::ofstream file{std::filesystem::path(output)}; file << "owned synthetic output"; }
+  fflush(stdout); fflush(stderr); ExitProcess(static_cast<UINT>(code));
+}
+[[noreturn]] void Chaos(const std::wstring& mode, const std::wstring& output, const std::vector<std::wstring>& inputs,
+                        int width, int height, double fps, double audioBps) {
+  const auto colon = mode.find(L':'); const auto kind = mode.substr(0,colon);
+  const long long value = colon == std::wstring::npos ? 0 : _wtoi64(mode.c_str()+colon+1);
+  const auto second = colon == std::wstring::npos ? std::wstring::npos : mode.find(L':',colon+1);
+  const int code = second == std::wstring::npos ? 0 : _wtoi(mode.c_str()+second+1);
+  if (kind == L"stats-then-error") {
+    for (int i = 0; i < 50; ++i) fprintf(stderr,"frame=%5d fps= 30 q=28.0 size=%6dKiB time=00:00:%02d.00 bitrate=1000.0kbits/s speed=1.0x\r",i*2,i*10,i%60);
+    fputs("\n[vost#0:0/libx264 @ 0x1] Error submitting video frame to the encoder\nConversion failed!\n",stderr);
+    fflush(stderr); ExitProcess(1);
+  }
+  static ChildIo io; static std::atomic<bool> advancing{true}, quiet{false}, videoEnded{false};
+  std::thread([] { for (;;) { Sleep(500); if (advancing) { io.outTime += 500000; io.size += 1000; } if (!quiet) io.Progress(); } }).detach();
+  HANDLE video = CreateFileW(inputs.at(0).c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+  std::thread audioReader;
+  if (inputs.size() > 1) audioReader = std::thread([&,path = inputs[1]] {
+    HANDLE audio = CreateFileW(path.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+    std::vector<char> buffer(16384); DWORD got = 0; long long bytes = 0;
+    for (;;) {
+      // latency:N holds audio until the encoder has N frames of video lookahead.
+      if (kind == L"latency") while (!videoEnded && audioBps > 0 && bytes / audioBps > (io.frames - value) / fps + 0.1) Sleep(2);
+      if (!ReadFile(audio,buffer.data(),DWORD(buffer.size()),&got,nullptr) || !got) break;
+      bytes += got;
+    }
+  });
+  const size_t frameBytes = size_t(width) * height * 3;
+  const long long stopAt = kind == L"stall-after" || kind == L"early-exit-mid" ? value : LLONG_MAX;
+  while (io.frames < stopAt && ReadBytes(video,frameBytes) == frameBytes) {
+    ++io.frames;
+    if (kind == L"slow-read") Sleep(DWORD(value));
+  }
+  if (kind == L"stall-after") { advancing = false; Sleep(INFINITE); }
+  if (kind == L"early-exit-mid") Quit(output,code);
+  videoEnded = true;
+  if (kind == L"early-exit-ok") Quit(output,0);
+  if (audioReader.joinable()) audioReader.join();
+  if (kind == L"hang-flush") { quiet = true; Sleep(INFINITE); }
+  if (kind == L"slow-flush") Sleep(DWORD(value));
+  io.Progress(true); Quit(output,0);
+}
 int Child(int argc, wchar_t** argv) {
   std::wstring mode, output; std::vector<std::wstring> inputs;
   bool probe = false, selectedStreams = false;
-  int boundedIntervals = 0;
+  int boundedIntervals = 0, width = 320, height = 180, audioRate = 48000, channels = 2; double fps = 30;
   for (int i=1;i<argc;++i) {
-    if (std::wstring(argv[i]) == L"-b4-fixture" && i+1<argc) mode=argv[++i];
+    const std::wstring arg = argv[i];
+    if (arg == L"-s" && i+1<argc) swscanf_s(argv[++i],L"%dx%d",&width,&height);
+    else if (arg == L"-r" && i+1<argc) { unsigned n = 30, d = 1; if (swscanf_s(argv[++i],L"%u/%u",&n,&d) == 2 && d) fps = double(n)/d; }
+    else if (arg == L"-ar" && i+1<argc) audioRate = _wtoi(argv[++i]);
+    else if (arg == L"-ac" && i+1<argc) channels = _wtoi(argv[++i]);
+    else if (std::wstring(argv[i]) == L"-b4-fixture" && i+1<argc) mode=argv[++i];
     else if (std::wstring(argv[i]) == L"-count_frames") probe=true;
     else if (std::wstring(argv[i]) == L"-read_intervals" && i+1<argc) {
       if (std::wstring(argv[++i]) == L"%+#32") ++boundedIntervals;
@@ -411,6 +532,8 @@ int Child(int argc, wchar_t** argv) {
   }
   if (mode == L"exit") { fputs("Unrecognized option 'b4-fixture'.\n",stderr); return 9; }
   if (mode == L"hold") { Sleep(20000); return 0; }
+  if (mode.find(L':') != std::wstring::npos || mode == L"hang-flush" || mode == L"early-exit-ok" || mode == L"stats-then-error")
+    Chaos(mode,output,inputs,width,height,fps,double(audioRate)*channels*4);
   std::vector<std::thread> readers;
   for (const auto& input : inputs) readers.emplace_back([input] {
     HANDLE pipe = CreateFileW(input.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
@@ -468,8 +591,15 @@ int wmain(int argc, wchar_t** argv) {
     test.name="cancel-mid"; test.cancelAt=15; test.success=false; summaries.push_back(Run(test,root));
     test.name="cancel-final"; test.cancelAt=60; summaries.push_back(Run(test,root));
     test.cancelAt=-1; test.name="host-failure"; test.failureSlot=6; summaries.push_back(Run(test,root));
-    test.failureSlot=0; test.name="destination-race"; test.collision=true; summaries.push_back(Run(test,root));
-    test.collision=false; test.success=true; test.name="recovery"; summaries.push_back(Run(test,root));
+    test.failureSlot=0; test.name="destination-race"; test.collision=true; test.replaceExisting=true;
+    test.reason="appeared during the render"; summaries.push_back(Run(test,root));
+    test.collision=false; test.success=true; test.name="recovery"; test.reason.clear(); summaries.push_back(Run(test,root));
+    test.name="preexisting-confirmed"; test.preexisting=true; summaries.push_back(Run(test,root));          // A4 (D1)
+    test.name="preexisting-locked"; test.lockExisting=true; test.success=false; test.reason="is in use, so it was not replaced";
+    summaries.push_back(Run(test,root));
+    test.name="preexisting-unconfirmed"; test.lockExisting=false; test.replaceExisting=false; test.reason="already exists";
+    summaries.push_back(Run(test,root));
+    test.preexisting=false; test.success=true; test.reason.clear();
     test.name="1080p-fractional"; test.width=1920; test.height=1080; summaries.push_back(Run(test,root));
     test.width=320; test.height=180; test.name="index-blocked"; test.blockedIndex=true; summaries.push_back(Run(test,root));
     test.blockedIndex=false; test.name="live-blocked"; test.blockedLive=true; summaries.push_back(Run(test,root));
@@ -482,9 +612,49 @@ int wmain(int argc, wchar_t** argv) {
     test.installation=Installation(Self(),Self()); test.verify=false;
     test.recipe=base; test.recipe["command"]={{"mode","template"},{"template","{inputs} -b4-fixture hold -c:v ffv1 -c:a pcm_f32le -f matroska {output}"}};
     test.name="blocked-pipe-cancel"; test.timedCancel=true; summaries.push_back(Run(test,root));
-    test.timedCancel=false; test.name="pipe-timeout"; test.pipeTimeout=200; summaries.push_back(Run(test,root));
-    test.pipeTimeout=3000; test.name="child-exit"; test.recipe["command"]["template"]="{inputs} -b4-fixture exit -c:v ffv1 -c:a pcm_f32le -f matroska {output}"; summaries.push_back(Run(test,root));
+    test.timedCancel=false; test.name="pipe-timeout"; test.connectTimeout=200; summaries.push_back(Run(test,root));
+    test.connectTimeout=3000; test.name="child-exit"; test.recipe["command"]["template"]="{inputs} -b4-fixture exit -c:v ffv1 -c:a pcm_f32le -f matroska {output}"; summaries.push_back(Run(test,root));
     test.success=true; test.name="slow-backpressure"; test.recipe["command"]["template"]="{inputs} -b4-fixture slow -c:v ffv1 -c:a pcm_f32le -f matroska {output}"; summaries.push_back(Run(test,root));
+    // T1 chaos child: transport, stall, readable-error and early-exit regressions.
+    auto chaos = [&](const char* name, const std::string& mode, bool success, int frames) {
+      Case current = test; current.name = name; current.success = success; current.frames = frames;
+      current.recipe["command"]["template"] = "{inputs} -b4-fixture " + mode + " -c:v ffv1 -c:a pcm_f32le -f matroska {output}";
+      return current;
+    };
+    summaries.push_back(Run(chaos("latency-300","latency:300",true,600),root));                    // A1
+    auto chaosCase = chaos("slow-read","slow-read:3500",true,3); summaries.push_back(Run(chaosCase,root)); // A3
+    chaosCase = chaos("slow-flush","slow-flush:6000",true,10); summaries.push_back(Run(chaosCase,root));
+    chaosCase = chaos("stall-after","stall-after:30",false,60); chaosCase.stallTimeout = 2000; chaosCase.maxDuration = 4500;
+    chaosCase.reason = "FFmpeg stopped making progress for 2 s"; summaries.push_back(Run(chaosCase,root));
+    chaosCase = chaos("hang-flush","hang-flush",false,10); chaosCase.stallTimeout = 2000; chaosCase.maxDuration = 4500;
+    chaosCase.reason = "FFmpeg stopped making progress for 2 s"; summaries.push_back(Run(chaosCase,root));
+    chaosCase = chaos("stats-then-error","stats-then-error",false,60);                               // A6
+    chaosCase.reason = "FFmpeg: Error submitting video frame to the encoder"; chaosCase.partialReason = false; summaries.push_back(Run(chaosCase,root));
+    summaries.push_back(Run(chaos("early-exit-ok","early-exit-ok",true,60),root));                   // A7
+    chaosCase = chaos("early-exit-mid","early-exit-mid:30",true,60); chaosCase.endedEarly = true; summaries.push_back(Run(chaosCase,root));
+    summaries.push_back(Run(chaos("early-exit-mid-failure","early-exit-mid:30:1",false,60),root));
+    Case clock; clock.recipe = base; clock.installation = Installation(argv[firstBuild]); clock.name = "clock-step"; clock.frames = 10; clock.clockStep = true;
+    summaries.push_back(Run(clock,root));                                                             // A18
+    const Json knownFailure{{"ffv1",{{"reason","No NVENC capable devices found."},{"testedAt","2026-11-01T10:00:00Z"}}}};
+    chaosCase = chaos("known-hw-failure","exit",false,60); chaosCase.failedEncoders = knownFailure;   // A10
+    chaosCase.reason = "ffv1 also failed its last test on this PC (2026-11-01): No NVENC capable devices found. Test it again on the FFmpeg page or choose another encoder.";
+    summaries.push_back(Run(chaosCase,root));
+    Require(ve::Str(summaries.back(),"message").find("FFmpeg: Unrecognized option") != std::string::npos,"the FFmpeg error stays in front of the known hardware context");
+    Case knownOk; knownOk.recipe = base; knownOk.installation = Installation(argv[firstBuild]); knownOk.name = "known-hw-failure-ok";
+    knownOk.frames = 10; knownOk.failedEncoders = knownFailure; summaries.push_back(Run(knownOk,root));
+    knownOk.name = "buffer-reuse"; knownOk.frames = 300; knownOk.failedEncoders = Json::object(); summaries.push_back(Run(knownOk,root)); // A11
+    // A13: identity hashes are cached per process by path, volume, file index, size and write time.
+    const auto copy = std::filesystem::path(root) / L"identity-ffmpeg.exe";
+    std::filesystem::copy_file(Self(),copy);
+    Case identity = chaos("identity-first","slow",true,10); identity.installation = Installation(copy.wstring(),copy.wstring());
+    summaries.push_back(Run(identity,root));
+    const auto hashed = IdentityHashCountForTests();
+    identity.name = "identity-repeat"; summaries.push_back(Run(identity,root));
+    Require(IdentityHashCountForTests() == hashed,"a second render with unchanged FFmpeg files hashes nothing");
+    { std::ofstream file(copy,std::ios::binary|std::ios::app); file << "changed"; }
+    identity.name = "identity-changed"; identity.success = false; identity.reason = "Selected FFmpeg identity changed";
+    summaries.push_back(Run(identity,root));
+    Require(IdentityHashCountForTests() > hashed,"a rewritten FFmpeg file is hashed again and refused");
     Save(root+L"\\summary.json",{{"checks",checks},{"instrumented",instrumented},{"validation","fake host / real FFmpeg plus controlled child fakes"},{"cases",summaries}});
     printf("B4 PASS: %d checks, %zu cases\n",checks,summaries.size()); return 0;
   } catch (const std::exception& error) { fprintf(stderr,"B4 FAIL after %d checks: %s\n",checks,error.what()); return 1; }

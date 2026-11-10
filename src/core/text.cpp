@@ -1,5 +1,6 @@
 #include "core.h"
 #include <cctype>
+#include <set>
 
 namespace ve {
 std::vector<size_t> Utf16Map(const std::string& text) {
@@ -90,5 +91,39 @@ std::string OptionKey(const std::string& name) {
 bool IsOption(const std::string& text) {
     return text.size() > 1 && text[0] == '-' &&
            (std::isalpha(static_cast<unsigned char>(text[1])) || text[1] == '_');
+}
+bool IsSwitch(const std::string& key) {
+    static const std::set<std::string> switches{"hide_banner","nostdin","nostats","y","n","vn","an","sn","dn","re","shortest","stats",
+        "copyts","start_at_zero","xerror","ignore_unknown","benchmark","stdin","accurate_seek","noaccurate_seek","bitexact"};
+    return switches.count(key) != 0;
+}
+std::string StreamOf(const std::string& option) {
+    if (option == "-vcodec") return "video";
+    if (option == "-acodec") return "audio";
+    const auto colon = option.find(':');
+    if (colon == std::string::npos || colon + 1 >= option.size()) return {};
+    const char stream = option[colon+1];
+    return stream == 'v' || stream == 'V' ? "video" : stream == 'a' ? "audio" : "";
+}
+namespace {
+std::string OptionName(const Word& word) {
+    if (word.quoted || word.text == "{inputs}" || word.text == "{output}") return {};
+    if (IsOption(word.text)) return word.text;
+    // FFmpeg's -/option form loads the option's argument from a file.
+    if (word.text.rfind("-/",0) == 0 && IsOption("-" + word.text.substr(2))) return "-" + word.text.substr(2);
+    return {};
+}
+}
+std::vector<OptionPair> PairOptions(const std::vector<Word>& words) {
+    std::vector<OptionPair> pairs;
+    for (size_t i = 0; i < words.size(); ++i) {
+        OptionPair pair; pair.name = OptionName(words[i]);
+        if (pair.name.empty()) continue;
+        pair.option = i; pair.key = OptionKey(pair.name); pair.stream = StreamOf(pair.name); pair.fromFile = pair.name != words[i].text;
+        if (!IsSwitch(pair.key) && i + 1 < words.size() && OptionName(words[i+1]).empty() &&
+            words[i+1].text != "{inputs}" && words[i+1].text != "{output}") pair.value = ++i;
+        pairs.push_back(std::move(pair));
+    }
+    return pairs;
 }
 } // namespace ve

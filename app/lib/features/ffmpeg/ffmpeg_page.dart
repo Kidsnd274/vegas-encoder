@@ -305,7 +305,8 @@ class _CardStrip extends StatelessWidget {
                         children: [
                           for (var i = 0; i < children.length; i++) ...[
                             if (i > 0) const SizedBox(width: gap),
-                            SizedBox(width: width, child: children[i]),
+                            // Keyed like its card, so adding a card never rebuilds another mid-click (C1).
+                            SizedBox(key: ObjectKey(children[i].key), width: width, child: children[i]),
                           ],
                         ],
                       ),

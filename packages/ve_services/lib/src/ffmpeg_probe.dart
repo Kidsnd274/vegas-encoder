@@ -104,21 +104,22 @@ class WindowsFFmpegProbe implements FFmpegProbe {
               runner.run(checked.path, [
                 '-hide_banner',
                 '-encoders',
-              ], cancellation: op.token),
+              ], cancellation: op.token, timeout: probeListTimeout),
               runner.run(checked.path, [
                 '-hide_banner',
                 '-muxers',
-              ], cancellation: op.token),
+              ], cancellation: op.token, timeout: probeListTimeout),
               runner.run(
                 checked.path,
                 ['-hide_banner', '-h', 'full'],
                 cancellation: op.token,
+                timeout: probeListTimeout,
                 stdoutLimit: 4 * 1024 * 1024,
               ),
               runner.run(checked.path, [
                 '-hide_banner',
                 '-filters',
-              ], cancellation: op.token),
+              ], cancellation: op.token, timeout: probeListTimeout),
             ]);
             for (final result in results) {
               result.requireSuccess('FFmpeg capability lists');
@@ -139,7 +140,7 @@ class WindowsFFmpegProbe implements FFmpegProbe {
                 '-hide_banner',
                 '-h',
                 'filter=$name',
-              ], cancellation: op.token);
+              ], cancellation: op.token, timeout: probeHelpTimeout);
               help.requireSuccess('Filter help');
               filters[name] = {
                 ...jsonMap(listedFilters[name]),
@@ -163,7 +164,7 @@ class WindowsFFmpegProbe implements FFmpegProbe {
                     '-hide_banner',
                     '-h',
                     'encoder=$name',
-                  ], cancellation: op.token);
+                  ], cancellation: op.token, timeout: probeHelpTimeout);
                   help.requireSuccess('Encoder help');
                   final detail = await _parseHelp(
                     help.stdout + help.stderr,
@@ -353,7 +354,7 @@ class WindowsFFmpegProbe implements FFmpegProbe {
         '-hide_banner',
         '-h',
         'encoder=$encoder',
-      ], cancellation: operation.token);
+      ], cancellation: operation.token, timeout: probeHelpTimeout);
       result.requireSuccess('Encoder help');
       final data = await _parseHelp(
         result.stdout + result.stderr,

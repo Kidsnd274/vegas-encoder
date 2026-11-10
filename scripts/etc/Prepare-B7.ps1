@@ -5,14 +5,16 @@ param(
   [Parameter(Mandatory)][string]$OutputDir,
   [string]$AppDir = (Join-Path $PSScriptRoot '..\..\build\release\vegas-encoder\app'),
   [string]$PluginDir = (Join-Path $PSScriptRoot '..\..\build\release\vegas-encoder\plugin'),
-  [string]$PythonPath = 'python',
-  [string[]]$VegasDir = @('C:\Program Files\BorisFX\Vegas Pro 2026',
-    'L:\Program Files\VEGAS\VEGAS Pro 23.0', 'L:\Program Files\VEGAS\VEGAS Pro 22.0',
-    'L:\Program Files\VEGAS\VEGAS Pro 21.0', 'C:\Program Files\Sony\Vegas Pro 13.0'),
+  [string]$PythonPath,
+  # Default install folders; registered installations are found as well unless -SkipRegistry.
+  [string[]]$VegasDir = @('BorisFX\Vegas Pro 2026', 'VEGAS\VEGAS Pro 23.0', 'VEGAS\VEGAS Pro 22.0',
+    'VEGAS\VEGAS Pro 21.0', 'Sony\Vegas Pro 13.0' | ForEach-Object { Join-Path $env:ProgramFiles $_ }),
   [switch]$SkipRegistry
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
+. (Join-Path $PSScriptRoot 'Tools.ps1')
+$PythonPath = Resolve-VePython $PythonPath
 . (Join-Path $PSScriptRoot 'Version.ps1')
 $version = Get-VeBuildVersion -PythonPath $PythonPath -CheckGenerated
 function Assert-PlainPath([string]$Path) {

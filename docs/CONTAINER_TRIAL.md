@@ -16,7 +16,7 @@ The owner operates VEGAS; installation requires explicit owner authorization.
 
 - Host: `C:\Program Files\BorisFX\Vegas Pro 2026\vegas2026.exe`,
   **2026.0.3.189 x64**. Other detected hosts are not trial targets.
-- Candidate: `L:\repos\vegas-encoder\build\release-inputs-containers-dashboard`.
+- Candidate: `build\release-inputs-containers-dashboard`.
   Native **0.1.7-recipe-proof**, app **0.1.7+1**, numeric PE **0.1.7.1**.
   These labels match earlier trials; distinguish the variant by native SHA-256:
   `9799B6CD65528101788658F4CCE59354BC8BAC6D4796A6670D0A18D2D0266707`.
@@ -133,7 +133,7 @@ error-interface investigation or deferred performance comparison is requested.
 
 The owner subsequently rendered MP4 successfully after switching audio to AAC.
 Job `C24475AA-4C26-420B-9D5C-C4E1C5D81795` published
-`C:\Users\Samuel Tee\Desktop\test_video\test_mp4.mp4` with S_OK and sampled
+`%USERPROFILE%\Desktop\test_video\test_mp4.mp4` with S_OK and sampled
 verification passed. Agent full video/audio decode succeeds; readback is 182 video
 frames, 1920×1080 at 30000/1001 fps, H.264 10-bit 4:2:0 plus 48 kHz stereo AAC.
 This modified-default recipe had faststart enabled; box inspection confirms
@@ -142,12 +142,12 @@ decision to close the test queue are recorded below.
 
 The owner also confirms MOV rendered correctly. Job
 `0DA59B34-CD66-4153-A21B-08267D4CA81E` publishes
-`C:\Users\Samuel Tee\Desktop\test_video\test_mov.mov`; full video/audio decode
+`%USERPROFILE%\Desktop\test_video\test_mov.mov`; full video/audio decode
 passes. Readback: ProRes **LT**, 10-bit 4:2:2, 1920×1080 at 30000/1001 fps,
 182 frames, 48 kHz stereo 24-bit PCM, 6.073 seconds. The recipe was the owner's
 modified default; this does not qualify the prepared HQ preset or every profile.
 The owner also completed WebM. Job `67F333E0-FE7A-4024-A9EA-BCB27C14E98E`
-published `C:\Users\Samuel Tee\Desktop\test_video\test_vp9.webm`; FFmpeg exit 0,
+published `%USERPROFILE%\Desktop\test_video\test_vp9.webm`; FFmpeg exit 0,
 sampled verification passed, terminal C5 done at 182/182 frames. Agent full
 video/audio decode passes. Readback: VP9 Profile 2, 10-bit 4:2:0, 1920×1080,
 30000/1001 fps, 182 frames, 48 kHz stereo Opus, 6.080 seconds, 726,231 bytes.

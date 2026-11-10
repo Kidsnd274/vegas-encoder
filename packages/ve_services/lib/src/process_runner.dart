@@ -73,6 +73,12 @@ class ProcessOutput {
   }
 }
 
+/// Probe timeouts: identity and `-version` 30 s, full lists and `-h full` 60 s,
+/// one encoder's or filter's help 30 s. Hardware tests keep their own.
+const probeIdentityTimeout = Duration(seconds: 30);
+const probeListTimeout = Duration(seconds: 60);
+const probeHelpTimeout = Duration(seconds: 30);
+
 abstract interface class ProcessExecutor {
   Future<ProcessOutput> run(
     String executable,
@@ -283,6 +289,8 @@ class FakeProcessExecutor implements ProcessExecutor {
   )
   handler;
   final List<(String, List<String>)> calls = [];
+  /// The timeout each call in [calls] asked for.
+  final List<Duration> timeouts = [];
   @override
   Future<ProcessOutput> run(
     String executable,
@@ -297,6 +305,7 @@ class FakeProcessExecutor implements ProcessExecutor {
     final token = cancellation ?? CancellationToken();
     token.check();
     calls.add((executable, List.unmodifiable(arguments)));
+    timeouts.add(timeout);
     final result = await handler(executable, arguments, token);
     if (result.stderr.isNotEmpty) onStderr?.call(result.stderr);
     if (result.stdout.isNotEmpty) onStdout?.call(result.stdout);

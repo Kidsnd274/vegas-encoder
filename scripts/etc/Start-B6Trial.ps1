@@ -3,7 +3,7 @@
 param(
   [ValidateSet('App','Vegas')][string]$Target = 'App',
   [string]$CandidateRoot = (Join-Path $PSScriptRoot '..\..\build\b6-candidate-0.1.6'),
-  [string]$VegasDir = 'C:\Program Files\BorisFX\Vegas Pro 2026'
+  [string]$VegasDir = (Join-Path $env:ProgramFiles 'BorisFX\Vegas Pro 2026')
 )
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path -LiteralPath $CandidateRoot).Path

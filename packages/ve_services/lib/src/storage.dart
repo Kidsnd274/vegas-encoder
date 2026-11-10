@@ -88,49 +88,67 @@ JsonMap decodeJson(String text) {
   }
 }
 
+final _int64Min = BigInt.parse('-9223372036854775808');
+final _int64Max = BigInt.parse('9223372036854775807');
+
+bool _isDigit(int u) => u >= 0x30 && u <= 0x39;
+bool _isNumberPart(int u) =>
+    _isDigit(u) || u == 0x65 || u == 0x45 || u == 0x2B || u == 0x2E || u == 0x2D;
+bool _isSpace(int u) => u == 0x20 || u == 0x0D || u == 0x0A || u == 0x09;
+
 JsonMap _decodeJson(String text) {
-  if (utf8.encode(text).length > jsonFileLimit) {
+  // Each UTF-16 unit is at most 3 UTF-8 bytes, so short texts skip the encode.
+  if (text.length > jsonFileLimit ~/ 3 && utf8.encode(text).length > jsonFileLimit) {
     throw const ServiceException('FILE-LIMIT', 'JSON exceeds 1 MiB.');
   }
   // Dart's decoder overwrites duplicate keys and rounds oversized integers.
   // Preflight tokens before decoding, including escaped duplicate key names.
   final scopes = <Set<String>?>[];
-  for (var i = 0; i < text.length; i++) {
-    final c = text[i];
-    if (c == '{' || c == '[') {
-      scopes.add(c == '{' ? <String>{} : null);
+  final length = text.length;
+  for (var i = 0; i < length; i++) {
+    final u = text.codeUnitAt(i);
+    if (u == 0x7B || u == 0x5B) {
+      scopes.add(u == 0x7B ? <String>{} : null);
       if (scopes.length > 64) invalid('JSON nesting exceeds 64 levels.');
-    } else if (c == '}' || c == ']') {
+    } else if (u == 0x7D || u == 0x5D) {
       if (scopes.isEmpty) invalid('Unbalanced JSON.');
       scopes.removeLast();
-    } else if (c == '"') {
+    } else if (u == 0x22) {
       final start = i++;
-      for (; i < text.length && text[i] != '"'; i++) {
-        if (text[i] == '\\') i++;
+      var escaped = false;
+      for (; i < length && text.codeUnitAt(i) != 0x22; i++) {
+        if (text.codeUnitAt(i) == 0x5C) {
+          escaped = true;
+          i++;
+        }
       }
-      if (i >= text.length) invalid('Unterminated JSON string.');
+      if (i >= length) invalid('Unterminated JSON string.');
       var next = i + 1;
-      while (next < text.length && ' \r\n\t'.contains(text[next])) {
+      while (next < length && _isSpace(text.codeUnitAt(next))) {
         next++;
       }
-      if (next < text.length &&
-          text[next] == ':' &&
+      if (next < length &&
+          text.codeUnitAt(next) == 0x3A &&
           scopes.isNotEmpty &&
           scopes.last != null) {
-        final key = jsonDecode(text.substring(start, i + 1)) as String;
+        final key = escaped
+            ? jsonDecode(text.substring(start, i + 1)) as String
+            : text.substring(start + 1, i);
         if (!scopes.last!.add(key)) invalid('Duplicate JSON key: $key.');
       }
-    } else if (c == '-' || (c.codeUnitAt(0) >= 48 && c.codeUnitAt(0) <= 57)) {
+    } else if (u == 0x2D || _isDigit(u)) {
       final start = i;
-      while (i + 1 < text.length &&
-          RegExp(r'[0-9eE+.-]').hasMatch(text[i + 1])) {
+      var integer = true;
+      while (i + 1 < length && _isNumberPart(text.codeUnitAt(i + 1))) {
         i++;
+        final v = text.codeUnitAt(i);
+        if (!_isDigit(v)) integer = false;
       }
-      final token = text.substring(start, i + 1);
-      if (RegExp(r'^-?\d+$').hasMatch(token)) {
-        final integer = BigInt.parse(token);
-        if (integer < BigInt.parse('-9223372036854775808') ||
-            integer > BigInt.parse('9223372036854775807')) {
+      final digits = i + 1 - start - (u == 0x2D ? 1 : 0);
+      // Fewer than 19 digits always fits; only longer integers need BigInt.
+      if (integer && digits >= 19) {
+        final value = BigInt.parse(text.substring(start, i + 1));
+        if (value < _int64Min || value > _int64Max) {
           invalid('JSON integer exceeds signed 64-bit bounds.');
         }
       }

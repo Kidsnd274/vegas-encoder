@@ -5,7 +5,7 @@ The filename remains stable for existing links.
 
 ## Working location and ownership
 
-- Work in **`L:\repos\vegas-encoder`**, the original repository folder. The current
+- Work in **the original checkout** (the original repository folder). The current
   local branch is **`master`**; no new worktree is needed.
 - One agent can edit the app, packages, native code, tests, scripts and product
   documentation together. The former app/platform path ownership split is retired.
@@ -38,7 +38,7 @@ link/source-transfer checks. No real-host or installed-binary change was made.
 Do not overwrite it, unrelated `.claude/`, historical evidence or build outputs.
 Old worktrees remain for reference and operational rollback, not development.
 The installed trial still references files under
-`L:\repos\vegas-encoder-platform\build\b6-candidate-0.1.7-template-name-fix`.
+the sibling `vegas-encoder-platform` checkout's `build\b6-candidate-0.1.7-template-name-fix`.
 The separate faster-progress candidate is prepared there and its owner trial is
 deferred. Moving source work does not move installed paths or qualify a new build.
 Keep those candidates, manifests, isolated profiles and exact rollback files in
@@ -70,7 +70,7 @@ C1 recipe/profiles, C2 core API, C3 services, C4 edit sessions, C5 live status,
 C6 job records/index and C7 settings. Implement producer, consumer and focused
 checks together; preserve backwards-compatible unknown fields and facts.
 
-Windows x64 only, using existing MSVC and `L:\flutter`. Read relevant specs and
+Windows x64 only, using existing MSVC and the Flutter SDK. Read relevant specs and
 native integration docs before changes. Follow AGENTS.md for current library
 documentation and Context7.
 

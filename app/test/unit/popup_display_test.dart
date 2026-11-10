@@ -55,6 +55,15 @@ void main() {
       expect(line.showChanges, isTrue, reason: 'both at once (S3)');
     });
 
+    test('a newer revision with an identical recipe is not "library newer" (C3)', () {
+      final carried = state();
+      expect(carried.base, isNotNull, reason: 'the template carries its base');
+      final line = originLine(carried, local: 0, since: 0);
+      expect(line.state, OriginState.unchanged);
+      expect(line.updateFromLibrary, isFalse);
+      expect(originLine(carried, local: 0, since: 1).state, OriginState.libraryNewer);
+    });
+
     test('origin deleted: the template still has all its settings', () {
       final line = originLine(state(library: const OriginMissing()));
       expect(line.state, OriginState.deleted);

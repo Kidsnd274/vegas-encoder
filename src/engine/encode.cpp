@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
+#include <cstring>
 #include <deque>
 #include <filesystem>
 #include <limits>
@@ -23,6 +24,23 @@ struct Handle {
   }
   bool Valid() const { return h && h != INVALID_HANDLE_VALUE; }
 };
+// Volume serial, file index, size and last write time: "still the same file".
+struct FileIdentity {
+  DWORD volume = 0; uint64_t index = 0, size = 0, written = 0;
+  bool operator==(const FileIdentity& o) const { return volume == o.volume && index == o.index && size == o.size && written == o.written; }
+};
+bool ReadIdentity(const std::wstring& path, FileIdentity& identity) {
+  Handle file;
+  file.h = CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  BY_HANDLE_FILE_INFORMATION info{};
+  if (!file.Valid() || !GetFileInformationByHandle(file.h, &info)) return false;
+  identity.volume = info.dwVolumeSerialNumber;
+  identity.index = (uint64_t(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
+  identity.size = (uint64_t(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
+  identity.written = (uint64_t(info.ftLastWriteTime.dwHighDateTime) << 32) | info.ftLastWriteTime.dwLowDateTime;
+  return true;
+}
 
 // Windows CRT argv quoting; CreateProcessW receives an explicit application path.
 std::wstring Quote(const std::wstring& value) {
@@ -53,12 +71,14 @@ BOOL CreateProcessPolled(const std::function<BOOL()>& create, const std::functio
 
 EncodeRate EncodeRate::FromDouble(double fps) {
   if (!std::isfinite(fps) || fps <= 0) return {};
-  for (DWORD n : {24000u, 30000u, 60000u, 120000u})
-    if (std::abs(fps - (double)n / 1001) < 1e-8) return {n, 1001};
-  double nearest = std::round(fps);
-  if (nearest >= 1 && nearest <= 240 && std::abs(fps - nearest) < 1e-8)
-    return {(DWORD)nearest, 1};
-  return {};  // prototype: reject an unqualified rate instead of rounding it
+  // Exact matches only: n/1 (1..240), n/2 (half rates such as 12.5), and k*1000/1001 (k <= 240).
+  for (DWORD k = 1; k <= 240; ++k)
+    if (std::abs(fps - k * 1000.0 / 1001) < 1e-8) return {k * 1000, 1001};
+  const double nearest = std::round(fps);
+  if (nearest >= 1 && nearest <= 240 && std::abs(fps - nearest) < 1e-8) return {(DWORD)nearest, 1};
+  const double half = std::round(fps * 2);
+  if (half >= 1 && half <= 480 && std::abs(fps * 2 - half) < 1e-8) return {(DWORD)half, 2};
+  return {};  // Refuse an unqualified rate instead of rounding it.
 }
 bool EncodeRate::Endpoint(LONGLONG frames, DWORD sampleRate, LONGLONG& samples) const {
   if (!num || !den || !sampleRate || frames < 0) return false;
@@ -91,8 +111,47 @@ struct FfmpegEncoder::Impl {
   std::string reason;
   EncodeStats stats;
   std::wstring output;
-  DWORD pipeTimeout = 10000, finishTimeout = 120000;
+  DWORD stallTimeout = 120000, connectTimeout = 30000;
+  uint64_t audioBytesPerSecond = 48000 * 2 * 4;
+  std::atomic<bool> endedEarly{false};
+  // Last proof that FFmpeg is working: an input write completed, or frame/out_time_us/total_size advanced.
+  std::atomic<ULONGLONG> activity{0};
+  std::atomic<long long> lastFrame{-1};
+  std::atomic<uint64_t> videoBuffersAllocated{0};
+  bool replaceExisting = false, hadExisting = false;
+  FileIdentity existing;
+  // Finished input buffers come back here (bounded: queue depth + 2); ownership moves only.
+  std::mutex poolMutex;
+  std::vector<std::vector<BYTE>> pool[2];
+  void Recycle(size_t index, std::vector<BYTE>&& buffer) {
+    std::lock_guard<std::mutex> lock(poolMutex);
+    if (pool[index].size() < (index ? 8u : 10u)) pool[index].push_back(std::move(buffer));
+  }
   bool withAudio = false, tempOwned = false, finished = false, started = false;
+
+  // Size the audio queue by time, not by block count: an encoder's lookahead can
+  // hold back audio reads for seconds while it consumes video (the AV1 "stall").
+  size_t AudioLimit() const {
+    return (size_t)(std::min)((std::max)(audioBytesPerSecond * 60, (uint64_t)2 * 1024 * 1024), (uint64_t)192 * 1024 * 1024);
+  }
+  void Active() { activity = GetTickCount64(); }
+  bool Stalled() const { return GetTickCount64() - activity.load() > stallTimeout; }
+  std::string StallMessage() const {
+    auto text = "FFmpeg stopped making progress for " + std::to_string((stallTimeout + 500) / 1000) + " s";
+    if (lastFrame >= 0) text += " (last frame " + std::to_string(lastFrame.load()) + ")";
+    return text + ".";
+  }
+  void Observe(const char* bytes, size_t count, std::string& line, long long (&seen)[3]) {
+    static const char* keys[] = {"frame=", "out_time_us=", "total_size="};
+    for (size_t i = 0; i < count; ++i) {
+      if (bytes[i] != '\n') { if (line.size() < 128) line += bytes[i]; continue; }
+      for (int k = 0; k < 3; ++k) if (line.rfind(keys[k], 0) == 0) {
+        const long long value = _strtoi64(line.c_str() + strlen(keys[k]), nullptr, 10);
+        if (value > seen[k]) { seen[k] = value; Active(); if (k == 0) lastFrame = value; }
+      }
+      line.clear();
+    }
+  }
 
   void Fail(HRESULT hr, const char* why) {
     {
@@ -105,20 +164,39 @@ struct FfmpegEncoder::Impl {
     for (auto& pipe : pipes) pipe.changed.notify_all();
   }
   bool Exited() const { return process.Valid() && WaitForSingleObject(process.h, 0) == WAIT_OBJECT_0; }
+  static bool ClosedPipe(DWORD code) { return code == ERROR_NO_DATA || code == ERROR_BROKEN_PIPE || code == ERROR_PIPE_NOT_CONNECTED; }
+  // FFmpeg stopped reading its input. Exit code 0 means an option (for example -t)
+  // finished the output early (decision D4); anything else is a failure.
+  void InputClosed() {
+    if (stopping || failed || endedEarly) return;
+    while (!Exited() && !Stalled() && !stopping && !failed) Sleep(10);
+    if (stopping || failed) return;
+    if (!Exited()) { Fail(E_FAIL, StallMessage().c_str()); return; }
+    DWORD code = STILL_ACTIVE;
+    GetExitCodeProcess(process.h, &code);
+    if (code != 0) { Fail(E_FAIL, "FFmpeg exited before input EOF"); return; }
+    endedEarly = true;
+    for (auto& pipe : pipes) pipe.changed.notify_all();
+  }
 
-  bool Complete(Pipe& pipe, OVERLAPPED& ov, DWORD& count) {
+  bool Complete(Pipe& pipe, OVERLAPPED& ov, DWORD& count, bool connecting = false) {
     ULONGLONG start = GetTickCount64();
     for (;;) {
       DWORD wait = WaitForSingleObject(ov.hEvent, 100);
       if (wait == WAIT_OBJECT_0) {
         if (GetOverlappedResult(pipe.handle.h, &ov, &count, FALSE)) return true;
-        if (!stopping && !failed) Fail(HRESULT_FROM_WIN32(GetLastError()), "named pipe I/O failed");
+        const DWORD code = GetLastError();
+        if (ClosedPipe(code)) InputClosed();
+        else if (!stopping && !failed && !endedEarly) Fail(HRESULT_FROM_WIN32(code), "named pipe I/O failed");
         return false;
       }
-      if (wait == WAIT_FAILED || stopping || failed || Exited() || GetTickCount64() - start > pipeTimeout) {
-        if (!stopping && !failed)
-          Fail(wait == WAIT_FAILED ? HRESULT_FROM_WIN32(GetLastError()) : E_FAIL,
-               Exited() ? "FFmpeg exited before input EOF" : "named pipe operation timed out");
+      const bool exited = Exited();
+      const bool late = connecting ? GetTickCount64() - start > connectTimeout : Stalled();
+      if (wait == WAIT_FAILED || stopping || failed || endedEarly || exited || late) {
+        if (wait == WAIT_FAILED) { if (!stopping && !failed) Fail(HRESULT_FROM_WIN32(GetLastError()), "named pipe wait failed"); }
+        else if (exited) InputClosed();
+        else if (late && !stopping && !failed && !endedEarly)
+          Fail(E_FAIL, connecting ? "FFmpeg did not open its input pipe in time" : StallMessage().c_str());
         CancelIoEx(pipe.handle.h, &ov);
         // Cancellation is a request: keep operation/buffer storage alive until completion.
         GetOverlappedResult(pipe.handle.h, &ov, &count, TRUE);
@@ -141,23 +219,27 @@ struct FfmpegEncoder::Impl {
         if (!connected) {
           DWORD code = GetLastError();
           if (code == ERROR_PIPE_CONNECTED) connected = true;
-          else if (code == ERROR_IO_PENDING) connected = Complete(pipe, ov, count);
+          else if (code == ERROR_IO_PENDING) connected = Complete(pipe, ov, count, true);
           else Fail(HRESULT_FROM_WIN32(code), "cannot connect FFmpeg input pipe");
         }
-        while (connected && !stopping && !failed) {
+        while (connected && !stopping && !failed && !endedEarly) {
           std::vector<BYTE> data;
+          bool closed = false;
           {
             std::unique_lock<std::mutex> lock(pipe.mutex);
-            while (pipe.queue.empty() && !pipe.eof && !stopping && !failed) {
+            while (pipe.queue.empty() && !pipe.eof && !stopping && !failed && !endedEarly) {
               pipe.changed.wait_for(lock, std::chrono::milliseconds(100));
-              if (Exited()) { Fail(E_FAIL, "FFmpeg exited before input EOF"); break; }
+              if (Exited()) { closed = true; break; }
             }
-            if (stopping || failed || (pipe.queue.empty() && pipe.eof)) break;
-            data = std::move(pipe.queue.front());
-            pipe.queue.pop_front();  // byte/block accounting includes this in-flight buffer
+            if (!closed && !stopping && !failed && !endedEarly && !(pipe.queue.empty() && pipe.eof)) {
+              data = std::move(pipe.queue.front());
+              pipe.queue.pop_front();  // byte/block accounting includes this in-flight buffer
+            }
           }
+          if (closed) { InputClosed(); break; }
+          if (data.empty()) break;
           size_t offset = 0;
-          while (offset < data.size() && !stopping && !failed) {
+          while (offset < data.size() && !stopping && !failed && !endedEarly) {
             ResetEvent(event.h);
             ov = OVERLAPPED{};
             ov.hEvent = event.h;
@@ -167,14 +249,16 @@ struct FfmpegEncoder::Impl {
             if (!written) {
               DWORD code = GetLastError();
               if (code == ERROR_IO_PENDING) written = Complete(pipe, ov, count);
+              else if (ClosedPipe(code)) InputClosed();
               else Fail(HRESULT_FROM_WIN32(code), "FFmpeg input pipe write failed");
             }
             if (!written || !count || count > want) {
-              if (!stopping && !failed) Fail(E_FAIL, "invalid pipe write completion");
+              if (!stopping && !failed && !endedEarly) Fail(E_FAIL, "invalid pipe write completion");
               break;
             }
             offset += count;
             pipe.written += count;
+            Active();
           }
           {
             std::lock_guard<std::mutex> lock(pipe.mutex);
@@ -182,6 +266,7 @@ struct FfmpegEncoder::Impl {
             pipe.blocks--;
           }
           pipe.changed.notify_all();
+          Recycle(index, std::move(data));
         }
       }
     } catch (...) { Fail(E_OUTOFMEMORY, "pipe writer exception"); }
@@ -227,31 +312,37 @@ FfmpegEncoder::FfmpegEncoder() : p_(new Impl) {}
 FfmpegEncoder::~FfmpegEncoder() = default;
 
 bool FfmpegEncoder::Start(const std::wstring& exe, const std::wstring& output, LONG width, LONG height,
-                          EncodeRate rate, bool audio, DWORD pipeTimeoutMs, DWORD finishTimeoutMs) {
-  return StartImpl(exe, output, width, height, rate, audio, pipeTimeoutMs, finishTimeoutMs, {}, {}, {}, {});
+                          EncodeRate rate, bool audio, DWORD stallTimeoutMs, DWORD connectTimeoutMs) {
+  return StartImpl(exe, output, width, height, rate, audio, stallTimeoutMs, connectTimeoutMs, {}, {}, {}, {});
 }
 bool FfmpegEncoder::StartCompiled(const std::wstring& exe, const std::wstring& output,
-                                 const std::wstring& log, DWORD pipeTimeoutMs, DWORD finishTimeoutMs,
+                                 const std::wstring& log, DWORD stallTimeoutMs, DWORD connectTimeoutMs,
                                  const Compile& compile, const Progress& progress, const Poll& startupPoll) {
   if (!compile) { p_->Fail(E_INVALIDARG, "missing command compiler"); return false; }
-  return StartImpl(exe, output, 0, 0, {}, true, pipeTimeoutMs, finishTimeoutMs, compile, progress, log, startupPoll);
+  return StartImpl(exe, output, 0, 0, {}, true, stallTimeoutMs, connectTimeoutMs, compile, progress, log, startupPoll);
 }
 bool FfmpegEncoder::StartImpl(const std::wstring& exe, const std::wstring& output, LONG width, LONG height,
-                              EncodeRate rate, bool audio, DWORD pipeTimeoutMs, DWORD finishTimeoutMs,
+                              EncodeRate rate, bool audio, DWORD stallTimeoutMs, DWORD connectTimeoutMs,
                               const Compile& compile, const Progress& progress, const std::wstring& logPath, const Poll& startupPoll) {
   auto& p = *p_;
   if (p.started) { p.Fail(E_UNEXPECTED, "encoder instances are single-use"); return false; }
   p.started = true;
   p.output = output;
   p.withAudio = audio;
-  p.pipeTimeout = (std::max)((DWORD)100, pipeTimeoutMs);
-  p.finishTimeout = (std::max)((DWORD)100, finishTimeoutMs);
+  p.stallTimeout = (std::max)((DWORD)100, stallTimeoutMs);
+  p.connectTimeout = (std::max)((DWORD)100, connectTimeoutMs);
   if (exe.size() < 3 || exe[1] != L':' || (exe[2] != L'\\' && exe[2] != L'/')) {
     p.Fail(E_INVALIDARG, "FFmpegPath must be an absolute executable path"); return false;
   }
   if (GetFileAttributesW(output.c_str()) != INVALID_FILE_ATTRIBUTES) {
-    p.Fail(HRESULT_FROM_WIN32(ERROR_FILE_EXISTS), "destination already exists (prototype refuses overwrite)");
-    return false;
+    // Decision D1: replace only a file VEGAS confirmed, and only if it is unchanged at publication.
+    if (!p.replaceExisting) {
+      p.Fail(HRESULT_FROM_WIN32(ERROR_FILE_EXISTS), "The destination file already exists. Choose another name."); return false;
+    }
+    if (!ReadIdentity(output, p.existing)) {
+      p.Fail(HRESULT_FROM_WIN32(GetLastError()), "Cannot read the existing destination file."); return false;
+    }
+    p.hadExisting = true;
   }
   GUID id{};
   if (FAILED(CoCreateGuid(&id))) { p.Fail(E_FAIL, "cannot create encode session ID"); return false; }
@@ -274,20 +365,21 @@ bool FfmpegEncoder::StartImpl(const std::wstring& exe, const std::wstring& outpu
   temp.Close();
   for (size_t i = 0; i < (audio ? 2u : 1u); i++) {
     std::wstring name = prefix + (i ? L"-audio" : L"-video");
-    p.pipes[i].limit = i ? 2u * 1024 * 1024 : 64u * 1024 * 1024;
+    p.pipes[i].limit = i ? p.AudioLimit() : 64u * 1024 * 1024;
     p.pipes[i].handle.h = CreateNamedPipeW(name.c_str(), PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED |
                                          FILE_FLAG_FIRST_PIPE_INSTANCE,
                                          PIPE_TYPE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
                                          1, 65536, 65536, 0, nullptr);
     if (!p.pipes[i].handle.Valid()) { p.Fail(HRESULT_FROM_WIN32(GetLastError()), "cannot create input pipe"); return false; }
   }
+  // Current FFmpeg rejects -thread_queue_size as an input option; the core dropped it too.
   std::vector<std::wstring> args = {exe, L"-hide_banner", L"-nostdin", L"-y",
-    L"-thread_queue_size", L"8", L"-probesize", L"32", L"-analyzeduration", L"0",
+    L"-probesize", L"32", L"-analyzeduration", L"0",
     L"-f", L"rawvideo", L"-pixel_format", L"p010le", L"-video_size",
     std::to_wstring(width) + L"x" + std::to_wstring(height), L"-framerate", rate.Text(),
     L"-i", prefix + L"-video"};
   if (audio) {
-    const std::vector<std::wstring> a = {L"-thread_queue_size", L"8", L"-probesize", L"32",
+    const std::vector<std::wstring> a = {L"-probesize", L"32",
       L"-analyzeduration", L"0", L"-f", L"f32le", L"-ar", L"48000", L"-ac", L"2",
       L"-i", prefix + L"-audio"};
     args.insert(args.end(), a.begin(), a.end());
@@ -378,9 +470,11 @@ bool FfmpegEncoder::StartImpl(const std::wstring& exe, const std::wstring& outpu
     p.Fail(HRESULT_FROM_WIN32(GetLastError()), "cannot resume FFmpeg"); return false;
   }
   input.Close(); nullOut.Close(); log.Close();
+  p.Active();
   if (progress) p.progressWorker = std::thread([&p, progress] {
-    char bytes[4096]; DWORD count = 0;
+    char bytes[4096]; DWORD count = 0; std::string line; long long seen[3] = {-1, -1, -1};
     while (ReadFile(p.progressRead.h, bytes, sizeof(bytes), &count, nullptr) && count) {
+      p.Observe(bytes, count, line, seen);
       try { progress(bytes, count); } catch (...) { Log("progress observer failed (nonfatal)"); }
     }
   });
@@ -394,20 +488,23 @@ bool FfmpegEncoder::Submit(bool audio, std::vector<BYTE> data, const Poll& poll)
   auto& pipe = p.pipes[audio ? 1 : 0];
   if (data.empty()) return true;
   if (data.size() > pipe.limit || (audio && !p.withAudio)) { p.Fail(E_INVALIDARG, "input exceeds pipe queue limit"); return false; }
-  ULONGLONG start = GetTickCount64();
-  for (;;) {
-    if (!poll() || p.failed || p.stopping) return false;
-    if (p.Exited()) { p.Fail(E_FAIL, "FFmpeg exited before input EOF"); return false; }
-    std::unique_lock<std::mutex> lock(pipe.mutex);
-    if (pipe.bytes <= pipe.limit - data.size() && pipe.blocks < (audio ? 128u : 8u)) {
-      pipe.bytes += data.size(); pipe.blocks++;
-      pipe.highWater = (std::max)(pipe.highWater, (uint64_t)pipe.bytes);
-      pipe.queue.push_back(std::move(data));
-      pipe.changed.notify_all();
-      return true;
+  // The caller polls once per frame; poll here only while waiting for queue space (every 100 ms).
+  for (bool waited = false;; waited = true) {
+    if ((waited && !poll()) || p.failed || p.stopping) return false;
+    if (p.endedEarly) return true;  // FFmpeg already finished; the caller stops fetching input.
+    if (p.Exited()) { p.InputClosed(); return p.endedEarly; }
+    {
+      std::unique_lock<std::mutex> lock(pipe.mutex);
+      if (pipe.bytes <= pipe.limit - data.size() && pipe.blocks < (audio ? 4096u : 8u)) {
+        pipe.bytes += data.size(); pipe.blocks++;
+        pipe.highWater = (std::max)(pipe.highWater, (uint64_t)pipe.bytes);
+        pipe.queue.push_back(std::move(data));
+        pipe.changed.notify_all();
+        return true;
+      }
+      pipe.changed.wait_for(lock, std::chrono::milliseconds(100));
     }
-    pipe.changed.wait_for(lock, std::chrono::milliseconds(100));
-    if (GetTickCount64() - start > p.pipeTimeout) { p.Fail(E_FAIL, "input queue wait timed out"); return false; }
+    if (p.Stalled()) { p.Fail(E_FAIL, p.StallMessage().c_str()); return false; }
   }
 }
 
@@ -420,10 +517,10 @@ bool FfmpegEncoder::Finish(const Poll& poll, bool publish) {
     p.pipes[i].eof = true;
     p.pipes[i].changed.notify_all();
   }
-  ULONGLONG start = GetTickCount64();
+  p.Active();  // A slow flush is healthy while progress keeps advancing.
   while (!p.pipes[0].done || (p.withAudio && !p.pipes[1].done) || !p.Exited()) {
-    if (!poll() || p.failed || GetTickCount64() - start > p.finishTimeout) {
-      if (!p.failed && GetTickCount64() - start > p.finishTimeout) p.Fail(E_FAIL, "FFmpeg finalization timed out");
+    if (!poll() || p.failed || p.Stalled()) {
+      if (!p.failed && p.Stalled()) p.Fail(E_FAIL, p.StallMessage().c_str());
       p.Abort(); return false;
     }
     WaitForSingleObject(p.process.h, 100);
@@ -452,14 +549,51 @@ bool FfmpegEncoder::Publish() {
   if (!p.finished || p.failed || p.stopping || p.stats.published) {
     p.Fail(E_UNEXPECTED, "publication requires a finished unfailed encoder"); return false;
   }
-  // No REPLACE_EXISTING: a destination created during encoding must be preserved.
-  if (!MoveFileExW(p.stats.tempPath.c_str(), p.output.c_str(), MOVEFILE_WRITE_THROUGH)) {
-    p.Fail(HRESULT_FROM_WIN32(GetLastError()), "cannot publish completed output"); p.Abort(); return false;
+  // A refused publication keeps the finished render and names it.
+  auto refuse = [&](DWORD code, const std::string& why) {
+    p.tempOwned = false;
+    p.Fail(HRESULT_FROM_WIN32(code), (why + " The finished render was kept as " + Utf8(p.stats.tempPath.c_str()) + ".").c_str());
+    p.Abort(); return false;
+  };
+  if (p.hadExisting) {
+    FileIdentity now;
+    if (!ReadIdentity(p.output, now) || !(now == p.existing))
+      return refuse(ERROR_FILE_EXISTS, "The destination file changed during the render, so it was not replaced.");
+    if (!MoveFileExW(p.stats.tempPath.c_str(), p.output.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+      const DWORD code = GetLastError();
+      return refuse(code, code == ERROR_SHARING_VIOLATION || code == ERROR_ACCESS_DENIED || code == ERROR_LOCK_VIOLATION ?
+        "The existing destination file is in use, so it was not replaced." : "The existing destination file could not be replaced.");
+    }
+    p.stats.replacedExisting = true;
+  } else if (!MoveFileExW(p.stats.tempPath.c_str(), p.output.c_str(), MOVEFILE_WRITE_THROUGH)) {
+    // No REPLACE_EXISTING: a destination created during encoding must be preserved.
+    const DWORD code = GetLastError();
+    if (code == ERROR_ALREADY_EXISTS || code == ERROR_FILE_EXISTS)
+      return refuse(code, "The destination file appeared during the render, so it was not overwritten.");
+    p.Fail(HRESULT_FROM_WIN32(code), "cannot publish completed output"); p.Abort(); return false;
   }
   p.stats.published = true;
   p.tempOwned = false;
   p.process.Close(); p.job.Close();
   return true;
+}
+void FfmpegEncoder::SetAudioBytesPerSecond(uint64_t bytesPerSecond) { p_->audioBytesPerSecond = bytesPerSecond; }
+void FfmpegEncoder::SetReplaceExisting(bool replace) { p_->replaceExisting = replace; }
+bool FfmpegEncoder::EndedEarly() const { return p_->endedEarly; }
+std::vector<BYTE> FfmpegEncoder::TakeBuffer(bool audio, size_t size) {
+  auto& p = *p_;
+  {
+    std::lock_guard<std::mutex> lock(p.poolMutex);
+    auto& pool = p.pool[audio ? 1 : 0];
+    for (auto it = pool.begin(); it != pool.end(); ++it) if (it->capacity() >= size) {
+      auto buffer = std::move(*it);
+      pool.erase(it);
+      buffer.resize(size);  // within capacity: no allocation, and no fill for a same-size frame
+      return buffer;
+    }
+  }
+  if (!audio) p.videoBuffersAllocated++;
+  return std::vector<BYTE>(size);
 }
 void FfmpegEncoder::RetainPartial() { p_->tempOwned = false; }
 void FfmpegEncoder::Abort() { p_->Abort(); }
@@ -469,6 +603,8 @@ EncodeStats FfmpegEncoder::Stats() const {
   EncodeStats s = p_->stats;
   s.videoBytes = p_->pipes[0].written; s.audioBytes = p_->pipes[1].written;
   s.videoHighWater = p_->pipes[0].highWater; s.audioHighWater = p_->pipes[1].highWater;
+  s.videoQueueLimit = 64u * 1024 * 1024; s.audioQueueLimit = p_->AudioLimit();
+  s.videoBuffersAllocated = p_->videoBuffersAllocated;
   return s;
 }
 }  // namespace vegas_encoder

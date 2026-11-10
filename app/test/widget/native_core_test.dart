@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui' show AppExitResponse;
 
 import 'package:flutter/material.dart';
@@ -229,6 +230,88 @@ void main() {
       await tester.tap(find.text('Save anyway'));
       await tester.pumpAndSettle();
       expect((await mine(tester)).single.recipe.video.quality, 20);
+    });
+
+    testWidgets('Save on close warns about errors only for the chosen FFmpeg (C13)', (tester) async {
+      await pump(tester);
+      await tester.tap(find.text('FFmpeg 8.1 full (default)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('FFmpeg 8.0 LGPL').last);
+      await tester.pumpAndSettle();
+      await type(tester, fieldWith('18'), '20');
+      final exit = tester.binding.handleRequestAppExit();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('can’t render with FFmpeg 8.0 LGPL'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(await exit, AppExitResponse.cancel, reason: 'Cancel keeps the window open');
+      expect(await mine(tester), isEmpty);
+    });
+
+    testWidgets('an option that can stop the render early asks before saving (C16, D4)', (tester) async {
+      await pump(tester);
+      await type(tester, extraField(), '-t 5');
+      await save(tester);
+      expect(find.text('The output may be shorter than the timeline'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(await mine(tester), isEmpty, reason: 'Cancel keeps editing');
+      expect(editor(tester).dirty, isTrue);
+
+      await save(tester);
+      await tester.tap(find.text('Save anyway'));
+      await tester.pumpAndSettle();
+      expect(await mine(tester), hasLength(1), reason: 'Save anyway saves');
+    });
+
+    testWidgets('importing a preset that reads other files asks first (C9, D3)', (tester) async {
+      await pump(tester);
+      await type(tester, extraField(), '-attach cover.jpg');
+      await save(tester);
+      final saved = (await mine(tester)).single;
+      final share = 'vepreset:1:${base64Url.encode(utf8.encode(jsonEncode(saved.data)))}';
+
+      Future<void> importShare() async {
+        await tester.tap(find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Add a preset'));
+        await tester.pumpAndSettle();
+        expect(find.text('Import share string…'), findsOneWidget);
+        await tester.tap(find.text('Import share string…'));
+        // The field starts from the clipboard, read before the dialog opens.
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await tester.pumpAndSettle();
+        expect(find.text('Import share string'), findsOneWidget);
+        await tester.enterText(find.byType(TextField).last, share);
+        await tester.pumpAndSettle();
+        expect(find.text('Import'), findsWidgets);
+        await tester.tap(find.text('Import').last);
+        await tester.pumpAndSettle();
+      }
+
+      await importShare();
+      expect(find.text('“${saved.recipe.name}” reads other files or uses the network'), findsOneWidget);
+      await tester.tap(find.text('Cancel').last);
+      await tester.pumpAndSettle();
+      expect(await mine(tester), hasLength(1), reason: 'Cancel imports nothing');
+
+      await importShare();
+      await tester.tap(find.text('Import').last);
+      await tester.pumpAndSettle();
+      expect(await mine(tester), hasLength(2), reason: 'Import adds it');
+      expect(
+        find.bySemanticsLabel(RegExp('reads other files or uses the network')),
+        findsWidgets,
+        reason: 'the library rows keep the warning',
+      );
+    });
+
+    testWidgets('a recipe without length limits saves without asking (C16)', (tester) async {
+      await pump(tester);
+      await type(tester, fieldWith('18'), '19');
+      await save(tester);
+      expect(find.text('The output may be shorter than the timeline'), findsNothing);
+      expect(await mine(tester), hasLength(1));
     });
 
     testWidgets('closing with a draft that has errors stays open and says why', (tester) async {

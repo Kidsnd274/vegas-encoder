@@ -25,18 +25,20 @@ void Write(HANDLE file, const std::string& bytes) {
     offset += count;
   }
 }
-void Atomic(const std::wstring& path, const ve::Json& data) {
+// Records and the index are durable. Live status is replaced every update and is
+// worthless after a crash, so it skips the disk flush; the rename keeps it atomic.
+void Atomic(const std::wstring& path, const ve::Json& data, bool durable = true) {
   const auto bytes = data.dump();
   Check(bytes.size() <= VE_CORE_JSON_LIMIT, "job JSON exceeds 1 MiB");
   const auto temp = path + L"." + Widen(NewJobId()) + L".tmp";
   try {
     { File file; file.h = CreateFileW(temp.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
       Check(file.h != INVALID_HANDLE_VALUE, "cannot create job temporary file"); Write(file.h, bytes);
-      Check(FlushFileBuffers(file.h) != FALSE, "cannot flush job file"); }
+      if (durable) Check(FlushFileBuffers(file.h) != FALSE, "cannot flush job file"); }
     // Never retry a sharing violation for live files on Render; all retries here
     // belong to this independent writer and are bounded to 500 ms.
     const auto started = GetTickCount64();
-    while (!MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+    while (!MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | (durable ? MOVEFILE_WRITE_THROUGH : 0))) {
       const DWORD error = GetLastError();
       Check((error == ERROR_SHARING_VIOLATION || error == ERROR_ACCESS_DENIED) && GetTickCount64() - started < 500, "cannot replace job file");
       Sleep(10);
@@ -159,7 +161,7 @@ DWORD WINAPI JobStore::Worker(void* context) {
     }
     if (!status.is_null()) try {
       std::filesystem::create_directories(state->root);
-      Atomic(state->root + L"\\" + Widen(state->id) + L".live.json", status); last = GetTickCount64();
+      Atomic(state->root + L"\\" + Widen(state->id) + L".live.json", status, false); last = GetTickCount64();
       if (!monitorAttempted && !state->monitorApplication.empty()) {
         monitorAttempted = true;
         // Windows app creation happens only on this independent writer, after

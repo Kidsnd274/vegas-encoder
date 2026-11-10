@@ -2,12 +2,8 @@
 setlocal
 set "VE_B0_VCVARS=%~1"
 if not defined VE_B0_VCVARS set "VE_B0_VCVARS=%VEGAS_ENCODER_VCVARS%"
-if not defined VE_B0_VCVARS if exist "L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" set "VE_B0_VCVARS=L:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat"
-if defined VE_B0_VCVARS (
-  call "%VE_B0_VCVARS%" >nul || exit /b 1
-) else (
-  where cl >nul 2>nul || (echo Run from an x64 MSVC developer prompt or pass vcvars64.bat. & exit /b 1)
-)
+if not defined VE_B0_VCVARS call "%~dp0Find-VcVars.cmd" VE_B0_VCVARS || exit /b 1
+if defined VE_B0_VCVARS (call "%VE_B0_VCVARS%" >nul || exit /b 1)
 set "VE_B0_ROOT=%~dp0..\.."
 if not exist "%VE_B0_ROOT%\build\core-tests" mkdir "%VE_B0_ROOT%\build\core-tests"
 pushd "%VE_B0_ROOT%\build\core-tests" || exit /b 1

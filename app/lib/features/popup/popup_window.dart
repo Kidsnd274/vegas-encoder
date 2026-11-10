@@ -168,6 +168,7 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
       _showToast(why);
       return;
     }
+    if (!await _checkApplyLength()) return;
     try {
       await _controller.apply();
     } on ServiceException catch (e) {
@@ -259,10 +260,21 @@ class _PopupWindowState extends ConsumerState<PopupWindow> {
       settings: errors.settings,
       ffmpeg: errors.ffmpeg,
       installation: data.installation?.label ?? 'this FFmpeg',
+      limits: errors.limits,
     );
     if (!mounted) return false;
     if (check == SaveCheck.showSetting) _showField(errors.settings.first.field);
     return check == SaveCheck.save;
+  }
+
+  /// Decision D4: Apply asks first when the settings can stop the render early.
+  Future<bool> _checkApplyLength() async {
+    final s = _state;
+    final data = ref.read(popupEditorProvider);
+    if (s == null || data == null) return false;
+    final limits = saveErrors(ref.read(veCoreProvider), s.recipe, data.issues).limits;
+    final check = await confirmShorter(context, limits, action: 'Apply anyway');
+    return mounted && check == SaveCheck.save;
   }
 
   Future<void> _saveAsNew() async {

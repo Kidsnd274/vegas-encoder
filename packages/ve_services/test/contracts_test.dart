@@ -521,7 +521,7 @@ Future<void> main() async {
     'history states',
   );
   check(
-    (await jobs.get(index.first.id))!.ffmpeg.isFixture,
+    (await jobs.get(index.first.id))!.ffmpeg!.isFixture,
     'job identity is illustrative',
   );
   final speedRecord = (await jobs.get(index.first.id))!.copyWith(realtime: 0.73);

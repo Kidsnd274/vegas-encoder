@@ -38,7 +38,7 @@ void main() {
 
     test('recorded speed is independent of project length and elapsed time', () {
       final r = jobs['j-1042']!;
-      final noLength = r.copyWith(media: MediaDescription.fromJson({...r.media.toJson(), 'durationSec': null}));
+      final noLength = r.copyWith(media: MediaDescription.fromJson({...r.media!.toJson(), 'durationSec': null}));
       expect(realtimeRatio(noLength.copyWith(realtime: 0.7, elapsedSec: 0)), 0.7);
       expect(resultSentence(noLength.copyWith(realtime: 0.7)), 'Rendered in 24:46, 0.70× realtime, 9.84\u00A0GB.');
     });
@@ -58,6 +58,43 @@ void main() {
   test('size shows only for a published file', () {
     expect(sizeLabel(jobs['j-1038']!), '5.02\u00A0GB');
     expect(sizeLabel(jobs['j-1039']!), 'No file');
+  });
+
+  group('0.2.1 record facts (C15)', () {
+    test('a preflight failure says it stopped before encoding, with its reason', () {
+      final r = JobRecord.fromJson({
+        ...jobs['j-1039']!.data,
+        'stage': 'preflight',
+        'media': null,
+        'ffmpeg': null,
+        'argv': <String>[],
+        'message': 'Change the Render As filename to end in .mkv.',
+      });
+      expect(resultSentence(r), 'Stopped before encoding started. Change the Render As filename to end in .mkv.');
+      expect(commandParts(r), isEmpty, reason: 'no command ran');
+    });
+
+    test('a clock that stepped back leaves the time unknown', () {
+      final r = jobs['j-1039']!;
+      final skewed = r.copyWith(endedAt: DateTime.parse(r.startedAt).subtract(const Duration(seconds: 1)).toUtc().toIso8601String());
+      expect(resultSentence(skewed.copyWith(message: '')), 'Failed after an unknown time.');
+    });
+
+    test('the output notes name the requested file, a replacement and an early finish', () {
+      final r = JobRecord.fromJson({
+        ...jobs['j-1042']!.data,
+        'outputPath': r'D:\Renders\Lakeside (2).mp4',
+        'requestedOutputPath': r'D:\Renders\Lakeside.mp4',
+      });
+      expect(outputNotes(r), [
+        'Render As asked for Lakeside.mp4. That name was taken, so this render used the next free name.',
+      ]);
+      expect(outputNotes(JobRecord.fromJson({...jobs['j-1042']!.data, 'replacedExisting': true})), [
+        'This render replaced an existing file with the same name.',
+      ]);
+      expect(outputNotes(JobRecord.fromJson({...jobs['j-1042']!.data, 'endedEarly': true})).single, contains('shorter'));
+      expect(outputNotes(jobs['j-1042']!), isEmpty, reason: 'older records have none of these');
+    });
   });
 
   group('encoder', () {
@@ -98,7 +135,7 @@ void main() {
     test('the executable, then every argument', () {
       final r = jobs['j-1039']!;
       final line = commandLine(r);
-      expect(line, startsWith('${r.ffmpeg.path} -hide_banner -nostdin'));
+      expect(line, startsWith('${r.ffmpeg!.path} -hide_banner -nostdin'));
       expect(line, contains(r' -i \\.\pipe\vegas-encoder-j-1039-video '));
       expect(line, endsWith(r' -f matroska "D:\Renders\Channel trailer v2.ve-partial-j-1039.mkv"'));
     });
@@ -223,7 +260,7 @@ void main() {
       final r = jobs['j-1039']!;
       final at = r.argv.indexOf('-preset');
       final parts = commandParts(r.copyWith(errorTokenIndices: [at, at + 1]));
-      expect(parts.first, (text: quoteArgument(r.ffmpeg.path), error: false));
+      expect(parts.first, (text: quoteArgument(r.ffmpeg!.path), error: false));
       expect(parts.length, r.argv.length + 1);
       expect(
         [

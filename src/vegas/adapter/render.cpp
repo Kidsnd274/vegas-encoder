@@ -300,11 +300,22 @@ class RenderFile final : public ISfRenderFile {
   HRESULT STDMETHODCALLTYPE SetFile(LPCWSTR path) override {
     return NativeBoundary([&]() -> HRESULT {
       std::wstring resolved = path ? path : L"";
+      requestedPath_ = resolved;
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
       if (Cfg().encode && Cfg().legacyAutoNames) {
         try { resolved = ResolveRecipeDestination(recipeSnapshot_.at("recipe"),resolved); }
         catch (const std::invalid_argument&) { return E_INVALIDARG; }
         catch (const ve::Error&) { return E_INVALIDARG; }
+        // Decision D1: VEGAS checked the requested name, not this one, so never replace;
+        // take the first free "name (n).ext" and report it as the actual path.
+        if (_wcsicmp(resolved.c_str(), requestedPath_.c_str()) != 0 && GetFileAttributesW(resolved.c_str()) != INVALID_FILE_ATTRIBUTES) {
+          const auto dot = resolved.find_last_of(L'.'), slash = resolved.find_last_of(L"/\\");
+          const auto split = dot != std::wstring::npos && (slash == std::wstring::npos || dot > slash) ? dot : resolved.size();
+          for (int n = 2; n < 10000; ++n) {
+            const auto candidate = resolved.substr(0, split) + L" (" + std::to_wstring(n) + L")" + resolved.substr(split);
+            if (GetFileAttributesW(candidate.c_str()) == INVALID_FILE_ATTRIBUTES) { resolved = candidate; break; }
+          }
+        }
         BestEffortDiagnostic([&] { Log("Legacy destination: requested=%s actual=%s", Utf8(path ? path : L"").c_str(), Utf8(resolved.c_str()).c_str()); });
       }
 #endif
@@ -533,6 +544,10 @@ class RenderFile final : public ISfRenderFile {
       if (!video && SUCCEEDED(s->QueryInterface(__uuidof(ISfReadVideoRenderStream), (void**)&v))) video.reset(v);
       else if (!audio && SUCCEEDED(s->QueryInterface(__uuidof(ISfReadAudioStream), (void**)&a))) audio.reset(a);
     }
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    // VEGAS still supplies audio when the recipe turns it off; never check or read it then.
+    try { if (audio && !ve::Bool(recipeSnapshot_.at("recipe").at("audio").at(0), "enabled", true)) audio.reset(); } catch (...) {}
+#endif
     r.videoPresent = video != nullptr;
     r.audioPresent = audio != nullptr;
     SFAUDIORECORD fmt = r.tplAudio;
@@ -566,9 +581,21 @@ class RenderFile final : public ISfRenderFile {
       fail("choose a .mkv output filename for the fixed FFmpeg profile", E_INVALIDARG);
     else if (!video) fail("fixed FFmpeg profile requires a video render stream", E_NOINTERFACE);
 #endif
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+    // The core and engine accept any float32 rate and channel count within the core's limits.
+    else if (audio && (fmt.format != SFAUDIO_FORMAT_FLOAT32 || fmt.channels < 1 || fmt.channels > 64 ||
+                       fmt.blockAlign != 4u * fmt.channels || fmt.sampleRate < 1 || fmt.sampleRate > 768000)) {
+      char why[256];
+      snprintf(why, sizeof why, "Project audio must be 32-bit float with 1 to 64 channels at 1 to 768000 Hz; "
+               "VEGAS delivered format %lu, %u channels, %lu Hz, block align %u.",
+               (unsigned long)fmt.format, (unsigned)fmt.channels, (unsigned long)fmt.sampleRate, (unsigned)fmt.blockAlign);
+      fail(why, E_INVALIDARG);
+    }
+#else
     else if (audio && (fmt.format != SFAUDIO_FORMAT_FLOAT32 || fmt.sampleRate != 48000 ||
                        fmt.channels != 2 || fmt.blockAlign != 8))
       fail("fixed FFmpeg profile requires float32 stereo at 48000 Hz", E_INVALIDARG);
+#endif
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
     if (ok) try {
       // Destination agreement is independent of delivered dimensions/rate. Check
@@ -652,7 +679,14 @@ class RenderFile final : public ISfRenderFile {
         (uint64_t)tok.offset + (uint64_t)count <= (uint64_t)tok.cbAlloc && tok.pData &&
         tok.pData <= (std::numeric_limits<ULONGLONG>::max)() - (uint64_t)tok.offset &&
         tok.pid == GetCurrentProcessId() && (tok.mode == 0 || tok.mode == 1) &&
-        index == frame && std::isfinite(fps) && std::isfinite(par) && std::abs(par - 1.0) < 1e-8;
+        index == frame && std::isfinite(fps) && std::isfinite(par);
+      if (layout && std::abs(par - 1.0) > 1e-8) {
+        // The most common cause of a refused frame: say exactly what to change.
+        char why[256];
+        snprintf(why, sizeof why, "This project uses non-square pixels (pixel aspect %.4f). Vegas Encoder renders "
+                 "square-pixel projects only. Set the pixel aspect ratio to 1.0000.", par);
+        fail(why, E_INVALIDARG); break;
+      }
       if (layout) {
         const auto firstPlaneEnd = (uint64_t)planes[0] * (height - 1) + row;
         layout = rgb ? firstPlaneEnd <= (uint64_t)count :
@@ -673,10 +707,6 @@ class RenderFile final : public ISfRenderFile {
             fps, Utf8(r.rate.Text().c_str()).c_str(), streamFps); });
         if (!r.rate.num || (streamFps && (!std::isfinite(streamFps) || std::abs(streamFps - fps) > 1e-8)))
           fail("unsupported or inconsistent delivered frame rate", E_INVALIDARG);
-#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
-        if (!std::isfinite(par) || std::abs(par - 1.0) > 1e-8)
-          fail("the B6 candidate currently requires square-pixel video", E_INVALIDARG);
-#endif
         LONGLONG expected = 0;
         if (ok && audio && (!r.rate.Endpoint(r.frameCountReported, fmt.sampleRate, expected) ||
                             std::abs(expected - r.streamLength) > 1))
@@ -689,15 +719,23 @@ class RenderFile final : public ISfRenderFile {
       }
       if (ok) {
         t = NowMs();
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+        // Reuse buffers the pipe writers finished with: no per-frame allocation and zero fill.
+        if (recipeJob) owned = recipeJob->TakeBuffer(false, (size_t)packed);
+        else owned.resize((size_t)packed);
+#else
         owned.resize((size_t)packed);
+#endif
         const BYTE* data = reinterpret_cast<const BYTE*>((uintptr_t)(tok.pData + (uint64_t)tok.offset));
-        for (size_t y = 0; y < (size_t)height; y++) {
+        if (!rgb && planes[0] == row) memcpy(owned.data(), data, (size_t)(row * height));
+        else for (size_t y = 0; y < (size_t)height; y++) {
           // Positive-height BI_RGB is bottom-up. FFmpeg expects top-down rows.
           const size_t sourceRow = rgb ? (size_t)height - 1 - y : y;
           memcpy(owned.data() + y * (size_t)row, data + sourceRow * planes[0], (size_t)row);
         }
         if (!rgb) {
-          for (size_t y = 0; y < (size_t)height / 2; y++)
+          if (planes[2] == row) memcpy(owned.data() + (size_t)(row * height), data + planes[1], (size_t)(row * (height / 2)));
+          else for (size_t y = 0; y < (size_t)height / 2; y++)
             memcpy(owned.data() + (size_t)(row * height) + y * (size_t)row,
                    data + planes[1] + y * planes[2], (size_t)row);
         }
@@ -722,7 +760,11 @@ class RenderFile final : public ISfRenderFile {
           options.verifyOutput = runtime.verifyOutput;
           options.monitorApplication = runtime.monitorApplication;
           options.nativeTarget = true;
-          options.pipeTimeoutMs = cfg.pipeTimeoutMs; options.finishTimeoutMs = cfg.finishTimeoutMs;
+          options.stallTimeoutMs = cfg.stallTimeoutMs; options.connectTimeoutMs = cfg.connectTimeoutMs;
+          options.failedEncoders = runtime.failedEncoders;
+          // Replace an existing file only when VEGAS checked this exact name (decision D1).
+          options.replaceExisting = _wcsicmp(path_.c_str(), requestedPath_.c_str()) == 0;
+          options.requestedOutput = requestedPath_;
           ve::Json media{{"video", {{"width", r.width}, {"height", r.height},
               {"fps", ve::Json::array({r.rate.num, r.rate.den})}, {"pixfmt", rgb ? "bgr0" : "p010le"},
               {"sar", "1:1"}, {"frames", r.frameCountReported}}},
@@ -750,8 +792,9 @@ class RenderFile final : public ISfRenderFile {
 #else
       if (!encoder_) {
         encoder_.reset(new FfmpegEncoder);
+        encoder_->SetReplaceExisting(_wcsicmp(path_.c_str(), requestedPath_.c_str()) == 0);
         if (!encoder_->Start(cfg.ffmpegPath, path_, r.width, r.height, r.rate, audio != nullptr,
-                             cfg.pipeTimeoutMs, cfg.finishTimeoutMs)) {
+                             cfg.stallTimeoutMs, cfg.connectTimeoutMs)) {
           fail(encoder_->Reason().c_str(), encoder_->Error()); break;
         }
       }
@@ -772,9 +815,15 @@ class RenderFile final : public ISfRenderFile {
         if (frame + 1 == r.frameCountReported) endpoint = r.streamLength;
         endpoint = (std::min)(endpoint, r.streamLength);
         while (ok && r.samplesWritten < endpoint) {
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+          // The frame's poll above covers its audio; Submit polls while it waits.
+          LONG want = (LONG)((std::min)(endpoint - r.samplesWritten, (LONGLONG)4096));
+          auto samples = recipeJob->TakeBuffer(true, (size_t)want * fmt.blockAlign);
+#else
           if (!poll(frame)) break;
           LONG want = (LONG)((std::min)(endpoint - r.samplesWritten, (LONGLONG)4096));
           std::vector<BYTE> samples((size_t)want * fmt.blockAlign);
+#endif
           SFMEMORYTOKEN at{};
           at.pData = (ULONGLONG)(uintptr_t)samples.data();
           at.cbData = at.cbAlloc = want * fmt.blockAlign;
@@ -799,8 +848,15 @@ class RenderFile final : public ISfRenderFile {
             break;
           }
           r.samplesWritten += got;
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+          if (recipeJob->EndedEarly()) break;
+#endif
         }
       }
+#if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
+      // FFmpeg finished early (for example -t): stop fetching from VEGAS, then verify and publish.
+      if (recipeJob && recipeJob->EndedEarly()) break;
+#endif
     }
 #if defined(VEGAS_ENCODER_B6_RECIPE_PROOF)
     if (ok && recipeJob) {
@@ -814,6 +870,16 @@ class RenderFile final : public ISfRenderFile {
       if (!ok) recipeJob->Stop(r.stopHr, r.stopReason, r.status == "cancelled");
       r.encoder = recipeJob->Stats();
     }
+    if (!ok && (!recipeJob || recipeJob->Record().is_null())) BestEffortDiagnostic([&] {
+      PreflightFailure failure;
+      failure.jobsRoot = RecipeJobsRoot(); failure.output = path_; failure.templateName = r.tplName;
+      failure.recipe = recipeSnapshot_.at("recipe"); failure.origin = recipeSnapshot_.at("origin");
+      failure.hresult = r.stopHr; failure.message = r.stopReason; failure.cancelled = r.status == "cancelled";
+      // Placement and the progress window are optional; a missing setup still records its reason.
+      try { const auto runtime = LoadRecipeRuntime(); failure.hostHwnd = runtime.hostHwnd; failure.monitorApplication = runtime.monitorApplication; }
+      catch (...) {}
+      WritePreflightRecord(failure);
+    });
 #else
     if (ok && encoder_) {
       auto finalPoll = [&] { return poll(r.frameCountReported); };
@@ -1253,7 +1319,7 @@ class RenderFile final : public ISfRenderFile {
 #if defined(VEGAS_ENCODER_CONFIGURATION_PROOF)
   bool proofExtraReport_ = false;
 #endif
-  std::wstring path_;
+  std::wstring path_, requestedPath_;  // actual destination, and the name VEGAS supplied
   std::vector<ISfReadStream*> streams_;
   ISfReadMeta* meta_ = nullptr;
   std::unique_ptr<FfmpegEncoder> encoder_;

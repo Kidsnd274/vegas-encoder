@@ -103,7 +103,7 @@ class _PopupEditorState extends ConsumerState<PopupEditor> {
     final controller = ref.read(popupProvider.notifier);
     final changes = ref.watch(popupChangesProvider);
     final local = changes.local?.value;
-    final line = originLine(state, local: local?.length);
+    final line = originLine(state, local: local?.length, since: changes.since?.value?.length);
     final length = VeFormat.parseLength(state.lengthText);
     final model = signalPathModel(
       recipe: data.recipe,
