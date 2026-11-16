@@ -32,9 +32,12 @@ if "%~2"=="progress-text-proof" (
 )
 set "VE_BUILD_TESTS=%VE_BUILD_ROOT%\build\fiohost"
 set "VE_BUILD_MODE=%~2"
+set "VE_BUILD_LINK_FLAGS="
 rem Retain the old argument as an alias, but never write to the legacy folder.
 if "%VE_BUILD_MODE%"=="recipe-proof" set "VE_BUILD_MODE=release"
 if "%VE_BUILD_MODE%"=="release" (
+  rem Remove unreferenced code while preserving function addresses and PDBs.
+  set "VE_BUILD_LINK_FLAGS=/INCREMENTAL:NO /OPT:REF,NOICF"
   set "VE_BUILD_TARGET=VEGAS Pro 2026 / 23 exporter"
   set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\release\vegas-encoder\plugin"
   set "VE_BUILD_PROOF_FLAGS=/DVEGAS_ENCODER_B6_RECIPE_PROOF"
@@ -77,7 +80,7 @@ if not exist "%~1" mkdir "%~1"
 pushd "%~1" || exit /b 1
 cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 /Zi /Fd:compiler.pdb %VE_BUILD_PROOF_FLAGS% %~2 "%VE_BUILD_ROOT%\src\vegas\adapter\plugin.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\render.cpp" "%VE_BUILD_ROOT%\src\support\diagnostics.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" "%VE_BUILD_ROOT%\src\engine\encode.cpp" "%VE_BUILD_ROOT%\src\engine\progress.cpp" "%VE_BUILD_ROOT%\src\engine\job_store.cpp" "%VE_BUILD_ROOT%\src\engine\recipe_job.cpp" %VE_BUILD_PROOF_SOURCES% || goto :fail
 rc /nologo %VE_BUILD_PROOF_FLAGS% %~2 /fo vegas-encoder.res "%VE_BUILD_ROOT%\src\vegas\adapter\version.rc" || goto :fail
-link /nologo /DLL /DEBUG /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj progress.obj job_store.obj recipe_job.obj "%VE_BUILD_ROOT%\build\release\vegas-encoder\core\ve_core_static.lib" %VE_BUILD_PROOF_OBJECTS% vegas-encoder.res ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
+link /nologo /DLL /DEBUG %VE_BUILD_LINK_FLAGS% /OUT:vegas-encoder.dll /DEF:"%VE_BUILD_ROOT%\src\vegas\adapter\vegas-encoder.def" plugin.obj render.obj diagnostics.obj template.obj encode.obj progress.obj job_store.obj recipe_job.obj "%VE_BUILD_ROOT%\build\release\vegas-encoder\core\ve_core_static.lib" %VE_BUILD_PROOF_OBJECTS% vegas-encoder.res ole32.lib oleaut32.lib user32.lib gdi32.lib version.lib bcrypt.lib || goto :fail
 if "%~2"=="" copy /y "%VE_BUILD_ROOT%\config\vegas-encoder.ini" vegas-encoder.ini >nul || goto :fail
 popd
 exit /b 0

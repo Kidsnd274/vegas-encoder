@@ -60,10 +60,13 @@ try {
     Write-ReleaseStep 'Build the Setup helper (ve-install.exe)'
     cmd /d /c scripts\etc\Build-SetupHelper.cmd
     if ($LASTEXITCODE -ne 0) { throw 'Setup helper build failed.' }
+    $symbolsDir = Assert-VeReleaseOutput $repo (Join-Path $repo (
+      "build/symbols/vegas-encoder-$($version.app)-" + (Get-Date -Format 'yyyyMMdd-HHmmssfff')
+    ))
     Push-Location app
     try {
       Write-ReleaseStep 'Build the Flutter Windows release app'
-      & $FlutterPath build windows --release --build-name $version.release --build-number $version.build
+      & $FlutterPath build windows --release "--split-debug-info=$symbolsDir" --build-name $version.release --build-number $version.build
       if ($LASTEXITCODE -ne 0) { throw 'App build failed.' }
     } finally { Pop-Location }
     Write-ReleaseStep 'Publish the app runtime'
@@ -73,6 +76,7 @@ try {
     if ($sourceBefore -cne ($sourceAfter | ConvertTo-Json -Depth 6 -Compress)) { throw 'Source changed during build. Rebuild before packaging.' }
     Write-VeBuildReceipt $repo $version $sourceAfter
     Write-Output 'Product build complete: build/release/vegas-encoder/{app,core,plugin,setup}'
+    Write-Output "Flutter crash symbols: $symbolsDir"
   }
   if ($Action -ne 'Build') {
     Write-ReleaseStep 'Check the generated versions and validate the build receipt'

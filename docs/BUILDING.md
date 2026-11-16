@@ -66,6 +66,10 @@ a build receipt, stages a fresh installer-input directory, and compiles Inno Set
 into `dist/`. It stops on failure.
 It does not upgrade tools, install, launch VEGAS, run an installer or execute tests.
 
+Release builds write Flutter crash symbols outside the Setup payload, in a fresh
+timestamped directory under `build/symbols/`. Archive the printed symbol directory
+with its matching Setup executable so Dart crash traces can be symbolicated.
+
 ```powershell
 # Compile only, retaining the output folders below.
 .\scripts\Build-Release.ps1 -Action Build
