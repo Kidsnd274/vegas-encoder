@@ -23,13 +23,16 @@ function Assert-Bundle {
   }
   foreach ($file in $actual) { if (-not $seen.Contains($file.FullName)) { throw "Unlisted bundle input: $($file.FullName)" } }
 }
+Write-Host '  Verify the staged bundle files and hashes'
 Assert-Bundle
 $dist = Join-Path $repo 'dist'
 if ((Test-Path -LiteralPath $dist) -and ((Get-Item -LiteralPath $dist -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'dist must not be a reparse point.' }
 New-Item -ItemType Directory -Path $dist -Force | Out-Null
 $name = "VegasEncoder-$($manifest.numericFileVersion)-windows-x64-setup-" + (Get-Date -Format 'yyyyMMdd-HHmmssfff')
+Write-Host '  Compile Setup with Inno Setup'
 & $IsccPath "/DBundleDir=$bundle" "/O$dist" "/F$name" "$bundle/setup/setup_script.iss"
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
+Write-Host '  Recheck the bundle and record the installer hash'
 Assert-Bundle
 $exe = Join-Path $dist "$name.exe"
 [ordered]@{schema='vegas-encoder-setup-artifact/1'; version=$manifest.app; bundle=$bundle

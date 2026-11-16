@@ -7,7 +7,10 @@ if defined VE_CORE_VCVARS (call "%VE_CORE_VCVARS%" >nul || exit /b 1)
 set "VE_CORE_ROOT=%~dp0..\.."
 set "VE_CORE_PYTHON=%VEGAS_ENCODER_PYTHON%"
 if not defined VE_CORE_PYTHON set "VE_CORE_PYTHON=python"
+echo   [Native] Check generated version files
 "%VE_CORE_PYTHON%" -I "%~dp0Generate-Versions.py" --check || exit /b 1
+echo(
+echo   [Native] Build the shared C++ core DLL and static library
 set "VE_CORE_OUT=%VE_CORE_ROOT%\build\release\vegas-encoder\core"
 if not exist "%VE_CORE_OUT%" mkdir "%VE_CORE_OUT%"
 pushd "%VE_CORE_OUT%" || exit /b 1

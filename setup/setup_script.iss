@@ -28,7 +28,7 @@ DisableWelcomePage=no
 DisableDirPage=auto
 OutputDir=..\dist
 OutputBaseFilename=VegasEncoder-{#VeReleaseVersion}-{#VeFileVersion}-windows-x64-setup
-Compression=lzma2
+Compression=lzma2/ultra
 SolidCompression=yes
 ; Follows the Windows light/dark setting.
 WizardStyle=modern dynamic polar

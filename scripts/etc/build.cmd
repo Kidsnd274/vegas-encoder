@@ -1,5 +1,6 @@
 @echo off
 setlocal
+echo   [Native] Set up MSVC for x64
 set "VE_BUILD_VCVARS=%~1"
 if not defined VE_BUILD_VCVARS set "VE_BUILD_VCVARS=%VEGAS_ENCODER_VCVARS%"
 if not defined VE_BUILD_VCVARS call "%~dp0Find-VcVars.cmd" VE_BUILD_VCVARS || exit /b 1
@@ -7,19 +8,23 @@ if defined VE_BUILD_VCVARS (call "%VE_BUILD_VCVARS%" >nul || exit /b 1)
 set "VE_BUILD_ROOT=%~dp0..\.."
 set "VE_BUILD_PYTHON=%VEGAS_ENCODER_PYTHON%"
 if not defined VE_BUILD_PYTHON set "VE_BUILD_PYTHON=python"
+echo   [Native] Check generated built-in recipes and VEGAS starters
 "%VE_BUILD_PYTHON%" -I "%~dp0Generate-ServiceBuiltins.py" --check || exit /b 1
 call "%~dp0build-core.cmd" "%VE_BUILD_VCVARS%" || exit /b 1
 set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\vegas-encoder"
+set "VE_BUILD_TARGET=Fixed-profile exporter"
 set "VE_BUILD_PROOF_FLAGS="
 set "VE_BUILD_PROOF_SOURCES="
 set "VE_BUILD_PROOF_OBJECTS="
 if "%~2"=="configuration-proof" (
+  set "VE_BUILD_TARGET=Configuration proof exporter"
   set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\configuration-proof\vegas-encoder"
   set "VE_BUILD_PROOF_FLAGS=/DVEGAS_ENCODER_CONFIGURATION_PROOF"
   set VE_BUILD_PROOF_SOURCES="%VE_BUILD_ROOT%\src\vegas\configuration\template_draft.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\proof_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp"
   set "VE_BUILD_PROOF_OBJECTS=template_draft.obj proof_page.obj native_store.obj"
 )
 if "%~2"=="progress-text-proof" (
+  set "VE_BUILD_TARGET=Progress text proof exporter"
   set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\progress-text-proof\vegas-encoder"
   set "VE_BUILD_PROOF_FLAGS=/DVEGAS_ENCODER_CONFIGURATION_PROOF /DVEGAS_ENCODER_PROGRESS_TEXT_PROOF"
   set VE_BUILD_PROOF_SOURCES="%VE_BUILD_ROOT%\src\vegas\configuration\template_draft.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\proof_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp"
@@ -30,6 +35,7 @@ set "VE_BUILD_MODE=%~2"
 rem Retain the old argument as an alias, but never write to the legacy folder.
 if "%VE_BUILD_MODE%"=="recipe-proof" set "VE_BUILD_MODE=release"
 if "%VE_BUILD_MODE%"=="release" (
+  set "VE_BUILD_TARGET=VEGAS Pro 2026 / 23 exporter"
   set "VE_BUILD_PLUGIN=%VE_BUILD_ROOT%\build\release\vegas-encoder\plugin"
   set "VE_BUILD_PROOF_FLAGS=/DVEGAS_ENCODER_B6_RECIPE_PROOF"
   set VE_BUILD_PROOF_SOURCES="%VE_BUILD_ROOT%\src\vegas\configuration\recipe_template.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\editor_session.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\recipe_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\recipe_runtime.cpp"
@@ -39,24 +45,34 @@ set "VE_BUILD_HELPERS=%VE_BUILD_ROOT%\build\host-tests"
 if not exist "%VE_BUILD_PLUGIN%" mkdir "%VE_BUILD_PLUGIN%"
 if not exist "%VE_BUILD_TESTS%" mkdir "%VE_BUILD_TESTS%"
 if not exist "%VE_BUILD_HELPERS%" mkdir "%VE_BUILD_HELPERS%"
-call :build-plugin "%VE_BUILD_PLUGIN%" "" || exit /b 1
+call :build-plugin "%VE_BUILD_PLUGIN%" "" "%VE_BUILD_TARGET%" || exit /b 1
 if "%VE_BUILD_MODE%"=="release" (
   for %%V in (22 21 13) do (
-    call :build-plugin "%VE_BUILD_PLUGIN%\vegas%%V" "/DVEGAS_ENCODER_LEGACY_HOST=%%V" || exit /b 1
+    call :build-plugin "%VE_BUILD_PLUGIN%\vegas%%V" "/DVEGAS_ENCODER_LEGACY_HOST=%%V" "VEGAS Pro %%V exporter" || exit /b 1
   )
 )
+echo(
+echo   [Native] Build fiohost fake-host executable
 pushd "%VE_BUILD_TESTS%" || exit /b 1
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\fiohost\fiohost.cpp" "%VE_BUILD_ROOT%\tests\fiohost\fakehost.cpp" /link /OUT:fiohost.exe ole32.lib oleaut32.lib wbemuuid.lib user32.lib || goto :fail
 popd
+echo(
+echo   [Native] Build native test executables
 pushd "%VE_BUILD_HELPERS%" || exit /b 1
+echo     host-helpers.exe
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\host_helpers.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" /link /OUT:host-helpers.exe ole32.lib oleaut32.lib || goto :fail
+echo     native-boundary.exe
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\native_boundary.cpp" /link /OUT:native-boundary.exe || goto :fail
+echo     native-progress.exe
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\native_progress.cpp" /link /OUT:native-progress.exe ole32.lib || goto :fail
+echo     native-configuration.exe
 cl /nologo /O2 /MT /W4 /WX /EHsc /std:c++17 /Zi "%VE_BUILD_ROOT%\tests\host\native_configuration.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\template_draft.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\proof_page.cpp" "%VE_BUILD_ROOT%\src\vegas\configuration\native_store.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" /link /OUT:native-configuration.exe ole32.lib user32.lib gdi32.lib || goto :fail
 popd
 echo BUILD OK: Vegas Encoder, fiohost and native helpers
 exit /b 0
 :build-plugin
+echo(
+echo   [Native] Build %~3
 if not exist "%~1" mkdir "%~1"
 pushd "%~1" || exit /b 1
 cl /nologo /c /O2 /MT /W4 /WX /EHsc /std:c++17 /utf-8 /Zi /Fd:compiler.pdb %VE_BUILD_PROOF_FLAGS% %~2 "%VE_BUILD_ROOT%\src\vegas\adapter\plugin.cpp" "%VE_BUILD_ROOT%\src\vegas\adapter\render.cpp" "%VE_BUILD_ROOT%\src\support\diagnostics.cpp" "%VE_BUILD_ROOT%\src\vegas\host\template.cpp" "%VE_BUILD_ROOT%\src\engine\encode.cpp" "%VE_BUILD_ROOT%\src\engine\progress.cpp" "%VE_BUILD_ROOT%\src\engine\job_store.cpp" "%VE_BUILD_ROOT%\src\engine\recipe_job.cpp" %VE_BUILD_PROOF_SOURCES% || goto :fail
