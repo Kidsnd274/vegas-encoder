@@ -903,6 +903,84 @@ buffersink AVOptions:
       'a change before the add’s check is identified again',
     );
 
+    // D2 (F4): the check test-encodes only the catalog's hardware encoders
+    // that FFmpeg lists; Linux/macOS-only APIs are refused without running.
+    final hardwareLines = RegExp(
+      r'^ V\S* (\w+_(?:nvenc|qsv|amf|mf|vaapi|v4l2m2m|videotoolbox|vulkan|d3d12va|rkmpp|mediacodec|omx)) ',
+    );
+    final catalogEncoders = [
+      for (final line in encoderText.split('\n'))
+        if (hardwareLines.firstMatch(line) case final m?)
+          if (m[1] == 'h264_nvenc' || m[1] == 'hevc_amf') line else null
+        else
+          line,
+    ].whereType<String>().join('\n');
+    final listing = FakeProcessExecutor(
+      (executable, arguments, token) async => arguments.contains('-encoders')
+          ? ProcessOutput(
+              exitCode: 0,
+              stdout:
+                  '$catalogEncoders\n V....D h264_vaapi           H.264/AVC (VAAPI) (codec h264)\n',
+            )
+          : fake.handler(executable, arguments, token),
+    );
+    final catalogBin = Directory(joinPath(root.path, 'catalog-bin'));
+    await catalogBin.create();
+    final catalogFFmpeg = File(joinPath(catalogBin.path, 'ffmpeg.exe'));
+    await catalogFFmpeg.writeAsBytes(bytes);
+    await File(joinPath(catalogBin.path, 'ffprobe.exe')).writeAsBytes(bytes);
+    final catalogServices = WindowsServices(
+      core: compileCore,
+      paths: ServicePaths(
+        roaming: joinPath(root.path, 'catalog-roaming'),
+        local: joinPath(root.path, 'catalog-local'),
+      ),
+      executor: listing,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final listed = await catalogServices.discovery.add(catalogFFmpeg.path);
+    final catalogCheck = await catalogServices.probe.probe(listed).toList();
+    check(
+      catalogCheck.last.phase == 'done',
+      'catalog check completes: ${catalogCheck.last.message}',
+    );
+    final encodes = [
+      for (final call in listing.calls)
+        if (call.$2.contains('-c:v')) call.$2[call.$2.indexOf('-c:v') + 1],
+    ].toSet();
+    check(
+      encodes.length == 1 && encodes.single == 'h264_nvenc',
+      'the check test-encodes only the catalog’s listed hardware encoders: $encodes',
+    );
+    final listedEncoders = catalogCheck.last.capabilities!.encoders;
+    final vaapi = jsonMap(jsonMap(listedEncoders['h264_vaapi'])['availability']);
+    check(
+      vaapi['state'] == 'failed' &&
+          vaapi['reason'] == 'Needs Linux or macOS; not available on Windows.' &&
+          !listing.calls.any((c) => c.$2.any((a) => a.contains('h264_vaapi'))),
+      'a Linux/macOS-only encoder is refused without running anything',
+    );
+    check(
+      jsonMap(jsonMap(listedEncoders['hevc_amf'])['availability'])['state'] ==
+          'unknown',
+      'a listed hardware encoder outside the catalog waits for its background test',
+    );
+    check(
+      windowsUnsupportedHardware('h264_vaapi') &&
+          windowsUnsupportedHardware('hevc_videotoolbox') &&
+          !windowsUnsupportedHardware('hevc_amf'),
+      'Windows-impossible hardware APIs',
+    );
+    final rest = await catalogServices.hardwareTests
+        .test(listed, encoders: ['hevc_amf'], reuseIdentity: true)
+        .toList();
+    check(
+      rest.single.encoder == 'hevc_amf' &&
+          (await catalogServices.discovery.list()).single.health == 'unchanged',
+      'the rest are tested afterwards on request',
+    );
+
     await processTests();
     final nativeGpu = await WindowsGpuIdentity().read();
     final nativeAgain = await WindowsGpuIdentity().read();

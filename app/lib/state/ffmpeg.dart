@@ -105,8 +105,11 @@ class FFmpegController extends Notifier<FFmpegState> {
       for (final id in _checks.keys) {
         probes.cancel(id);
       }
-      for (final id in _testing) {
+      for (final id in {..._testing, ..._background.keys}) {
         tests.cancel(id);
+      }
+      for (final run in _background.values) {
+        run.cancel();
       }
     });
     return const FFmpegState();
@@ -117,6 +120,13 @@ class FFmpegController extends Notifier<FFmpegState> {
   // asking again returns the running one.
   final Map<String, Future<void>> _checks = {};
   final Set<String> _testing = {};
+
+  // D2: after a check, the listed hardware encoders the catalog doesn't
+  // know are tested in the background, one at a time, with nothing on the
+  // card. Stopped by a check, a hardware test or Remove on that
+  // installation, and by closing the app; never restarted by itself.
+  final Map<String, StreamSubscription<HardwareTestResult>> _background = {};
+
 
   // capabilitiesProvider instances waiting on a check, which read the result
   // themselves: invalidating one mid-load would leave its future unfinished.
@@ -189,6 +199,7 @@ class FFmpegController extends Notifier<FFmpegState> {
       throw const ServiceException('DEFAULT-IN-USE', 'Choose another default FFmpeg before removing this one.');
     }
     await ref.read(ffmpegProbeProvider).cancel(id);
+    await _stopBackground(id);
     await ref.read(hardwareTestsProvider).cancel(id);
     await _discovery.remove(id);
     // A check still ending writes nothing for an installation that is gone.
@@ -219,6 +230,7 @@ class FFmpegController extends Notifier<FFmpegState> {
   Future<void> probe(FFmpegInstallation installation) {
     final id = installation.id;
     if (_checks[id] case final running?) return running;
+    unawaited(_stopBackground(id));
     final done = Completer<void>();
     final check = done.future;
     _checks[id] = check;
@@ -266,6 +278,44 @@ class FFmpegController extends Notifier<FFmpegState> {
       probed: found == null ? null : {...state.probed, id: found},
       probeFailures: failure == null ? null : {...state.probeFailures, id: failure},
     );
+    if (found != null && failure == null) _testTheRest(installation, found);
+  }
+
+  /// The hardware encoders [found] lists that the check left untested and
+  /// the catalog doesn't know (the check tests the catalog's; services refuse
+  /// Linux/macOS-only APIs as failed), tested now in the background.
+  void _testTheRest(FFmpegInstallation installation, FFmpegCapabilities found) {
+    final id = installation.id;
+    if (found.identityKey != installation.identity.key) return; // re-identified: the next check tests them
+    final catalog = {
+      for (final p in ref.read(profilesProvider).video)
+        if (p.hw != null) p.id,
+    };
+    final rest = [
+      for (final MapEntry(:key, :value) in found.encoders.entries)
+        if (value is Map &&
+            value['kind'] == 'video' &&
+            !catalog.contains(key) &&
+            (value['availability'] as Map?)?['state'] == 'unknown')
+          key,
+    ];
+    if (rest.isEmpty) return;
+    void finished() {
+      _background.remove(id);
+      if (ref.mounted) ref.invalidate(capabilitiesProvider(id));
+    }
+
+    _background[id] = ref
+        .read(hardwareTestsProvider)
+        .test(installation, encoders: rest, reuseIdentity: true)
+        .listen(null, onError: (Object _) => finished(), onDone: finished, cancelOnError: true);
+  }
+
+  Future<void> _stopBackground(String id) async {
+    final run = _background.remove(id);
+    if (run == null) return;
+    await run.cancel();
+    await ref.read(hardwareTestsProvider).cancel(id);
   }
 
   /// Test-encodes [encoders] on this PC (all of [hardwareEncoders] when
@@ -280,6 +330,7 @@ class FFmpegController extends Notifier<FFmpegState> {
     if (_checks.containsKey(id)) {
       throw ServiceException('CHECK-RUNNING', 'Wait until the check of ${installation.label} finishes.');
     }
+    if (_background.containsKey(id)) await _stopBackground(id);
     final names = {...encoders ?? hardwareEncoders};
     state = state.copyWith(
       testing: {

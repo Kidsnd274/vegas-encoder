@@ -14,6 +14,14 @@ bool isHardwareEncoder(String name) => RegExp(
   r'_(?:nvenc|qsv|amf|mf|vaapi|v4l2m2m|videotoolbox|vulkan|d3d12va|rkmpp|mediacodec|omx)$',
 ).hasMatch(name);
 
+/// Hardware APIs that can't work on Windows (D2): never test-encoded.
+bool windowsUnsupportedHardware(String name) => RegExp(
+  r'_(?:vaapi|videotoolbox|v4l2m2m|mediacodec|rkmpp|omx)$',
+).hasMatch(name);
+
+const windowsUnsupportedReason =
+    'Needs Linux or macOS; not available on Windows.';
+
 bool _fresh(
   Object? data,
   String fingerprint,
@@ -198,6 +206,7 @@ class WindowsHardwareTests implements HardwareTests {
             .where(
               (e) =>
                   isHardwareEncoder(e.key) &&
+                  !windowsUnsupportedHardware(e.key) &&
                   jsonMap(e.value)['kind'] == 'video',
             )
             .map((e) => e.key)

@@ -363,6 +363,46 @@ void main() {
       await probe.finish();
     });
 
+    test('after a check, the other listed hardware encoders are tested in the background (F4)', () async {
+      final tests = StalledHardwareTests();
+      final full = inst('gyan-8.1');
+      Map<String, Object?> listed(String kind, String state) => {
+        'kind': kind,
+        'availability': {'state': state},
+      };
+      final found = FFmpegCapabilities(
+        installationId: full.id,
+        identityKey: full.identity.key,
+        version: '8.1',
+        probedAt: '2026-11-19T00:00:00Z',
+        encoders: {
+          'libx264': listed('video', 'ok'),
+          'h264_nvenc': listed('video', 'ok'),
+          'hevc_qsv': listed('video', 'unknown'),
+          'hevc_amf': listed('video', 'unknown'),
+          'h264_vaapi': listed('video', 'failed'),
+          'aac': listed('audio', 'ok'),
+        },
+      );
+      start(
+        tests: tests,
+        probe: FakeFFmpegProbe(
+          progress: {
+            full.id: [ProbeProgress(installationId: full.id, phase: 'done', completed: 1, total: 1, capabilities: found)],
+          },
+        ),
+      );
+      await controller().probe(full);
+      expect(tests.calls.map((c) => '${c.installationId} ${c.encoders} reuse=${c.reuseIdentity}'), [
+        'gyan-8.1 [hevc_amf] reuse=true',
+      ], reason: 'not in the catalog, listed and untested; nothing shows on the card');
+      expect(state().testing, isEmpty);
+      unawaited(controller().testHardware(full, hardwareEncoders: const ['h264_nvenc']));
+      await Future<void>.delayed(Duration.zero);
+      expect(tests.cancelled, ['gyan-8.1'], reason: 'Test hardware encoders stops the background run first');
+      expect(tests.calls.last.encoders, isNull);
+    });
+
     test('hardware tests stream in; the encoders show Testing until then', () async {
       start();
       final full = inst('gyan-8.1');

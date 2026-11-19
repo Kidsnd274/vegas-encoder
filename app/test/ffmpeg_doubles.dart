@@ -50,13 +50,19 @@ class StalledProbe implements FFmpegProbe {
 class StalledHardwareTests implements HardwareTests {
   final List<String> cancelled = [];
 
+  /// What each test asked for, in order.
+  final List<({String installationId, List<String>? encoders, bool reuseIdentity})> calls = [];
+
   @override
   Stream<HardwareTestResult> test(
     FFmpegInstallation installation, {
     List<String>? encoders,
     bool force = false,
     bool reuseIdentity = false,
-  }) => StreamController<HardwareTestResult>().stream;
+  }) {
+    calls.add((installationId: installation.id, encoders: encoders, reuseIdentity: reuseIdentity));
+    return StreamController<HardwareTestResult>().stream;
+  }
 
   @override
   Future<void> cancel(String installationId) async => cancelled.add(installationId);

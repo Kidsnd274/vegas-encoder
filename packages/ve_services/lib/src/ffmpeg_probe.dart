@@ -197,17 +197,23 @@ class WindowsFFmpegProbe implements FFmpegProbe {
             await Future.wait([for (var i = 0; i < 4; i++) worker()]);
             op.token.check();
             for (final entry in encoders.entries.toList()) {
+              final hardware =
+                  isHardwareEncoder(entry.key) &&
+                  jsonMap(entry.value)['kind'] == 'video';
+              // Linux/macOS-only APIs are refused without running anything (D2).
+              final impossible =
+                  hardware && windowsUnsupportedHardware(entry.key);
               encoders[entry.key] = {
                 ...jsonMap(entry.value),
                 'availability': EncoderAvailability(
-                  state:
-                      isHardwareEncoder(entry.key) &&
-                          jsonMap(entry.value)['kind'] == 'video'
+                  state: impossible
+                      ? 'failed'
+                      : hardware
                       ? 'unknown'
                       : 'ok',
-                  reason:
-                      isHardwareEncoder(entry.key) &&
-                          jsonMap(entry.value)['kind'] == 'video'
+                  reason: impossible
+                      ? windowsUnsupportedReason
+                      : hardware
                       ? 'Listed; awaiting a test on this PC.'
                       : 'Listed by this FFmpeg.',
                 ).data,
@@ -240,11 +246,25 @@ class WindowsFFmpegProbe implements FFmpegProbe {
                 gpuFingerprint: previous?.gpuFingerprint ?? '',
               ),
             );
+            // D2: the catalog's hardware encoders this FFmpeg lists; the app
+            // tests the other listed ones afterwards, in the background.
+            final catalogHardware = [
+              for (final p in profiles.video)
+                if (p.hw != null &&
+                    encoders[p.id] is Map &&
+                    jsonMap(encoders[p.id])['kind'] == 'video' &&
+                    !windowsUnsupportedHardware(p.id))
+                  p.id,
+            ];
             emit(
               'hardware',
               message: 'Testing listed hardware encoders on this PC.',
             );
-            await for (final result in hardware.qualify(checked, op.token)) {
+            await for (final result in hardware.qualify(
+              checked,
+              op.token,
+              encoders: catalogHardware,
+            )) {
               emit(
                 'hardware',
                 completed: ++completed,
