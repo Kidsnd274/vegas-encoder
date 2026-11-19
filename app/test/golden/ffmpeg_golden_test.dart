@@ -66,9 +66,10 @@ void main() {
       overrides: [ffmpegDiscoveryProvider.overrideWith((ref) => FakeFFmpegDiscovery(installations: _unhealthy))],
       act: (tester) async {},
     ),
-    // Scan again while a check is still running: progress on the card.
+    // Scan again while a check is still testing hardware encoders: progress
+    // on the card, the encoder list already in, hardware rows Testing… (F7).
     'probing': (
-      overrides: [ffmpegProbeProvider.overrideWithValue(StalledProbe())],
+      overrides: [ffmpegProbeProvider.overrideWithValue(StalledProbe(atHardware: true))],
       act: (tester) async {
         await tester.tap(find.text('Scan again'));
         await tester.pump();

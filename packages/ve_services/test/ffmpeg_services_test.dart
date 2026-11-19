@@ -620,6 +620,32 @@ buffersink AVOptions:
           progress.any((p) => p.phase == 'hardware'),
       'probe phases stream',
     );
+    // F7: the encoder list arrives with the first hardware event; each tested
+    // hardware encoder's result streams in before done.
+    final hardwareEvents = progress.where((p) => p.phase == 'hardware').toList();
+    final streamed = [
+      for (final p in hardwareEvents)
+        if (p.hardwareResult case final r?) r.encoder,
+    ];
+    final firstHardware = hardwareEvents.first;
+    check(
+      firstHardware.capabilities != null &&
+          firstHardware.hardwareResult == null &&
+          jsonMap(
+                jsonMap(firstHardware.capabilities!.encoders['hevc_nvenc'])['availability'],
+              )['state'] ==
+              'unknown' &&
+          firstHardware.total == streamed.length &&
+          streamed.isNotEmpty &&
+          streamed.toSet().length == streamed.length &&
+          hardwareEvents.skip(1).every((p) => p.hardwareResult != null) &&
+          progress.indexOf(firstHardware) <
+              progress.indexWhere((p) => p.hardwareResult != null) &&
+          progress.last.phase == 'done' &&
+          progress.where((p) => p.phase == 'done').length == 1,
+      'capabilities on the first hardware event, one result per tested encoder, then done: '
+      '${[for (final p in progress) '${p.phase}${p.capabilities != null ? '+caps' : ''}${p.hardwareResult != null ? '+${p.hardwareResult!.encoder}' : ''}'].join(' ')}',
+    );
     final capabilities = progress.last.capabilities!;
     check(
       capabilities.filters.length == 3 && capabilities.parser == parser.version,

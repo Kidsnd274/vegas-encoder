@@ -75,6 +75,7 @@ class WindowsFFmpegProbe implements FFmpegProbe {
             int total = 0,
             String message = '',
             FFmpegCapabilities? capabilities,
+            HardwareTestResult? hardwareResult,
           }) {
             if (!controller.isClosed)
               controller.add(
@@ -85,6 +86,7 @@ class WindowsFFmpegProbe implements FFmpegProbe {
                   total: total,
                   message: message,
                   capabilities: capabilities,
+                  hardwareResult: hardwareResult,
                 ),
               );
           }
@@ -256,10 +258,15 @@ class WindowsFFmpegProbe implements FFmpegProbe {
                     !windowsUnsupportedHardware(p.id))
                   p.id,
             ];
+            // The encoder list shows now, hardware rows still unknown (F7);
+            // each test's result follows as it finishes.
             emit(
               'hardware',
+              total: catalogHardware.length,
               message: 'Testing listed hardware encoders on this PC.',
+              capabilities: await cache.read(checked.identity.key),
             );
+            var tested = 0;
             await for (final result in hardware.qualify(
               checked,
               op.token,
@@ -267,8 +274,10 @@ class WindowsFFmpegProbe implements FFmpegProbe {
             )) {
               emit(
                 'hardware',
-                completed: ++completed,
+                completed: ++tested,
+                total: catalogHardware.length,
                 message: '${result.encoder}: ${result.state}',
+                hardwareResult: result,
               );
             }
             op.token.check();

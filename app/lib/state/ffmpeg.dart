@@ -257,25 +257,71 @@ class FFmpegController extends Notifier<FFmpegState> {
       },
       probeFailures: Map.of(state.probeFailures)..remove(id),
     );
+    final before = state.probed[id];
     FFmpegCapabilities? found;
     String? failure;
+    // The catalog's hardware encoders this check is testing (F7).
+    final testingNow = <String>{};
     try {
       await for (final progress in ref.read(ffmpegProbeProvider).probe(installation)) {
         if (!ref.mounted || !current()) return;
-        if (progress.capabilities != null) found = progress.capabilities;
+        final capabilities = progress.capabilities;
+        final result = progress.hardwareResult;
         if (progress.phase == 'failed' || progress.phase == 'cancelled') {
           failure = progress.message.isEmpty ? 'The check stopped (${progress.phase}).' : progress.message;
         }
-        state = state.copyWith(probes: {...state.probes, id: progress});
+        var testing = state.testing;
+        if (capabilities != null && progress.phase == 'hardware') {
+          // The list shows now; the hardware rows say Testing… until their result.
+          testingNow.addAll([
+            for (final p in ref.read(profilesProvider).video)
+              if (p.hw != null &&
+                  switch (capabilities.encoders[p.id]) {
+                    {'availability': {'state': 'unknown'}} => true,
+                    _ => false,
+                  })
+                p.id,
+          ]);
+          testing = {
+            ...testing,
+            id: {...?testing[id], ...testingNow},
+          };
+        }
+        if (result != null) {
+          testingNow.remove(result.encoder);
+          testing = {
+            ...testing,
+            id: {...?testing[id]}..remove(result.encoder),
+          }..removeWhere((_, v) => v.isEmpty);
+        }
+        state = state.copyWith(
+          probes: {...state.probes, id: progress},
+          probed: capabilities == null ? null : {...state.probed, id: capabilities},
+          testing: testing,
+          testResults: result == null
+              ? null
+              : {
+                  ...state.testResults,
+                  id: {...?state.testResults[id], result.encoder: result},
+                },
+        );
+        if (capabilities != null) {
+          found = capabilities;
+          if (!_awaited.containsKey(id)) ref.invalidate(capabilitiesProvider(id));
+        }
       }
     } on ServiceException catch (e) {
       failure = e.message;
     }
     if (!ref.mounted || !current()) return;
-    if (found != null && !_awaited.containsKey(id)) ref.invalidate(capabilitiesProvider(id));
+    final left = {...?state.testing[id]}..removeAll(testingNow);
     state = state.copyWith(
       probes: Map.of(state.probes)..remove(id),
-      probed: found == null ? null : {...state.probed, id: found},
+      // A check that didn't finish claims no completed check for the card.
+      probed: failure == null || found == null
+          ? null
+          : (before == null ? (Map.of(state.probed)..remove(id)) : {...state.probed, id: before}),
+      testing: {...state.testing, id: left}..removeWhere((_, v) => v.isEmpty),
       probeFailures: failure == null ? null : {...state.probeFailures, id: failure},
     );
     if (found != null && failure == null) _testTheRest(installation, found);

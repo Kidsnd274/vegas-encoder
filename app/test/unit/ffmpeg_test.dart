@@ -442,6 +442,81 @@ void main() {
       expect(tests.calls.last.encoders, isNull);
     });
 
+    test('the encoder list shows from the first hardware event; hardware results stream in (F7)', () async {
+      final never = FFmpegInstallation.fromJson({
+        ...inst('gyan-8.1').toJson(),
+        'probedAt': null,
+        'probeMs': null,
+        'counts': <String, Object?>{},
+        'availability': <String, Object?>{},
+      });
+      Map<String, Object?> listed(String state, {String kind = 'video'}) => {
+        'kind': kind,
+        'availability': {'state': state},
+      };
+      FFmpegCapabilities caps(String nvenc) => FFmpegCapabilities(
+        installationId: never.id,
+        identityKey: never.identity.key,
+        version: '8.1',
+        probedAt: '2026-11-19T00:00:00Z',
+        encoders: {'libx264': listed('ok'), 'h264_nvenc': listed(nvenc), 'aac': listed('ok', kind: 'audio')},
+        muxers: {
+          'mp4': {'canonical': 'mp4'},
+          'mov': {'canonical': 'mov'},
+        },
+      );
+      final result = HardwareTestResult(
+        encoder: 'h264_nvenc',
+        state: 'ok',
+        reason: 'One-frame test passed on this GPU/driver.',
+        testedAt: '2026-11-19T00:00:01Z',
+        identityKey: never.identity.key,
+        gpuFingerprint: 'gpu',
+      );
+      ProbeProgress event(String phase, {FFmpegCapabilities? capabilities, HardwareTestResult? hardwareResult}) =>
+          ProbeProgress(
+            installationId: never.id,
+            phase: phase,
+            completed: hardwareResult == null ? 0 : 1,
+            total: phase == 'hardware' ? 1 : 0,
+            capabilities: capabilities,
+            hardwareResult: hardwareResult,
+          );
+      start(
+        probe: FakeFFmpegProbe(
+          progress: {
+            never.id: [
+              event('identity'),
+              event('lists'),
+              event('hardware', capabilities: caps('unknown')),
+              event('hardware', hardwareResult: result),
+              event('done', capabilities: caps('ok')),
+            ],
+          },
+        ),
+      );
+      final seen = <String>[];
+      container.listen(ffmpegControllerProvider, (_, s) {
+        final status = statusLookup(never, s);
+        final card = installationCard(never, isDefault: false, state: s, presets: const [], catalog: catalog);
+        final line =
+            '${s.probes[never.id]?.phase ?? 'ended'}: x264 ${status('libx264').state.name}, '
+            'nvenc ${status('h264_nvenc').state.name}, counts ${card.counts}';
+        if (seen.lastOrNull != line) seen.add(line);
+      });
+      await controller().probe(never);
+      expect(seen, [
+        'identity: x264 unknown, nvenc unknown, counts null',
+        'lists: x264 unknown, nvenc unknown, counts null',
+        'hardware: x264 ready, nvenc testing, counts (audio: 1, muxers: 2, video: 2)',
+        'hardware: x264 ready, nvenc ready, counts (audio: 1, muxers: 2, video: 2)',
+        'done: x264 ready, nvenc ready, counts (audio: 1, muxers: 2, video: 2)',
+        'ended: x264 ready, nvenc ready, counts (audio: 1, muxers: 2, video: 2)',
+      ]);
+      expect(state().testing, isEmpty);
+      expect(state().testResults[never.id]?['h264_nvenc']?.state, 'ok');
+    });
+
     test('hardware tests stream in; the encoders show Testing until then', () async {
       start();
       final full = inst('gyan-8.1');

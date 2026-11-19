@@ -281,7 +281,17 @@ InstallationCardModel installationCard(
     blocked.add(p.recipe.name);
     needs.addAll(missing.map((id) => encoderLabel(catalog, id)));
   }
-  final counts = installation.counts;
+  // This session's check counts as soon as its list arrives; the record's
+  // counts are written when the check ends (F7).
+  final counts = probed == null
+      ? installation.counts
+      : {
+          'video': probed.encoders.values.where((e) => e is Map && e['kind'] == 'video').length,
+          'audio': probed.encoders.values.where((e) => e is Map && e['kind'] == 'audio').length,
+          'muxers': {
+            for (final MapEntry(:key, :value) in probed.muxers.entries) (value is Map ? value['canonical'] : null) ?? key,
+          }.length,
+        };
   final video = counts['video'], audio = counts['audio'], muxers = counts['muxers'];
   final probedAt = probed?.probedAt ?? installation.probedAt;
   final when = probedAt == null ? null : DateTime.tryParse(probedAt);

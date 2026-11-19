@@ -3,8 +3,12 @@ import 'dart:async';
 import 'package:ve_services/ve_services.dart';
 
 /// A probe that reports one step and then waits, so a test can see the
-/// FFmpeg screen mid-check. [finish] completes every probe started.
+/// FFmpeg screen mid-check. [finish] completes every probe started. With
+/// [atHardware], the step is the hardware phase's first event: the encoder
+/// list (the fixture's, hardware rows not tested yet) is already in (F7).
 class StalledProbe implements FFmpegProbe {
+  StalledProbe({this.atHardware = false});
+  final bool atHardware;
   final FakeFFmpegProbe _fake = FakeFFmpegProbe();
   final List<StreamController<ProbeProgress>> _open = [];
   final List<String> cancelled = [];
@@ -17,6 +21,29 @@ class StalledProbe implements FFmpegProbe {
     started.add(installation.id);
     final controller = StreamController<ProbeProgress>();
     _open.add(controller);
+    if (atHardware) {
+      () async {
+        final listed = (await _fake.probe(installation).last).capabilities!;
+        final hardware = {for (final p in FakeVeCore().profiles().video) if (p.hw != null) p.id};
+        final encoders = {
+          for (final MapEntry(:key, :value) in listed.encoders.entries)
+            key: hardware.contains(key)
+                ? {...value as Map, 'availability': {'state': 'unknown', 'reason': 'Listed; awaiting a test on this PC.'}}
+                : value,
+        };
+        if (controller.isClosed) return;
+        controller.add(
+          ProbeProgress(
+            installationId: installation.id,
+            phase: 'hardware',
+            total: hardware.where(encoders.containsKey).length,
+            message: 'Testing listed hardware encoders on this PC.',
+            capabilities: listed.copyWith(encoders: encoders),
+          ),
+        );
+      }();
+      return controller.stream;
+    }
     controller.add(
       ProbeProgress(
         installationId: installation.id,
