@@ -94,7 +94,11 @@ class WindowsFFmpegProbe implements FFmpegProbe {
               'identity',
               message: 'Checking FFmpeg and FFprobe identities.',
             );
-            final checked = await discovery.refresh(installation, op.token);
+            // The check that follows Add or a scan reuses that fingerprint (D1).
+            final (installation: checked, :reused) = await discovery.refresh(
+              installation,
+              op.token,
+            );
             emit(
               'lists',
               message:
@@ -248,7 +252,15 @@ class WindowsFFmpegProbe implements FFmpegProbe {
               );
             }
             op.token.check();
-            await requireCurrentInstallation(checked, parser.version, op.token);
+            // A reused fingerprint is confirmed by file stats, and read again
+            // only if they changed; a fresh one is read again in full.
+            if (!reused || !await statsUnchanged(checked))
+              await requireCurrentInstallation(
+                checked,
+                parser.version,
+                op.token,
+              );
+            op.token.check();
             final finalCapabilities = (await cache.read(checked.identity.key))!;
             final availability = <String, Object?>{
               for (final e in finalCapabilities.encoders.entries)

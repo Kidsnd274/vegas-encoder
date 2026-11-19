@@ -463,6 +463,7 @@ buffersink AVOptions:
     var failHelp = false;
     var blockProbeLists = false;
     var changeProbeDuringCheck = false;
+    Future<void> Function()? duringLists;
     final fake = FakeProcessExecutor((executable, arguments, token) async {
       token.check();
       if (arguments.contains('-version'))
@@ -487,6 +488,11 @@ buffersink AVOptions:
             ],
           }),
         );
+      }
+      if (arguments.contains('-encoders') && duringLists != null) {
+        final change = duringLists!;
+        duringLists = null;
+        await change();
       }
       if (blockProbeLists && arguments.contains('-encoders')) {
         await token.whenCancelled;
@@ -823,6 +829,78 @@ buffersink AVOptions:
           (await services.machineSettings.read()).defaultFFmpegId ==
               installation.id,
       'scan preserves vanished default with explicit health',
+    );
+
+    // D1 (F3): an add fingerprints the files once; the check that follows
+    // reuses that fingerprint and confirms it by file stats. Checks the user
+    // starts later read the files again.
+    failHelp = false;
+    final reuseBin = Directory(joinPath(root.path, 'reuse-bin'));
+    await reuseBin.create();
+    final reuseFFmpeg = File(joinPath(reuseBin.path, 'ffmpeg.exe'));
+    await reuseFFmpeg.writeAsBytes(bytes);
+    await File(joinPath(reuseBin.path, 'ffprobe.exe')).writeAsBytes(bytes);
+    final reuse = WindowsServices(
+      core: compileCore,
+      paths: ServicePaths(
+        roaming: joinPath(root.path, 'reuse-roaming'),
+        local: joinPath(root.path, 'reuse-local'),
+      ),
+      executor: fake,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final reused = await reuse.discovery.add(reuseFFmpeg.path);
+    int versionRuns() => fake.calls
+        .where(
+          (c) =>
+              c.$1.toLowerCase() == reused.path.toLowerCase() &&
+              c.$2.contains('-version'),
+        )
+        .length;
+    final versionsAfterAdd = versionRuns();
+    final reusedModified = await reuseFFmpeg.lastModified();
+    await reuseFFmpeg.writeAsBytes(Uint8List.fromList(bytes)..[200] = 1);
+    await reuseFFmpeg.setLastModified(reusedModified);
+    final afterAdd = await reuse.probe.probe(reused).toList();
+    check(
+      afterAdd.last.phase == 'done',
+      'the add’s own check completes on stats: ${afterAdd.last.message}',
+    );
+    check(
+      afterAdd.last.capabilities!.identityKey == reused.identity.key &&
+          versionRuns() == versionsAfterAdd,
+      'the check after add reuses the add’s fingerprint instead of reading the files again',
+    );
+    await rejects(
+      () => reuse.hardwareTests
+          .test(reused, encoders: ['hevc_nvenc'], force: true)
+          .toList(),
+      'FFMPEG-CHANGED',
+    );
+    final later = await reuse.probe.probe(reused).toList();
+    check(
+      later.last.phase == 'done' &&
+          later.last.capabilities!.identityKey != reused.identity.key &&
+          versionRuns() == versionsAfterAdd + 1,
+      'a check the user starts later reads the files again',
+    );
+    final duringAdd = await reuse.discovery.add(reuseFFmpeg.path);
+    duringLists = () => reuseFFmpeg.writeAsBytes([...bytes, 9]);
+    final grown = await reuse.probe.probe(duringAdd).toList();
+    check(
+      grown.last.phase == 'failed' &&
+          grown.last.message.contains('FFmpeg changed on disk'),
+      'a size change during the add’s check fails it: ${grown.last.message}',
+    );
+    final beforeCheck = await reuse.discovery.add(reuseFFmpeg.path);
+    await reuseFFmpeg.writeAsBytes([...bytes, 9, 9]);
+    final reidentified = await reuse.probe.probe(beforeCheck).toList();
+    check(
+      reidentified.last.phase == 'done' &&
+          reidentified.last.capabilities!.identityKey !=
+              beforeCheck.identity.key,
+      'a change before the add’s check is identified again',
     );
 
     await processTests();

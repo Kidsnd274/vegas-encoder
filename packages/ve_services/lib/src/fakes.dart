@@ -263,6 +263,7 @@ class FakeHardwareTests implements HardwareTests {
     FFmpegInstallation installation, {
     List<String>? encoders,
     bool force = false,
+    bool reuseIdentity = false,
   }) async* {
     final generation = (_generation[installation.id] ?? 0) + 1;
     _generation[installation.id] = generation;

@@ -51,8 +51,12 @@ class StalledHardwareTests implements HardwareTests {
   final List<String> cancelled = [];
 
   @override
-  Stream<HardwareTestResult> test(FFmpegInstallation installation, {List<String>? encoders, bool force = false}) =>
-      StreamController<HardwareTestResult>().stream;
+  Stream<HardwareTestResult> test(
+    FFmpegInstallation installation, {
+    List<String>? encoders,
+    bool force = false,
+    bool reuseIdentity = false,
+  }) => StreamController<HardwareTestResult>().stream;
 
   @override
   Future<void> cancel(String installationId) async => cancelled.add(installationId);

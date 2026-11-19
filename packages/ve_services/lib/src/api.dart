@@ -38,10 +38,14 @@ abstract interface class FFmpegHelpParser {
 }
 
 abstract interface class HardwareTests {
+  /// [reuseIdentity]: confirm the installation's fingerprint by file stats
+  /// instead of reading the files again (only for tests that directly follow
+  /// a check of it).
   Stream<HardwareTestResult> test(
     FFmpegInstallation installation, {
     List<String>? encoders,
     bool force = false,
+    bool reuseIdentity = false,
   });
   Future<void> cancel(String installationId);
 }

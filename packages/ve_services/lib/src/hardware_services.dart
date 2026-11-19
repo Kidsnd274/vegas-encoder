@@ -133,6 +133,7 @@ class WindowsHardwareTests implements HardwareTests {
     FFmpegInstallation installation, {
     List<String>? encoders,
     bool force = false,
+    bool reuseIdentity = false,
   }) {
     late StreamController<HardwareTestResult> stream;
     ServiceOperation? operation;
@@ -141,11 +142,15 @@ class WindowsHardwareTests implements HardwareTests {
         final op = operation = _operations.begin(installation.id);
         unawaited(() async {
           try {
-            await requireCurrentInstallation(
-              installation,
-              parser.version,
-              op.token,
-            );
+            // Tests right after a check (reuseIdentity) confirm its
+            // fingerprint by file stats; others read the files again.
+            if (!reuseIdentity || !await statsUnchanged(installation))
+              await requireCurrentInstallation(
+                installation,
+                parser.version,
+                op.token,
+              );
+            op.token.check();
             await for (final result in qualify(
               installation,
               op.token,
