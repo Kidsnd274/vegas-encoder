@@ -849,6 +849,33 @@ buffersink AVOptions:
     await rejects(() => services.discovery.add(ffmpeg.path), 'FFPROBE-MISSING');
     await ffprobe.writeAsBytes(bytes);
     await ffmpeg.delete();
+    final notFFmpeg = File(joinPath(joinPath(root.path, 'not-ffmpeg'), 'ffmpeg.exe'));
+    await notFFmpeg.create(recursive: true);
+    await notFFmpeg.writeAsString('not a program');
+    final problemScan = WindowsServices(
+      core: compileCore,
+      paths: ServicePaths(
+        roaming: joinPath(root.path, 'problem-roaming'),
+        local: joinPath(root.path, 'problem-local'),
+      ),
+      executor: fake,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([
+        FFmpegCandidate(notFFmpeg.path, 'path'),
+        FFmpegCandidate(joinPath(joinPath(root.path, 'nowhere'), 'ffmpeg.exe'), 'path'),
+      ]),
+    );
+    final FFmpegDiscovery problemDiscovery = problemScan.discovery;
+    check(
+      (await problemDiscovery.scan()).isEmpty &&
+          problemDiscovery.scanProblems.length == 1 &&
+          problemDiscovery.scanProblems.single.path.toLowerCase().endsWith(
+            r'\not-ffmpeg\ffmpeg.exe',
+          ) &&
+          problemDiscovery.scanProblems.single.code == 'FFMPEG-ARCH' &&
+          problemDiscovery.scanProblems.single.message.isNotEmpty,
+      'scan problems name the candidate that couldn’t be used; a missing PATH entry is no problem',
+    );
     final missing = await services.discovery.scan();
     check(
       missing.single.health == 'missing' &&

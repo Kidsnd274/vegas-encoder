@@ -24,6 +24,17 @@ abstract interface class FFmpegDiscovery {
   Future<FFmpegInstallation> quickCheck(String executablePath);
   Future<FFmpegInstallation> add(String executablePath);
   Future<void> remove(String installationId);
+
+  /// The candidates the latest [scan] found but couldn't use (not x64, too
+  /// old, no FFprobe beside it…). A PATH entry with no ffmpeg.exe is none.
+  List<ScanProblem> get scanProblems;
+}
+
+/// A scan candidate that couldn't be used: where it is, and why ([code] is
+/// the service error code).
+class ScanProblem {
+  const ScanProblem({required this.path, required this.code, required this.message});
+  final String path, code, message;
 }
 
 abstract interface class FFmpegProbe {

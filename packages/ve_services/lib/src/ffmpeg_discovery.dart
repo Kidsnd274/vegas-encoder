@@ -229,7 +229,9 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
   final FFmpegCandidateFinder finder;
   final WindowsFFmpegHelpParser parser;
   final CapabilityCache? capabilities;
-  final List<ServiceException> scanProblems = [];
+  final List<ScanProblem> _scanProblems = [];
+  @override
+  List<ScanProblem> get scanProblems => List.unmodifiable(_scanProblems);
   @override
   Future<List<FFmpegInstallation>> list() async => List.unmodifiable(
     await Future.wait(
@@ -522,7 +524,7 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
       _registerFingerprinted(await identify(executablePath));
   @override
   Future<List<FFmpegInstallation>> scan() async {
-    scanProblems.clear();
+    _scanProblems.clear();
     final candidates = [
       for (final i in (await settings.read()).installations)
         FFmpegCandidate(i.path, i.source),
@@ -539,9 +541,18 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
       } on ServiceException catch (e) {
         // Missing PATH entries are normal. Other candidate failures are explicit
         // diagnostics, never promoted into a usable installation.
-        if (e.code != 'FFMPEG-MISSING') scanProblems.add(e);
+        if (e.code != 'FFMPEG-MISSING')
+          _scanProblems.add(
+            ScanProblem(path: candidate.path, code: e.code, message: e.message),
+          );
       } on FileSystemException catch (e) {
-        scanProblems.add(ServiceException('DISCOVERY-READ', e.message));
+        _scanProblems.add(
+          ScanProblem(
+            path: candidate.path,
+            code: 'DISCOVERY-READ',
+            message: e.message,
+          ),
+        );
       }
     }
     return list(); // Keep vanished/manual/default records with current health.

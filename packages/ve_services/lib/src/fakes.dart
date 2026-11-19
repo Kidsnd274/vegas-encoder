@@ -82,6 +82,10 @@ class FakeFFmpegDiscovery implements FFmpegDiscovery {
   /// When set, [add] fails with this after its quick check passed.
   ServiceException? addFailure;
 
+  /// What [scan] reports it couldn't use; tests set these.
+  @override
+  List<ScanProblem> scanProblems = const [];
+
   /// The addition fixture for [executablePath], as [add] will record it.
   @override
   Future<FFmpegInstallation> quickCheck(String executablePath) async =>

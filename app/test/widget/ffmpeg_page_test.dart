@@ -447,6 +447,24 @@ void main() {
     expect(container(tester).read(ffmpegControllerProvider).probes, isNot(contains('manual-7.1')));
   });
 
+  testWidgets('Scan again names a candidate it couldn’t use (F9)', (tester) async {
+    final discovery = FakeFFmpegDiscovery()
+      ..scanProblems = const [
+        ScanProblem(path: r'C:\Tools\old\ffmpeg.exe', code: 'FFMPEG-UNSUPPORTED', message: 'FFmpeg 4.4 or newer is required.'),
+        ScanProblem(path: r'C:\Tools\x86\ffmpeg.exe', code: 'FFMPEG-ARCH', message: 'FFmpeg must be Windows x64.'),
+      ];
+    await open(tester, withDiscovery: discovery);
+    await tester.tap(find.text('Scan again'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Scanned again. Found 3 installations. 2 couldn’t be used: '
+        r'C:\Tools\old\ffmpeg.exe: FFmpeg 4.4 or newer is required.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Scan again reports what it found', (tester) async {
     await open(tester);
     await tester.tap(find.text('Scan again'));

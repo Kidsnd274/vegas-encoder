@@ -126,9 +126,15 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
 
   Future<void> _scan() => _guard(() async {
     final found = await _controller.scan();
-    if (mounted) {
-      showToast('Scanned again. Found ${found.length} ${found.length == 1 ? 'installation' : 'installations'}.');
-    }
+    if (!mounted) return;
+    final problems = ref.read(ffmpegDiscoveryProvider).scanProblems;
+    showToast(
+      [
+        'Scanned again. Found ${found.length} ${found.length == 1 ? 'installation' : 'installations'}.',
+        if (problems.firstOrNull case final first?)
+          '${problems.length} couldn’t be used: ${first.path}: ${first.message}',
+      ].join(' '),
+    );
   }, failure: 'Couldn’t scan');
 
   Future<void> _test(FFmpegInstallation installation, {String? encoder}) => _guard(() async {
