@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' show Scrollable, State, TextField;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,7 +7,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart';
 import 'package:vegas_encoder/app/app.dart';
-import 'package:vegas_encoder/design/components/button.dart' show VeTooltip;
+import 'package:vegas_encoder/design/components/button.dart' show VeButton, VeTooltip;
 import 'package:vegas_encoder/features/ffmpeg/capability_table.dart';
 import 'package:vegas_encoder/features/ffmpeg/encoder_detail.dart';
 import 'package:vegas_encoder/features/ffmpeg/installation_card.dart';
@@ -31,6 +33,18 @@ void main() {
   Future<FFmpegInstallation> fixture(String id) async =>
       (await FakeFFmpegDiscovery().list()).singleWhere((i) => i.id == id);
 
+  /// What Add FFmpeg… adds at [addedPath].
+  Future<FFmpegInstallation> portable(WidgetTester tester) async {
+    final manual = await tester.runAsync(() => fixture('manual-7.1'));
+    return FFmpegInstallation.fromJson({
+      ...manual!.toJson(),
+      'id': 'manual-8.1',
+      'label': 'FFmpeg 8.1 portable',
+      'path': addedPath,
+      'identity': {...manual.identity.toJson(), 'key': 'b0-fixture-manual-8.1'},
+    });
+  }
+
   Future<void> open(
     WidgetTester tester, {
     List<Override> overrides = const [],
@@ -38,14 +52,7 @@ void main() {
     FakeFFmpegDiscovery? withDiscovery,
     FakeMachineSettingsRepository? withMachine,
   }) async {
-    final manual = await tester.runAsync(() => fixture('manual-7.1'));
-    final extra = FFmpegInstallation.fromJson({
-      ...manual!.toJson(),
-      'id': 'manual-8.1',
-      'label': 'FFmpeg 8.1 portable',
-      'path': addedPath,
-      'identity': {...manual.identity.toJson(), 'key': 'b0-fixture-manual-8.1'},
-    });
+    final extra = await portable(tester);
     window = FakeWindowController();
     machine = withMachine ?? FakeMachineSettingsRepository();
     discovery = withDiscovery ?? FakeFFmpegDiscovery(additions: {addedPath: extra});
@@ -299,6 +306,51 @@ void main() {
     await tester.runAsync(probe.finish);
     await tester.pumpAndSettle();
     expect(find.text('ffmpeg.exe stopped responding.'), findsWidgets);
+  });
+
+  testWidgets('while an added FFmpeg is checked, its hardware tests wait and Scan again starts no second check (F2)', (
+    tester,
+  ) async {
+    final probe = StalledProbe();
+    final extra = await portable(tester);
+    await open(
+      tester,
+      overrides: [ffmpegProbeProvider.overrideWithValue(probe)],
+      withDiscovery: FakeFFmpegDiscovery(additions: {addedPath: extra}, scanResults: [extra]),
+    );
+    window.pickedFile = addedPath;
+    await tester.tap(find.text('Add FFmpeg…'));
+    await tester.pump();
+    await tester.pump();
+    Iterable<String> checks() => probe.started.where((id) => id == 'manual-8.1');
+    expect(checks(), hasLength(1));
+    expect(container(tester).read(ffmpegControllerProvider).selectedId, 'manual-8.1');
+    expect(tester.widget<VeButton>(find.widgetWithText(VeButton, 'Test hardware encoders')).onPressed, isNull);
+
+    await tester.tap(find.text('Scan again'));
+    await tester.pump();
+    await tester.pump();
+    expect(checks(), hasLength(1), reason: 'the scan waits for the check already running');
+    await tester.runAsync(() => probe.finish(phase: 'done', message: ''));
+    await tester.pumpAndSettle();
+    expect(find.text('Scanned again. Found 1 installation.'), findsOneWidget);
+    expect(checks(), hasLength(1));
+  });
+
+  testWidgets('Remove… on a card mid-check cancels the check (F2)', (tester) async {
+    final probe = StalledProbe();
+    await open(tester, overrides: [ffmpegProbeProvider.overrideWithValue(probe)]);
+    final seven = (await tester.runAsync(() => fixture('manual-7.1')))!;
+    unawaited(container(tester).read(ffmpegControllerProvider.notifier).probe(seven));
+    await tester.pump();
+    expect(inCard('FFmpeg 7.1.1', 'Reading encoders… 18 of 25'), findsOneWidget);
+    await tester.tap(inCard('FFmpeg 7.1.1', 'Remove…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+    expect(probe.cancelled, contains('manual-7.1'));
+    expect(card('FFmpeg 7.1.1'), findsNothing);
+    expect(container(tester).read(ffmpegControllerProvider).probes, isNot(contains('manual-7.1')));
   });
 
   testWidgets('Scan again reports what it found', (tester) async {

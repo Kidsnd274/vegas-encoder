@@ -324,6 +324,45 @@ void main() {
       expect(state().probeFailures['gyan-8.1'], 'ffmpeg.exe stopped responding.');
     });
 
+    test('a check and the capabilities it feeds start one probe (F2)', () async {
+      final probe = StalledProbe();
+      start(probe: probe);
+      final full = inst('gyan-8.1');
+      final checking = controller().probe(full);
+      final capabilities = container.listen(capabilitiesProvider(full.id).future, (_, _) {}).read();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(probe.started, ['gyan-8.1'], reason: 'the capabilities wait for the running check');
+      await probe.finish(phase: 'done', message: '');
+      await checking;
+      expect(await capabilities, isNull, reason: 'the stalled probe cached nothing');
+      expect(probe.started, ['gyan-8.1']);
+    });
+
+    test('two checks of one installation start one probe; hardware tests wait for it (F2)', () async {
+      final probe = StalledProbe();
+      start(probe: probe);
+      final full = inst('gyan-8.1');
+      final first = controller().probe(full);
+      final second = controller().probe(full);
+      await Future<void>.delayed(Duration.zero);
+      expect(probe.started, ['gyan-8.1']);
+      await expectLater(
+        controller().testHardware(full, hardwareEncoders: const ['hevc_nvenc']),
+        throwsA(
+          isA<ServiceException>()
+              .having((e) => e.code, 'code', 'CHECK-RUNNING')
+              .having((e) => e.message, 'message', 'Wait until the check of FFmpeg 8.1 full finishes.'),
+        ),
+      );
+      await probe.finish();
+      await Future.wait([first, second]);
+      expect(state().probeFailures['gyan-8.1'], 'ffmpeg.exe stopped responding.');
+      unawaited(controller().probe(full));
+      await Future<void>.delayed(Duration.zero);
+      expect(probe.started, ['gyan-8.1', 'gyan-8.1'], reason: 'a finished check can run again');
+      await probe.finish();
+    });
+
     test('hardware tests stream in; the encoders show Testing until then', () async {
       start();
       final full = inst('gyan-8.1');

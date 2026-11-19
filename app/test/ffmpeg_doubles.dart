@@ -9,8 +9,12 @@ class StalledProbe implements FFmpegProbe {
   final List<StreamController<ProbeProgress>> _open = [];
   final List<String> cancelled = [];
 
+  /// The installation of each probe started, in order.
+  final List<String> started = [];
+
   @override
   Stream<ProbeProgress> probe(FFmpegInstallation installation) {
+    started.add(installation.id);
     final controller = StreamController<ProbeProgress>();
     _open.add(controller);
     controller.add(

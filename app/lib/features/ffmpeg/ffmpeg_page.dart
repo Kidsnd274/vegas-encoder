@@ -183,6 +183,8 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
         installations.where((i) => i.id == defaultId).firstOrNull ??
         installations.firstOrNull;
     final testing = selected != null && (state.testing[selected.id]?.isNotEmpty ?? false);
+    // The check tests the hardware encoders itself; a second run would share the GPU with it.
+    final checking = selected != null && state.probes.containsKey(selected.id);
 
     return CallbackShortcuts(
       bindings: {const SingleActivator(LogicalKeyboardKey.keyF, control: true): _search.requestFocus},
@@ -208,7 +210,7 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
                     label: testing ? 'Testing…' : 'Test hardware encoders',
                     icon: VeIcons.flask,
                     variant: VeButtonVariant.primary,
-                    onPressed: selected == null || testing ? null : () => _test(selected),
+                    onPressed: selected == null || testing || checking ? null : () => _test(selected),
                   ),
                 ],
               ),
@@ -444,7 +446,9 @@ class _Capabilities extends ConsumerWidget {
                   status: status(encoderId),
                   presets: presets,
                 ),
-                onTest: state.isTesting(installation.id, encoderId) ? null : () => onTest(encoderId),
+                onTest: state.isTesting(installation.id, encoderId) || state.probes.containsKey(installation.id)
+                    ? null
+                    : () => onTest(encoderId),
                 onOpenPreset: onOpenPreset,
               ),
             ),
