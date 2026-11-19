@@ -31,7 +31,7 @@ NVENC rate-control modes passed on an RTX 5070 Ti (see status); no core rule is
 needed. Quick Sync is still unverified (no Intel GPU here). Run
 `scripts/etc/Test-RateControlMatrix.py --encoders hevc_qsv` on a PC with one, and add
 core rules only for combinations that real FFmpeg rejects there. HEVC profile/depth
-rules and the 8-bit HEVC NVENC default were added and confirmed on an RTX 5070 Ti
+rules were added and confirmed on an RTX 5070 Ti; HEVC NVENC defaults to 10-bit
 (see status).
 
 **Also check in L6: the progress window stays above VEGAS.** While VEGAS is in

@@ -583,7 +583,7 @@
         "8": "yuv420p",
         "10": "p010le"
       },
-      "depthDef": 8,
+      "depthDef": 10,
       "multipass": {
         "flag": "-multipass",
         "values": [

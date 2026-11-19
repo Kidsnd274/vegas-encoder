@@ -75,12 +75,15 @@ average, and CBR, at each supported depth.
 - Owner's RTX 5070 Ti re-run with this core: 13 HEVC NVENC rows pass, 0 mismatches.
   8-bit now writes Main. `main10` at 8-bit writes Main 10, and the core warns. `main`
   at 10-bit is accepted and written as Main 10, so no rule is needed.
-- Default bit depth (owner decision, 2026-11-19): x265 stays 10-bit Main 10. HEVC
-  NVENC's default is now 8-bit (`depthDef` 8), because NVIDIA's support matrix lists
-  Maxwell 2nd gen (GTX 950-980 Ti, Titan X, Quadro M2000-M6000, Tesla M4-M60) as 8-bit
-  HEVC only; every HEVC-capable GPU from Pascal on also does 10-bit. This applies when
-  no depth is set; switching encoders keeps a depth the new encoder offers. The
-  built-in HEVC (NVENC) preset stores 10-bit and is unchanged.
+- Default bit depth (owner decision, 2026-11-20): x265 and HEVC NVENC both default to
+  10-bit Main 10 (`depthDef` 10). NVIDIA's support matrix lists every HEVC-capable GPU
+  from Pascal on as 10-bit capable. Maxwell 2nd gen (GTX 950-980 Ti, Titan X, Quadro
+  M2000-M6000, Tesla M4-M60) encodes 8-bit HEVC only, so those users must choose
+  8-bit. A 10-bit render there fails at encoder open, which is now reported in
+  seconds. The FFmpeg page's hardware test encodes 8-bit only, so it doesn't catch
+  this. This applies when no depth is set; switching encoders keeps a depth the new
+  encoder offers. The built-in HEVC (NVENC) preset stores 10-bit and is unchanged.
+  An 8-bit default was briefly committed on 2026-11-19 and reverted.
 - Checks after the default change: core 3,273; B1 catalog 180; B2 Dart FFI 246 ×2;
   app 728 tests with light and dark goldens, none changed.
 - Separately, x264 `high422`/`high444` and x265 `main444-*` still write 4:2:0

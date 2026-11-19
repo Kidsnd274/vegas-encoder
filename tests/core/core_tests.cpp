@@ -200,10 +200,10 @@ void FixPlanChecks(const ve::Json& bundle, const ve::Json& request) {
         Expect(After(result.at("argv"),"-profile:v") == (depth == 8 ? "main" : "main10") && !hevcIssue(result,"V-PROFILE-DEPTH") && !hevcIssue(result,"V-PROFILE-LABEL"),
                std::string("an unset HEVC profile follows the bit depth: ") + encoder + " " + std::to_string(depth) + "-bit");
     }
-    // Unset depth (owner decision, 2026-11-19): x265 stays 10-bit Main 10. HEVC NVENC is 8-bit
-    // Main, because Maxwell 2nd gen (GTX 950-980 Ti, Quadro M2000-M6000) encodes 8-bit HEVC
-    // only (NVIDIA Video Encode and Decode Support Matrix); Pascal and newer also take 10-bit.
-    for (const auto& [encoder,expectedProfile,pixfmt] : {std::tuple{"libx265","main10","yuv420p10le"},{"hevc_nvenc","main","yuv420p"}}) {
+    // Unset depth (owner decision, 2026-11-20): x265 and HEVC NVENC are 10-bit Main 10. Every
+    // HEVC-capable NVIDIA GPU from Pascal on encodes 10-bit; Maxwell 2nd gen (GTX 950-980 Ti,
+    // Quadro M2000-M6000) encodes 8-bit HEVC only (NVIDIA Video Encode and Decode Support Matrix).
+    for (const auto& [encoder,expectedProfile,pixfmt] : {std::tuple{"libx265","main10","yuv420p10le"},{"hevc_nvenc","main10","p010le"}}) {
         auto unsetDepth = fixtureRequest("yt-hevc-nv"); auto& v = unsetDepth["recipe"]["video"];
         v["encoder"] = encoder; v["mode"] = std::string(encoder) == "libx265" ? "crf" : "cq"; v["speed"] = nullptr; v["tune"] = nullptr; v["profile"] = nullptr; v["depth"] = nullptr;
         const auto result = CallJson(ve_compile,unsetDepth); const auto& argv = result.at("argv");
