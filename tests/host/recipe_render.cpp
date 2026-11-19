@@ -289,12 +289,33 @@ int wmain(int argc, wchar_t** argv) {
     const auto failedId = Widen(ve::Str(filterFailure,"id"));
     const auto failedLive = Read(std::filesystem::path(root) / L"bad-filter" / L"jobs" / (failedId + L".live.json"));
     Check(failedLive.at("message") == filterFailure.at("message"), "C5 and C6 share the actionable failure message");
+    // 0.2.1 field report: SVT-AV1 rejects a peak rate outside CRF at encoder open and
+    // FFmpeg stays alive with its pipes unread. Render must return a failure, not wait
+    // for StallTimeoutMs (120 s here) or the user's cancel.
+    const auto encoders = [&] {
+      FILE* pipe = _wpopen((L"\"\"" + std::filesystem::absolute(argv[3]).wstring() + L"\" -hide_banner -encoders 2>NUL\"").c_str(), L"r");
+      std::string text; char buffer[4096]; size_t got = 0;
+      while (pipe && (got = fread(buffer, 1, sizeof(buffer), pipe)) > 0) text.append(buffer, got);
+      if (pipe) _pclose(pipe);
+      return text;
+    }();
+    if (encoders.find(" libsvtav1 ") != std::string::npos) {
+      auto svt = recipe; svt["command"] = {{"mode","template"},{"template","{inputs} -map 0:v:0 -map 1:a:0 -c:v libsvtav1 -preset 8 -b:v 4000k "
+                                          "-maxrate 4000k -bufsize 8000k -pix_fmt yuv420p10le -c:a pcm_f32le -f matroska {output}"}};
+      const auto began = GetTickCount64();
+      const auto svtFailure = Run(root, L"svt-peak-rejected", svt, E_FAIL, -1, 0, false, false, true);
+      Check(GetTickCount64() - began < 8000, "SVT-AV1 encoder-open failure returns to VEGAS within seconds");
+      Check(ve::Str(svtFailure,"message") == "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode" && ve::Str(svtFailure,"hresult") == Hr(E_FAIL),
+            "History and the returned HRESULT name SVT-AV1's own diagnostic");
+      const auto svtLive = Read(std::filesystem::path(root) / L"svt-peak-rejected" / L"jobs" / (Widen(ve::Str(svtFailure,"id")) + L".live.json"));
+      Check(svtLive.at("state") == "failed" && svtLive.at("message") == svtFailure.at("message"), "the progress window shows the same SVT-AV1 diagnostic");
+    } else puts("SKIP svt-peak-rejected: no libsvtav1");
     Run(root, L"after-filter-failure", recipe, S_OK);
     Run(root, L"existing-destination", recipe, S_OK, -1, 0, false, true);
     auto empty = Tpl::Make(L"Not a recipe", L"", 0); empty.SetGuid(tpl::iidOwner, GUID_VegasEncoderType);
     ISfRenderFile* rejected = nullptr;
     Check(CreateRenderFile(empty.Ptr(), &rejected) == E_INVALIDARG && !rejected, "Create rejects absent recipe instead of using proof settings");
-    printf("B6 actual adapter PASS: %d checks / 11 fake-host real-FFmpeg cases.\n", checks);
+    printf("B6 actual adapter PASS: %d checks / %s fake-host real-FFmpeg cases.\n", checks, encoders.find(" libsvtav1 ") != std::string::npos ? "12" : "11");
     return 0;
   } catch (const std::exception& error) {
     fprintf(stderr, "B6 adapter FAIL after %d checks: %s\n", checks, error.what()); return 1;

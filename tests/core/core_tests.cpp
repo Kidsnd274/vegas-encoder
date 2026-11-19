@@ -162,6 +162,35 @@ void FixPlanChecks(const ve::Json& bundle, const ve::Json& request) {
     const auto at48 = CallJson(ve_compile,fixtureRequest("av1-small"));
     Expect(outputAr(at48.at("argv")).empty() && !FindIssue(at48.at("issues"),"V-RATE-RESAMPLED"),"D11 a supported project rate is not resampled");
 
+    // SVT-AV1 (4.3.0 in N-128435) refuses a peak rate outside CRF ("Max Bitrate only
+    // supported with CRF mode"). Saved recipes such as "AV1 4Mb/s Smol" r1 must be
+    // refused before FFmpeg starts, on the field the user can fix.
+    for (const int schema : {1,2}) {
+        auto peak = fixtureRequest("av1-small"); peak["recipe"]["schema"] = schema;
+        peak["recipe"]["video"]["mode"] = "abr"; peak["recipe"]["video"]["bitrateK"] = 4000; peak["recipe"]["video"]["maxrateK"] = 4000;
+        for (const auto call : {ve_recipe_validate,ve_compile}) {
+            const auto issues = CallJson(call,peak).at("issues"); const auto issue = FindIssue(issues,"V-PEAK-UNSUPPORTED");
+            Expect(issue && ve::Str(*issue,"level") == "error" && ve::Str(*issue,"field") == "video.maxrateK" &&
+                   ve::Str(*issue,"message").find("Peak bitrate") != std::string::npos,"SVT-AV1 target bitrate with a peak is an error on Peak bitrate (schema " + std::to_string(schema) + ")");
+        }
+    }
+    auto svt = fixtureRequest("av1-small"); svt["recipe"]["video"]["mode"] = "abr"; svt["recipe"]["video"]["bitrateK"] = 4000;
+    svt["recipe"]["video"]["maxrateK"] = nullptr;
+    const auto noPeak = CallJson(ve_compile,svt);
+    Expect(!ve::HasErrors(noPeak.at("issues")) && After(noPeak.at("argv"),"-b:v") == "4000k" && !Count(noPeak.at("argv"),"-maxrate"),"SVT-AV1 target bitrate without a peak compiles");
+    svt["recipe"]["video"]["extra"] = "-maxrate 5000k -bufsize 10000k";
+    const auto svtExtraIssues = CallJson(ve_compile,svt).at("issues");
+    const auto svtExtra = FindIssue(svtExtraIssues,"V-PEAK-UNSUPPORTED");
+    Expect(svtExtra && ve::Str(*svtExtra,"level") == "error" && ve::Str(*svtExtra,"field") == "video.extra","SVT-AV1 target bitrate with -maxrate in Extra is an error on Extra arguments");
+    svt["recipe"]["video"]["mode"] = "crf"; svt["recipe"]["video"]["maxrateK"] = 4000;
+    const auto cappedCrf = CallJson(ve_compile,svt);
+    Expect(!ve::HasErrors(cappedCrf.at("issues")) && After(cappedCrf.at("argv"),"-maxrate") == "5000k","SVT-AV1 capped CRF through Extra stays allowed; an inactive Peak bitrate is ignored");
+
+    auto x264 = request; x264["recipe"]["video"]["mode"] = "abr"; x264["recipe"]["video"]["maxrateK"] = 16000;
+    const auto x264Peak = CallJson(ve_compile,x264);
+    Expect(!ve::HasErrors(x264Peak.at("issues")) && After(x264Peak.at("argv"),"-maxrate") == "16000k" && After(x264Peak.at("argv"),"-bufsize") == "32000k",
+           "encoders that support a peak keep -maxrate/-bufsize");
+
 #if defined(__SANITIZE_ADDRESS__)
     const int rounds = 20;
 #else

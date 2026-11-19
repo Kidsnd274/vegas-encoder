@@ -279,6 +279,21 @@ Json Validate(const Json& request, const Json* capabilities, const Json* structu
         if (Str(v,"color","bt709") != "bt709" && Str(v,"color") != "none") issues.push_back(Issue("V-COLOR","error","video.color","Use BT.709 tags or no tags; other color policies need Advanced mode."));
         if (Num(v,"gopSec") > 10) issues.push_back(Issue("V-GOP","warn","video.gopSec","Keyframes more than 10 seconds apart make seeking slow."));
         if (Str(v,"encoder") == "libx264" && Num(res,"depth") == 10) issues.push_back(Issue("V-H264-10BIT","warn","video.depth","10-bit H.264 does not play on most phones, browsers or TVs."));
+        // SVT-AV1 accepts a peak rate only with CRF ("Max Bitrate only supported with CRF mode")
+        // and then fails at encoder open, after the render has started.
+        if (Str(v,"encoder") == "libsvtav1" && Str(res,"videoMode") == "abr") {
+            if (Num(v,"maxrateK") > 0) issues.push_back(Issue("V-PEAK-UNSUPPORTED","error","video.maxrateK",
+                "SVT-AV1 can't cap the peak in Target bitrate mode. Clear Peak bitrate, or use Constant quality."));
+            try {
+                const auto words = Tokenize(Str(v,"extra"));
+                for (const auto& pair : PairOptions(words)) if (pair.key == "maxrate" && pair.stream != "audio") {
+                    issues.push_back(Issue("V-PEAK-UNSUPPORTED","error","video.extra",
+                        "SVT-AV1 can't cap the peak in Target bitrate mode. Remove -maxrate, or use Constant quality.",
+                        {{"start",ve::Utf16Offset(Str(v,"extra"),words[pair.option].start)},{"end",ve::Utf16Offset(Str(v,"extra"),pair.HasValue() ? words[pair.value].end : words[pair.option].end)}}));
+                    break;
+                }
+            } catch (const Error&) {} // Extra lint reports malformed text.
+        }
     }
     if (withAudio) {
         stream(a,res.at("audioProfile"),"audio","audio[0]");

@@ -58,6 +58,15 @@ std::wstring Quote(const std::wstring& value) {
 }
 }  // namespace
 
+bool FatalFfmpegDiagnostic(const std::string& line) {
+  // FFmpeg 4.4-8.x wording. After these FFmpeg only shuts down, but on Windows its
+  // shutdown can wait forever on a demuxer blocked in a named-pipe read.
+  for (const char* marker : {"Error while opening encoder", "Could not open encoder before EOF", "Error initializing output stream",
+                             "Error opening output file", "Task finished with error", "Conversion failed!"})
+    if (line.find(marker) != std::string::npos) return line.find("End of file") == std::string::npos;
+  return false;
+}
+
 BOOL CreateProcessPolled(const std::function<BOOL()>& create, const std::function<bool()>& poll, bool& interrupted) {
   if (!poll) return create();
   std::atomic<bool> done{false}; BOOL result = FALSE;
@@ -116,6 +125,10 @@ struct FfmpegEncoder::Impl {
   std::atomic<bool> endedEarly{false};
   // Last proof that FFmpeg is working: an input write completed, or frame/out_time_us/total_size advanced.
   std::atomic<ULONGLONG> activity{0};
+  // Last time a progress key advanced (input writes excluded), and the stderr watcher.
+  std::atomic<ULONGLONG> progressAt{0};
+  std::thread stderrWorker;
+  static constexpr DWORD fatalGraceMs = 2000;
   std::atomic<long long> lastFrame{-1};
   std::atomic<uint64_t> videoBuffersAllocated{0};
   bool replaceExisting = false, hadExisting = false;
@@ -147,9 +160,35 @@ struct FfmpegEncoder::Impl {
       if (bytes[i] != '\n') { if (line.size() < 128) line += bytes[i]; continue; }
       for (int k = 0; k < 3; ++k) if (line.rfind(keys[k], 0) == 0) {
         const long long value = _strtoi64(line.c_str() + strlen(keys[k]), nullptr, 10);
-        if (value > seen[k]) { seen[k] = value; Active(); if (k == 0) lastFrame = value; }
+        if (value > seen[k]) { seen[k] = value; Active(); progressAt = GetTickCount64(); if (k == 0) lastFrame = value; }
       }
       line.clear();
+    }
+  }
+  // Follows the stderr log while FFmpeg runs. A fatal diagnostic followed by no exit
+  // and no progress for fatalGraceMs fails the encode, so Render stops waiting on
+  // pipes FFmpeg will never read again. The log keeps the full text for the message.
+  void WatchStderr() {
+    Handle file;
+    file.h = CreateFileW(stats.stderrPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                         nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (!file.Valid()) { Log("FFmpeg stderr watcher unavailable: %lu", GetLastError()); return; }
+    std::string line, fatal; ULONGLONG fatalAt = 0; char bytes[4096]; DWORD count = 0;
+    while (!stopping && !failed && !Exited()) {
+      while (fatal.empty() && ReadFile(file.h, bytes, sizeof(bytes), &count, nullptr) && count) {
+        for (DWORD i = 0; i < count && fatal.empty(); ++i) {
+          if (bytes[i] != '\r' && bytes[i] != '\n') { if (line.size() < 4096) line += bytes[i]; continue; }
+          if (FatalFfmpegDiagnostic(line)) { fatal = line; fatalAt = GetTickCount64(); }
+          line.clear();
+        }
+      }
+      const ULONGLONG now = GetTickCount64();
+      if (!fatal.empty() && now - fatalAt >= fatalGraceMs && now - progressAt.load() >= fatalGraceMs && !Exited() && !stopping) {
+        Log("FFmpeg reported a fatal error but kept running: %s", fatal.c_str());
+        Fail(E_FAIL, "FFmpeg reported a fatal error and stopped processing input.");
+        return;
+      }
+      Sleep(50);
     }
   }
 
@@ -292,6 +331,7 @@ struct FfmpegEncoder::Impl {
       pipe.queue.clear();
       pipe.bytes = pipe.blocks = 0;
     }
+    if (stderrWorker.joinable()) stderrWorker.join();
     // Closing the kill-on-close job also closes stdout inherited by descendants.
     job.Close();
     if (progressWorker.joinable()) progressWorker.join();
@@ -478,6 +518,7 @@ bool FfmpegEncoder::StartImpl(const std::wstring& exe, const std::wstring& outpu
       try { progress(bytes, count); } catch (...) { Log("progress observer failed (nonfatal)"); }
     }
   });
+  p.stderrWorker = std::thread([&p] { try { p.WatchStderr(); } catch (...) { Log("FFmpeg stderr watcher failed (nonfatal)"); } });
   for (size_t i = 0; i < (p.withAudio ? 2u : 1u); i++) p.pipes[i].worker = std::thread([&p, i] { p.WritePipe(i); });
   return true;
 }
@@ -490,7 +531,8 @@ bool FfmpegEncoder::Submit(bool audio, std::vector<BYTE> data, const Poll& poll)
   if (data.size() > pipe.limit || (audio && !p.withAudio)) { p.Fail(E_INVALIDARG, "input exceeds pipe queue limit"); return false; }
   // The caller polls once per frame; poll here only while waiting for queue space (every 100 ms).
   for (bool waited = false;; waited = true) {
-    if ((waited && !poll()) || p.failed || p.stopping) return false;
+    // A recognized FFmpeg failure stays the outcome even if the host cancels meanwhile.
+    if (p.failed || p.stopping || (waited && !poll())) return false;
     if (p.endedEarly) return true;  // FFmpeg already finished; the caller stops fetching input.
     if (p.Exited()) { p.InputClosed(); return p.endedEarly; }
     {
@@ -519,7 +561,7 @@ bool FfmpegEncoder::Finish(const Poll& poll, bool publish) {
   }
   p.Active();  // A slow flush is healthy while progress keeps advancing.
   while (!p.pipes[0].done || (p.withAudio && !p.pipes[1].done) || !p.Exited()) {
-    if (!poll() || p.failed || p.Stalled()) {
+    if (p.failed || !poll() || p.Stalled()) {
       if (!p.failed && p.Stalled()) p.Fail(E_FAIL, p.StallMessage().c_str());
       p.Abort(); return false;
     }
@@ -528,6 +570,7 @@ bool FfmpegEncoder::Finish(const Poll& poll, bool publish) {
     if (p.Exited()) std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   for (auto& pipe : p.pipes) if (pipe.worker.joinable()) pipe.worker.join();
+  if (p.stderrWorker.joinable()) p.stderrWorker.join();
   GetExitCodeProcess(p.process.h, &p.stats.exitCode);
   p.job.Close();
   if (p.progressWorker.joinable()) p.progressWorker.join();

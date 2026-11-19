@@ -1310,6 +1310,7 @@ All new record fields are optional, so older records stay readable.
 | `L-NETWORK` / `V-EXTRA-NETWORK` | warn | URL or protocol arguments, including `tee` targets |
 | `L-FILE-ACCESS` / `V-EXTRA-FILE` | warn | Options and filters that read or write other files |
 | `V-EXTRA-WRONG-STREAM` | warn | An option with the other stream's specifier, for example `-b:a` in Video Extra |
+| `V-PEAK-UNSUPPORTED` | error | SVT-AV1 (`libsvtav1`) in Target bitrate (`abr`) mode with a peak: `video.maxrateK` set, or `-maxrate` in Video Extra (field `video.extra`, with its range). SVT-AV1 accepts a peak only with CRF, so capped CRF through Extra stays allowed. Other encoders keep `-maxrate`/`-bufsize`. |
 | `V-RATE-RESAMPLED` | info | Decision D11: with `sampleRate: "source"`, a project rate the encoder or container can't take is resampled. The target is 48000 Hz when accepted, else the nearest accepted rate, and the core emits `-ar`. An explicitly chosen unsupported rate stays `V-RATE` (error). MXF accepts only 48000 Hz. |
 
 The app's external-access set is `L-INPUT`, `L-OUTPUTS`, `L-NETWORK`,
@@ -1319,6 +1320,14 @@ include `-nostats`.
 **Native INI keys.** `StallTimeoutMs` defaults to 120000 and `ConnectTimeoutMs`
 to 30000. The older `PipeTimeoutMs` and `FinishTimeoutMs` are read as deprecated
 aliases for `StallTimeoutMs`, and the log says which value was used.
+
+**Fatal FFmpeg diagnostics.** The engine follows FFmpeg's stderr while it runs. After
+a fatal line (`Error while opening encoder`, `Could not open encoder before EOF`,
+`Error initializing output stream`, `Error opening output file`, `Task finished
+with error`, `Conversion failed!`), if FFmpeg neither exits nor advances a progress
+key for 2 s, the render fails with `E_FAIL` and History records `failed`. This
+doesn't wait for `StallTimeoutMs`. The message prefers an encoder library's own
+`[error]` line, for example `FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode`.
 
 ## App handoff / validation
 

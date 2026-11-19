@@ -21,6 +21,13 @@ shared-DLL build is still uncovered. See [status](STATUS.md#current-progress).
 
 ## Current queue: older VEGAS release qualification
 
+**Also check in L6: SVT-AV1 with a peak bitrate fails promptly.** On VEGAS 2026,
+render an Advanced AV1 command with `-b:v 4000k -maxrate 4000k`. Within a few
+seconds VEGAS must report a failure, and the progress window and History must show
+`FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode` as Failed, not
+Cancelled. Opening the old `AV1 4Mb/s Smol` preset must show the error under Peak
+bitrate. Fake host and real FFmpeg pass; see [status](STATUS.md#current-progress).
+
 **Also check in L6: the progress window stays above VEGAS.** While VEGAS is in
 front, a click anywhere in VEGAS must leave the unpinned progress window visible,
 and switching to another app must put it behind that app (UI_SPEC §12). The

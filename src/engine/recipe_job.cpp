@@ -165,7 +165,9 @@ std::string EncoderFailureMessage(const std::string& fallback, const std::string
     }
     auto lower = line;
     std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    for (const char* marker : {"no such filter", "unknown encoder", "unrecognized option", "option not found",
+    // Encoder libraries name the rejected setting themselves ("Svt[error]: ...",
+    // "x265 [error]: ..."), before FFmpeg's generic open/send failures.
+    for (const char* marker : {"[error]", "no such filter", "unknown encoder", "unrecognized option", "option not found",
                               "error opening", "error initializing", "unable to ", "cannot ", "could not ", "invalid argument"}) {
       if (lower.find(marker) != std::string::npos) { specific = line; break; }
     }

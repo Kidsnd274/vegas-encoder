@@ -34,6 +34,13 @@ Json Read(const std::wstring& path) {
 }
 void Save(const std::wstring& path, const Json& json) { std::ofstream file{std::filesystem::path(path)}; file << json.dump(2); }
 std::wstring Self() { wchar_t path[32768]; GetModuleFileNameW(nullptr,path,32768); return path; }
+bool HasEncoder(const std::wstring& exe, const std::string& name) {
+  const auto command = L"\"\"" + exe + L"\" -hide_banner -encoders 2>NUL\"";
+  FILE* pipe = _wpopen(command.c_str(),L"r"); if (!pipe) return false;
+  std::string text; char buffer[4096]; size_t got = 0;
+  while ((got = fread(buffer,1,sizeof(buffer),pipe)) > 0) text.append(buffer,got);
+  _pclose(pipe); return text.find(" " + name + " ") != std::string::npos;
+}
 Json Installation(const std::wstring& exe, const std::wstring& probe = {}) {
   for (const auto& snapshot : installationSnapshots) if (_wcsicmp(Widen(ve::Str(snapshot,"path")).c_str(),exe.c_str()) == 0) {
     auto result = snapshot;
@@ -134,6 +141,26 @@ void PureChecks() {
     "frame=   20 fps= 19 q=28.0 size=     256KiB time=00:00:00.66 bitrate=3000.0kbits/s speed=0.6x\r"
     "[vost#0:0/libx264 @ 0x1] Error submitting video frame to the encoder\nConversion failed!\n") == "FFmpeg: Error submitting video frame to the encoder",
     "carriage-return statistics lines never hide the mid-render FFmpeg error");
+  const std::string svtLog =
+    "Stream mapping:\n  Stream #0:0 -> #0:0 (rawvideo (native) -> av1 (libsvtav1))\nSvt[info]: -------------------------------------------\n"
+    "Svt[error]: Max Bitrate only supported with CRF mode\nSvt[error]: CBR Rate control is currently not supported for RANDOM_ACCESS/ALL_INTRA, use VBR mode\n"
+    "[libsvtav1 @ 000002289178a800] Error setting encoder parameters: bad parameter (0x80001005)\n"
+    "[vost#0:0/libsvtav1 @ 0000022891786580] [enc:libsvtav1 @ 000002288fb2d380] Error while opening encoder - maybe incorrect parameters such as bit_rate, rate, width or height.\n"
+    "[vf#0:0 @ 000002289178c000] Error sending frames to consumers: Invalid argument\n[vf#0:0 @ 000002289178c000] Task finished with error: Invalid argument\n";
+  Require(EncoderFailureMessage("stall", svtLog) == "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode",
+          "the encoder library's own error names the rejected setting (N-128435 / SVT-AV1 4.3.0 stderr)");
+  Require(EncoderFailureMessage("x", "x265 [error]: Invalid tune\nError while opening encoder\n") == "FFmpeg: x265 [error]: Invalid tune","x265 library error retained");
+  for (const auto* line : {"[vost#0:0/libsvtav1 @ 0x1] [enc:libsvtav1 @ 0x2] Error while opening encoder - maybe incorrect parameters such as bit_rate, rate, width or height.",
+                           "[vost#0:0/libsvtav1 @ 0x1] [enc:libsvtav1 @ 0x2] Could not open encoder before EOF",
+                           "[vf#0:0 @ 0x1] Task finished with error: Invalid argument", "[vf#0:0 @ 0x1] Task finished with error code: -22 (Invalid argument)",
+                           "Error initializing output stream 0:0 -- Error while opening encoder for output stream #0:0", "Conversion failed!",
+                           "[out#0/matroska @ 0x1] Error opening output file C:\\x.mkv."})
+    Require(FatalFfmpegDiagnostic(line),"FFmpeg 4.4-8.x fatal lines recognized");
+  for (const auto* line : {"Svt[error]: Max Bitrate only supported with CRF mode", "Svt[warn]: Failed to set thread priority",
+                           "[libx264 @ 0x1] -qscale is ignored, -crf is recommended.", "[aist#1:0/pcm_f32le @ 0x1] Guessed Channel Layout: stereo",
+                           "[vf#0:0 @ 0x1] Error sending frames to consumers: Invalid argument", "[vist#0:0/rawvideo @ 0x1] Error while decoding stream #0:0: Invalid data",
+                           "[vf#0:0 @ 0x1] Task finished with error code: -541478725 (End of file)", "frame=  10 fps=0.0 q=0.0 size=0KiB time=N/A bitrate=N/A", ""})
+    Require(!FatalFfmpegDiagnostic(line),"warnings, recoverable errors and library text alone are not fatal");
   for (const auto& [fps,num,den] : {std::tuple{48000.0/1001,48000u,1001u},{12.5,25u,2u},{240000.0/1001,240000u,1001u},{50.0,50u,1u},{29.97002997002997,30000u,1001u}}) {
     const auto rate = EncodeRate::FromDouble(fps);
     Require(rate.num == num && rate.den == den,"exact rational frame rates (n/1, n/2, n*1000/1001)");
@@ -401,6 +428,7 @@ Json Run(const Case& test, const std::wstring& root) {
   } else {
     Require(!stats.published && job.Record()["sizeBytes"] == 0,"stopped job never publishes bytes");
     if (test.cancelAt >= 0 || test.timedCancel || test.cancelDuringProbe) Require(job.Record()["status"] == "cancelled","cancellation remains distinct");
+    else Require(job.Record()["status"] == "failed" && FAILED(job.Error()) && job.Error() != SF_E_RENDER_STOPPED,"a non-cancel stop records Failed with a failure HRESULT");
     if (test.failureSlot) Require(job.Record()["status"] == "failed" && job.Error() == E_ACCESSDENIED,"host failure HRESULT preserved");
     if (test.collision) { std::ifstream file(std::filesystem::path(options.output)); std::string text; file>>text; Require(text=="sentinel","destination created during render preserved"); }
     if (test.collision || test.lockExisting)
@@ -486,12 +514,31 @@ size_t ReadBytes(HANDLE pipe, size_t want) {
     }
   });
   const size_t frameBytes = size_t(width) * height * 3;
-  const long long stopAt = kind == L"stall-after" || kind == L"early-exit-mid" ? value : LLONG_MAX;
+  if (kind == L"warnings" || kind == L"fatal-hold") { fputs("Input #0, rawvideo, from 'video pipe':\n",stderr); fflush(stderr); }
+  if (kind == L"warnings") {
+    // Ordinary diagnostics from a healthy encode; none of them may fail it.
+    fputs("[aist#1:0/pcm_f32le @ 0x1] Guessed Channel Layout: stereo\n[libx264 @ 0x2] -qscale is ignored, -crf is recommended.\n"
+          "Svt[warn]: Failed to set thread priority\n[matroska @ 0x3] Starting new cluster due to timestamp\n"
+          "[vf#0:0 @ 0x4] More than 1000 frames duplicated\n[vost#0:0/libx264 @ 0x5] Past duration 0.999992 too large\n",stderr);
+    fflush(stderr);
+  }
+  const long long stopAt = kind == L"stall-after" || kind == L"early-exit-mid" || kind == L"fatal-hold" ? value : LLONG_MAX;
   while (io.frames < stopAt && ReadBytes(video,frameBytes) == frameBytes) {
     ++io.frames;
-    if (kind == L"slow-read") Sleep(DWORD(value));
+    if (kind == L"slow-read" || kind == L"warnings") Sleep(DWORD(value));
   }
   if (kind == L"stall-after") { advancing = false; Sleep(INFINITE); }
+  if (kind == L"fatal-hold") {
+    // FFmpeg 8 with SVT-AV1 4.3 rejecting ABR plus a peak rate, then stuck in shutdown
+    // with both pipes unread (0.2.1 field report: no exit, no progress).
+    advancing = false;
+    fputs("Svt[info]: SVT [version]:\tSVT-AV1 Encoder Lib v4.3.0\nSvt[error]: Max Bitrate only supported with CRF mode\n"
+          "Svt[error]: CBR Rate control is currently not supported for RANDOM_ACCESS/ALL_INTRA, use VBR mode\n"
+          "[libsvtav1 @ 0x1] Error setting encoder parameters: bad parameter (0x80001005)\n"
+          "[vost#0:0/libsvtav1 @ 0x2] [enc:libsvtav1 @ 0x3] Error while opening encoder - maybe incorrect parameters such as bit_rate, rate, width or height.\n"
+          "[vf#0:0 @ 0x4] Error sending frames to consumers: Invalid argument\n[vf#0:0 @ 0x4] Task finished with error: Invalid argument\n",stderr);
+    fflush(stderr); Sleep(INFINITE);
+  }
   if (kind == L"early-exit-mid") Quit(output,code);
   videoEnded = true;
   if (kind == L"early-exit-ok") Quit(output,0);
@@ -571,6 +618,15 @@ int wmain(int argc, wchar_t** argv) {
       test.name="video-only"+suffix; test.recipe=base; test.recipe["audio"][0]["enabled"]=false; summaries.push_back(Run(test,root));
       test.name="advanced"+suffix; test.recipe=base; test.recipe["command"]={{"mode","template"},{"template","{inputs} -map 0:v:0 -map 1:a:0 -c:v ffv1 -pix_fmt yuv420p10le -c:a pcm_f32le -f matroska {output}"}};
       summaries.push_back(Run(test,root));
+      // SVT-AV1 rejects ABR with a peak rate at encoder open. The live pipes must not
+      // hide that behind the stall timeout or a later cancel (0.2.1 field report).
+      if (HasEncoder(argv[build],"libsvtav1")) {
+        Case svt = test; svt.name = "svt-maxrate-rejected"+suffix; svt.success = false;
+        svt.recipe["command"]["template"] = "{inputs} -map 0:v:0 -map 1:a:0 -c:v libsvtav1 -preset 8 -b:v 4000k -maxrate 4000k -bufsize 8000k "
+                                            "-pix_fmt yuv420p10le -c:a pcm_f32le -f matroska {output}";
+        svt.stallTimeout = 60000; svt.maxDuration = 6000; svt.reason = "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode";
+        svt.partialReason = false; summaries.push_back(Run(svt,root));
+      } else printf("SKIP svt-maxrate-rejected%s: no libsvtav1\n",suffix.c_str());
     }
     {
       Case resized; resized.recipe = base; resized.recipe["schema"] = 2;
@@ -633,6 +689,14 @@ int wmain(int argc, wchar_t** argv) {
     summaries.push_back(Run(chaos("early-exit-ok","early-exit-ok",true,60),root));                   // A7
     chaosCase = chaos("early-exit-mid","early-exit-mid:30",true,60); chaosCase.endedEarly = true; summaries.push_back(Run(chaosCase,root));
     summaries.push_back(Run(chaos("early-exit-mid-failure","early-exit-mid:30:1",false,60),root));
+    // A fatal encoder-open diagnostic, then FFmpeg stays alive and reads nothing more:
+    // fail about 2 s later with the encoder's own text, long before the stall timeout.
+    chaosCase = chaos("fatal-hold","fatal-hold:2",false,60); chaosCase.stallTimeout = 60000; chaosCase.maxDuration = 5000;
+    chaosCase.reason = "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode"; chaosCase.partialReason = false;
+    summaries.push_back(Run(chaosCase,root));
+    chaosCase = chaos("fatal-hold-cancel","fatal-hold:2",false,60); chaosCase.stallTimeout = 60000; chaosCase.timedCancel = true;
+    summaries.push_back(Run(chaosCase,root));                                                         // a cancel before the grace ends stays a cancel
+    summaries.push_back(Run(chaos("warnings","warnings:50",true,60),root));                           // 3 s of warnings, longer than the grace
     Case clock; clock.recipe = base; clock.installation = Installation(argv[firstBuild]); clock.name = "clock-step"; clock.frames = 10; clock.clockStep = true;
     summaries.push_back(Run(clock,root));                                                             // A18
     const Json knownFailure{{"ffv1",{{"reason","No NVENC capable devices found."},{"testedAt","2026-11-01T10:00:00Z"}}}};

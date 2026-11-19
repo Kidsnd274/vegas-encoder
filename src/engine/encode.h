@@ -12,6 +12,10 @@ namespace vegas_encoder {
 // CreateProcess itself can be slow (large static executables/AV inspection).
 // Only the Windows launch moves to a worker; caller polling stays on Render.
 BOOL CreateProcessPolled(const std::function<BOOL()>& create, const std::function<bool()>& poll, bool& interrupted);
+// An FFmpeg stderr line that means the run has already failed (an encoder did not
+// open, or a scheduler task ended with an error). Warnings and library errors that
+// FFmpeg may still recover from are not fatal.
+bool FatalFfmpegDiagnostic(const std::string& line);
 
 struct EncodeRate {
   DWORD num = 0, den = 1;

@@ -7,6 +7,32 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**SVT-AV1 peak-rate failure no longer hangs on "Encoding" (2026-11-16; not
+installed).** 0.2.1 on VEGAS 2026.0.3.189 stayed on "Encoding" with the user preset
+`AV1 4Mb/s Smol` r1 (Target bitrate 4000 kb/s, Peak 4000 kb/s). SVT-AV1 4.3.0 refused
+`-maxrate` ("Max Bitrate only supported with CRF mode") at encoder open. FFmpeg
+N-128435 then stayed alive: its video demuxer stopped reading, Render waited on the
+full video queue, and so the audio demuxer stayed blocked in a pipe read. With
+independently fed pipes FFmpeg exits at once (-22). The engine reproduction waited
+for the full stall timeout and reported "Error sending frames to consumers".
+- Core: `V-PEAK-UNSUPPORTED` (error) on Peak bitrate for SVT-AV1 in Target bitrate
+  mode, and on Video Extra for `-maxrate` there. Saved recipes are refused before
+  FFmpeg starts. Capped CRF and other encoders' peaks are unchanged.
+- Engine: a stderr watcher fails the render 2 s after a fatal FFmpeg line if FFmpeg
+  neither exits nor makes progress. VEGAS gets `E_FAIL`, History records Failed,
+  and the message is the encoder's own line
+  (`FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode`). A recognized
+  failure is no longer turned into a cancel by a later host cancel.
+
+Checks: core 3,256 (static); B4 engine normal 31,433 and ASan 31,326 checks, 50 cases
+each, plus 689 Dart record-reader checks. These use the fake host with real FFmpeg
+N-128435 and a controlled fake child. New cases: fatal-hold (fails in 2.6 s with a
+60 s stall timeout), fatal-hold-cancel, ordinary warnings over 3.8 s, and real SVT-AV1
+with a peak (2.1 s, was 60 s). B6 normal and ASan 523/99/486 checks; actual adapter
+271 checks in 12 fake-host real-FFmpeg cases, including the SVT case returning
+`E_FAIL` within 8 s. Legacy containers with real FFmpeg pass. A retry in real
+VEGAS is pending.
+
 **Progress window stays above VEGAS (owner request, 2026-11-16; not committed or
 installed).** A click in VEGAS used to cover the unpinned progress window. The
 runner now finds VEGAS's process from C5 `hostHwnd`, follows foreground changes
