@@ -17,7 +17,7 @@ import '../presets/library_model.dart';
 /// An encoder's state in one installation.
 @immutable
 class EncoderStatus {
-  const EncoderStatus(this.state, {this.reason, this.detail, this.note, this.test});
+  const EncoderStatus(this.state, {this.reason, this.detail, this.note, this.tenBit, this.test});
 
   final VeAvailability state;
 
@@ -30,11 +30,32 @@ class EncoderStatus {
   /// The device a hardware encoder ran on ("NVIDIA GeForce RTX 4070").
   final String? note;
 
+  /// Whether the recorded test's 10-bit encode passed; null if unknown.
+  final bool? tenBit;
+
   /// This session's test result, when there is one.
   final HardwareTestResult? test;
 }
 
 String? _text(Object? value) => value is String && value.isNotEmpty ? value : null;
+
+/// The device a recorded availability names (C3 `note`). Results saved by
+/// earlier builds put a sentence there instead (the reason, or a 10-bit
+/// sentence): those name no device.
+String? _device(Object? raw) {
+  if (raw is! Map) return null;
+  final note = _text(raw['note']);
+  if (note == null || note == raw['reason'] || note == '10-bit test passed.' || note == '10-bit has not passed.') {
+    return null;
+  }
+  return note;
+}
+
+/// The recorded 10-bit result: the record's `extensions.tenBit`, or the cache's `tenBit`.
+bool? _tenBit(Map raw) => switch (raw['extensions']) {
+  {'tenBit': final bool b} => b,
+  _ => raw['tenBit'] is bool ? raw['tenBit'] as bool : null,
+};
 
 /// The newest fact wins: a test running now, then this session's test result,
 /// then this session's probe, then the installation's recorded availability.
@@ -53,9 +74,8 @@ EncoderStatus encoderStatus(
       _state(test.state),
       reason: _text(test.reason),
       detail: _text(test.stderr),
-      note: _text(
-        installation.availability[encoder] is Map ? (installation.availability[encoder] as Map)['note'] : null,
-      ),
+      note: test.state == 'ok' ? _device(installation.availability[encoder]) : null,
+      tenBit: test.tenBit,
       test: test,
     );
   }
@@ -66,7 +86,8 @@ EncoderStatus encoderStatus(
       _state(raw['state']),
       reason: _text(raw['reason']),
       detail: _text(raw['detail']),
-      note: _text(raw['note']),
+      note: _device(raw),
+      tenBit: _tenBit(raw),
     );
   }
   if (probed == null && installation.probedAt == null) return const EncoderStatus(VeAvailability.unknown);
@@ -501,7 +522,8 @@ EncoderDetailModel encoderDetail(
     advice: advice,
     testFacts: [
       ?failureClassLabel(test?.failureClass),
-      if (test != null && test.state == 'ok' && video) test.tenBit ? '10-bit works' : '8-bit only on this PC',
+      if (status.state == VeAvailability.ready && video && hw != null && status.tenBit != null)
+        status.tenBit! ? '10-bit works' : '8-bit only on this PC',
       if (tested != null) 'Tested ${VeFormat.date(tested)}',
     ],
     usedBy: [

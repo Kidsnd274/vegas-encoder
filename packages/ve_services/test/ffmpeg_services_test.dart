@@ -981,6 +981,73 @@ buffersink AVOptions:
       'the rest are tested afterwards on request',
     );
 
+    // D3 (F5): a passing hardware test records the adapter it ran on as
+    // `note`, matched by vendor; a failure records none.
+    const nvidia = 'NVIDIA GeForce RTX 4070';
+    const amd = 'AMD Radeon(TM) 8060S Graphics';
+    final vendorGpu = FakeGpuIdentity(
+      GpuSnapshot(
+        fingerprint: 'gpu-two-vendors',
+        cacheable: true,
+        adapters: [
+          {'name': nvidia, 'vendorId': 4318, 'driver': '1'},
+          {'name': amd, 'vendorId': 4098, 'driver': '2'},
+          {'name': 'Microsoft Basic Render Driver', 'vendorId': 5140, 'driver': '3'},
+        ],
+      ),
+    );
+    final vendorRunner = FakeProcessExecutor(
+      (executable, arguments, token) async =>
+          arguments.contains('-c:v') &&
+              arguments[arguments.indexOf('-c:v') + 1] == 'h264_amf'
+          ? const ProcessOutput(exitCode: 0)
+          : fake.handler(executable, arguments, token),
+    );
+    final vendorBin = Directory(joinPath(root.path, 'vendor-bin'));
+    await vendorBin.create();
+    final vendorFFmpeg = File(joinPath(vendorBin.path, 'ffmpeg.exe'));
+    await vendorFFmpeg.writeAsBytes(bytes);
+    await File(joinPath(vendorBin.path, 'ffprobe.exe')).writeAsBytes(bytes);
+    final vendorServices = WindowsServices(
+      core: compileCore,
+      paths: ServicePaths(
+        roaming: joinPath(root.path, 'vendor-roaming'),
+        local: joinPath(root.path, 'vendor-local'),
+      ),
+      executor: vendorRunner,
+      gpuIdentity: vendorGpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final vendorAdded = await vendorServices.discovery.add(vendorFFmpeg.path);
+    final vendorCheck = await vendorServices.probe.probe(vendorAdded).toList();
+    check(
+      vendorCheck.last.phase == 'done',
+      'vendor check completes: ${vendorCheck.last.message}',
+    );
+    final vendorCache = (await vendorServices.rawCache.read(
+      vendorAdded.identity.key,
+    ))!;
+    final vendorRecord =
+        (await vendorServices.machineSettings.read()).installations.single;
+    String cacheNote(String encoder) =>
+        jsonMap(vendorCache.hardware[encoder])['note'] as String;
+    String recordNote(String encoder) =>
+        jsonMap(vendorRecord.availability[encoder])['note'] as String;
+    check(
+      cacheNote('h264_nvenc') == nvidia && recordNote('h264_nvenc') == nvidia,
+      'a passing NVENC test runs on the NVIDIA adapter: ${cacheNote('h264_nvenc')} / ${recordNote('h264_nvenc')}',
+    );
+    check(
+      cacheNote('h264_amf') == amd && recordNote('h264_amf') == amd,
+      'a passing AMF test runs on the AMD adapter: ${cacheNote('h264_amf')}',
+    );
+    check(
+      jsonMap(vendorCache.hardware['hevc_qsv'])['state'] == 'failed' &&
+          cacheNote('hevc_qsv') == '' &&
+          recordNote('hevc_qsv') == '',
+      'a failed test names no device',
+    );
+
     await processTests();
     final nativeGpu = await WindowsGpuIdentity().read();
     final nativeAgain = await WindowsGpuIdentity().read();

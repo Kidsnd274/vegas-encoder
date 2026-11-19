@@ -132,6 +132,45 @@ void main() {
     });
   });
 
+  group('runs on (F5, D3)', () {
+    FFmpegInstallation withAmf(Map<String, Object?> entry) => FFmpegInstallation.fromJson({
+      ...inst('gyan-8.1').toJson(),
+      'availability': {...inst('gyan-8.1').availability, 'h264_amf': entry},
+    });
+    CapabilityRow amfRow(FFmpegInstallation i) => capabilityGroups(
+      catalog,
+      kind: EncoderKind.video,
+      statusOf: statusLookup(i, const FFmpegState()),
+    ).expand((g) => g.rows).singleWhere((r) => r.id == 'h264_amf');
+    EncoderDetailModel amfDetail(FFmpegInstallation i) =>
+        encoderDetail(catalog, 'h264_amf', installation: i, status: encoderStatus(i, 'h264_amf'), presets: presets);
+
+    test('a note saved by earlier builds (a sentence, not a device) names no device', () {
+      for (final old in [
+        {'state': 'ok', 'reason': '8-bit test passed; 10-bit test failed.', 'note': '8-bit test passed; 10-bit test failed.'},
+        {'state': 'ok', 'reason': 'One-frame test passed on this GPU/driver.', 'note': '10-bit has not passed.'},
+        {'state': 'ok', 'reason': 'One-frame test passed on this GPU/driver.', 'note': '10-bit test passed.'},
+      ]) {
+        final i = withAmf(old);
+        expect(amfRow(i).runsOn, 'AMD GPU', reason: '${old['note']}');
+        expect(amfDetail(i).meaning, isNot(contains('passed on 8-bit')));
+        expect(amfDetail(i).meaning, isNot(contains('passed on 10-bit')));
+      }
+    });
+
+    test('a device note names the GPU; the recorded 10-bit result shows without a test this session', () {
+      final i = withAmf({
+        'state': 'ok',
+        'reason': 'One-frame test passed on this GPU/driver.',
+        'note': 'AMD Radeon(TM) 8060S Graphics',
+        'extensions': {'testedAt': '2026-11-19T00:00:00Z', 'tenBit': false},
+      });
+      expect(amfRow(i).runsOn, 'AMD Radeon(TM) 8060S Graphics');
+      expect(amfDetail(i).meaning, contains('a test encode passed on AMD Radeon(TM) 8060S Graphics.'));
+      expect(amfDetail(i).testFacts, contains('8-bit only on this PC'));
+    });
+  });
+
   group('installation card', () {
     test('says what it is, where it came from and when it was checked', () {
       final card = installationCard(

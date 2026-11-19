@@ -22,6 +22,33 @@ bool windowsUnsupportedHardware(String name) => RegExp(
 const windowsUnsupportedReason =
     'Needs Linux or macOS; not available on Windows.';
 
+/// The adapter a hardware encoder runs on (D3): the snapshot's adapter of
+/// its vendor (NVENC NVIDIA, QSV Intel, AMF AMD). Other APIs (Media
+/// Foundation, D3D12, Vulkan) name the adapter only when there is just one.
+/// Microsoft's Basic Render Driver is never a hardware encoder's device.
+/// Empty when it can't be told.
+String hardwareDevice(String encoder, GpuSnapshot snapshot) {
+  final adapters = [
+    for (final a in snapshot.adapters)
+      if (a['name'] is String &&
+          (a['name'] as String).isNotEmpty &&
+          a['vendorId'] != 0x1414)
+        a,
+  ];
+  final vendor = switch (encoder) {
+    _ when encoder.endsWith('_nvenc') => 0x10DE,
+    _ when encoder.endsWith('_qsv') => 0x8086,
+    _ when encoder.endsWith('_amf') => 0x1002,
+    _ => null,
+  };
+  if (vendor != null)
+    return adapters.where((a) => a['vendorId'] == vendor).firstOrNull?['name']
+            as String? ??
+        '';
+  final names = {for (final a in adapters) a['name'] as String};
+  return names.length == 1 ? names.single : '';
+}
+
 bool _fresh(
   Object? data,
   String fingerprint,
@@ -360,6 +387,10 @@ class WindowsHardwareTests implements HardwareTests {
         );
       }
       token.check();
+      // `note` is the device a passing test ran on, empty otherwise (D3).
+      final device = result.state == 'ok'
+          ? hardwareDevice(encoder, snapshot)
+          : '';
       await cache.update(installation.identity.key, (current) {
         if (current == null)
           throw const ServiceException(
@@ -370,7 +401,7 @@ class WindowsHardwareTests implements HardwareTests {
         hardware[encoder] = {
           ...result.data,
           'detail': result.stderr,
-          'note': result.reason,
+          'note': device,
         };
         final entries = current.encoders;
         if (entries[encoder] is Map)
@@ -394,9 +425,7 @@ class WindowsHardwareTests implements HardwareTests {
               state: result.state,
               reason: result.reason,
               detail: result.stderr,
-              note: result.tenBit
-                  ? '10-bit test passed.'
-                  : '10-bit has not passed.',
+              note: device,
               extensions: {
                 'testedAt': result.testedAt,
                 'gpuFingerprint': snapshot.fingerprint,
