@@ -284,9 +284,7 @@ class WindowsFFmpegProbe implements FFmpegProbe {
             final finalCapabilities = (await cache.read(checked.identity.key))!;
             final availability = <String, Object?>{
               for (final e in finalCapabilities.encoders.entries)
-                e.key:
-                    jsonMap(e.value)['availability'] ??
-                    EncoderAvailability().data,
+                e.key: recordAvailability(jsonMap(e.value)['availability']),
             };
             for (final name in curated.keys) {
               availability.putIfAbsent(

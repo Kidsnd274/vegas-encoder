@@ -279,7 +279,10 @@ class WindowsHardwareTests implements HardwareTests {
           installation.id,
           installation.identity.key,
           (record) => record.copyWith(
-            availability: {...record.availability, encoder: old},
+            availability: {
+              ...record.availability,
+              encoder: recordAvailability(old),
+            },
           ),
         );
         yield cachedResult;
@@ -421,17 +424,13 @@ class WindowsHardwareTests implements HardwareTests {
         (record) => record.copyWith(
           availability: {
             ...record.availability,
-            encoder: EncoderAvailability(
-              state: result.state,
-              reason: result.reason,
-              detail: result.stderr,
-              note: device,
-              extensions: {
-                'testedAt': result.testedAt,
-                'gpuFingerprint': snapshot.fingerprint,
-                'tenBit': result.tenBit,
-              },
-            ).data,
+            encoder: recordAvailability({
+              'state': result.state,
+              'reason': result.reason,
+              'note': device,
+              'testedAt': result.testedAt,
+              'tenBit': result.tenBit,
+            }),
           },
         ),
       );

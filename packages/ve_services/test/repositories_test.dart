@@ -986,6 +986,33 @@ Future<void> main(List<String> args) async {
           preflight.message.contains('.mkv'),
       'preflight records with no media or FFmpeg are readable',
     );
+    // D4 (F6): the exporter copies the slim installation record into jobs.
+    const slimId = '00000000-0000-4000-8000-0000000000a4';
+    final recordedFFmpeg = jsonMap(job.data['ffmpeg']);
+    final slim = (await readBack(slimId, {
+      ...job.data,
+      'id': slimId,
+      'logFile': null,
+      'ffmpeg': {
+        ...recordedFFmpeg,
+        'availability': {
+          'libx264': {'state': 'ok', 'reason': 'Listed by this FFmpeg.', 'note': '', 'extensions': <String, Object?>{}},
+          'h264_nvenc': {
+            'state': 'ok',
+            'reason': 'One-frame test passed on this GPU/driver.',
+            'note': 'NVIDIA GeForce RTX 4070',
+            'extensions': {'testedAt': '2026-11-19T01:00:00.000Z', 'tenBit': true},
+          },
+          'hevc_qsv': {'state': 'failed', 'reason': 'No device available.', 'note': '', 'extensions': <String, Object?>{}},
+        },
+      },
+    }))!;
+    check(
+      slim.ffmpeg != null &&
+          jsonMap(slim.ffmpeg!.availability['h264_nvenc'])['note'] == 'NVIDIA GeForce RTX 4070' &&
+          !jsonMap(slim.ffmpeg!.availability['hevc_qsv']).containsKey('detail'),
+      'a job whose FFmpeg is a slim installation record decodes',
+    );
     const skewId = '00000000-0000-4000-8000-0000000000a3';
     final started = DateTime.parse(job.startedAt);
     final skewed = (await readBack(skewId, {

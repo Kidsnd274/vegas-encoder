@@ -176,6 +176,45 @@ Future<MachineSettings> updateMachine(
   );
 }
 
+/// One encoder's availability as machine.json keeps it (D4): state, reason
+/// (at most 300 characters), the short note (the device a passing hardware
+/// test ran on) and, for tests, when it ran and whether 10-bit passed.
+/// An empty note or extensions is left out. FFmpeg's stderr and other test
+/// details stay in the capability cache.
+JsonMap recordAvailability(Object? entry) {
+  final e = entry is Map ? jsonMap(entry) : <String, Object?>{};
+  final extensions = e['extensions'] is Map
+      ? jsonMap(e['extensions'])
+      : <String, Object?>{};
+  final testedAt = e['testedAt'] ?? extensions['testedAt'];
+  final tenBit = e['tenBit'] ?? extensions['tenBit'];
+  final reason = e['reason'] is String ? e['reason'] as String : '';
+  final note = e['note'] is String ? e['note'] as String : '';
+  return {
+    'state': e['state'] is String ? e['state'] : 'unknown',
+    'reason': reason.length > 300 ? reason.substring(0, 300) : reason,
+    if (note.isNotEmpty) 'note': note,
+    if (testedAt is String || tenBit is bool)
+      'extensions': {
+        if (testedAt is String) 'testedAt': testedAt,
+        if (tenBit is bool) 'tenBit': tenBit,
+      },
+  };
+}
+
+/// [installation] with every availability in its record form.
+FFmpegInstallation slimInstallation(FFmpegInstallation installation) =>
+    installation.copyWith(
+      availability: {
+        for (final e in installation.availability.entries)
+          e.key: recordAvailability(e.value),
+      },
+    );
+
+MachineSettings _slim(MachineSettings settings) => settings.copyWith(
+  installations: settings.installations.map(slimInstallation).toList(),
+);
+
 class WindowsFFmpegDiscovery implements FFmpegDiscovery {
   WindowsFFmpegDiscovery({
     required this.settings,
@@ -355,12 +394,14 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
       final prior = current.installations
           .where((i) => i.id == found.id)
           .firstOrNull;
-      return current.copyWith(
-        installations: [
-          for (final i in current.installations)
-            if (i.id != found.id) i else _combine(prior, found),
-          if (prior == null) found,
-        ],
+      return _slim(
+        current.copyWith(
+          installations: [
+            for (final i in current.installations)
+              if (i.id != found.id) i else _combine(prior, found),
+            if (prior == null) found,
+          ],
+        ),
       );
     });
     return saved.installations.firstWhere((i) => i.id == found.id);
@@ -416,10 +457,12 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
           'FFMPEG-CHANGED',
           'Installation path changed during probing.',
         );
-      return current.copyWith(
-        installations: current.installations
-            .map((i) => i.id == installation.id ? _combine(i, fresh) : i)
-            .toList(),
+      return _slim(
+        current.copyWith(
+          installations: current.installations
+              .map((i) => i.id == installation.id ? _combine(i, fresh) : i)
+              .toList(),
+        ),
       );
     });
     return (
@@ -505,10 +548,12 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
           'FFMPEG-CHANGED',
           'Installation identity changed during probing.',
         );
-      return current.copyWith(
-        installations: current.installations
-            .map((i) => i.id == id ? change(i) : i)
-            .toList(),
+      return _slim(
+        current.copyWith(
+          installations: current.installations
+              .map((i) => i.id == id ? change(i) : i)
+              .toList(),
+        ),
       );
     });
   }

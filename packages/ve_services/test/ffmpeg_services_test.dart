@@ -1032,7 +1032,7 @@ buffersink AVOptions:
     String cacheNote(String encoder) =>
         jsonMap(vendorCache.hardware[encoder])['note'] as String;
     String recordNote(String encoder) =>
-        jsonMap(vendorRecord.availability[encoder])['note'] as String;
+        jsonMap(vendorRecord.availability[encoder])['note'] as String? ?? '';
     check(
       cacheNote('h264_nvenc') == nvidia && recordNote('h264_nvenc') == nvidia,
       'a passing NVENC test runs on the NVIDIA adapter: ${cacheNote('h264_nvenc')} / ${recordNote('h264_nvenc')}',
@@ -1046,6 +1046,119 @@ buffersink AVOptions:
           cacheNote('hevc_qsv') == '' &&
           recordNote('hevc_qsv') == '',
       'a failed test names no device',
+    );
+
+    // D4 (F6): machine.json keeps state, reason and a short note per encoder;
+    // FFmpeg's stderr and other test details stay in the capability cache.
+    final noisyStderr = 'No device available.\n${'x' * 16384}';
+    final noisy = FakeProcessExecutor(
+      (executable, arguments, token) async => arguments.contains('-c:v')
+          ? ProcessOutput(exitCode: 1, stderr: noisyStderr)
+          : fake.handler(executable, arguments, token),
+    );
+    final slimBin = Directory(joinPath(root.path, 'slim-bin'));
+    await slimBin.create();
+    final slimFFmpeg = File(joinPath(slimBin.path, 'ffmpeg.exe'));
+    await slimFFmpeg.writeAsBytes(bytes);
+    await File(joinPath(slimBin.path, 'ffprobe.exe')).writeAsBytes(bytes);
+    final slimPaths = ServicePaths(
+      roaming: joinPath(root.path, 'slim-roaming'),
+      local: joinPath(root.path, 'slim-local'),
+    );
+    final slimServices = WindowsServices(
+      core: compileCore,
+      paths: slimPaths,
+      executor: noisy,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final slimAdded = await slimServices.discovery.add(slimFFmpeg.path);
+    final slimCheck = await slimServices.probe.probe(slimAdded).toList();
+    check(
+      slimCheck.last.phase == 'done',
+      'noisy check completes: ${slimCheck.last.message}',
+    );
+    final slimRecord =
+        (await slimServices.machineSettings.read()).installations.single;
+    final failedHardware = [
+      for (final e in slimRecord.availability.entries)
+        if (isHardwareEncoder(e.key) && jsonMap(e.value)['state'] == 'failed')
+          jsonMap(e.value),
+    ];
+    const bulky = ['detail', 'stderr', 'identityKey', 'gpuFingerprint'];
+    check(
+      failedHardware.isNotEmpty &&
+          slimRecord.availability.values.every(
+            (v) => !bulky.any(jsonMap(v).containsKey),
+          ),
+      'the record keeps no stderr, detail, identity key or GPU fingerprint',
+    );
+    check(
+      failedHardware.every((v) => (v['reason'] as String).length <= 300),
+      'the record’s reasons are capped',
+    );
+    final slimCache = (await slimServices.rawCache.read(
+      slimAdded.identity.key,
+    ))!;
+    check(
+      slimCache.hardware.values.any(
+        (v) => noisyStderr.endsWith(jsonMap(v)['detail'] as String) &&
+            (jsonMap(v)['detail'] as String).length == 16384,
+      ),
+      'the capability cache keeps FFmpeg’s stderr',
+    );
+    final machineBytes = await File(slimPaths.machine).length();
+    check(
+      machineBytes < 20 * 1024,
+      'machine.json stays under 20 KB for one full installation: $machineBytes bytes',
+    );
+    final fatSettings = await slimServices.machineSettings.read();
+    await slimServices.machineSettings.save(
+      fatSettings.copyWith(
+        installations: [
+          slimRecord.copyWith(
+            availability: {
+              ...slimRecord.availability,
+              'hevc_qsv': {
+                'state': 'failed',
+                'reason': noisyStderr,
+                'detail': noisyStderr,
+                'stderr': noisyStderr,
+                'identityKey': slimRecord.identity.key,
+                'gpuFingerprint': 'gpu-driver-2',
+                'note': '10-bit has not passed.',
+                'extensions': {
+                  'testedAt': '2026-11-19T01:00:00.000Z',
+                  'gpuFingerprint': 'gpu-driver-2',
+                  'tenBit': false,
+                },
+              },
+            },
+          ),
+        ],
+      ),
+      expectedRevision: fatSettings.revision,
+    );
+    await slimServices.discovery.updateRecord(
+      slimRecord.id,
+      slimRecord.identity.key,
+      (record) => record,
+    );
+    final legacy = jsonMap(
+      (await slimServices.machineSettings.read())
+          .installations
+          .single
+          .availability['hevc_qsv'],
+    );
+    check(
+      !bulky.any(legacy.containsKey) &&
+          (legacy['reason'] as String).length <= 300 &&
+          canonicalJson(legacy['extensions']) ==
+              canonicalJson({
+                'testedAt': '2026-11-19T01:00:00.000Z',
+                'tenBit': false,
+              }),
+      'a fat legacy record is slimmed by the next record update: ${jsonEncode(legacy).length} bytes',
     );
 
     await processTests();
