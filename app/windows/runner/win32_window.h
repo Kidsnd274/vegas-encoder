@@ -60,6 +60,13 @@ class Win32Window {
   // it there with RestoreBounds before Show, after replying to Dart.
   std::optional<RECT> HostBounds(HWND host);
 
+  // Progress window only: stays above VEGAS while any window of |host|'s
+  // process is in the foreground (topmost then, so a click in VEGAS can't
+  // cover it), and goes just behind another app's window when that app comes
+  // to the front. Follows foreground changes with an out-of-context WinEvent
+  // hook: nothing is sent to VEGAS and VEGAS never waits on this window.
+  void FollowHost(HWND host);
+
   void SetKeepOnTop(bool keep_on_top);
   bool keep_on_top() const { return keep_on_top_; }
 
@@ -117,6 +124,16 @@ class Win32Window {
 
   static Win32Window* GetThisFromHandle(HWND const window) noexcept;
 
+  static void CALLBACK ForegroundChanged(HWINEVENTHOOK hook,
+                                         DWORD event,
+                                         HWND window,
+                                         LONG object,
+                                         LONG child,
+                                         DWORD thread,
+                                         DWORD time);
+  // Keep on top, or above VEGAS while |foreground| is one of its windows.
+  void UpdateZOrder(HWND foreground);
+
   // Hit test for the top resize band, which lies inside the client area
   // because the caption is removed.
   static LRESULT CALLBACK ChildSubclassProc(HWND window,
@@ -136,6 +153,8 @@ class Win32Window {
   bool was_maximized_ = false;
   bool start_maximized_ = false;
   HWND owner_ = nullptr;
+  DWORD host_process_ = 0;
+  HWINEVENTHOOK foreground_hook_ = nullptr;
 
   // window handle for top level window.
   HWND window_handle_ = nullptr;

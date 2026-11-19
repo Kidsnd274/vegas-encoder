@@ -42,6 +42,16 @@ constexpr int kTopResizeBand = 5;
 // The number of Win32Window objects that currently exist.
 static int g_active_window_count = 0;
 
+// The progress window following VEGAS's foreground changes (FollowHost).
+Win32Window* g_foreground_follower = nullptr;
+
+// The desktop is at the bottom of the z-order: behind it is behind everything.
+bool IsDesktopWindow(HWND window) {
+  wchar_t name[16];
+  return GetClassNameW(window, name, 16) > 0 &&
+         (lstrcmpW(name, L"Progman") == 0 || lstrcmpW(name, L"WorkerW") == 0);
+}
+
 using EnableNonClientDpiScaling = BOOL __stdcall(HWND hwnd);
 
 // Scale helper to convert logical scaler values to physical using passed in
@@ -391,12 +401,71 @@ std::optional<RECT> Win32Window::HostBounds(HWND host) {
   return RECT{x, y, x + width, y + height};
 }
 
+void Win32Window::FollowHost(HWND host) {
+  DWORD process = 0;
+  if (window_handle_ == nullptr ||
+      options_.kind != LaunchKind::kRenderMonitor || host == nullptr ||
+      !IsWindow(host) || GetWindowThreadProcessId(host, &process) == 0 ||
+      process == GetCurrentProcessId()) {
+    return;
+  }
+  host_process_ = process;
+  if (foreground_hook_ == nullptr) {
+    g_foreground_follower = this;
+    foreground_hook_ = SetWinEventHook(
+        EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
+        ForegroundChanged, 0, 0,
+        WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+  }
+  startup_trace::Mark(foreground_hook_ != nullptr ? "follow_host"
+                                                  : "follow_host failed");
+  UpdateZOrder(GetForegroundWindow());
+}
+
+// static
+void CALLBACK Win32Window::ForegroundChanged(HWINEVENTHOOK hook,
+                                             DWORD event,
+                                             HWND window,
+                                             LONG object,
+                                             LONG child,
+                                             DWORD thread,
+                                             DWORD time) {
+  if (object == OBJID_WINDOW && g_foreground_follower != nullptr) {
+    g_foreground_follower->UpdateZOrder(window);
+  }
+}
+
+void Win32Window::UpdateZOrder(HWND foreground) {
+  if (window_handle_ == nullptr) {
+    return;
+  }
+  DWORD process = 0;
+  if (foreground != nullptr) {
+    GetWindowThreadProcessId(foreground, &process);
+  }
+  const bool topmost =
+      keep_on_top_ || (host_process_ != 0 && process == host_process_);
+  const bool is_topmost =
+      (GetWindowLongPtr(window_handle_, GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
+  if (topmost == is_topmost) {
+    return;
+  }
+  // Leaving the topmost band, go just behind the window now in front, so the
+  // app the user switched to stays in front. HWND_NOTOPMOST would put this
+  // window above it; it is only for when that can't work.
+  HWND after = topmost ? HWND_TOPMOST : HWND_NOTOPMOST;
+  if (!topmost && foreground != nullptr && foreground != window_handle_ &&
+      !IsDesktopWindow(foreground) &&
+      (GetWindowLongPtr(foreground, GWL_EXSTYLE) & WS_EX_TOPMOST) == 0) {
+    after = foreground;
+  }
+  SetWindowPos(window_handle_, after, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+}
+
 void Win32Window::SetKeepOnTop(bool keep_on_top) {
   keep_on_top_ = keep_on_top;
-  if (window_handle_ != nullptr) {
-    SetWindowPos(window_handle_, keep_on_top ? HWND_TOPMOST : HWND_NOTOPMOST,
-                 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-  }
+  UpdateZOrder(GetForegroundWindow());
 }
 
 void Win32Window::StartDrag() {
@@ -633,6 +702,11 @@ Win32Window::MessageHandler(HWND hwnd,
 }
 
 void Win32Window::Destroy() {
+  if (foreground_hook_ != nullptr) {
+    UnhookWinEvent(foreground_hook_);
+    foreground_hook_ = nullptr;
+    g_foreground_follower = nullptr;
+  }
   OnDestroy();
 
   if (window_handle_) {

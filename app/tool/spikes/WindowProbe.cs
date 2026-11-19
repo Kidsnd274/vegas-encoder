@@ -78,6 +78,7 @@ static class Native
     public delegate bool MonitorProc(IntPtr monitor, IntPtr dc, ref RECT rect, IntPtr data);
     [DllImport("user32.dll")] public static extern bool EnumDisplayMonitors(IntPtr dc, IntPtr clip, MonitorProc proc, IntPtr data);
 
+    public const uint GW_HWNDNEXT = 2;
     public const uint GW_OWNER = 4;
     public const int GWL_EXSTYLE = -20;
     public const long WS_EX_TOPMOST = 0x8;
@@ -117,21 +118,23 @@ sealed class FakeHost : IDisposable
     }
 
     /// A real click in the window, as a user would, so it becomes foreground.
-    public bool Activate()
+    public bool Activate() => Activate(Handle);
+
+    public static bool Activate(IntPtr handle)
     {
         for (int attempt = 0; attempt < 3; ++attempt)
         {
-            Native.SetForegroundWindow(Handle);
-            Native.SetWindowPos(Handle, IntPtr.Zero, 0, 0, 0, 0, 0x0013); // NOMOVE | NOSIZE | NOACTIVATE
+            Native.SetForegroundWindow(handle);
+            Native.SetWindowPos(handle, IntPtr.Zero, 0, 0, 0, 0, 0x0013); // NOMOVE | NOSIZE | NOACTIVATE
             Thread.Sleep(100);
-            Native.GetWindowRect(Handle, out var r);
+            Native.GetWindowRect(handle, out var r);
             Native.GetCursorPos(out var saved);
             Native.SetCursorPos(r.Left + r.Width / 2, r.Top + r.Height / 2);
             Native.mouse_event(Native.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, UIntPtr.Zero);
             Native.mouse_event(Native.MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
             Thread.Sleep(250);
             Native.SetCursorPos(saved.X, saved.Y);
-            if (Native.GetForegroundWindow() == Handle) return true;
+            if (Native.GetForegroundWindow() == handle) return true;
         }
         return false;
     }
@@ -160,6 +163,11 @@ static class Probe
         _out = Path.GetFullPath(args[1]);
         Directory.CreateDirectory(_out);
         var what = args.Length > 2 ? args[2] : "all";
+        if (what == "other-app")
+        {
+            // Another app, in its own process, until the probe kills it.
+            using (new FakeHost("Another app", new Rectangle(300, 200, 1400, 900))) Thread.Sleep(Timeout.Infinite);
+        }
         if (what == "shot")
         {
             // shot <name.png> [renderer] [app arguments...]: capture one window for review.
@@ -774,7 +782,7 @@ static class Probe
             Log($"progress window visible: {Yes(mon != IntPtr.Zero && Native.IsWindowVisible(mon))}");
             Log($"VEGAS still foreground after the window showed: {Yes(fg == host.Handle)}");
             var ex = Native.GetWindowLongPtr(mon, Native.GWL_EXSTYLE).ToInt64();
-            Log($"WS_EX_NOACTIVATE: {Yes((ex & Native.WS_EX_NOACTIVATE) != 0)}, topmost (keep on top): {Yes((ex & Native.WS_EX_TOPMOST) != 0)}");
+            Log($"WS_EX_NOACTIVATE: {Yes((ex & Native.WS_EX_NOACTIVATE) != 0)}, topmost while VEGAS is in front: {Yes((ex & Native.WS_EX_TOPMOST) != 0)}");
             var r = Visible(mon);
             var work = WorkArea(host.Handle);
             Log($"progress window {r}; work area of VEGAS's monitor {work}; {CornerCheck(r, MonitorOf(host.Handle))}");
@@ -788,7 +796,8 @@ static class Probe
             Thread.Sleep(300);
             Native.SetCursorPos(saved.X, saved.Y);
             Log($"VEGAS still foreground after a click on the progress window: {Yes(Native.GetForegroundWindow() == host.Handle)}");
-            CloseAndWait(p, mon);
+            try { FollowsVegas(host, mon); }
+            finally { CloseAndWait(p, mon); }
 
             // The remembered pin (C7 keepOnTop) applies before the first frame.
             SetKeepOnTop(true);
@@ -802,6 +811,41 @@ static class Probe
             SetKeepOnTop(false);
         }
         MonitorOnHostMonitor();
+    }
+
+    /// [a] is above [b] in the z-order.
+    static bool IsAbove(IntPtr a, IntPtr b)
+    {
+        for (var h = Native.GetWindow(a, Native.GW_HWNDNEXT); h != IntPtr.Zero; h = Native.GetWindow(h, Native.GW_HWNDNEXT))
+            if (h == b) return true;
+        return false;
+    }
+
+    static bool IsTopmost(IntPtr hwnd) => (Native.GetWindowLongPtr(hwnd, Native.GWL_EXSTYLE).ToInt64() & Native.WS_EX_TOPMOST) != 0;
+
+    /// Unpinned, the progress window stays above every VEGAS window while
+    /// VEGAS is in front (a click in VEGAS doesn't cover it), and goes behind
+    /// another app (its own process) when that app comes to the front.
+    static void FollowsVegas(FakeHost host, IntPtr mon)
+    {
+        Require(host.Activate() && IsTopmost(mon) && IsAbove(mon, host.Handle), "click in VEGAS: progress window stays above VEGAS");
+        var self = Process.GetCurrentProcess().MainModule.FileName;
+        using (var other = Process.Start(new ProcessStartInfo(self, $"\"{_exe}\" \"{_out}\" other-app") { UseShellExecute = false }))
+        {
+            try
+            {
+                var sw = Stopwatch.StartNew();
+                while (other.MainWindowHandle == IntPtr.Zero && sw.ElapsedMilliseconds < 5000) { Thread.Sleep(50); other.Refresh(); }
+                var app = other.MainWindowHandle;
+                Require(app != IntPtr.Zero && FakeHost.Activate(app), "another app comes to the front");
+                Thread.Sleep(300);
+                Require(!IsTopmost(mon) && IsAbove(app, mon), "another app in front: progress window behind it, not topmost");
+                Require(host.Activate(), "back to VEGAS");
+                Thread.Sleep(300);
+                Require(IsTopmost(mon) && IsAbove(mon, host.Handle), "VEGAS in front again: progress window above it");
+            }
+            finally { other.Kill(); other.WaitForExit(); }
+        }
     }
 
     /// C5 hostHwnd names VEGAS's main window on another monitor while a

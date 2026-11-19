@@ -180,8 +180,9 @@ void FlutterWindow::HandleMethodCall(
     }
     std::optional<RECT> on_host;
     if (auto host = AsInt(Find(args, "hostHwnd"))) {
-      on_host =
-          HostBounds(reinterpret_cast<HWND>(static_cast<intptr_t>(*host)));
+      const auto host_window = reinterpret_cast<HWND>(static_cast<intptr_t>(*host));
+      on_host = HostBounds(host_window);
+      FollowHost(host_window);
     }
     if (auto keep_on_top = AsBool(Find(args, "keepOnTop"))) {
       SetKeepOnTop(*keep_on_top);

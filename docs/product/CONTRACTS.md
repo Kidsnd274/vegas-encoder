@@ -1117,7 +1117,9 @@ Monitor must not steal focus; keep-on-top comes from C7. Window performance rema
 subject to the owner's three-with/three-without real-host test and ~2%/120 MB rule.
 
 `hostHwnd` is VEGAS's **main window**, for locating the monitor work area before
-showing the progress window. It is not C4's template-dialog owner and establishes
+showing the progress window. Its process also tells the window when VEGAS is in
+front: the app follows foreground changes with an out-of-context WinEvent hook and
+stays above VEGAS meanwhile (UI_SPEC §12). It sends nothing to VEGAS. It is not C4's template-dialog owner and establishes
 neither modality nor window ownership. The writer includes it in the initial
 snapshot before launching the monitor, then keeps it for that job. It is an unsigned
 decimal string in 1…18446744073709551615; null/absent means unavailable. Handles

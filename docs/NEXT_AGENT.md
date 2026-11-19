@@ -21,6 +21,11 @@ shared-DLL build is still uncovered. See [status](STATUS.md#current-progress).
 
 ## Current queue: older VEGAS release qualification
 
+**Also check in L6: the progress window stays above VEGAS.** While VEGAS is in
+front, a click anywhere in VEGAS must leave the unpinned progress window visible,
+and switching to another app must put it behind that app (UI_SPEC §12). The
+fake-host window probe passes; real VEGAS hasn't been tried.
+
 **Next: the owner's real-VEGAS checklist for 0.2.1 (L6).** Version 0.2.1+1 is on
 `master`, with every offline suite and the fake-host render matrix passing; see
 [status](STATUS.md#current-progress).

@@ -7,6 +7,17 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**Progress window stays above VEGAS (owner request, 2026-11-16; not committed or
+installed).** A click in VEGAS used to cover the unpinned progress window. The
+runner now finds VEGAS's process from C5 `hostHwnd`, follows foreground changes
+with an out-of-context WinEvent hook, and stays topmost while any VEGAS window is in
+front. When another app comes to the front, the window goes just behind that app
+(UI_SPEC §12). The pin still keeps it above every app. The window probe
+(`run_window_spikes.ps1 -Checks monitor`) gains a check for this, using a fake
+VEGAS window and a second process as the other app. The check failed on the
+previous Release build and passes on the rebuilt one (single 96 dpi monitor, so
+the other-monitor case was skipped). Not yet tried in real VEGAS.
+
 **0.2.1 fix pass (branch `fix/0.2.1`, version 0.2.1+1, 2026-11-08).** Every item
 of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) except the owner's real-VEGAS checklist (L6)
 is implemented. Fixes and tests were committed one item at a time. No installer was
