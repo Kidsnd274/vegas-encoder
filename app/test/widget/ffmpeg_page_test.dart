@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' show Scrollable, TextField;
+import 'package:flutter/material.dart' show Scrollable, State, TextField;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -12,7 +12,8 @@ import 'package:vegas_encoder/features/ffmpeg/installation_card.dart';
 import 'package:vegas_encoder/features/presets/presets_page.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
-import 'package:vegas_encoder/state/ffmpeg.dart' show ffmpegControllerProvider;
+import 'package:vegas_encoder/design/components/interactive.dart' show VeInteractive;
+import 'package:vegas_encoder/state/ffmpeg.dart' show CapabilityFilter, ffmpegControllerProvider;
 import 'package:vegas_encoder/state/presets.dart';
 import 'package:vegas_encoder/state/services.dart';
 
@@ -196,6 +197,29 @@ void main() {
     await adding;
     await tester.pumpAndSettle();
     expect(container.read(ffmpegControllerProvider).selectedId, 'manual-7.1');
+  });
+
+  testWidgets('a page rebuild keeps each card mounted', (tester) async {
+    await open(tester);
+    State interactive() =>
+        tester.state(find.descendant(of: card('FFmpeg 7.1.1'), matching: find.byType(VeInteractive)).first);
+    final before = interactive();
+    container(tester).read(ffmpegControllerProvider.notifier).setFilter(CapabilityFilter.problems);
+    await tester.pump();
+    expect(identical(interactive(), before), isTrue, reason: 'the card keeps its hover, press and focus state');
+  });
+
+  testWidgets('a click whose press and release straddle a rebuild selects the card', (tester) async {
+    await open(tester);
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.descendant(of: card('FFmpeg 7.1.1'), matching: find.text('FFmpeg 7.1.1'))),
+    );
+    await tester.pump(const Duration(milliseconds: 60));
+    container(tester).read(ffmpegControllerProvider.notifier).setQuery('x');
+    await tester.pump(const Duration(milliseconds: 60));
+    await gesture.up();
+    await tester.pump();
+    expect(container(tester).read(ffmpegControllerProvider).selectedId, 'manual-7.1');
   });
 
   testWidgets('Add FFmpeg… says why discovery refused a file', (tester) async {
