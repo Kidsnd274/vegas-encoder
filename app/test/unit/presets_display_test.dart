@@ -18,6 +18,18 @@ void main() {
   setUpAll(() async => inst = (await installations.read()).installations);
   FFmpegInstallation installation(String id) => inst.firstWhere((i) => i.id == id);
 
+  group('encoder availability (F9)', () {
+    test('an FFmpeg never checked knows nothing yet; a checked one that lacks it is missing', () {
+      final full = installation('gyan-8.1');
+      final never = full.copyWith(probedAt: null, availability: <String, Object?>{});
+      expect(availabilityOf(never, 'libx264'), VeAvailability.unknown);
+      expect(availabilityReason(never, 'libx264'), isNull);
+      expect(availabilityOf(full, 'libfoo'), VeAvailability.missing);
+      expect(availabilityReason(full, 'libfoo'), 'Not in FFmpeg 8.1 full.');
+      expect(availabilityOf(full, 'libx264'), VeAvailability.ready);
+    });
+  });
+
   group('command', () {
     test('groups the core\'s tokens: inputs chip, -map on the program line, one line per stage', () {
       final f = fixture('yt-h264');
