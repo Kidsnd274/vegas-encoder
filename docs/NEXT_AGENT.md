@@ -18,10 +18,9 @@ the worktree `../vegas-encoder-ffmpeg-fixes` on branch `fix/ffmpeg-page` (from
 `2543714`). The branch is not merged or pushed, and nothing is installed. See
 [status](STATUS.md#current-progress) for the checks and numbers.
 
-Next:
-- the owner's manual checks (plan section 6), on a build from the branch with an
-  isolated `VEGAS_ENCODER_DATA_ROOT`;
-- the owner decides whether to merge. `master` has moved on since the branch started.
+The section 6 desktop checks and the readiness-summary fix are recorded in
+[status](STATUS.md#current-progress). The owner decides whether to merge.
+`master` has moved on since the branch started.
 
 The worktree stays until the owner removes it.
 

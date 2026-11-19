@@ -250,6 +250,12 @@ void main() {
       expect(inCard('FFmpeg 8.1 portable', 'Remove…'), findsNothing);
       expect(tester.widget<VeButton>(find.widgetWithText(VeButton, 'Test hardware encoders')).onPressed, isNull);
       expect(find.text('Not checked yet'), findsWidgets, reason: 'the table, before its check');
+      expect(find.text('FFmpeg 8.1 portable: checking encoders…'), findsOneWidget);
+      await tester.tap(find.text('Only problems'));
+      await tester.pumpAndSettle();
+      expect(find.text('No missing or failed encoders in this list.'), findsOneWidget);
+      await tester.tap(find.text('All'));
+      await tester.pumpAndSettle();
 
       discovery.addGate!.complete();
       for (var i = 0; i < 20; i++) {

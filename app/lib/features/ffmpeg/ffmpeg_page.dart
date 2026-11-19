@@ -293,7 +293,7 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
                       ? const SizedBox.shrink()
                       : _Capabilities(
                           installation: selected,
-                          testable: !checking,
+                          checking: checking,
                           state: state,
                           catalog: catalog,
                           presets: presets,
@@ -370,7 +370,7 @@ class _CardStrip extends StatelessWidget {
 class _Capabilities extends ConsumerWidget {
   const _Capabilities({
     required this.installation,
-    required this.testable,
+    required this.checking,
     required this.state,
     required this.catalog,
     required this.presets,
@@ -382,8 +382,8 @@ class _Capabilities extends ConsumerWidget {
 
   final FFmpegInstallation installation;
 
-  /// Not while it is being added or checked: the check tests the hardware encoders.
-  final bool testable;
+  /// The selected installation is being added or probed.
+  final bool checking;
   final FFmpegState state;
   final ProfileCatalog catalog;
   final List<Preset> presets;
@@ -454,7 +454,7 @@ class _Capabilities extends ConsumerWidget {
                         onChanged: controller.setQuery,
                       ),
                       Text(
-                        problemSummary(catalog, installation.label, status),
+                        problemSummary(catalog, installation.label, status, checking: checking),
                         style: t.text.small.copyWith(color: c.muted),
                       ),
                     ],
@@ -468,7 +468,7 @@ class _Capabilities extends ConsumerWidget {
                     onSelect: controller.selectEncoder,
                     emptyText: switch (filter) {
                       _ when state.query.trim().isNotEmpty => 'No encoders match “${state.query.trim()}”.',
-                      CapabilityFilter.problems => 'Everything in this list is ready.',
+                      CapabilityFilter.problems => 'No missing or failed encoders in this list.',
                       CapabilityFilter.hardware => 'No hardware encoders in this list.',
                       CapabilityFilter.all => 'No encoders to show.',
                     },
@@ -493,7 +493,7 @@ class _Capabilities extends ConsumerWidget {
                   status: status(encoderId),
                   presets: presets,
                 ),
-                onTest: state.isTesting(installation.id, encoderId) || !testable ? null : () => onTest(encoderId),
+                onTest: state.isTesting(installation.id, encoderId) || checking ? null : () => onTest(encoderId),
                 onOpenPreset: onOpenPreset,
               ),
             ),

@@ -132,6 +132,21 @@ void main() {
     });
   });
 
+  test('the summary reports incomplete and running encoder checks', () {
+    expect(
+      problemSummary(catalog, 'FFmpeg', (_) => const EncoderStatus(VeAvailability.unknown)),
+      'FFmpeg: encoder checks incomplete',
+    );
+    expect(
+      problemSummary(
+        catalog,
+        'FFmpeg',
+        (id) => EncoderStatus(id == 'h264_amf' ? VeAvailability.testing : VeAvailability.ready),
+      ),
+      'FFmpeg: checking encoders…',
+    );
+  });
+
   group('runs on (F5, D3)', () {
     FFmpegInstallation withAmf(Map<String, Object?> entry) => FFmpegInstallation.fromJson({
       ...inst('gyan-8.1').toJson(),

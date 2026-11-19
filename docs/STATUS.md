@@ -67,7 +67,27 @@ Checks run on the branch:
 Goldens: every `ffmpeg_*` image was reviewed and updated. The default card shows this
 session's fixture check (no duration, the fixture's counts). The probing images show
 the list with hardware rows Testing…. `ffmpeg_pending_{light,dark}` are new. Nothing
-was tried in real VEGAS. The owner's manual checks are in the plan's section 6.
+was tried in real VEGAS.
+
+Section 6 desktop checks (2026-11-20, Release from `4cda1e2` with isolated data
+roots and real FFmpeg N-128435 static and gyan 9.0.2 essentials). Settings > About
+showed the isolated folders. The selected static card showed its version within
+0.5 s and the encoder list and partial hardware results were visible by 3.1 s.
+The other card could be selected and its Remove… prompt opened during a hardware
+test. Both builds remained listed after switching apps and restarting.
+Setting gyan as default at 3 of 5 hardware tests and opening Presets produced no
+duplicate hardware commands in Windows process samples. The earlier scratch test
+covered the cache-miss path. AMF H.264 passed at 8-bit and Runs on displayed
+AMD Radeon(TM) 8060S Graphics. At narrower widths the column truncates the name
+and the detail pane shows it in full. The initial desktop check caught the
+summary briefly claiming every encoder was ready during first registration.
+
+The summary now says “checking encoders…” during an active check and confirms
+readiness only when all encoder states are ready. The empty Only problems list
+reports that it has no missing or failed encoders. The regression failed before
+the fix. Flutter analysis was clean and all 750 app tests passed, including the
+pending and probing goldens on fakes in light and dark. The Windows Release build
+succeeded.
 
 **0.2.1 fix pass (branch `fix/0.2.1`, version 0.2.1+1, 2026-11-08).** Every item
 of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) except the owner's real-VEGAS checklist (L6)

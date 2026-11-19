@@ -563,7 +563,9 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
   `save(expectedRevision)`, reapplied on a revision conflict.
 - **Capability list:** Video / Audio encoders, All / Only problems / Hardware (video
   only), a search over name, FFmpeg name, codec, group and device (Ctrl+F), and a
-  summary ("FFmpeg 8.0 LGPL: 4 video and 1 audio encoders not ready"). Columns: codec,
+  summary ("FFmpeg 8.0 LGPL: 4 video and 1 audio encoders not ready"). It says
+  "checking encoders…" while a check runs and reports readiness only after every
+  catalog encoder is confirmed ready. Columns: codec,
   encoder, FFmpeg name, bit depth, runs on (the GPU a passed test ran on, by name, from
   C3 `note`; otherwise "NVIDIA GPU" and so on; results saved by earlier builds name no
   device), state,

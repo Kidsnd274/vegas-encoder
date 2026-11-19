@@ -439,15 +439,26 @@ CapabilityRow _row(EncoderProfile p, EncoderStatus status, {required bool video}
   );
 }
 
-/// "FFmpeg 8.1 full: 4 video and 1 audio encoders not ready".
+/// The status of the selected installation's encoders, across both lists.
 String problemSummary(
   ProfileCatalog catalog,
   String installationLabel,
-  EncoderStatus Function(String encoder) statusOf,
-) {
-  int count(List<EncoderProfile> list) => list.where((p) => statusOf(p.id).state.isProblem).length;
-  final v = count(catalog.video), a = count(catalog.audio);
-  if (v == 0 && a == 0) return '$installationLabel: every encoder is ready';
+  EncoderStatus Function(String encoder) statusOf, {
+  bool checking = false,
+}) {
+  if (checking) return '$installationLabel: checking encoders…';
+
+  final video = catalog.video.map((p) => statusOf(p.id).state).toList();
+  final audio = catalog.audio.map((p) => statusOf(p.id).state).toList();
+  bool has(VeAvailability state) => video.contains(state) || audio.contains(state);
+  if (has(VeAvailability.testing)) return '$installationLabel: checking encoders…';
+
+  int countProblems(List<VeAvailability> states) => states.where((state) => state.isProblem).length;
+  final v = countProblems(video), a = countProblems(audio);
+  if (v == 0 && a == 0) {
+    if (has(VeAvailability.unknown)) return '$installationLabel: encoder checks incomplete';
+    return '$installationLabel: every encoder is ready';
+  }
   return '$installationLabel: $v video and $a audio ${a == 1 && v <= 1 ? 'encoder' : 'encoders'} not ready';
 }
 
