@@ -66,11 +66,35 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
         .read(windowControllerProvider)
         .pickFile(title: 'Choose ffmpeg.exe', filterName: 'FFmpeg', filterPattern: 'ffmpeg.exe');
     if (path == null || !mounted) return;
-    await _guard(() async {
-      final added = await _controller.add(path);
-      if (mounted) showToast('Added ${added.label}');
-    }, failure: 'Couldn’t add $path');
+    final listed = {for (final i in ref.read(discoveredInstallationsProvider).value ?? const []) i.id};
+    // The card shows from the quick version check; the toast comes once
+    // discovery has recorded it, before the check (F8).
+    await _guard(
+      () => _controller.add(
+        path,
+        onRegistered: (added) {
+          if (!mounted) return;
+          showToast(
+            listed.contains(added.id) ? '${added.label} is already listed. Checking it again.' : 'Added ${added.label}',
+          );
+        },
+      ),
+      failure: 'Couldn’t add $path',
+    );
   }
+
+  // One key per card, kept across rebuilds and the pending-to-recorded swap,
+  // so the selected card can be scrolled into view.
+  final Map<String, GlobalKey> _cardKeys = {};
+  GlobalKey _cardKey(String id) => _cardKeys.putIfAbsent(id, () => GlobalKey(debugLabel: 'ffmpeg card $id'));
+
+  /// A card selected off-screen (a fourth, just added) scrolls into view.
+  void _reveal(String id) => WidgetsBinding.instance.addPostFrameCallback((_) {
+    final context = _cardKeys[id]?.currentContext;
+    if (context != null && context.mounted) {
+      unawaited(Scrollable.ensureVisible(context, duration: VeTokens.motion(context, VeDurations.short)));
+    }
+  });
 
   /// Locate… on a missing installation: the Open dialog, then discovery adds
   /// ffmpeg.exe where it is now (the same folder again updates the same
@@ -172,9 +196,20 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
   Widget build(BuildContext context) {
     final t = VeTokens.of(context);
     final c = t.colors;
+    ref.listen(ffmpegControllerProvider.select((s) => s.selectedId), (_, id) {
+      if (id != null) _reveal(id);
+    });
     final state = ref.watch(ffmpegControllerProvider);
     final found = ref.watch(discoveredInstallationsProvider);
-    final installations = found.value ?? const <FFmpegInstallation>[];
+    final listed = found.value ?? const <FFmpegInstallation>[];
+    // Installations being added show from their quick check until discovery
+    // lists them: one card per installation at every moment.
+    final pending = [
+      for (final p in state.pending.values)
+        if (!listed.any((i) => i.id == p.id)) p,
+    ];
+    final installations = [...listed, ...pending];
+    bool isPending(FFmpegInstallation i) => pending.any((p) => p.id == i.id);
     final defaultId = ref.watch(machineSettingsProvider.select((s) => s.value?.defaultFFmpegId));
     final catalog = ref.watch(profilesProvider);
     final presets = ref.watch(presetsProvider).value ?? const <Preset>[];
@@ -184,7 +219,7 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
         installations.firstOrNull;
     final testing = selected != null && (state.testing[selected.id]?.isNotEmpty ?? false);
     // The check tests the hardware encoders itself; a second run would share the GPU with it.
-    final checking = selected != null && state.probes.containsKey(selected.id);
+    final checking = selected != null && (state.probes.containsKey(selected.id) || isPending(selected));
 
     return CallbackShortcuts(
       bindings: {const SingleActivator(LogicalKeyboardKey.keyF, control: true): _search.requestFocus},
@@ -224,13 +259,14 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
                 children: [
                   for (final i in installations)
                     InstallationCard(
-                      key: ValueKey(i.id),
+                      key: _cardKey(i.id),
                       model: installationCard(
                         i,
                         isDefault: i.id == defaultId,
                         state: state,
                         presets: presets,
                         catalog: catalog,
+                        pending: isPending(i),
                       ),
                       selected: i.id == selected?.id,
                       onSelect: () => _controller.select(i.id),
@@ -251,6 +287,7 @@ class _FFmpegPageState extends ConsumerState<FFmpegPage> with VeToastHost {
                       ? const SizedBox.shrink()
                       : _Capabilities(
                           installation: selected,
+                          testable: !checking,
                           state: state,
                           catalog: catalog,
                           presets: presets,
@@ -307,9 +344,9 @@ class _CardStrip extends StatelessWidget {
                         children: [
                           for (var i = 0; i < children.length; i++) ...[
                             if (i > 0) const SizedBox(width: gap),
-                            // The card's own key (equal across builds), so a rebuild or a new card
-                            // never remounts a card mid-click and its hover, press and focus survive (C1).
-                            SizedBox(key: children[i].key, width: width, child: children[i]),
+                            // Keyed by the card's own key (equal across builds), so a rebuild or a new
+                            // card never remounts a card mid-click and its hover, press and focus survive (C1).
+                            SizedBox(key: ValueKey(children[i].key), width: width, child: children[i]),
                           ],
                         ],
                       ),
@@ -327,6 +364,7 @@ class _CardStrip extends StatelessWidget {
 class _Capabilities extends ConsumerWidget {
   const _Capabilities({
     required this.installation,
+    required this.testable,
     required this.state,
     required this.catalog,
     required this.presets,
@@ -337,6 +375,9 @@ class _Capabilities extends ConsumerWidget {
   });
 
   final FFmpegInstallation installation;
+
+  /// Not while it is being added or checked: the check tests the hardware encoders.
+  final bool testable;
   final FFmpegState state;
   final ProfileCatalog catalog;
   final List<Preset> presets;
@@ -446,9 +487,7 @@ class _Capabilities extends ConsumerWidget {
                   status: status(encoderId),
                   presets: presets,
                 ),
-                onTest: state.isTesting(installation.id, encoderId) || state.probes.containsKey(installation.id)
-                    ? null
-                    : () => onTest(encoderId),
+                onTest: state.isTesting(installation.id, encoderId) || !testable ? null : () => onTest(encoderId),
                 onOpenPreset: onOpenPreset,
               ),
             ),

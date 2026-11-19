@@ -2,7 +2,10 @@
 // dark. Regenerate with: flutter test --update-goldens test/golden/ffmpeg_golden_test.dart
 // Images: test/golden/goldens/ffmpeg_<state>_<light|dark>.png
 
+import 'dart:async';
+
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ve_services/ve_services.dart';
@@ -28,9 +31,21 @@ Future<void> openFFmpeg(WidgetTester tester, {List<Override> overrides = const [
 }
 
 late List<FFmpegInstallation> _unhealthy;
+late FFmpegInstallation _portable;
+const _addedPath = r'E:\Tools\ffmpeg-8.1\bin\ffmpeg.exe';
 
 void main() {
-  setUpAll(() async => _unhealthy = await unhealthyInstallations());
+  setUpAll(() async {
+    _unhealthy = await unhealthyInstallations();
+    final manual = (await FakeFFmpegDiscovery().list()).singleWhere((i) => i.id == 'manual-7.1');
+    _portable = FFmpegInstallation.fromJson({
+      ...manual.toJson(),
+      'id': 'manual-8.1',
+      'label': 'FFmpeg 8.1 portable',
+      'path': _addedPath,
+      'identity': {...manual.identity.toJson(), 'key': 'b0-fixture-manual-8.1'},
+    });
+  });
 
   Future<void> tapRow(WidgetTester tester, String ffmpegName) async {
     await tester.tap(find.descendant(of: find.byType(CapabilityTable), matching: find.text(ffmpegName)));
@@ -74,6 +89,21 @@ void main() {
         await tester.tap(find.text('Scan again'));
         await tester.pump();
         await tester.pump();
+      },
+    ),
+    // Add FFmpeg… while discovery is still identifying the files: the new
+    // card from the quick version check, selected and scrolled into view, its
+    // encoders not checked yet (F8).
+    'pending': (
+      overrides: [
+        ffmpegDiscoveryProvider.overrideWith(
+          (ref) => FakeFFmpegDiscovery(additions: {_addedPath: _portable})..addGate = Completer<void>(),
+        ),
+      ],
+      act: (tester) async {
+        (tester.container().read(windowControllerProvider) as FakeWindowController).pickedFile = _addedPath;
+        await tester.tap(find.text('Add FFmpeg…'));
+        await tester.pumpAndSettle();
       },
     ),
   };

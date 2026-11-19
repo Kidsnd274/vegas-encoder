@@ -276,6 +276,41 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
     return canonicalExecutable(path);
   }
 
+  /// Installation IDs are stable per canonical executable path.
+  static String installationIdFor(String resolved) =>
+      'ffmpeg-${sha256.convert(utf8.encode(resolved.toLowerCase())).toString().substring(0, 32)}';
+
+  @override
+  Future<FFmpegInstallation> quickCheck(String executablePath) async {
+    final resolved = await _resolve(executablePath);
+    await requireX64Pe(resolved);
+    final ffprobe = joinPath(File(resolved).parent.path, 'ffprobe.exe');
+    if (!await File(ffprobe).exists())
+      throw const ServiceException(
+        'FFPROBE-MISSING',
+        'FFprobe must be beside FFmpeg.',
+      );
+    final version = await runner.run(resolved, [
+      '-hide_banner',
+      '-version',
+    ], timeout: probeIdentityTimeout);
+    version.requireSuccess('FFmpeg identity');
+    final metadata = parser.parseVersion(version.stdout + version.stderr);
+    requireSupportedFFmpeg(metadata);
+    return FFmpegInstallation(
+      id: installationIdFor(resolved),
+      label: 'FFmpeg ${metadata['version']}',
+      path: resolved,
+      ffprobePath: ffprobe,
+      source: 'manual',
+      version: metadata['version'] as String,
+      build: metadata['build'] as String,
+      license: metadata['license'] as String,
+      identity: BinaryIdentity(sha256: '', key: ''),
+      health: 'unknown',
+    );
+  }
+
   Future<FFmpegInstallation> identify(
     String path, {
     String source = 'manual',
@@ -337,7 +372,7 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
       );
     token.check();
     return FFmpegInstallation(
-      id: 'ffmpeg-${sha256.convert(utf8.encode(resolved.toLowerCase())).toString().substring(0, 32)}',
+      id: installationIdFor(resolved),
       label: 'FFmpeg ${metadata['version']}',
       path: resolved,
       ffprobePath: ffprobe,

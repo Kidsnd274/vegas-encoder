@@ -229,6 +229,100 @@ void main() {
     expect(container(tester).read(ffmpegControllerProvider).selectedId, 'manual-7.1');
   });
 
+  group('Add FFmpeg… shows the new card at once (F8)', () {
+    Future<FakeFFmpegDiscovery> gated(WidgetTester tester) async =>
+        FakeFFmpegDiscovery(additions: {addedPath: await portable(tester)})..addGate = Completer<void>();
+
+    testWidgets('the checked version shows and is selected within one pump; the recorded card replaces it', (
+      tester,
+    ) async {
+      final discovery = await gated(tester);
+      await open(tester, withDiscovery: discovery);
+      window.pickedFile = addedPath;
+      await tester.tap(find.text('Add FFmpeg…'));
+      await tester.pump();
+      expect(card('FFmpeg 8.1 portable'), findsOneWidget);
+      expect(container(tester).read(ffmpegControllerProvider).selectedId, 'manual-8.1');
+      expect(inCard('FFmpeg 8.1 portable', 'Checking the files…'), findsOneWidget);
+      expect(inCard('FFmpeg 8.1 portable', 'gyan.dev essentials build, GPL v3. Added by hand.'), findsOneWidget);
+      expect(inCard('FFmpeg 8.1 portable', 'Copy path'), findsOneWidget);
+      expect(inCard('FFmpeg 8.1 portable', 'Set as default'), findsNothing);
+      expect(inCard('FFmpeg 8.1 portable', 'Remove…'), findsNothing);
+      expect(tester.widget<VeButton>(find.widgetWithText(VeButton, 'Test hardware encoders')).onPressed, isNull);
+      expect(find.text('Not checked yet'), findsWidgets, reason: 'the table, before its check');
+
+      discovery.addGate!.complete();
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+        expect(card('FFmpeg 8.1 portable'), findsOneWidget, reason: 'one card for it at every moment ($i)');
+      }
+      await tester.pumpAndSettle();
+      expect(find.text('Added FFmpeg 8.1 portable'), findsOneWidget);
+      expect(inCard('FFmpeg 8.1 portable', 'Set as default'), findsOneWidget, reason: 'the recorded card');
+      expect(find.byType(InstallationCard), findsNWidgets(4));
+    });
+
+    testWidgets('a failing add removes the new card and says why', (tester) async {
+      final discovery = await gated(tester);
+      discovery.addFailure = const ServiceException('FFPROBE-CHANGED', 'FFprobe changed during its identity check.');
+      await open(tester, withDiscovery: discovery);
+      window.pickedFile = addedPath;
+      await tester.tap(find.text('Add FFmpeg…'));
+      await tester.pump();
+      expect(card('FFmpeg 8.1 portable'), findsOneWidget);
+      discovery.addGate!.complete();
+      await tester.pumpAndSettle();
+      expect(card('FFmpeg 8.1 portable'), findsNothing);
+      expect(find.byType(InstallationCard), findsNWidgets(3));
+      expect(find.text('Couldn’t add $addedPath: FFprobe changed during its identity check.'), findsOneWidget);
+    });
+
+    testWidgets('a refused quick check shows a toast and no card', (tester) async {
+      await open(tester);
+      window.pickedFile = r'C:\Windows\notepad.exe';
+      await tester.tap(find.text('Add FFmpeg…'));
+      await tester.pump();
+      expect(find.byType(InstallationCard), findsNWidgets(3));
+      await tester.pumpAndSettle();
+      expect(find.byType(InstallationCard), findsNWidgets(3));
+      expect(find.textContaining(r'Couldn’t add C:\Windows\notepad.exe: '), findsOneWidget);
+    });
+
+    testWidgets('adding the same path twice quickly gives one card', (tester) async {
+      final discovery = await gated(tester);
+      await open(tester, withDiscovery: discovery);
+      window.pickedFile = addedPath;
+      await tester.tap(find.text('Add FFmpeg…'));
+      await tester.pump();
+      await tester.tap(find.text('Add FFmpeg…'));
+      await tester.pump();
+      expect(card('FFmpeg 8.1 portable'), findsOneWidget);
+      discovery.addGate!.complete();
+      await tester.pumpAndSettle();
+      expect(card('FFmpeg 8.1 portable'), findsOneWidget);
+      expect(find.byType(InstallationCard), findsNWidgets(4));
+    });
+
+    testWidgets('re-adding a listed FFmpeg says it is checked again', (tester) async {
+      final seven = (await tester.runAsync(() => fixture('manual-7.1')))!;
+      await open(tester, withDiscovery: FakeFFmpegDiscovery(additions: {seven.path: seven}));
+      window.pickedFile = seven.path;
+      await tester.tap(find.text('Add FFmpeg…'));
+      await tester.pumpAndSettle();
+      expect(find.text('FFmpeg 7.1.1 is already listed. Checking it again.'), findsOneWidget);
+      expect(find.byType(InstallationCard), findsNWidgets(3));
+    });
+
+    testWidgets('with three cards, the added fourth scrolls into view', (tester) async {
+      await open(tester);
+      window.pickedFile = addedPath;
+      await tester.tap(find.text('Add FFmpeg…'));
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(card('FFmpeg 8.1 portable'));
+      expect(rect.left >= 0 && rect.right <= 1440, isTrue, reason: 'on screen: $rect');
+    });
+  });
+
   testWidgets('Add FFmpeg… says why discovery refused a file', (tester) async {
     await open(tester);
     window.pickedFile = r'C:\Windows\notepad.exe';

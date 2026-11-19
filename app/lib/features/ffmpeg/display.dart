@@ -143,6 +143,7 @@ String probePhaseLabel(String phase) => switch (phase) {
   'done' => 'Finishing',
   'failed' => 'The check failed',
   'cancelled' => 'The check was cancelled',
+  'adding' => 'Checking the files',
   _ => 'Checking',
 };
 
@@ -227,11 +228,16 @@ class InstallationCardModel {
     this.blocked = const [],
     this.blockedNeeds = const [],
     this.health,
+    this.pending = false,
   });
 
   final String id;
   final String title;
   final bool isDefault;
+
+  /// Being added: its quick version check passed and discovery is still
+  /// identifying the files. Only Copy path is offered.
+  final bool pending;
 
   /// "gyan.dev full build, GPL v3. Installed with winget."
   final String line;
@@ -266,8 +272,11 @@ InstallationCardModel installationCard(
   required FFmpegState state,
   required List<Preset> presets,
   required ProfileCatalog catalog,
+  bool pending = false,
 }) {
-  final progress = state.probes[installation.id];
+  final progress = pending
+      ? ProbeProgress(installationId: installation.id, phase: 'adding')
+      : state.probes[installation.id];
   final probed = state.probed[installation.id];
   final status = statusLookup(installation, state);
   final blocked = <String>[];
@@ -323,7 +332,8 @@ InstallationCardModel installationCard(
     failure: state.probeFailures[installation.id],
     blocked: blocked,
     blockedNeeds: needs.toList(),
-    health: installationHealth(installation, isDefault: isDefault),
+    health: pending ? null : installationHealth(installation, isDefault: isDefault),
+    pending: pending,
   );
 }
 

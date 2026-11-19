@@ -1187,6 +1187,83 @@ buffersink AVOptions:
       'a fat legacy record is slimmed by the next record update: ${jsonEncode(legacy).length} bytes',
     );
 
+    // F8: Add's quick version check shows the card at once. It writes,
+    // hashes and runs nothing but `-version`, and refuses what identify does.
+    var oldVersion = false;
+    final quick = FakeProcessExecutor((executable, arguments, token) async {
+      if (arguments.contains('-version') && oldVersion)
+        return ProcessOutput(
+          exitCode: 0,
+          stdout: versionText.replaceFirst(
+            RegExp(r'libavformat\s+59\. 27\.100 / 59\. 27\.100'),
+            'libavformat    58. 45.100 / 58. 45.100',
+          ),
+        );
+      return fake.handler(executable, arguments, token);
+    });
+    final quickPaths = ServicePaths(
+      roaming: joinPath(root.path, 'quick-roaming'),
+      local: joinPath(root.path, 'quick-local'),
+    );
+    final quickServices = WindowsServices(
+      core: compileCore,
+      paths: quickPaths,
+      executor: quick,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final quickBin = Directory(joinPath(root.path, 'quick-bin'));
+    await quickBin.create();
+    final quickFFmpeg = File(joinPath(quickBin.path, 'ffmpeg.exe'));
+    await quickFFmpeg.writeAsBytes(bytes);
+    final quickProbe = File(joinPath(quickBin.path, 'ffprobe.exe'));
+    await quickProbe.writeAsBytes(bytes);
+    final shown = await quickServices.discovery.quickCheck(quickFFmpeg.path);
+    check(
+      shown.version == metadata['version'] &&
+          shown.build == metadata['build'] &&
+          shown.license == metadata['license'] &&
+          shown.label == 'FFmpeg ${metadata['version']}' &&
+          shown.source == 'manual' &&
+          shown.identity.key.isEmpty &&
+          shown.health == 'unknown' &&
+          shown.ffprobePath.toLowerCase() ==
+              quickProbe.resolveSymbolicLinksSync().toLowerCase(),
+      'the quick check reads version, build and licence: ${jsonEncode(shown.data)}',
+    );
+    check(
+      quick.calls.length == 1 &&
+          quick.calls.single.$2.contains('-version') &&
+          !File(quickPaths.machine).existsSync(),
+      'the quick check runs -version once, never FFprobe, and writes nothing: ${quick.calls}',
+    );
+    final recordedQuick = await quickServices.discovery.add(quickFFmpeg.path);
+    check(
+      recordedQuick.id == shown.id,
+      'the quick check names the installation as identify does',
+    );
+    final x86 = File(joinPath(quickBin.path, 'x86.exe'));
+    await x86.writeAsBytes(Uint8List.fromList(bytes)..[68] = 0x4c..[69] = 0x01);
+    await rejects(
+      () => quickServices.discovery.quickCheck(x86.path),
+      'FFMPEG-ARCH',
+    );
+    await rejects(
+      () => quickServices.discovery.quickCheck(joinPath(quickBin.path, 'ffmpeg.txt')),
+      'FFMPEG-PATH',
+    );
+    oldVersion = true;
+    await rejects(
+      () => quickServices.discovery.quickCheck(quickFFmpeg.path),
+      'FFMPEG-UNSUPPORTED',
+    );
+    oldVersion = false;
+    await quickProbe.delete();
+    await rejects(
+      () => quickServices.discovery.quickCheck(quickFFmpeg.path),
+      'FFPROBE-MISSING',
+    );
+
     await processTests();
     final nativeGpu = await WindowsGpuIdentity().read();
     final nativeAgain = await WindowsGpuIdentity().read();

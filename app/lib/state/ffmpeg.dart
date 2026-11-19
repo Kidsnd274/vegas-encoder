@@ -28,6 +28,7 @@ class FFmpegState {
     this.testing = const {},
     this.testResults = const {},
     this.scanning = false,
+    this.pending = const {},
   });
 
   /// The installation shown below the cards; null is the default one.
@@ -57,6 +58,10 @@ class FFmpegState {
   /// Scan again is running.
   final bool scanning;
 
+  /// Installations being added: shown from their quick version check until
+  /// discovery has recorded them (app state only; nothing is written).
+  final Map<String, FFmpegInstallation> pending;
+
   FFmpegState copyWith({
     Object? selectedId = _keep,
     EncoderKind? kind,
@@ -69,6 +74,7 @@ class FFmpegState {
     Map<String, Set<String>>? testing,
     Map<String, Map<String, HardwareTestResult>>? testResults,
     bool? scanning,
+    Map<String, FFmpegInstallation>? pending,
   }) => FFmpegState(
     selectedId: identical(selectedId, _keep) ? this.selectedId : selectedId as String?,
     kind: kind ?? this.kind,
@@ -81,6 +87,7 @@ class FFmpegState {
     testing: testing ?? this.testing,
     testResults: testResults ?? this.testResults,
     scanning: scanning ?? this.scanning,
+    pending: pending ?? this.pending,
   );
 
   bool isTesting(String installationId, String encoder) => testing[installationId]?.contains(encoder) ?? false;
@@ -178,16 +185,57 @@ class FFmpegController extends Notifier<FFmpegState> {
   }
 
   /// Adds the FFmpeg at [executablePath] (from the Open dialog; discovery
-  /// records it), checks it and shows it. Discovery's failure (not FFmpeg, no
+  /// records it), checks it and shows it. Its quick version check shows it
+  /// at once, as [FFmpegState.pending]; [onRegistered] hears when discovery
+  /// has recorded it, before the check. Adding one already being added
+  /// selects it and returns that add. Discovery's failure (not FFmpeg, no
   /// ffprobe beside it…) reaches the caller as a [ServiceException].
-  Future<FFmpegInstallation> add(String executablePath) async {
+  Future<FFmpegInstallation> add(
+    String executablePath, {
+    ValueChanged<FFmpegInstallation>? onRegistered,
+  }) async {
     final before = _selections;
-    final installation = await _discovery.add(executablePath);
-    if (!ref.mounted) return installation;
-    // Show the new card only if the user hasn't picked another meanwhile.
-    if (_selections == before) select(installation.id);
-    await probe(installation);
-    return installation;
+    final quick = await _discovery.quickCheck(executablePath);
+    if (!ref.mounted) return quick;
+    if (_adds[quick.id] case final running?) {
+      select(quick.id);
+      return running;
+    }
+    final adding = _add(executablePath, quick, selectIt: _selections == before, onRegistered: onRegistered);
+    _adds[quick.id] = adding;
+    try {
+      return await adding;
+    } finally {
+      if (identical(_adds[quick.id], adding)) _adds.remove(quick.id);
+    }
+  }
+
+  // Adds running, by installation, so adding one twice gives one card.
+  final Map<String, Future<FFmpegInstallation>> _adds = {};
+
+  Future<FFmpegInstallation> _add(
+    String executablePath,
+    FFmpegInstallation quick, {
+    required bool selectIt,
+    ValueChanged<FFmpegInstallation>? onRegistered,
+  }) async {
+    final id = quick.id;
+    // Display-only until discovery records it: nothing checked yet.
+    final shown = quick.copyWith(probedAt: null, probeMs: null, counts: <String, Object?>{}, availability: <String, Object?>{});
+    state = state.copyWith(pending: {...state.pending, id: shown});
+    // Show the new card only if the user hasn't picked another meanwhile (C1).
+    if (selectIt) select(id);
+    try {
+      final installation = await _discovery.add(executablePath);
+      if (!ref.mounted) return installation;
+      // The recorded card now, not at the next discovery poll.
+      ref.invalidate(discoveredInstallationsProvider);
+      onRegistered?.call(installation);
+      await probe(installation);
+      return installation;
+    } finally {
+      if (ref.mounted) state = state.copyWith(pending: Map.of(state.pending)..remove(id));
+    }
   }
 
   /// Forgets an installation, first stopping its check and hardware tests.

@@ -188,6 +188,26 @@ void main() {
     expect((await machine.read()).defaultFFmpegId, 'manual-7.1');
   });
 
+  testWidgets('Add FFmpeg… lists the new one at once, as a row that can’t be chosen yet (F8)', (tester) async {
+    final manual = (await tester.runAsync(FakeFFmpegDiscovery().list))!.singleWhere((i) => i.id == 'manual-7.1');
+    final discovery = FakeFFmpegDiscovery(installations: const [], additions: {addedPath: manual})
+      ..addGate = Completer<void>();
+    await start(tester, discovery: discovery);
+    window.pickedFile = addedPath;
+    await tester.tap(find.descendant(of: find.byType(SetupWizard), matching: find.text('Add FFmpeg…')));
+    await tester.pump();
+    await tester.pump();
+    final row = find.descendant(of: find.byType(SetupWizard), matching: find.text('FFmpeg 7.1.1'));
+    expect(row, findsOneWidget);
+    expect(find.descendant(of: find.byType(SetupWizard), matching: find.text('Checking the files…')), findsOneWidget);
+    expect(tester.container().read(setupWizardProvider).step, SetupStep.check);
+    discovery.addGate!.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Choose the FFmpeg every render uses.'), findsOneWidget);
+    expect(find.descendant(of: find.byType(SetupWizard), matching: find.text('FFmpeg 7.1.1')), findsOneWidget);
+    expect(find.descendant(of: find.byType(SetupWizard), matching: find.text('Checking the files…')), findsNothing);
+  });
+
   testWidgets('a scan that fails says why; Try again finds them', (tester) async {
     await start(tester, discovery: FailingDiscovery());
     expect(find.text('Couldn’t look for FFmpeg: The winget folder couldn’t be read.'), findsOneWidget);

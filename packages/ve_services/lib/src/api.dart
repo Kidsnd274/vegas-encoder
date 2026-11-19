@@ -15,6 +15,13 @@ abstract interface class FFmpegDiscovery {
   Future<List<FFmpegInstallation>> list();
   Stream<List<FFmpegInstallation>> watch();
   Future<List<FFmpegInstallation>> scan();
+
+  /// A quick version check of the FFmpeg at [executablePath], for showing
+  /// its card at once while [add] identifies it: version, build and licence
+  /// from `-version` only. Hashes nothing, runs no FFprobe and records
+  /// nothing; the result is display-only (empty identity, health unknown),
+  /// with the id [add] gives it. Refuses what [add] would, with its codes.
+  Future<FFmpegInstallation> quickCheck(String executablePath);
   Future<FFmpegInstallation> add(String executablePath);
   Future<void> remove(String installationId);
 }
