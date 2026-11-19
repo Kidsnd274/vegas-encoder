@@ -304,9 +304,9 @@ int wmain(int argc, wchar_t** argv) {
                                           "-maxrate 4000k -bufsize 8000k -pix_fmt yuv420p10le -c:a pcm_f32le -f matroska {output}"}};
       const auto began = GetTickCount64();
       const auto svtFailure = Run(root, L"svt-peak-rejected", svt, E_FAIL, -1, 0, false, false, true);
-      Check(GetTickCount64() - began < 8000, "SVT-AV1 encoder-open failure returns to VEGAS within seconds");
-      Check(ve::Str(svtFailure,"message") == "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode" && ve::Str(svtFailure,"hresult") == Hr(E_FAIL),
-            "History and the returned HRESULT name SVT-AV1's own diagnostic");
+      Check(GetTickCount64() - began < 4000, "SVT-AV1 encoder-open failure returns to VEGAS within seconds");
+      Check(ve::Str(svtFailure,"message") == "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode" && ve::Str(svtFailure,"hresult") == Hr(E_FAIL) && svtFailure.at("ffmpegExitCode") == -22,
+            "History, the returned HRESULT and FFmpeg's own exit code (-22) report SVT-AV1's diagnostic");
       const auto svtLive = Read(std::filesystem::path(root) / L"svt-peak-rejected" / L"jobs" / (Widen(ve::Str(svtFailure,"id")) + L".live.json"));
       Check(svtLive.at("state") == "failed" && svtLive.at("message") == svtFailure.at("message"), "the progress window shows the same SVT-AV1 diagnostic");
     } else puts("SKIP svt-peak-rejected: no libsvtav1");

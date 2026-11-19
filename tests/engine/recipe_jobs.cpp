@@ -255,6 +255,7 @@ struct Case {
   bool success = true, verify = true, blockedIndex = false, blockedLive = false, collision = false;
   bool cancelDuringProbe = false, timedCancel = false, invalidRoot = false;
   bool endedEarly = false, clockStep = false;
+  Json exitCode = nullptr; // expected C6 ffmpegExitCode, when the case pins it
   bool preexisting = false, replaceExisting = false, lockExisting = false; // decision D1
   Json failedEncoders = Json::object(); // encoders the app's last hardware test marked failed
   std::string reason; // expected exact (or, with partialReason, contained) C6 message
@@ -397,6 +398,7 @@ Json Run(const Case& test, const std::wstring& root) {
   if (test.maxDuration) Require(duration < test.maxDuration * (instrumented ? 3 : 1),"stall detected within the stall timeout plus margin");
   Require(job.Record().value("endedEarly",false) == test.endedEarly,"C6 endedEarly fact");
   if (test.endedEarly) Require(fetched < test.frames && job.LiveStatus().value("message",std::string()).find("finished early") != std::string::npos,"host frame fetching stops soon after FFmpeg finished early");
+  if (!test.exitCode.is_null()) Require(job.Record().at("ffmpegExitCode") == test.exitCode,"C6 records FFmpeg's own exit code");
   if (test.clockStep) Require(ve::Str(job.Record(),"endedAt") >= ve::Str(job.Record(),"startedAt"),"endedAt never precedes startedAt");
   if (test.name == "stats-then-error") Require(ve::Str(job.Record(),"stderrTail").find("frame=") == std::string::npos,"stderr tail omits FFmpeg statistics lines");
   Require(peak.load() <= baseline+160u*1024*1024,"parent additional working set under 160 MiB");
@@ -514,7 +516,8 @@ size_t ReadBytes(HANDLE pipe, size_t want) {
     }
   });
   const size_t frameBytes = size_t(width) * height * 3;
-  if (kind == L"warnings" || kind == L"fatal-hold") { fputs("Input #0, rawvideo, from 'video pipe':\n",stderr); fflush(stderr); }
+  const bool fatal = kind == L"fatal-hold" || kind == L"fatal-stuck";
+  if (kind == L"warnings" || fatal) { fputs("Input #0, rawvideo, from 'video pipe':\n",stderr); fflush(stderr); }
   if (kind == L"warnings") {
     // Ordinary diagnostics from a healthy encode; none of them may fail it.
     fputs("[aist#1:0/pcm_f32le @ 0x1] Guessed Channel Layout: stereo\n[libx264 @ 0x2] -qscale is ignored, -crf is recommended.\n"
@@ -522,22 +525,28 @@ size_t ReadBytes(HANDLE pipe, size_t want) {
           "[vf#0:0 @ 0x4] More than 1000 frames duplicated\n[vost#0:0/libx264 @ 0x5] Past duration 0.999992 too large\n",stderr);
     fflush(stderr);
   }
-  const long long stopAt = kind == L"stall-after" || kind == L"early-exit-mid" || kind == L"fatal-hold" ? value : LLONG_MAX;
+  const long long stopAt = kind == L"stall-after" || kind == L"early-exit-mid" || fatal ? value : LLONG_MAX;
   while (io.frames < stopAt && ReadBytes(video,frameBytes) == frameBytes) {
     ++io.frames;
     if (kind == L"slow-read" || kind == L"warnings") Sleep(DWORD(value));
   }
   if (kind == L"stall-after") { advancing = false; Sleep(INFINITE); }
-  if (kind == L"fatal-hold") {
-    // FFmpeg 8 with SVT-AV1 4.3 rejecting ABR plus a peak rate, then stuck in shutdown
-    // with both pipes unread (0.2.1 field report: no exit, no progress).
+  if (fatal) {
+    // FFmpeg 8 with SVT-AV1 4.3 rejecting ABR plus a peak rate. Its shutdown then waits for
+    // the demuxers, which stay blocked in pipe reads until input EOF (0.2.1 field report:
+    // no exit, no progress). fatal-stuck never exits, even at EOF.
     advancing = false;
     fputs("Svt[info]: SVT [version]:\tSVT-AV1 Encoder Lib v4.3.0\nSvt[error]: Max Bitrate only supported with CRF mode\n"
           "Svt[error]: CBR Rate control is currently not supported for RANDOM_ACCESS/ALL_INTRA, use VBR mode\n"
           "[libsvtav1 @ 0x1] Error setting encoder parameters: bad parameter (0x80001005)\n"
           "[vost#0:0/libsvtav1 @ 0x2] [enc:libsvtav1 @ 0x3] Error while opening encoder - maybe incorrect parameters such as bit_rate, rate, width or height.\n"
           "[vf#0:0 @ 0x4] Error sending frames to consumers: Invalid argument\n[vf#0:0 @ 0x4] Task finished with error: Invalid argument\n",stderr);
-    fflush(stderr); Sleep(INFINITE);
+    fflush(stderr);
+    if (kind == L"fatal-stuck") Sleep(INFINITE);
+    if (audioReader.joinable()) audioReader.join();
+    std::vector<char> rest(65536); DWORD got = 0;
+    while (ReadFile(video,rest.data(),DWORD(rest.size()),&got,nullptr) && got) {}
+    fputs("Conversion failed!\n",stderr); fflush(stderr); ExitProcess(static_cast<UINT>(-22));
   }
   if (kind == L"early-exit-mid") Quit(output,code);
   videoEnded = true;
@@ -624,7 +633,7 @@ int wmain(int argc, wchar_t** argv) {
         Case svt = test; svt.name = "svt-maxrate-rejected"+suffix; svt.success = false;
         svt.recipe["command"]["template"] = "{inputs} -map 0:v:0 -map 1:a:0 -c:v libsvtav1 -preset 8 -b:v 4000k -maxrate 4000k -bufsize 8000k "
                                             "-pix_fmt yuv420p10le -c:a pcm_f32le -f matroska {output}";
-        svt.stallTimeout = 60000; svt.maxDuration = 6000; svt.reason = "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode";
+        svt.stallTimeout = 60000; svt.maxDuration = 3000; svt.exitCode = -22; svt.reason = "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode";
         svt.partialReason = false; summaries.push_back(Run(svt,root));
       } else printf("SKIP svt-maxrate-rejected%s: no libsvtav1\n",suffix.c_str());
     }
@@ -689,14 +698,18 @@ int wmain(int argc, wchar_t** argv) {
     summaries.push_back(Run(chaos("early-exit-ok","early-exit-ok",true,60),root));                   // A7
     chaosCase = chaos("early-exit-mid","early-exit-mid:30",true,60); chaosCase.endedEarly = true; summaries.push_back(Run(chaosCase,root));
     summaries.push_back(Run(chaos("early-exit-mid-failure","early-exit-mid:30:1",false,60),root));
-    // A fatal encoder-open diagnostic, then FFmpeg stays alive and reads nothing more:
-    // fail about 2 s later with the encoder's own text, long before the stall timeout.
-    chaosCase = chaos("fatal-hold","fatal-hold:2",false,60); chaosCase.stallTimeout = 60000; chaosCase.maxDuration = 5000;
+    // A fatal encoder-open diagnostic, then FFmpeg waits for input EOF before it exits.
+    // Closing the inputs lets it exit with its own code at once, long before the stall timeout.
+    chaosCase = chaos("fatal-hold","fatal-hold:2",false,60); chaosCase.stallTimeout = 60000; chaosCase.maxDuration = 2000;
+    chaosCase.reason = "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode"; chaosCase.partialReason = false;
+    chaosCase.exitCode = -22; summaries.push_back(Run(chaosCase,root));
+    // FFmpeg that still doesn't exit after EOF fails 5 s after its fatal line, with the same text.
+    chaosCase = chaos("fatal-stuck","fatal-stuck:2",false,60); chaosCase.stallTimeout = 60000; chaosCase.maxDuration = 7500;
     chaosCase.reason = "FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode"; chaosCase.partialReason = false;
     summaries.push_back(Run(chaosCase,root));
-    chaosCase = chaos("fatal-hold-cancel","fatal-hold:2",false,60); chaosCase.stallTimeout = 60000; chaosCase.timedCancel = true;
-    summaries.push_back(Run(chaosCase,root));                                                         // a cancel before the grace ends stays a cancel
-    summaries.push_back(Run(chaos("warnings","warnings:50",true,60),root));                           // 3 s of warnings, longer than the grace
+    chaosCase = chaos("fatal-stuck-cancel","fatal-stuck:2",false,60); chaosCase.stallTimeout = 60000; chaosCase.timedCancel = true;
+    summaries.push_back(Run(chaosCase,root));                                                         // a cancel before that failure stays a cancel
+    summaries.push_back(Run(chaos("warnings","warnings:50",true,60),root));                           // 3 s of ordinary warnings stay a success
     Case clock; clock.recipe = base; clock.installation = Installation(argv[firstBuild]); clock.name = "clock-step"; clock.frames = 10; clock.clockStep = true;
     summaries.push_back(Run(clock,root));                                                             // A18
     const Json knownFailure{{"ffv1",{{"reason","No NVENC capable devices found."},{"testedAt","2026-11-01T10:00:00Z"}}}};

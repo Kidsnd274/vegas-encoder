@@ -125,10 +125,10 @@ struct FfmpegEncoder::Impl {
   std::atomic<bool> endedEarly{false};
   // Last proof that FFmpeg is working: an input write completed, or frame/out_time_us/total_size advanced.
   std::atomic<ULONGLONG> activity{0};
-  // Last time a progress key advanced (input writes excluded), and the stderr watcher.
-  std::atomic<ULONGLONG> progressAt{0};
+  // FFmpeg printed a fatal diagnostic: the writers close both inputs so it can exit.
+  std::atomic<bool> fatalSeen{false};
   std::thread stderrWorker;
-  static constexpr DWORD fatalGraceMs = 2000;
+  static constexpr DWORD fatalExitMs = 5000;
   std::atomic<long long> lastFrame{-1};
   std::atomic<uint64_t> videoBuffersAllocated{0};
   bool replaceExisting = false, hadExisting = false;
@@ -160,14 +160,16 @@ struct FfmpegEncoder::Impl {
       if (bytes[i] != '\n') { if (line.size() < 128) line += bytes[i]; continue; }
       for (int k = 0; k < 3; ++k) if (line.rfind(keys[k], 0) == 0) {
         const long long value = _strtoi64(line.c_str() + strlen(keys[k]), nullptr, 10);
-        if (value > seen[k]) { seen[k] = value; Active(); progressAt = GetTickCount64(); if (k == 0) lastFrame = value; }
+        if (value > seen[k]) { seen[k] = value; Active(); if (k == 0) lastFrame = value; }
       }
       line.clear();
     }
   }
-  // Follows the stderr log while FFmpeg runs. A fatal diagnostic followed by no exit
-  // and no progress for fatalGraceMs fails the encode, so Render stops waiting on
-  // pipes FFmpeg will never read again. The log keeps the full text for the message.
+  // Follows the stderr log while FFmpeg runs. After a fatal diagnostic FFmpeg only shuts
+  // down, but on Windows a demuxer blocked in a named-pipe read keeps it alive, so it
+  // never exits. Closing our end of both pipes (EOF) lets FFmpeg exit with its own exit
+  // code, which fails the encode through the normal exit path; the log keeps the full
+  // text for the message. FFmpeg still running fatalExitMs later is failed here.
   void WatchStderr() {
     Handle file;
     file.h = CreateFileW(stats.stderrPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -182,10 +184,13 @@ struct FfmpegEncoder::Impl {
           line.clear();
         }
       }
-      const ULONGLONG now = GetTickCount64();
-      if (!fatal.empty() && now - fatalAt >= fatalGraceMs && now - progressAt.load() >= fatalGraceMs && !Exited() && !stopping) {
-        Log("FFmpeg reported a fatal error but kept running: %s", fatal.c_str());
-        Fail(E_FAIL, "FFmpeg reported a fatal error and stopped processing input.");
+      if (!fatal.empty() && !fatalSeen) {
+        Log("FFmpeg reported a fatal error; closing its inputs so it can exit: %s", fatal.c_str());
+        fatalSeen = true;
+        for (auto& pipe : pipes) pipe.changed.notify_all();
+      }
+      if (fatalSeen && GetTickCount64() - fatalAt >= fatalExitMs && !Exited() && !stopping) {
+        Fail(E_FAIL, "FFmpeg reported a fatal error and did not exit.");
         return;
       }
       Sleep(50);
@@ -214,6 +219,7 @@ struct FfmpegEncoder::Impl {
     DWORD code = STILL_ACTIVE;
     GetExitCodeProcess(process.h, &code);
     if (code != 0) { Fail(E_FAIL, "FFmpeg exited before input EOF"); return; }
+    if (fatalSeen) { Fail(E_FAIL, "FFmpeg reported a fatal error."); return; }
     endedEarly = true;
     for (auto& pipe : pipes) pipe.changed.notify_all();
   }
@@ -226,15 +232,15 @@ struct FfmpegEncoder::Impl {
         if (GetOverlappedResult(pipe.handle.h, &ov, &count, FALSE)) return true;
         const DWORD code = GetLastError();
         if (ClosedPipe(code)) InputClosed();
-        else if (!stopping && !failed && !endedEarly) Fail(HRESULT_FROM_WIN32(code), "named pipe I/O failed");
+        else if (!stopping && !failed && !endedEarly && !fatalSeen) Fail(HRESULT_FROM_WIN32(code), "named pipe I/O failed");
         return false;
       }
       const bool exited = Exited();
       const bool late = connecting ? GetTickCount64() - start > connectTimeout : Stalled();
-      if (wait == WAIT_FAILED || stopping || failed || endedEarly || exited || late) {
+      if (wait == WAIT_FAILED || stopping || failed || endedEarly || fatalSeen || exited || late) {
         if (wait == WAIT_FAILED) { if (!stopping && !failed) Fail(HRESULT_FROM_WIN32(GetLastError()), "named pipe wait failed"); }
         else if (exited) InputClosed();
-        else if (late && !stopping && !failed && !endedEarly)
+        else if (late && !stopping && !failed && !endedEarly && !fatalSeen)
           Fail(E_FAIL, connecting ? "FFmpeg did not open its input pipe in time" : StallMessage().c_str());
         CancelIoEx(pipe.handle.h, &ov);
         // Cancellation is a request: keep operation/buffer storage alive until completion.
@@ -261,16 +267,16 @@ struct FfmpegEncoder::Impl {
           else if (code == ERROR_IO_PENDING) connected = Complete(pipe, ov, count, true);
           else Fail(HRESULT_FROM_WIN32(code), "cannot connect FFmpeg input pipe");
         }
-        while (connected && !stopping && !failed && !endedEarly) {
+        while (connected && !stopping && !failed && !endedEarly && !fatalSeen) {
           std::vector<BYTE> data;
           bool closed = false;
           {
             std::unique_lock<std::mutex> lock(pipe.mutex);
-            while (pipe.queue.empty() && !pipe.eof && !stopping && !failed && !endedEarly) {
+            while (pipe.queue.empty() && !pipe.eof && !stopping && !failed && !endedEarly && !fatalSeen) {
               pipe.changed.wait_for(lock, std::chrono::milliseconds(100));
               if (Exited()) { closed = true; break; }
             }
-            if (!closed && !stopping && !failed && !endedEarly && !(pipe.queue.empty() && pipe.eof)) {
+            if (!closed && !stopping && !failed && !endedEarly && !fatalSeen && !(pipe.queue.empty() && pipe.eof)) {
               data = std::move(pipe.queue.front());
               pipe.queue.pop_front();  // byte/block accounting includes this in-flight buffer
             }
@@ -278,7 +284,7 @@ struct FfmpegEncoder::Impl {
           if (closed) { InputClosed(); break; }
           if (data.empty()) break;
           size_t offset = 0;
-          while (offset < data.size() && !stopping && !failed && !endedEarly) {
+          while (offset < data.size() && !stopping && !failed && !endedEarly && !fatalSeen) {
             ResetEvent(event.h);
             ov = OVERLAPPED{};
             ov.hEvent = event.h;
@@ -289,10 +295,10 @@ struct FfmpegEncoder::Impl {
               DWORD code = GetLastError();
               if (code == ERROR_IO_PENDING) written = Complete(pipe, ov, count);
               else if (ClosedPipe(code)) InputClosed();
-              else Fail(HRESULT_FROM_WIN32(code), "FFmpeg input pipe write failed");
+              else if (!fatalSeen) Fail(HRESULT_FROM_WIN32(code), "FFmpeg input pipe write failed");
             }
             if (!written || !count || count > want) {
-              if (!stopping && !failed && !endedEarly) Fail(E_FAIL, "invalid pipe write completion");
+              if (!stopping && !failed && !endedEarly && !fatalSeen) Fail(E_FAIL, "invalid pipe write completion");
               break;
             }
             offset += count;
@@ -309,7 +315,8 @@ struct FfmpegEncoder::Impl {
         }
       }
     } catch (...) { Fail(E_OUTOFMEMORY, "pipe writer exception"); }
-    // Closing after successful writes sends EOF. Do not Disconnect/flush away queued data.
+    // Closing after successful writes (or after FFmpeg's fatal error) sends EOF.
+    // Do not Disconnect/flush away queued data.
     pipe.handle.Close();
     pipe.done = true;
     pipe.changed.notify_all();
@@ -537,7 +544,8 @@ bool FfmpegEncoder::Submit(bool audio, std::vector<BYTE> data, const Poll& poll)
     if (p.Exited()) { p.InputClosed(); return p.endedEarly; }
     {
       std::unique_lock<std::mutex> lock(pipe.mutex);
-      if (pipe.bytes <= pipe.limit - data.size() && pipe.blocks < (audio ? 4096u : 8u)) {
+      // After FFmpeg's fatal error nothing more is queued; wait for its exit (or the watcher's failure).
+      if (!p.fatalSeen && pipe.bytes <= pipe.limit - data.size() && pipe.blocks < (audio ? 4096u : 8u)) {
         pipe.bytes += data.size(); pipe.blocks++;
         pipe.highWater = (std::max)(pipe.highWater, (uint64_t)pipe.bytes);
         pipe.queue.push_back(std::move(data));
@@ -575,7 +583,7 @@ bool FfmpegEncoder::Finish(const Poll& poll, bool publish) {
   p.job.Close();
   if (p.progressWorker.joinable()) p.progressWorker.join();
   p.progressRead.Close();
-  if (p.failed || p.stats.exitCode != 0) {
+  if (p.failed || p.stats.exitCode != 0 || p.fatalSeen) {
     p.Fail(E_FAIL, "FFmpeg returned a failing exit code"); p.Abort(); return false;
   }
   WIN32_FILE_ATTRIBUTE_DATA file{};

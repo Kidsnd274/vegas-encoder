@@ -439,9 +439,10 @@ Product behaviour: [FFMPEG_INTEGRATION.md](FFMPEG_INTEGRATION.md).
   deadline.
 - **Fatal diagnostics.** On Windows, FFmpeg that has already failed (an encoder
   didn't open) can hang on shutdown: a demuxer stays blocked in a named-pipe read
-  while Render waits on the other, full queue. A stderr watcher fails the render
-  2 s after a fatal FFmpeg line if FFmpeg neither exits nor makes progress (see
-  CONTRACTS, Fatal FFmpeg diagnostics).
+  while Render waits on the other, full queue. A stderr watcher sees the fatal line
+  and the writers close both input pipes, so FFmpeg exits with its own code. If it
+  hasn't exited 5 s later, the render fails anyway (see CONTRACTS, Fatal FFmpeg
+  diagnostics).
 - **Early exit.** FFmpeg exiting 0 before every frame was sent (for example `-t`)
   is a successful render with `endedEarly`.
 - **Preflight records.** A render that stops before FFmpeg starts still writes a

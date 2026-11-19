@@ -1323,12 +1323,15 @@ include `-nostats`.
 to 30000. The older `PipeTimeoutMs` and `FinishTimeoutMs` are read as deprecated
 aliases for `StallTimeoutMs`, and the log says which value was used.
 
-**Fatal FFmpeg diagnostics.** The engine follows FFmpeg's stderr while it runs. After
-a fatal line (`Error while opening encoder`, `Could not open encoder before EOF`,
+**Fatal FFmpeg diagnostics.** The engine follows FFmpeg's stderr while it runs. On a
+fatal line (`Error while opening encoder`, `Could not open encoder before EOF`,
 `Error initializing output stream`, `Error opening output file`, `Task finished
-with error`, `Conversion failed!`), if FFmpeg neither exits nor advances a progress
-key for 2 s, the render fails with `E_FAIL` and History records `failed`. This
-doesn't wait for `StallTimeoutMs`. The message prefers an encoder library's own
+with error`, `Conversion failed!`) it stops sending input and closes both input pipes.
+FFmpeg's blocked pipe reads then end, so it exits with its own exit code. The render
+fails with `E_FAIL`, History records `failed` and `ffmpegExitCode` is FFmpeg's code
+(for example -22). Even exit code 0 counts as a failure after a fatal line. If FFmpeg
+is still running 5 s after the fatal line, the render fails and the job is killed.
+None of this waits for `StallTimeoutMs`. The message prefers an encoder library's own
 `[error]` line, for example `FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode`.
 
 ## App handoff / validation

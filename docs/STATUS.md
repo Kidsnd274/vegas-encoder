@@ -7,6 +7,21 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**FFmpeg reports its own fatal error code (2026-11-20; not installed).** After a
+fatal FFmpeg line the engine now closes both input pipes instead of waiting 2 s; FFmpeg
+then exits with its own code. A standalone reproduction with real FFmpeg N-128435, fed
+like the exporter, hung with the pipes open and exited -22 in 0.1 s once they closed.
+The real SVT-AV1 case now fails in 0.2 s (was 2.1 s) with `ffmpegExitCode` -22. FFmpeg
+still running 5 s after its fatal line fails anyway. Checks:
+- B4 engine, normal / ASan: 31,608 / 31,483 checks, 51 cases each, plus 703 record
+  checks. Cases include a fake FFmpeg that exits -22 at EOF (0.2 s), one that never
+  exits (5.1 s), a cancel before that failure (still Cancelled), and ordinary warnings.
+- B6 normal and ASan: 523/99/486.
+- Actual adapter: 271 checks with the SVT case under 4 s and exit code -22.
+- Legacy containers with real FFmpeg: pass.
+
+All of these used the fake host with real FFmpeg, not real VEGAS.
+
 **SVT-AV1 peak-rate failure no longer hangs on "Encoding" (2026-11-16; not
 installed).** 0.2.1 on VEGAS 2026.0.3.189 stayed on "Encoding" with the user preset
 `AV1 4Mb/s Smol` r1 (Target bitrate 4000 kb/s, Peak 4000 kb/s). SVT-AV1 4.3.0 refused
