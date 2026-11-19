@@ -127,6 +127,10 @@ Json Resolve(const Json& recipe) {
     const Json profileControl = v.contains("profileQuality") ? v.at("profileQuality") : v.value("profile",Json::object());
     Json profile = DefaultValue(video,"profile",profileControl);
     if (Str(v,"id") == "libx264" && (!video.contains("profile") || video.at("profile").is_null()) && depth == 10) profile = "high10";
+    // HEVC's default is Main 10; 8-bit output gets Main, so encoders that keep the
+    // requested label (NVENC) don't mark an 8-bit file as Main 10.
+    if (Str(v,"family") == "hevc" && (!video.contains("profile") || video.at("profile").is_null()) && depth == 8 &&
+        profileControl.is_object() && Includes(profileControl.value("values",Json::array()),Json("main"))) profile = "main";
     if (profile.is_string() && profileControl.is_object() && profileControl.contains("pixfmt")) pixfmt = Str(profileControl.at("pixfmt"),profile.get<std::string>(),pixfmt);
     if (Str(v,"id") == "prores_ks" && profile.is_string() && profile.get<std::string>().rfind("4444",0) == 0) pixfmt = "yuv444p10le";
     const int actualDepth = pixfmt.find("10") != std::string::npos || pixfmt == "p010le" ? 10 : pixfmt.find("12") != std::string::npos ? 12 : depth;
@@ -152,6 +156,14 @@ void CheckVideoProfile(const Json& resolved, Json& issues) {
         (profile == "baseline" || profile == "main" || profile == "high") &&
         std::none_of(issues.begin(),issues.end(),[](const Json& issue) { return Str(issue,"id") == "V-PROFILE-DEPTH"; }))
         issues.push_back(Issue("V-PROFILE-DEPTH","error","video.profile","This H.264 profile requires 8-bit pixels; use High 10 or another 10-bit profile."));
+    // Measured with N-128435: x265 refuses these at encoder open with 10-bit pixels.
+    if (Str(resolved,"videoEncoder") == "libx265" && Num(resolved,"depth") > 8 && (profile == "main" || profile == "main444-8") &&
+        std::none_of(issues.begin(),issues.end(),[](const Json& issue) { return Str(issue,"id") == "V-PROFILE-DEPTH"; }))
+        issues.push_back(Issue("V-PROFILE-DEPTH","error","video.profile","This HEVC profile requires 8-bit pixels; use Main 10 or another 10-bit profile."));
+    // HEVC NVENC keeps the requested label (RTX 5070 Ti, driver 617.42). x265 writes Main instead.
+    if (Str(resolved,"videoEncoder") == "hevc_nvenc" && Num(resolved,"depth") == 8 && profile == "main10")
+        issues.push_back(Issue("V-PROFILE-LABEL","warn","video.profile",
+            "Main 10 with 8-bit pixels labels the file as 10-bit, so players that only decode Main may refuse it. Choose Main, or 10-bit."));
 }
 void CheckMedia(const Json& media) {
     if (!media.is_object() || !media.contains("video") || !media.at("video").is_object()) throw Error(VE_INVALID_ARGUMENT,"MEDIA","Expected delivered video facts.");

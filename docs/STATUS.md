@@ -46,6 +46,31 @@ average, and CBR, at each supported depth.
   labelled Main 10, because the core always asked for `main10`.
 - Quick Sync remains untested.
 
+**HEVC profile and bit depth (2026-11-19; not installed).**
+- With no profile set, HEVC encoders now get `main` for 8-bit (was `main10`).
+- `V-PROFILE-DEPTH` (error) now covers x265 `main`/`main444-8` with 10-bit pixels,
+  which x265 refuses at encoder open.
+- `V-PROFILE-LABEL` (warn) on Profile covers HEVC NVENC `main10` with 8-bit pixels.
+- Built-in presets (HEVC 10-bit) and argv goldens are unchanged.
+- The matrix now tries every selectable profile at every depth and reads back the
+  written profile. On this PC it shows x264 and x265 refusals matching the core, and
+  0 mismatches.
+- Checks: core 3,271; B2 Dart FFI 246 ×2; B4 31,400 checks, 50 cases, plus 689
+  reader checks.
+- Owner's RTX 5070 Ti re-run with this core: 13 HEVC NVENC rows pass, 0 mismatches.
+  8-bit now writes Main. `main10` at 8-bit writes Main 10, and the core warns. `main`
+  at 10-bit is accepted and written as Main 10, so no rule is needed.
+- Default bit depth (owner decision, 2026-11-19): x265 stays 10-bit Main 10. HEVC
+  NVENC's default is now 8-bit (`depthDef` 8), because NVIDIA's support matrix lists
+  Maxwell 2nd gen (GTX 950-980 Ti, Titan X, Quadro M2000-M6000, Tesla M4-M60) as 8-bit
+  HEVC only; every HEVC-capable GPU from Pascal on also does 10-bit. This applies when
+  no depth is set; switching encoders keeps a depth the new encoder offers. The
+  built-in HEVC (NVENC) preset stores 10-bit and is unchanged.
+- Checks after the default change: core 3,273; B1 catalog 180; B2 Dart FFI 246 ×2;
+  app 728 tests with light and dark goldens, none changed.
+- Separately, x264 `high422`/`high444` and x265 `main444-*` still write 4:2:0
+  (High / Main), because the profile doesn't change the pixel format.
+
 **Progress window stays above VEGAS (owner request, 2026-11-16; not committed or
 installed).** A click in VEGAS used to cover the unpinned progress window. The
 runner now finds VEGAS's process from C5 `hostHwnd`, follows foreground changes

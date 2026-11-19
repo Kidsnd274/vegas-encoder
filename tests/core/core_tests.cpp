@@ -185,6 +185,48 @@ void FixPlanChecks(const ve::Json& bundle, const ve::Json& request) {
     svt["recipe"]["video"]["mode"] = "crf"; svt["recipe"]["video"]["maxrateK"] = 4000;
     const auto cappedCrf = CallJson(ve_compile,svt);
     Expect(!ve::HasErrors(cappedCrf.at("issues")) && After(cappedCrf.at("argv"),"-maxrate") == "5000k","SVT-AV1 capped CRF through Extra stays allowed; an inactive Peak bitrate is ignored");
+    // HEVC profile and bit depth. Measured with N-128435: x265 refuses main/main444-8 with
+    // 10-bit pixels at encoder open and writes Main for main10 with 8-bit pixels; HEVC NVENC
+    // (RTX 5070 Ti, driver 617.42) writes an 8-bit file labelled Main 10.
+    auto hevc = [&](const char* encoder, const ve::Json& profile, int depth, const char* extra = "") {
+        auto r = fixtureRequest("yt-hevc-nv"); auto& v = r["recipe"]["video"];
+        v["encoder"] = encoder; v["mode"] = std::string(encoder) == "libx265" ? "crf" : "cq";
+        v["speed"] = nullptr; v["tune"] = nullptr; v["profile"] = profile; v["depth"] = depth; v["extra"] = extra;
+        return CallJson(ve_compile,r);
+    };
+    auto hevcIssue = [](const ve::Json& result, const char* id) { return FindIssue(result.at("issues"),id) != nullptr; };
+    for (const auto* encoder : {"libx265","hevc_nvenc","hevc_qsv"}) for (const int depth : {8,10}) {
+        const auto result = hevc(encoder,nullptr,depth);
+        Expect(After(result.at("argv"),"-profile:v") == (depth == 8 ? "main" : "main10") && !hevcIssue(result,"V-PROFILE-DEPTH") && !hevcIssue(result,"V-PROFILE-LABEL"),
+               std::string("an unset HEVC profile follows the bit depth: ") + encoder + " " + std::to_string(depth) + "-bit");
+    }
+    // Unset depth (owner decision, 2026-11-19): x265 stays 10-bit Main 10. HEVC NVENC is 8-bit
+    // Main, because Maxwell 2nd gen (GTX 950-980 Ti, Quadro M2000-M6000) encodes 8-bit HEVC
+    // only (NVIDIA Video Encode and Decode Support Matrix); Pascal and newer also take 10-bit.
+    for (const auto& [encoder,expectedProfile,pixfmt] : {std::tuple{"libx265","main10","yuv420p10le"},{"hevc_nvenc","main","yuv420p"}}) {
+        auto unsetDepth = fixtureRequest("yt-hevc-nv"); auto& v = unsetDepth["recipe"]["video"];
+        v["encoder"] = encoder; v["mode"] = std::string(encoder) == "libx265" ? "crf" : "cq"; v["speed"] = nullptr; v["tune"] = nullptr; v["profile"] = nullptr; v["depth"] = nullptr;
+        const auto result = CallJson(ve_compile,unsetDepth); const auto& argv = result.at("argv");
+        const auto outputPixfmt = std::find(argv.rbegin(),argv.rend(),ve::Json("-pix_fmt")); // the first -pix_fmt describes the raw input
+        Expect(After(argv,"-profile:v") == expectedProfile && outputPixfmt != argv.rend() && outputPixfmt != argv.rbegin() && *std::prev(outputPixfmt) == pixfmt &&
+               !ve::HasErrors(result.at("issues")) && !hevcIssue(result,"V-PROFILE-LABEL"),
+               std::string("unset depth default for ") + encoder + ": " + expectedProfile + " / " + pixfmt);
+    }
+    for (const auto* eightBitOnly : {"main","main444-8"}) {
+        const auto refused = hevc("libx265",eightBitOnly,10); const auto issue = FindIssue(refused.at("issues"),"V-PROFILE-DEPTH");
+        Expect(issue && ve::Str(*issue,"level") == "error" && ve::Str(*issue,"field") == "video.profile",std::string("x265 ") + eightBitOnly + " with 10-bit pixels is an error on Profile");
+    }
+    const auto extraProfile = hevc("libx265",nullptr,10,"-profile:v main");
+    Expect(hevcIssue(extraProfile,"V-PROFILE-DEPTH"),"x265 Main through Extra with 10-bit pixels is an error too");
+    for (const auto& [accepted,depth] : {std::pair{"main10",8},{"main",8},{"main10",10},{"main444-10",10}}) {
+        const auto allowed = hevc("libx265",accepted,depth);
+        Expect(!ve::HasErrors(allowed.at("issues")) && !hevcIssue(allowed,"V-PROFILE-LABEL"),std::string("x265 accepts and labels correctly: ") + accepted + " " + std::to_string(depth) + "-bit");
+    }
+    const auto label = hevc("hevc_nvenc","main10",8); const auto labelIssue = FindIssue(label.at("issues"),"V-PROFILE-LABEL");
+    Expect(labelIssue && ve::Str(*labelIssue,"level") == "warn" && ve::Str(*labelIssue,"field") == "video.profile" && !ve::HasErrors(label.at("issues")),
+           "HEVC NVENC Main 10 with 8-bit pixels warns on Profile");
+    const auto starter = CallJson(ve_compile,fixtureRequest("yt-hevc-nv"));
+    Expect(!hevcIssue(starter,"V-PROFILE-LABEL") && !hevcIssue(starter,"V-PROFILE-DEPTH") && After(starter.at("argv"),"-profile:v") == "main10","the 10-bit HEVC NVENC starter is unchanged");
 
     auto x264 = request; x264["recipe"]["video"]["mode"] = "abr"; x264["recipe"]["video"]["maxrateK"] = 16000;
     const auto x264Peak = CallJson(ve_compile,x264);

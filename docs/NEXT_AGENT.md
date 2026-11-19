@@ -30,7 +30,9 @@ bitrate. Fake host and real FFmpeg pass; see [status](STATUS.md#current-progress
 NVENC rate-control modes passed on an RTX 5070 Ti (see status); no core rule is
 needed. Quick Sync is still unverified (no Intel GPU here). Run
 `scripts/etc/Test-RateControlMatrix.py --encoders hevc_qsv` on a PC with one, and add
-core rules only for combinations that real FFmpeg rejects there.
+core rules only for combinations that real FFmpeg rejects there. HEVC profile/depth
+rules and the 8-bit HEVC NVENC default were added and confirmed on an RTX 5070 Ti
+(see status).
 
 **Also check in L6: the progress window stays above VEGAS.** While VEGAS is in
 front, a click anywhere in VEGAS must leave the unpinned progress window visible,
