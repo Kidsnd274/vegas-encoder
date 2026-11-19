@@ -36,10 +36,8 @@ begin
     TransactionDir := '';
   end;
   { We do not download or install machine-wide dependencies automatically. }
-  if not FileExists(ExpandConstant('{sys}\vcruntime140.dll')) or
-     not FileExists(ExpandConstant('{sys}\vcruntime140_1.dll')) or
-     not FileExists(ExpandConstant('{sys}\msvcp140.dll')) then begin
-    Result := 'Install the Microsoft Visual C++ 2015-2022 x64 Redistributable, then run Setup again.';
+  if not HasX64VisualCppRuntime then begin
+    Result := MissingVisualCppRuntimeMessage;
     Exit;
   end;
   Result := WaitForClosedPrograms;

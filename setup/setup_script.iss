@@ -66,4 +66,5 @@ Filename: "{app}\VegasEncoder.exe"; Description: "Launch Vegas Encoder"; Flags: 
 #include "includes\helper.iss"
 #include "includes\hosts.iss"
 #include "includes\wizard.iss"
+#include "includes\runtime.iss"
 #include "includes\lifecycle.iss"

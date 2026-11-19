@@ -1,4 +1,4 @@
-"""Run only wizard initialization in an unprivileged, non-installing Inno harness.
+"""Run prerequisites and wizard checks in unprivileged Inno fixtures.
 
 Uses the actual helper/hosts/wizard scripts and the production helper's read-only
 detection. Builds the VEGAS integrations page in install, update and maintenance
@@ -13,6 +13,44 @@ import uuid
 REPO = Path(__file__).resolve().parents[2]
 
 
+def runtime_preflight(args, fixture):
+    """Verify runtime detection and the silent error text without installing."""
+    marker = fixture / 'runtime-passed.txt'
+    expected_message = (
+        'Download and install the x64 Microsoft Visual C++ Redistributable, then run Setup again.\n\n'
+        'https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170'
+        '#latest-supported-redistributable-version'
+    )
+    source = fixture / 'runtime-test.iss'
+    source.write_text(fr'''[Setup]
+AppName=Vegas Encoder runtime prerequisite fixture
+AppVersion=0
+PrivilegesRequired=lowest
+ArchitecturesAllowed=x64os
+ArchitecturesInstallIn64BitMode=x64os
+CreateAppDir=no
+Uninstallable=no
+OutputDir={fixture}
+OutputBaseFilename=runtime-test
+[Code]
+#include "{REPO / 'setup/includes/runtime.iss'}"
+function InitializeSetup: Boolean;
+begin
+  Result := False;
+  if HasX64VisualCppRuntime then
+    SaveStringToFile('{marker}', MissingVisualCppRuntimeMessage, False);
+end;
+''', encoding='utf-8-sig')
+    subprocess.run([args.iscc, '/Q', str(source)], check=True, timeout=60)
+    result = subprocess.run([str(fixture / 'runtime-test.exe'), '/VERYSILENT',
+                             '/SUPPRESSMSGBOXES', '/NORESTART'], timeout=30)
+    if not marker.exists():
+        raise SystemExit(f'x64 runtime prerequisite check failed (exit {result.returncode})')
+    if marker.read_text(encoding='ascii') != expected_message:
+        raise SystemExit('Runtime prerequisite instructions or Microsoft URL are incorrect.')
+    print('Runtime prerequisite PASS: 32-bit Setup found the x64 runtime and the simulated silent error matched.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--iscc', default=str(Path(os.environ.get('ProgramFiles(x86)', '')) / 'Inno Setup 6' / 'ISCC.exe'))
@@ -20,6 +58,7 @@ def main():
     args = parser.parse_args()
     fixture = REPO / 'build/test-results' / ('setup-wizard-' + uuid.uuid4().hex)
     fixture.mkdir(parents=True)
+    runtime_preflight(args, fixture)
     # Rename the events so the harness can invoke them, check the results, then abort.
     wizard = (REPO / 'setup/includes/wizard.iss').read_text(encoding='utf-8')
     wizard = wizard.replace('function InitializeSetup: Boolean;', 'function ProductInitializeSetup: Boolean;')

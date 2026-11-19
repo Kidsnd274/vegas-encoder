@@ -4,16 +4,18 @@ Build from the repository root with `scripts/Build-Release.ps1`. The default All
 action builds the product, publishes `build/release/vegas-encoder/{app,core,plugin,setup}`,
 stages a fresh frozen bundle and compiles its installer into `dist/`. Build only
 uses `-Action Build`; Package stages the existing receipted build and compiles
-Setup. Neither command runs the installer. Inno Setup **6.7.1** is the verified
-compiler; `-IsccPath` overrides its location. Tool installation is separate.
+Setup. Neither command runs the installer. The default compiler path is for
+Inno Setup 6. Inno Setup 7.1.1 also compiles Setup via `-IsccPath`. Tool
+installation is separate.
 
 All Inno sources live under `setup/`: `setup_script.iss`, `version.generated.iss` and
-`includes/{helper,hosts,wizard,lifecycle}.iss`:
+`includes/{helper,hosts,wizard,runtime,lifecycle}.iss`:
 
 - `helper.iss` runs the native helper with UTF-16 INI requests and results;
 - `hosts.iss` holds the detected VEGAS versions and the VEGAS integrations page;
 - `wizard.iss` picks the mode and drives the welcome, maintenance, ready and
   finished pages;
+- `runtime.iss` checks the x64 Visual C++ runtime and provides the download page;
 - `lifecycle.iss` prepares, commits, rolls back and uninstalls.
 
 The generated include comes from root `version.json`. `native/install.cpp` is a
@@ -220,7 +222,10 @@ rather than assigning new AppIds that leave two uninstallers owning the same fil
 
 Setup requires administrator rights, Windows x64, and the x64 Microsoft Visual
 C++ runtime already installed (`vcruntime140`, `vcruntime140_1`, `msvcp140`).
-It reports a missing prerequisite rather than downloading or installing tools.
+When the runtime is missing, Setup tells the user to download and install the
+x64 package and gives them the Microsoft download page. Interactive Setup offers
+to open the page, and silent Setup reports the URL without opening a browser.
+[Microsoft's latest Visual C++ Redistributable downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version)
 Setup does not kill processes or schedule partial file replacement on reboot.
 Updates keep the existing app directory; uninstall first to relocate it.
 Detection alone does not qualify a build. The helper requires exact executable

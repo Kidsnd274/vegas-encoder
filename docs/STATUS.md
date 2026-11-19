@@ -7,6 +7,14 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**Setup runtime prerequisite and 0.2.2+1 version bump (2026-11-20).**
+The old check failed in a 32-bit Setup process on Windows x64 with runtime
+14.52.37029 installed. The corrected check passed in x86 and x64 Setup
+fixtures on that PC. These used the real runtime and exited before installation.
+When the runtime is missing, Setup directs users to Microsoft's download page
+for the x64 package. Missing-runtime and real install/update/uninstall
+qualification remain open.
+
 **SVT-AV1 peak in Target bitrate mode is a warning (owner decision, 2026-11-19; not
 installed).** `V-PEAK-UNSUPPORTED` is now `warn` instead of `error`, on Peak bitrate and
 on `-maxrate` in Video Extra, because a later SVT-AV1 may accept the peak. The recipe

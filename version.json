@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "release": {"version": "0.2.1", "build": 1, "exporterSuffix": ""},
+  "release": {"version": "0.2.2", "build": 1, "exporterSuffix": ""},
   "core": {"version": "0.3.1", "packageVersion": "0.3.1", "abi": 1, "schemaMax": 2, "contracts": 1},
   "services": {"packageVersion": "0.3.0", "ffmpegParserVersion": 5},
   "legacyExporters": {
