@@ -62,6 +62,13 @@ actual-path records, cancellation, recovery and collision checks. It does not
 launch VEGAS or the app. General Setup still
 supports only the already-qualified target.
 
+`python -I scripts/etc/Test-RateControlMatrix.py [--hardware | --encoders h264_nvenc ...]`
+runs every curated video encoder through every Basic rate-control mode (including
+Peak bitrate and CBR) with the real core and the supplied FFmpeg, on a generated
+clip. It exits 1 when the core allows a command FFmpeg rejects, or blocks one FFmpeg
+accepts. Hardware without a driver or device is reported as unavailable, not as a
+failure. It is standalone: copy it with `ve_core.dll` to test another PC's GPU.
+
 See [building](../docs/BUILDING.md) and [installer/recovery](../docs/INSTALLER.md)
 for requirements, options and qualification limits. Historical experiment and
 component-handoff documents retain their originally recorded script paths;

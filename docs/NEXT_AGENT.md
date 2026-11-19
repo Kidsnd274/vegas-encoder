@@ -27,6 +27,10 @@ seconds VEGAS must report a failure, and the progress window and History must sh
 `FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode` as Failed, not
 Cancelled. Opening the old `AV1 4Mb/s Smol` preset must show the error under Peak
 bitrate. Fake host and real FFmpeg pass; see [status](STATUS.md#current-progress).
+NVENC rate-control modes passed on an RTX 5070 Ti (see status); no core rule is
+needed. Quick Sync is still unverified (no Intel GPU here). Run
+`scripts/etc/Test-RateControlMatrix.py --encoders hevc_qsv` on a PC with one, and add
+core rules only for combinations that real FFmpeg rejects there.
 
 **Also check in L6: the progress window stays above VEGAS.** While VEGAS is in
 front, a click anywhere in VEGAS must leave the unpinned progress window visible,

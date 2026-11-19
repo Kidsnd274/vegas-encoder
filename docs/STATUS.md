@@ -33,6 +33,19 @@ with a peak (2.1 s, was 60 s). B6 normal and ASan 523/99/486 checks; actual adap
 `E_FAIL` within 8 s. Legacy containers with real FFmpeg pass. A retry in real
 VEGAS is pending.
 
+Other encoders, through `scripts/etc/Test-RateControlMatrix.py` (real core compile
+and real FFmpeg N-128435 on a generated P010 clip; no pipes, exporter or VEGAS). Every
+Basic mode was tried, including Target bitrate with a peak equal to or 1.5x the
+average, and CBR, at each supported depth.
+- This PC (AMD Radeon 8060S): 61 rows. x264, x265, VP9, H.264 AMF, ProRes, DNxHR and
+  FFV1 pass everything; only SVT-AV1 with a peak is rejected. NVENC and Quick Sync
+  are unavailable here.
+- Owner's PC (NVIDIA GeForce RTX 5070 Ti, driver 617.42 / 32.0.16.1742, 1080p 90
+  frames): all 20 H.264, HEVC and AV1 NVENC rows pass, 0 core/FFmpeg mismatches.
+  Other GPU generations and drivers were not tested. The 8-bit HEVC NVENC file was
+  labelled Main 10, because the core always asked for `main10`.
+- Quick Sync remains untested.
+
 **Progress window stays above VEGAS (owner request, 2026-11-16; not committed or
 installed).** A click in VEGAS used to cover the unpinned progress window. The
 runner now finds VEGAS's process from C5 `hostHwnd`, follows foreground changes
