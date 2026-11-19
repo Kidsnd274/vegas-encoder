@@ -21,6 +21,7 @@ import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
 import 'package:vegas_encoder/state/editor.dart';
 import 'package:vegas_encoder/state/presets.dart';
+import 'package:vegas_encoder/state/recipe_edit.dart';
 import 'package:vegas_encoder/state/services.dart';
 
 import '../helpers.dart';
@@ -304,6 +305,34 @@ void main() {
         findsWidgets,
         reason: 'the library rows keep the warning',
       );
+    });
+
+    testWidgets('an SVT-AV1 peak in Target bitrate mode warns at Peak bitrate and still saves', (tester) async {
+      await pump(tester);
+      final svt = editor(tester).catalog.video.singleWhere((e) => e.id == 'libsvtav1');
+      container(tester)
+          .read(presetsControllerProvider.notifier)
+          .edit(
+            (r) => r
+                .withVideoEncoder('libsvtav1', svt)
+                .withVideo((v) => v.copyWith(mode: 'abr', bitrateK: 4000, maxrateK: 4000)),
+          );
+      await tester.pumpAndSettle();
+      final peak = editor(tester).issues.where((i) => i.id == 'V-PEAK-UNSUPPORTED').single;
+      expect(peak.level, IssueLevel.warn);
+      expect(peak.field, 'video.maxrateK');
+      expect(editor(tester).hasErrors, isFalse, reason: 'a later SVT-AV1 may accept the peak');
+
+      await openNode(tester, editor(tester).compiled.value!.summary['video']! as String);
+      expect(
+        messagesAt(tester, 'Peak bitrate').where((m) => m.level == VeLevel.warning).map((m) => m.text),
+        [peak.message],
+        reason: 'the warning shows under Peak bitrate',
+      );
+
+      await save(tester);
+      expect(find.text('Fix the errors before saving'), findsNothing);
+      expect((await mine(tester)).single.recipe.video.maxrateK, 4000, reason: 'the peak is saved as typed');
     });
 
     testWidgets('a recipe without length limits saves without asking (C16)', (tester) async {

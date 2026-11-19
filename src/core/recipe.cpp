@@ -292,15 +292,16 @@ Json Validate(const Json& request, const Json* capabilities, const Json* structu
         if (Num(v,"gopSec") > 10) issues.push_back(Issue("V-GOP","warn","video.gopSec","Keyframes more than 10 seconds apart make seeking slow."));
         if (Str(v,"encoder") == "libx264" && Num(res,"depth") == 10) issues.push_back(Issue("V-H264-10BIT","warn","video.depth","10-bit H.264 does not play on most phones, browsers or TVs."));
         // SVT-AV1 accepts a peak rate only with CRF ("Max Bitrate only supported with CRF mode")
-        // and then fails at encoder open, after the render has started.
+        // and then fails at encoder open, after the render has started. A warning, not an
+        // error: a later SVT-AV1 may accept it, and the engine fails such a render promptly.
         if (Str(v,"encoder") == "libsvtav1" && Str(res,"videoMode") == "abr") {
-            if (Num(v,"maxrateK") > 0) issues.push_back(Issue("V-PEAK-UNSUPPORTED","error","video.maxrateK",
-                "SVT-AV1 can't cap the peak in Target bitrate mode. Clear Peak bitrate, or use Constant quality."));
+            if (Num(v,"maxrateK") > 0) issues.push_back(Issue("V-PEAK-UNSUPPORTED","warn","video.maxrateK",
+                "SVT-AV1 currently accepts a peak only with Constant quality, so this render will probably fail. Clear Peak bitrate, or use Constant quality."));
             try {
                 const auto words = Tokenize(Str(v,"extra"));
                 for (const auto& pair : PairOptions(words)) if (pair.key == "maxrate" && pair.stream != "audio") {
-                    issues.push_back(Issue("V-PEAK-UNSUPPORTED","error","video.extra",
-                        "SVT-AV1 can't cap the peak in Target bitrate mode. Remove -maxrate, or use Constant quality.",
+                    issues.push_back(Issue("V-PEAK-UNSUPPORTED","warn","video.extra",
+                        "SVT-AV1 currently accepts -maxrate only with Constant quality, so this render will probably fail. Remove -maxrate, or use Constant quality.",
                         {{"start",ve::Utf16Offset(Str(v,"extra"),words[pair.option].start)},{"end",ve::Utf16Offset(Str(v,"extra"),pair.HasValue() ? words[pair.value].end : words[pair.option].end)}}));
                     break;
                 }

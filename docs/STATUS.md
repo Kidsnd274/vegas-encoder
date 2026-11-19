@@ -7,6 +7,15 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**SVT-AV1 peak in Target bitrate mode is a warning (owner decision, 2026-11-19; not
+installed).** `V-PEAK-UNSUPPORTED` is now `warn` instead of `error`, on Peak bitrate and
+on `-maxrate` in Video Extra, because a later SVT-AV1 may accept the peak. The recipe
+saves, applies and compiles with the peak; the warning shows under the field and in
+Checks. Nothing checks the SVT-AV1 version or test-encodes. A render that SVT-AV1 still
+refuses fails promptly as below. Checks: core static and ASan 3,275 each; app
+`native_core_test.dart` 17 tests on the native core with fake services (no FFmpeg, no
+VEGAS), including a new case that the warning shows and Save goes through.
+
 **FFmpeg reports its own fatal error code (2026-11-20; not installed).** After a
 fatal FFmpeg line the engine now closes both input pipes instead of waiting 2 s; FFmpeg
 then exits with its own code. A standalone reproduction with real FFmpeg N-128435, fed
@@ -30,9 +39,9 @@ N-128435 then stayed alive: its video demuxer stopped reading, Render waited on 
 full video queue, and so the audio demuxer stayed blocked in a pipe read. With
 independently fed pipes FFmpeg exits at once (-22). The engine reproduction waited
 for the full stall timeout and reported "Error sending frames to consumers".
-- Core: `V-PEAK-UNSUPPORTED` (error) on Peak bitrate for SVT-AV1 in Target bitrate
-  mode, and on Video Extra for `-maxrate` there. Saved recipes are refused before
-  FFmpeg starts. Capped CRF and other encoders' peaks are unchanged.
+- Core: `V-PEAK-UNSUPPORTED` on Peak bitrate for SVT-AV1 in Target bitrate mode, and
+  on Video Extra for `-maxrate` there. First an error that refused such recipes; now a
+  warning (see above). Capped CRF and other encoders' peaks are unchanged.
 - Engine: a stderr watcher fails the render 2 s after a fatal FFmpeg line if FFmpeg
   neither exits nor makes progress. VEGAS gets `E_FAIL`, History records Failed,
   and the message is the encoder's own line

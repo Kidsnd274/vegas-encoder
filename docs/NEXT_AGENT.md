@@ -25,8 +25,9 @@ shared-DLL build is still uncovered. See [status](STATUS.md#current-progress).
 render an Advanced AV1 command with `-b:v 4000k -maxrate 4000k`. Within a few
 seconds VEGAS must report a failure, and the progress window and History must show
 `FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode` as Failed, not
-Cancelled. Opening the old `AV1 4Mb/s Smol` preset must show the error under Peak
-bitrate. Fake host and real FFmpeg pass; see [status](STATUS.md#current-progress).
+Cancelled. Opening the old `AV1 4Mb/s Smol` preset must show a warning (not an
+error) under Peak bitrate, and it must still save, apply and render to that same
+prompt failure. Fake host and real FFmpeg pass; see [status](STATUS.md#current-progress).
 NVENC rate-control modes passed on an RTX 5070 Ti (see status); no core rule is
 needed. Quick Sync is still unverified (no Intel GPU here). Run
 `scripts/etc/Test-RateControlMatrix.py --encoders hevc_qsv` on a PC with one, and add
