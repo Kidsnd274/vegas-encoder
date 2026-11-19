@@ -841,6 +841,10 @@ buffersink AVOptions:
       failedProbe.last.phase == 'failed',
       'unknown-name exit zero is a probe failure, not success/cancellation',
     );
+    check(
+      failedProbe.last.message == 'FFmpeg did not recognize this encoder.',
+      'a failed check says why in the service’s words, not the exception’s: ${failedProbe.last.message}',
+    );
     await ffprobe.delete();
     check(
       (await services.discovery.list()).single.health == 'ffprobe-missing',

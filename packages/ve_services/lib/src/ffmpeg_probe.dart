@@ -334,13 +334,16 @@ class WindowsFFmpegProbe implements FFmpegProbe {
           } catch (e) {
             // A complete catalog can be cached for on-demand help, but a failed or
             // cancelled stream never claims a completed probe on the installation.
+            final error = failure ?? e;
             emit(
               failure != null
                   ? 'failed'
                   : op.token.cancelled
                   ? 'cancelled'
                   : 'failed',
-              message: (failure ?? e).toString(),
+              message: error is ServiceException
+                  ? error.message
+                  : error.toString(),
             );
           } finally {
             _operations.finish(installation.id, op);
