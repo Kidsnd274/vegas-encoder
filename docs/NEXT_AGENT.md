@@ -21,13 +21,12 @@ shared-DLL build is still uncovered. See [status](STATUS.md#current-progress).
 
 ## Current queue: older VEGAS release qualification
 
-**Also check in L6: SVT-AV1 with a peak bitrate fails promptly.** On VEGAS 2026,
-render an Advanced AV1 command with `-b:v 4000k -maxrate 4000k`. Within a few
-seconds VEGAS must report a failure, and the progress window and History must show
-`FFmpeg: Svt[error]: Max Bitrate only supported with CRF mode` as Failed, not
-Cancelled. Opening the old `AV1 4Mb/s Smol` preset must show a warning (not an
-error) under Peak bitrate, and it must still save, apply and render to that same
-prompt failure. Fake host and real FFmpeg pass; see [status](STATUS.md#current-progress).
+**SVT-AV1 Basic failure and recovery passed on VEGAS Pro 2026.0.3.189.**
+A 4000 kb/s average and peak warned and applied, then failed promptly with
+FFmpeg exit code -22. The built-in AV1 (CPU) preset rendered successfully in
+the same session. The real-host Advanced command variant (`-b:v 4000k -maxrate
+4000k`) and saving and reopening the old `AV1 4Mb/s Smol` preset remain to be
+checked. See [status](STATUS.md#current-progress).
 NVENC rate-control modes passed on an RTX 5070 Ti (see status); no core rule is
 needed. Quick Sync is still unverified (no Intel GPU here). Run
 `scripts/etc/Test-RateControlMatrix.py --encoders hevc_qsv` on a PC with one, and add

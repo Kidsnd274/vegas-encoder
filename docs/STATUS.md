@@ -7,6 +7,19 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**Real VEGAS SVT-AV1 failure and recovery passed (2026-11-20).** The installed
+app/core/exporter matched the 0.2.1+1 installer payload staged from `db938ba`
+(the receipt records a dirty checkout). On VEGAS Pro 2026.0.3.189 with FFmpeg
+N-128435-g7798de15f86-gdb8537d8cc7+2 and SVT-AV1 4.3.0, a Basic SVT-AV1
+template with 4000 kb/s average and peak showed the warning and applied.
+The render failed in 0.859 s with `E_FAIL` and FFmpeg exit code -22. The progress
+window and History both showed the SVT-AV1 CRF-only diagnostic, and no output
+was published. In the same session, the unmodified AV1 (CPU) revision 5 preset
+rendered the 10 s checkerboard in 2.703 s. FFprobe counted 300 frames of
+1920×1080 10-bit AV1 at 30000/1001 fps with 48 kHz stereo Opus, and FFmpeg
+decoded both streams. The timeline had no audible source audio. The long AV1
+run and progress-window pin and app-switching checks remain open.
+
 **Setup runtime prerequisite and 0.2.2+1 version bump (2026-11-20).**
 The old check failed in a 32-bit Setup process on Windows x64 with runtime
 14.52.37029 installed. The corrected check passed in x86 and x64 Setup
@@ -15,8 +28,8 @@ When the runtime is missing, Setup directs users to Microsoft's download page
 for the x64 package. Missing-runtime and real install/update/uninstall
 qualification remain open.
 
-**SVT-AV1 peak in Target bitrate mode is a warning (owner decision, 2026-11-19; not
-installed).** `V-PEAK-UNSUPPORTED` is now `warn` instead of `error`, on Peak bitrate and
+**SVT-AV1 peak in Target bitrate mode is a warning (owner decision, 2026-11-19).**
+`V-PEAK-UNSUPPORTED` is now `warn` instead of `error`, on Peak bitrate and
 on `-maxrate` in Video Extra, because a later SVT-AV1 may accept the peak. The recipe
 saves, applies and compiles with the peak; the warning shows under the field and in
 Checks. Nothing checks the SVT-AV1 version or test-encodes. A render that SVT-AV1 still
@@ -24,7 +37,7 @@ refuses fails promptly as below. Checks: core static and ASan 3,275 each; app
 `native_core_test.dart` 17 tests on the native core with fake services (no FFmpeg, no
 VEGAS), including a new case that the warning shows and Save goes through.
 
-**FFmpeg reports its own fatal error code (2026-11-20; not installed).** After a
+**FFmpeg reports its own fatal error code (2026-11-20).** After a
 fatal FFmpeg line the engine now closes both input pipes instead of waiting 2 s; FFmpeg
 then exits with its own code. A standalone reproduction with real FFmpeg N-128435, fed
 like the exporter, hung with the pipes open and exited -22 in 0.1 s once they closed.
@@ -37,10 +50,10 @@ still running 5 s after its fatal line fails anyway. Checks:
 - Actual adapter: 271 checks with the SVT case under 4 s and exit code -22.
 - Legacy containers with real FFmpeg: pass.
 
-All of these used the fake host with real FFmpeg, not real VEGAS.
+These automated checks used the fake host with real FFmpeg.
 
-**SVT-AV1 peak-rate failure no longer hangs on "Encoding" (2026-11-16; not
-installed).** 0.2.1 on VEGAS 2026.0.3.189 stayed on "Encoding" with the user preset
+**SVT-AV1 peak-rate failure no longer hangs on "Encoding" (2026-11-16).**
+0.2.1 on VEGAS 2026.0.3.189 stayed on "Encoding" with the user preset
 `AV1 4Mb/s Smol` r1 (Target bitrate 4000 kb/s, Peak 4000 kb/s). SVT-AV1 4.3.0 refused
 `-maxrate` ("Max Bitrate only supported with CRF mode") at encoder open. FFmpeg
 N-128435 then stayed alive: its video demuxer stopped reading, Render waited on the
@@ -62,8 +75,8 @@ N-128435 and a controlled fake child. New cases: fatal-hold (fails in 2.6 s with
 60 s stall timeout), fatal-hold-cancel, ordinary warnings over 3.8 s, and real SVT-AV1
 with a peak (2.1 s, was 60 s). B6 normal and ASan 523/99/486 checks; actual adapter
 271 checks in 12 fake-host real-FFmpeg cases, including the SVT case returning
-`E_FAIL` within 8 s. Legacy containers with real FFmpeg pass. A retry in real
-VEGAS is pending.
+`E_FAIL` within 8 s. Legacy containers with real FFmpeg pass. The later real
+VEGAS result is recorded above.
 
 Other encoders, through `scripts/etc/Test-RateControlMatrix.py` (real core compile
 and real FFmpeg N-128435 on a generated P010 clip; no pipes, exporter or VEGAS). Every
