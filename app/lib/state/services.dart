@@ -104,6 +104,9 @@ abstract interface class AppServices {
   /// the fakes, which keep nothing.
   ServicePaths? get paths;
 
+  /// The executable running this copy of the app, for Settings > About.
+  String? get executablePath;
+
   Future<void> dispose();
 }
 
@@ -121,6 +124,9 @@ final class WindowsAppServices implements AppServices {
 
   @override
   ServicePaths get paths => _paths;
+
+  @override
+  String get executablePath => _windows.executablePath;
   @override
   PresetLibrary get library => _windows.library;
 

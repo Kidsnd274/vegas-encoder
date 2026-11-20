@@ -16,11 +16,11 @@ history; their old locations, ownership splits and queues do not apply.
 [FIX_PLAN_FFMPEG.md](FIX_PLAN_FFMPEG.md) F1 to F9 and the lost-clicks fix
 (FIX_PLAN_0.2.1 C1: stray presses after the Open dialog) were merged from
 `fix/ffmpeg-page` into `master` at owner request on 2026-11-20 (`b92a635`). The
-release is now 0.2.3+1; the core stays 0.3.1 because the branch changed no core or
-native code. Nothing is pushed or installed. The owner will package the installer
-from `master`. The owner accepted the real app's larger `machine.json` record
-(about 21.5 KB per installation), so the record format stays. The report of an
-FFmpeg disappearing (FIX_PLAN_FFMPEG §7) is set aside at owner request. See
+merge bumped the release to 0.2.3+1. The core stayed 0.3.1 because the branch
+changed no core or native code. Nothing was pushed or installed. The owner will
+package the installer from `master`. The owner accepted the real app's larger
+`machine.json` record (about 21.5 KB per installation), so the record format
+stays. The report of an FFmpeg disappearing (FIX_PLAN_FFMPEG §7) is set aside at owner request. See
 [status](STATUS.md#current-progress) for the checks.
 
 The `../vegas-encoder-ffmpeg-fixes` worktree is still there; the owner decides when to
@@ -54,7 +54,7 @@ front, a click anywhere in VEGAS must leave the unpinned progress window visible
 and switching to another app must put it behind that app (UI_SPEC §12). The
 fake-host window probe passes; real VEGAS hasn't been tried.
 
-**Next: the owner's real-VEGAS checklist for 0.2.1 (L6).** `master` is now 0.2.3+1.
+**Next: the owner's real-VEGAS checklist for 0.2.1 (L6).** `master` is now 0.2.3+2.
 The app, services and repository suites and the fake-host render matrix pass on the
 merge; see [status](STATUS.md#current-progress).
 Follow step L6 of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) on VEGAS 2026.0.3.189,

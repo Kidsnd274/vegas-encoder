@@ -75,9 +75,16 @@ class _SettingsList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final app = switch (ref.watch(appVersionProvider)) {
+      AsyncData(value: final String version) => 'Vegas Encoder $version',
+      AsyncLoading() => 'Vegas Encoder',
+      _ => 'Vegas Encoder (version unavailable)',
+    };
     final version = ref.watch(veCoreProvider).version;
+    final services = ref.watch(servicesProvider);
+    final executablePath = services.executablePath;
     // Null for the platform's fakes, which keep nothing.
-    final paths = ref.watch(servicesProvider).paths;
+    final paths = services.paths;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(22, 24, 22, 40),
       child: Center(
@@ -163,16 +170,18 @@ class _SettingsList extends ConsumerWidget {
                 title: 'About',
                 children: [
                   PanelFacts([
-                    ('App', 'Vegas Encoder'),
+                    ('App', app),
+                    ('Platform', 'Windows x64'),
+                    if (executablePath != null) ('Executable', executablePath),
                     ('Core', coreVersionLabel(version)),
+                    ('Core ABI', '${version.abi}'),
                     ('Formats', 'Recipe schema ${version.schemaMax}, contracts ${version.contracts}'),
-                    (
-                      'Services',
-                      paths == null
-                          ? 'Sample data from the platform’s fakes. Settings last until the app closes.'
-                          : 'This PC. Settings and presets are in "${paths.roaming}"; FFmpeg checks and render '
-                                'records in "${paths.local}".',
-                    ),
+                    if (paths == null)
+                      ('Services', 'Sample data from the platform’s fakes. Settings last until the app closes.')
+                    else ...[
+                      ('Settings and presets', paths.roaming),
+                      ('FFmpeg checks and history', paths.local),
+                    ],
                   ]),
                 ],
               ),

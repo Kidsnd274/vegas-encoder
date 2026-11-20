@@ -14,6 +14,17 @@ final launchModeProvider = Provider<LaunchMode>((ref) => const DesktopLaunch());
 /// The runner's window channel. Tests override it with [FakeWindowController].
 final windowControllerProvider = Provider<WindowController>((ref) => MethodChannelWindowController());
 
+/// The running executable's build stamp, shared by Settings and the popup.
+final appVersionProvider = FutureProvider<String?>((ref) async {
+  final window = ref.watch(windowControllerProvider);
+  try {
+    final version = await window.appVersion();
+    return version == null || version.trim().isEmpty ? null : version;
+  } catch (_) {
+    return null;
+  }
+});
+
 /// The window state read before `runApp`; the notifier keeps it current.
 final initialWindowStateProvider = Provider<WindowState>((ref) => const WindowState());
 

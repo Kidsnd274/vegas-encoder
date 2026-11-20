@@ -44,9 +44,13 @@ void main() {
         testWidgets('settings_$name', (tester) async {
           addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
           tester.platformDispatcher.platformBrightnessTestValue = brightness;
+          final window = FakeWindowController()..buildVersion = '0.1.7+19';
+          final services = FakeAppServices(executablePath: r'<app folder>\VegasEncoder.exe');
+          addTearDown(services.dispose);
           await pumpApp(
             tester,
-            overrides: [windowControllerProvider.overrideWithValue(FakeWindowController()), ...s.overrides()],
+            services: services,
+            overrides: [windowControllerProvider.overrideWithValue(window), ...s.overrides()],
           );
           await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
           await tester.sendKeyEvent(LogicalKeyboardKey.digit4);

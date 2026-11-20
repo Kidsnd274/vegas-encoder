@@ -56,14 +56,8 @@ String _stamp(String? value) => value == null || value.trim().isEmpty ? 'unavail
 /// never replaced by a hardcoded pubspec or candidate version.
 final popupVersionsProvider = FutureProvider<PopupVersionStatus>((ref) async {
   final request = await ref.watch(editSessionRequestProvider.future);
-  final window = ref.watch(windowControllerProvider);
   final core = ref.watch(veCoreProvider);
-  String? appVersion;
-  try {
-    appVersion = await window.appVersion();
-  } catch (_) {
-    // A stamp that could not be read remains explicitly unverified.
-  }
+  final appVersion = await ref.watch(appVersionProvider.future);
   String? appCoreVersion;
   try {
     appCoreVersion = core.version.core;

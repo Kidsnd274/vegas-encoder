@@ -695,7 +695,7 @@ host/exporter process is started. The contract is in CONTRACTS C3.
   formats as unverified without inventing that installer's future schema.
 
 Scope/test details are in NEXT_AGENT. Other unfinished Settings/log-management
-and expanded About features are skipped; the existing cards below remain.
+are skipped; the existing cards below remain.
 
 Built in F3 (`app/lib/features/settings/`). Settings (Ctrl+4) is one centred column,
 at most 720 px wide, of surface cards. Every control saves at once to C7 `machine.json`
@@ -712,8 +712,10 @@ toast.
 - **Rendering:** show a progress window, keep it on top (off by default, disabled while
   the progress window is off, the same setting as the window's pin), and check each file
   after rendering. A note says VEGAS reads these when a render starts.
-- **About:** app, core version (marked "preview core (fake)" for the fake), recipe schema
-  and contracts, and whether the services are the platform's sample fakes.
+- **About:** running app version and build number, target platform, and executable path
+  when available. It shows the core version and ABI, recipe schema, and contract version.
+  The Windows services show the settings and presets folder and the FFmpeg checks and
+  history folder separately. Tests using fake services identify the sample data and core.
 
 ## 7. Keyboard
 

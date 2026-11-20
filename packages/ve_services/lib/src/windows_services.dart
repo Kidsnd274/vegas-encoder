@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:ve_core/ve_core.dart';
 import 'api.dart';
 import 'storage.dart';
@@ -82,6 +84,7 @@ class WindowsServices {
     this.jobs,
   );
   final FileMachineSettingsRepository machineSettings;
+  String get executablePath => Platform.resolvedExecutable;
   final VeCore _core;
   EditSessionService get editSessions {
     final core = _core;

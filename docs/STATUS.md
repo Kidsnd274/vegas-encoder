@@ -7,6 +7,15 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**Settings > About shows the running app version (2026-11-21).** The App row
+uses the Windows runner's full version and build number. About also shows the
+Windows x64 target, executable path, core ABI and separate data folders for
+settings and presets and for FFmpeg checks and history. The missing-version
+regression failed before the fix. Flutter analysis was clean and all 756 app
+tests passed, including the reviewed light and dark About goldens on fakes.
+Build number 2 is synchronized across the version files and passes all eight
+version tests. The Windows x64 release executable reports `0.2.3+2`.
+
 **Real VEGAS SVT-AV1 failure and recovery passed (2026-11-20).** The installed
 app/core/exporter matched the 0.2.1+1 installer payload staged from `db938ba`
 (the receipt records a dirty checkout). On VEGAS Pro 2026.0.3.189 with FFmpeg

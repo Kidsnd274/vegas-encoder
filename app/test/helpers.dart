@@ -38,6 +38,11 @@ Override coreOverride([VeCore? core]) => veCoreProvider.overrideWithValue(core ?
 /// to build the real ones under `flutter test`. A test that needs a
 /// particular fake still overrides that service's provider on top.
 class FakeAppServices implements AppServices {
+  FakeAppServices({this.executablePath});
+
+  @override
+  final String? executablePath;
+
   @override
   final FakePresetLibrary library = FakePresetLibrary();
   @override

@@ -61,11 +61,15 @@ void main() {
 
   setUp(() => repository = FakeMachineSettingsRepository());
 
-  Future<ProviderContainer> openSettings(WidgetTester tester, {MachineSettingsRepository? repo}) async {
+  Future<ProviderContainer> openSettings(
+    WidgetTester tester, {
+    MachineSettingsRepository? repo,
+    FakeWindowController? window,
+  }) async {
     await pumpApp(
       tester,
       overrides: [
-        windowControllerProvider.overrideWithValue(FakeWindowController()),
+        windowControllerProvider.overrideWithValue(window ?? FakeWindowController()),
         machineSettingsRepositoryProvider.overrideWithValue(repo ?? repository),
       ],
     );
@@ -215,13 +219,23 @@ void main() {
     expect(find.byType(FFmpegPage), findsOneWidget);
   });
 
-  testWidgets('About names the core and says the services are samples', (tester) async {
-    await openSettings(tester);
+  testWidgets('About shows the runner version, platform, core details and sample services', (tester) async {
+    final window = FakeWindowController()..buildVersion = '0.1.7+19';
+    await openSettings(tester, window: window);
+    expect(find.text('Vegas Encoder 0.1.7+19'), findsOneWidget);
+    expect(find.text('Windows x64'), findsOneWidget);
     expect(find.text('0.1.0-b0-fake, preview core (fake)'), findsOneWidget);
+    expect(find.text('Core ABI'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
     expect(find.text('Sample data from the platform’s fakes. Settings last until the app closes.'), findsOneWidget);
   });
 
-  testWidgets('About says where this PC\'s services keep their files', (tester) async {
+  testWidgets('About reports when the runner version is unavailable', (tester) async {
+    await openSettings(tester);
+    expect(find.text('Vegas Encoder (version unavailable)'), findsOneWidget);
+  });
+
+  testWidgets('About shows the executable and both data folders', (tester) async {
     final services = _OnThisPc();
     addTearDown(services.dispose);
     await pumpApp(
@@ -233,13 +247,12 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.digit4);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pumpAndSettle();
-    expect(
-      find.text(
-        'This PC. Settings and presets are in "C:\\Users\\Ana\\AppData\\Roaming\\VegasEncoder"; FFmpeg checks and '
-        'render records in "C:\\Users\\Ana\\AppData\\Local\\VegasEncoder".',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Executable'), findsOneWidget);
+    expect(find.text(services.executablePath!), findsOneWidget);
+    expect(find.text('Settings and presets'), findsOneWidget);
+    expect(find.text(services.paths.roaming), findsOneWidget);
+    expect(find.text('FFmpeg checks and history'), findsOneWidget);
+    expect(find.text(services.paths.local), findsOneWidget);
   });
 
   group('default FFmpeg state', () {
@@ -256,6 +269,8 @@ void main() {
 
 /// The fakes, reporting the folders the Windows services would use.
 class _OnThisPc extends FakeAppServices {
+  _OnThisPc() : super(executablePath: r'<app folder>\VegasEncoder.exe');
+
   @override
   ServicePaths get paths => ServicePaths(
     roaming: r'C:\Users\Ana\AppData\Roaming\VegasEncoder',
