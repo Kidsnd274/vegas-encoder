@@ -109,6 +109,15 @@ begin
   InstalledVersion := '0.0.1';
   ProductInitializeWizard;
   Check(Pos('0.0.1', WizardForm.WelcomeLabel2.Caption) > 0, 'Update summary missing from the welcome page');
+  (* Exporter rows show the recorded exporter version, not the app version. *)
+  HostSupported[0] := True; HostVersion[0] := '2026.0.3.189'; HostCore[0] := '0.0.9';
+  HostRecordedDir[0] := HostDir[0]; HostWanted[0] := True;
+  Check(RowStatus(0, True) = 'Update 0.0.9' + Arrow + '{{#VeExporterVersion}}', 'Exporter update row: ' + RowStatus(0, True));
+  Check(Pos('update exporter 0.0.9' + Arrow + '{{#VeExporterVersion}}', IntegrationSummary('', #13#10)) > 0,
+    'Exporter update summary: ' + IntegrationSummary('', #13#10));
+  HostCore[0] := '{{#VeExporterVersion}}';
+  Check(RowStatus(0, True) = 'Reinstall {{#VeExporterVersion}}', 'Unchanged exporter row: ' + RowStatus(0, True));
+  Check(Pos('reinstall exporter', IntegrationSummary('', #13#10)) > 0, 'Unchanged exporter summary: ' + IntegrationSummary('', #13#10));
   Relation := 'same';
   ProductInitializeWizard;
   Check(MaintenancePage.CheckListBox.Items.Count = 3, 'Maintenance choices missing');

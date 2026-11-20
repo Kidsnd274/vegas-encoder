@@ -93,6 +93,17 @@ begin
   if (HostVersion[I] <> '') and (HostVersion[I] <> '?') then Result := Result + '  (' + HostVersion[I] + ')';
 end;
 
+{ Exporter versions come from each host's record, never from the app version. }
+function ExporterUpdated(const I: Integer): Boolean;
+begin
+  Result := HostCore[I] <> '{#VeExporterVersion}';
+end;
+
+function ExporterChange(const I: Integer): String;
+begin
+  Result := HostCore[I] + Arrow + '{#VeExporterVersion}';
+end;
+
 function RowStatus(const I: Integer; const Wanted: Boolean): String;
 begin
   if not HostSupported[I] then Result := 'Not supported by this release'
@@ -102,7 +113,8 @@ begin
   end
   else if not Wanted then Result := 'Exporter will be removed'
   else if Moved(I) then Result := 'Exporter will move here'
-  else if Relation = 'older' then Result := 'Update ' + InstalledVersion + Arrow + '{#VeAppVersion}'
+  else if (Relation = 'older') and ExporterUpdated(I) then Result := 'Update ' + ExporterChange(I)
+  else if Relation = 'older' then Result := 'Reinstall {#VeExporterVersion}'
   else Result := 'Installed';
 end;
 
@@ -306,7 +318,7 @@ begin
     Line := '';
     if HostWanted[I] and (HostCore[I] = '') then Line := 'add exporter in ' + HostDir[I]
     else if HostWanted[I] and Moved(I) then Line := 'move exporter to ' + HostDir[I]
-    else if HostWanted[I] and (Relation = 'older') then Line := 'update exporter'
+    else if HostWanted[I] and (Relation = 'older') and ExporterUpdated(I) then Line := 'update exporter ' + ExporterChange(I)
     else if HostWanted[I] then Line := 'reinstall exporter'
     else if HostCore[I] <> '' then Line := 'remove exporter';
     if Line <> '' then Result := Result + Space + HostLabel[I] + ': ' + Line + NewLine;
