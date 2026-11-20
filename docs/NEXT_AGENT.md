@@ -11,24 +11,20 @@ No separate worktree or permanent ownership split was introduced. Read [AGENTS.m
 [status](STATUS.md) and relevant contracts/specs. Former workstream handoffs are
 history; their old locations, ownership splits and queues do not apply.
 
-## FFmpeg page fixes: done on `fix/ffmpeg-page`, awaiting the owner
+## Merged: FFmpeg page fixes, as 0.2.3+1
 
-[FIX_PLAN_FFMPEG.md](FIX_PLAN_FFMPEG.md) F1 to F9 are implemented, one commit each, in
-the worktree `../vegas-encoder-ffmpeg-fixes` on branch `fix/ffmpeg-page` (from
-`2543714`). The branch is not merged or pushed, and nothing is installed. See
-[status](STATUS.md#current-progress) for the checks and numbers.
+[FIX_PLAN_FFMPEG.md](FIX_PLAN_FFMPEG.md) F1 to F9 and the lost-clicks fix
+(FIX_PLAN_0.2.1 C1: stray presses after the Open dialog) were merged from
+`fix/ffmpeg-page` into `master` at owner request on 2026-11-20 (`b92a635`). The
+release is now 0.2.3+1; the core stays 0.3.1 because the branch changed no core or
+native code. Nothing is pushed or installed. The owner will package the installer
+from `master`. The owner accepted the real app's larger `machine.json` record
+(about 21.5 KB per installation), so the record format stays. The report of an
+FFmpeg disappearing (FIX_PLAN_FFMPEG §7) is set aside at owner request. See
+[status](STATUS.md#current-progress) for the checks.
 
-The section 6 desktop checks, the readiness-summary fix and the lost-clicks fix
-(FIX_PLAN_0.2.1 C1: stray presses after the Open dialog) are recorded in
-[status](STATUS.md#current-progress). The owner decides whether to merge.
-`master` has moved on since the branch started; the owner will merge it, so
-don't rebase.
-
-Nothing on the branch is left to do. The owner accepted the real app's larger
-`machine.json` record (about 21.5 KB per installation, over the plan's 20 KB), so
-the record format stays. Next: the owner merges, then the queue below.
-
-The worktree stays until the owner removes it.
+The `../vegas-encoder-ffmpeg-fixes` worktree is still there; the owner decides when to
+remove it.
 
 ## Merged: FFmpeg parser compatibility and 0.2.1
 
@@ -58,14 +54,15 @@ front, a click anywhere in VEGAS must leave the unpinned progress window visible
 and switching to another app must put it behind that app (UI_SPEC §12). The
 fake-host window probe passes; real VEGAS hasn't been tried.
 
-**Next: the owner's real-VEGAS checklist for 0.2.1 (L6).** Version 0.2.1+1 is on
-`master`, with every offline suite and the fake-host render matrix passing; see
-[status](STATUS.md#current-progress).
+**Next: the owner's real-VEGAS checklist for 0.2.1 (L6).** `master` is now 0.2.3+1.
+The app, services and repository suites and the fake-host render matrix pass on the
+merge; see [status](STATUS.md#current-progress).
 Follow step L6 of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) on VEGAS 2026.0.3.189,
 23.0.0.278, 22.0.0.248, 21.0.0.108 and Sony 13.0.0.453. Render AV1 (CPU)
 revision 5, which no longer carries `-svtav1-params lp=3`, first on 2026 and
-Sony 13. Packaging an installer and removing the merged worktrees
-(`fix/0.2.1-a/-b/-c`, `ffmpeg-parser-compat`, `from-vegas-display`) wait for the owner.
+Sony 13. The owner packages the installer. The merged worktrees for
+`fix/0.2.1-a/-b/-c`, `ffmpeg-parser-compat` and `from-vegas-display` were removed at
+owner request on 2026-11-20. They were clean, and their branches are kept.
 
 The owner confirmed the RGB render fix in Sony 13 build 453. Logs show MP4 and
 WebM publication. Independent decode is pending. The trial's old app path causes

@@ -130,8 +130,23 @@ VEGAS window and a second process as the other app. The check failed on the
 previous Release build and passes on the rebuilt one (single 96 dpi monitor, so
 the other-monitor case was skipped). Not yet tried in real VEGAS.
 
+**FFmpeg page fixes merged as 0.2.3+1 (2026-11-20, `b92a635`; not installed).**
+`fix/ffmpeg-page` was bumped to release 0.2.3+1, above `master`'s 0.2.2+1, then
+merged. The core stays 0.3.1. Only the four version files conflicted; they took
+0.2.3 and `Generate-Versions.py --check` passes. The docs merged cleanly. Checks on the
+merged tree:
+- app analyze clean and 755 tests with light and dark goldens (fakes);
+- B3 services 4,547 checks (fake FFmpeg processes, real Windows processes and DXGI);
+- B3 repositories 190 checks (real files, native core);
+- `Test-Versions.py` 8 tests;
+- `Build-Release.ps1 -Action Build` from a clean `b92a635` (app 0.2.3+1);
+- render matrix `-Quick` on that build: 36 passed, 0 failed, 12 skipped (NVENC; fake
+  host, real FFmpeg N-128435).
+
+Nothing was tried in real VEGAS.
+
 **FFmpeg page fixes (branch `fix/ffmpeg-page`, worktree `../vegas-encoder-ffmpeg-fixes`,
-2026-11-19; not merged, not installed).** Every item of
+2026-11-19).** Every item of
 [FIX_PLAN_FFMPEG.md](FIX_PLAN_FFMPEG.md) (F1 to F9) is implemented and committed one
 item at a time, following owner decisions D1 to D4. No native or exporter code changed
 and `ffmpegParserVersion` stays 5.
