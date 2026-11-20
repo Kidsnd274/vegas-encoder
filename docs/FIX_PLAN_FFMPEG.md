@@ -2,8 +2,13 @@
 
 Written 2026-11-19 from a review of the FFmpeg section on `master` at `510b417`
 (0.2.1+1). The review reproduced each bug marked **confirmed** with tests or real
-FFmpeg; the others come from reading the code. **Nothing in this plan has been
-implemented.** Line numbers are approximate; find the code by name.
+FFmpeg; the others come from reading the code. Line numbers are approximate; find
+the code by name.
+
+**Status (2026-11-20): done on `fix/ffmpeg-page`, not merged.** F1 to F9 are
+implemented, and the owner's section 6 checks pass. The checkboxes below are the
+original plan and are not ticked. [STATUS](STATUS.md#current-progress) records
+the checks, the measured numbers and the owner's later decisions.
 
 The owner wants every item fixed. One agent carries it out, in the order of
 section 4. The owner's decisions are final (section 1): follow them exactly.

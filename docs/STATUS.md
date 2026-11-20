@@ -101,11 +101,19 @@ listed across a restart, and Runs on showed the GPU name. Two findings:
   `guardStrayPresses` cancels a device's open press before its next press. The new
   tests replay the presses as raw pointer data and failed without it. App analyze
   clean and 754 tests pass (fakes). The owner confirmed the fix on the debug build.
-- **`machine.json` over the plan's 20 KB in the real app, open.** One static-build
-  installation came to 21,458 bytes after the background tests. The 19 extra
-  hardware results add about 3.6 KB. The services harness never runs that
+- **`machine.json` over the plan's 20 KB in the real app, accepted.** One
+  static-build installation came to 21,458 bytes after the background tests. The
+  19 extra hardware results add about 3.6 KB. The services harness never runs that
   background pass, so its 20 KB test doesn't see it. About 13 KB is ~220 software
-  entries repeating "Listed by this FFmpeg.". The owner hasn't decided yet.
+  entries repeating "Listed by this FFmpeg.". The owner accepts the larger record
+  (2026-11-20). The format stays as F6 left it, and the harness's 20 KB bound
+  still covers the check without the background pass.
+
+Background pass in the real app (same run, static build, the startup check on a
+fresh data root, from the record's `testedAt` times): the five catalog hardware
+tests ran in about 1.0 s, 10-bit retries included. The 19 other listed hardware
+encoders were then tested one at a time in about 6.3 s. Nothing on the card shows
+that pass.
 
 **0.2.1 fix pass (branch `fix/0.2.1`, version 0.2.1+1, 2026-11-08).** Every item
 of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) except the owner's real-VEGAS checklist (L6)

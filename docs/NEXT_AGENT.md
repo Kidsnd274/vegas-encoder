@@ -24,10 +24,9 @@ The section 6 desktop checks, the readiness-summary fix and the lost-clicks fix
 `master` has moved on since the branch started; the owner will merge it, so
 don't rebase.
 
-Open, waiting for the owner: one installation's `machine.json` record is about
-21.5 KB in the real app, over the plan's 20 KB. Either leave the default
-"Listed by this FFmpeg." reason out of the record (about 14 KB; a C7 change), or
-keep the format and raise the limit.
+Nothing on the branch is left to do. The owner accepted the real app's larger
+`machine.json` record (about 21.5 KB per installation, over the plan's 20 KB), so
+the record format stays. Next: the owner merges, then the queue below.
 
 The worktree stays until the owner removes it.
 
