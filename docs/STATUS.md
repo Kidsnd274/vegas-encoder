@@ -89,6 +89,24 @@ the fix. Flutter analysis was clean and all 750 app tests passed, including the
 pending and probing goldens on fakes in light and dark. The Windows Release build
 succeeded.
 
+Owner's section 6 run (2026-11-20, Release then debug builds of `3486822`, isolated
+data roots, real FFmpeg N-128435 static, gyan 9.0.2 essentials and BtbN n8.1.3
+shared; the static build's folder was removed from the app's `PATH` so it had to be
+added by hand). Checks 3 to 5 passed: a process watcher saw each hardware test run
+once per check (Set as default mid-check, then Presets), all three builds stayed
+listed across a restart, and Runs on showed the GPU name. Two findings:
+- **Lost clicks after Add FFmpeg… (FIX_PLAN_0.2.1 C1), fixed.** Closing the Open
+  dialog by double-clicking the file left two presses and no release on the card
+  under the cursor, which then ignored every click until the page was rebuilt.
+  `guardStrayPresses` cancels a device's open press before its next press. The new
+  tests replay the presses as raw pointer data and failed without it. App analyze
+  clean and 754 tests pass (fakes). The owner confirmed the fix on the debug build.
+- **`machine.json` over the plan's 20 KB in the real app, open.** One static-build
+  installation came to 21,458 bytes after the background tests. The 19 extra
+  hardware results add about 3.6 KB. The services harness never runs that
+  background pass, so its 20 KB test doesn't see it. About 13 KB is ~220 software
+  entries repeating "Listed by this FFmpeg.". The owner hasn't decided yet.
+
 **0.2.1 fix pass (branch `fix/0.2.1`, version 0.2.1+1, 2026-11-08).** Every item
 of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) except the owner's real-VEGAS checklist (L6)
 is implemented. Fixes and tests were committed one item at a time. No installer was

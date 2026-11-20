@@ -12,6 +12,7 @@ import 'package:vegas_encoder/features/ffmpeg/capability_table.dart';
 import 'package:vegas_encoder/features/ffmpeg/encoder_detail.dart';
 import 'package:vegas_encoder/features/ffmpeg/installation_card.dart';
 import 'package:vegas_encoder/features/presets/presets_page.dart';
+import 'package:vegas_encoder/platform/pointer_guard.dart';
 import 'package:vegas_encoder/platform/window_channel.dart';
 import 'package:vegas_encoder/state/app_state.dart';
 import 'package:vegas_encoder/design/components/interactive.dart' show VeInteractive;
@@ -21,6 +22,7 @@ import 'package:vegas_encoder/state/services.dart';
 
 import '../ffmpeg_doubles.dart';
 import '../helpers.dart';
+import '../raw_pointer.dart';
 
 /// The FFmpeg screen (S4) on the platform fakes. No FFmpeg runs: discovery,
 /// probes and hardware tests are B0 fixtures, and the Open dialog is faked.
@@ -204,6 +206,28 @@ void main() {
     await adding;
     await tester.pumpAndSettle();
     expect(container.read(ffmpegControllerProvider).selectedId, 'manual-7.1');
+  });
+
+  testWidgets('after the Open dialog is closed by double-clicking, the old card still takes a click (C1)', (
+    tester,
+  ) async {
+    addTearDown(guardStrayPresses(tester.binding.platformDispatcher));
+    await open(tester);
+    window.pickedFile = addedPath;
+    await tester.tap(find.text('Add FFmpeg…'));
+    await tester.pumpAndSettle();
+    expect(container(tester).read(ffmpegControllerProvider).selectedId, 'manual-8.1');
+
+    // The double-click's leftovers land on the old card: two presses, no release.
+    final old = tester.getCenter(find.descendant(of: card('FFmpeg 7.1.1'), matching: find.text('FFmpeg 7.1.1')));
+    final mouse = RawMouse(tester, old)
+      ..strayPress(old)
+      ..strayPress(old);
+    await tester.pumpAndSettle();
+
+    await mouse.click(old);
+    await tester.pumpAndSettle();
+    expect(container(tester).read(ffmpegControllerProvider).selectedId, 'manual-7.1');
   });
 
   testWidgets('a page rebuild keeps each card mounted', (tester) async {

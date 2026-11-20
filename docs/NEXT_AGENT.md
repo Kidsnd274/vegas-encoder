@@ -18,9 +18,16 @@ the worktree `../vegas-encoder-ffmpeg-fixes` on branch `fix/ffmpeg-page` (from
 `2543714`). The branch is not merged or pushed, and nothing is installed. See
 [status](STATUS.md#current-progress) for the checks and numbers.
 
-The section 6 desktop checks and the readiness-summary fix are recorded in
+The section 6 desktop checks, the readiness-summary fix and the lost-clicks fix
+(FIX_PLAN_0.2.1 C1: stray presses after the Open dialog) are recorded in
 [status](STATUS.md#current-progress). The owner decides whether to merge.
-`master` has moved on since the branch started.
+`master` has moved on since the branch started; the owner will merge it, so
+don't rebase.
+
+Open, waiting for the owner: one installation's `machine.json` record is about
+21.5 KB in the real app, over the plan's 20 KB. Either leave the default
+"Listed by this FFmpeg." reason out of the record (about 14 KB; a C7 change), or
+keep the format and raise the limit.
 
 The worktree stays until the owner removes it.
 
