@@ -31,12 +31,14 @@ Future<void> openFFmpeg(WidgetTester tester, {List<Override> overrides = const [
 }
 
 late List<FFmpegInstallation> _unhealthy;
+late List<FFmpegInstallation> _withAmfHevc;
 late FFmpegInstallation _portable;
 const _addedPath = r'E:\Tools\ffmpeg-8.1\bin\ffmpeg.exe';
 
 void main() {
   setUpAll(() async {
     _unhealthy = await unhealthyInstallations();
+    _withAmfHevc = [for (final i in await FakeFFmpegDiscovery().list()) i.id == 'gyan-8.1' ? withAmfHevcResult(i) : i];
     final manual = (await FakeFFmpegDiscovery().list()).singleWhere((i) => i.id == 'manual-7.1');
     _portable = FFmpegInstallation.fromJson({
       ...manual.toJson(),
@@ -55,6 +57,15 @@ void main() {
   final states = <String, ({List<Override> overrides, Future<void> Function(WidgetTester) act})>{
     // The default FFmpeg, its video encoders, x264's details.
     'default': (overrides: const [], act: (tester) async {}),
+    // A listed encoder outside the preset catalog, with a saved hardware result.
+    'amf_hevc': (
+      overrides: [ffmpegDiscoveryProvider.overrideWith((ref) => FakeFFmpegDiscovery(installations: _withAmfHevc))],
+      act: (tester) async {
+        await tester.tap(find.text('Hardware'));
+        await tester.pumpAndSettle();
+        await tapRow(tester, 'hevc_amf');
+      },
+    ),
     // A hardware encoder that failed its test: reason, test encode, FFmpeg's line.
     'failed': (overrides: const [], act: (tester) => tapRow(tester, 'hevc_qsv')),
     // The LGPL build, only problems: x264 and x265 missing, presets it can't render.

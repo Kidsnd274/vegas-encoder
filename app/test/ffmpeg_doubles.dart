@@ -95,6 +95,19 @@ class StalledHardwareTests implements HardwareTests {
   Future<void> cancel(String installationId) async => cancelled.add(installationId);
 }
 
+/// A completed background AMF HEVC check, as discovery returns it.
+FFmpegInstallation withAmfHevcResult(FFmpegInstallation installation) => installation.copyWith(
+  availability: {
+    ...installation.availability,
+    'hevc_amf': {
+      'state': 'ok',
+      'reason': 'One-frame test passed on this GPU/driver.',
+      'note': 'AMD Radeon(TM) 8060S Graphics',
+      'tenBit': true,
+    },
+  },
+);
+
 /// The fixture installations with discovery's health facts (C3 `health`): the
 /// default changed on disk, 7.1.1 missing, the LGPL build without ffprobe.
 Future<List<FFmpegInstallation>> unhealthyInstallations() async => [

@@ -399,8 +399,16 @@ class _Capabilities extends ConsumerWidget {
     final controller = ref.read(ffmpegControllerProvider.notifier);
     final video = state.kind == EncoderKind.video;
     final status = statusLookup(installation, state);
+    final amfHevc = amfHevcRow(installation, state);
     final filter = !video && state.filter == CapabilityFilter.hardware ? CapabilityFilter.all : state.filter;
-    final groups = capabilityGroups(catalog, kind: state.kind, statusOf: status, filter: filter, query: state.query);
+    final groups = capabilityGroups(
+      catalog,
+      kind: state.kind,
+      statusOf: status,
+      amfHevc: amfHevc,
+      filter: filter,
+      query: state.query,
+    );
     final rows = [for (final g in groups) ...g.rows];
     final encoderId =
         state.selectedEncoder ??
@@ -454,7 +462,7 @@ class _Capabilities extends ConsumerWidget {
                         onChanged: controller.setQuery,
                       ),
                       Text(
-                        problemSummary(catalog, installation.label, status, checking: checking),
+                        problemSummary(catalog, installation.label, status, checking: checking, amfHevc: amfHevc),
                         style: t.text.small.copyWith(color: c.muted),
                       ),
                     ],
@@ -490,7 +498,7 @@ class _Capabilities extends ConsumerWidget {
                   catalog,
                   encoderId,
                   installation: installation,
-                  status: status(encoderId),
+                  status: amfHevc != null && encoderId == amfHevc.id ? amfHevc.status : status(encoderId),
                   presets: presets,
                 ),
                 onTest: state.isTesting(installation.id, encoderId) || checking ? null : () => onTest(encoderId),

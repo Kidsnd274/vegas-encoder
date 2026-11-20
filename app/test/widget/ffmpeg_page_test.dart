@@ -88,7 +88,7 @@ void main() {
     expect(inCard('FFmpeg 7.1.1', 'Default'), findsNothing);
     expect(inCard('FFmpeg 8.1 full', 'Set as default'), findsNothing, reason: 'it already is');
     expect(find.textContaining('Can’t render 1 preset: needs x264'), findsOneWidget);
-    expect(find.text('FFmpeg 8.1 full: 2 video and 1 audio encoders not ready'), findsOneWidget);
+    expect(find.text('FFmpeg 8.1 full: 3 video and 1 audio encoders not ready'), findsOneWidget);
     expect(detailTitle('x264'), findsOneWidget);
   });
 
@@ -102,7 +102,13 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
+    expect(detailTitle('AMF HEVC'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
     expect(detailTitle('SVT-AV1'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(detailTitle('AMF HEVC'), findsOneWidget);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
     expect(detailTitle('Quick Sync HEVC'), findsOneWidget);
@@ -112,7 +118,7 @@ void main() {
     await open(tester);
     await tester.tap(find.text('FFmpeg 8.0 LGPL'));
     await tester.pumpAndSettle();
-    expect(find.text('FFmpeg 8.0 LGPL: 4 video and 1 audio encoders not ready'), findsOneWidget);
+    expect(find.text('FFmpeg 8.0 LGPL: 5 video and 1 audio encoders not ready'), findsOneWidget);
     await tester.tap(find.text('Only problems'));
     await tester.pumpAndSettle();
     expect(row('libx264'), findsOneWidget);
@@ -137,6 +143,123 @@ void main() {
     await tester.enterText(find.byType(TextField), 'zzz');
     await tester.pumpAndSettle();
     expect(find.text('No encoders match “zzz”.'), findsOneWidget);
+  });
+
+  testWidgets('AMF HEVC uses the background result after the probe lists it', (tester) async {
+    FFmpegInstallation withoutAmfHevc(FFmpegInstallation i) =>
+        i.copyWith(availability: {...i.availability}..remove('hevc_amf'));
+    final full = withoutAmfHevc((await tester.runAsync(() => fixture('gyan-8.1')))!);
+    final other = withoutAmfHevc((await tester.runAsync(() => fixture('manual-7.1')))!);
+    final discovery = FakeFFmpegDiscovery(installations: [full, other], scanResults: [withAmfHevcResult(full), other]);
+    final caps = FFmpegCapabilities(
+      installationId: full.id,
+      identityKey: full.identity.key,
+      version: full.version,
+      probedAt: full.probedAt!,
+      encoders: {
+        'hevc_amf': {
+          'kind': 'video',
+          'availability': {'state': 'unknown'},
+        },
+      },
+    );
+    final probe = FakeFFmpegProbe(
+      progress: {
+        full.id: [ProbeProgress(installationId: full.id, phase: 'done', completed: 1, total: 1, capabilities: caps)],
+      },
+    );
+    final hardware = StalledHardwareTests();
+    await open(
+      tester,
+      withDiscovery: discovery,
+      overrides: [
+        ffmpegProbeProvider.overrideWithValue(probe),
+        hardwareTestsProvider.overrideWithValue(hardware),
+        capabilityCacheProvider.overrideWithValue(
+          FakeCapabilityCache(capabilities: [caps.copyWith(encoders: const {})]),
+        ),
+      ],
+    );
+    expect(row('hevc_amf'), findsNothing);
+
+    await container(tester).read(ffmpegControllerProvider.notifier).probe(full);
+    await tester.pumpAndSettle();
+    expect(hardware.calls.single.encoders, ['hevc_amf']);
+    expect(row('hevc_amf'), findsOneWidget);
+    await tester.tap(row('hevc_amf'));
+    await tester.pumpAndSettle();
+    expect(detailTitle('AMF HEVC'), findsOneWidget);
+    expect(find.textContaining('hasn’t been tested on this PC yet'), findsOneWidget);
+
+    // Discovery publishes the new capability snapshot while the page is open.
+    await discovery.scan();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hardware'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'hevc_amf');
+    await tester.pumpAndSettle();
+    final table = tester.widget<CapabilityTable>(find.byType(CapabilityTable));
+    expect(table.groups.single.name, 'HEVC');
+    final amf = table.groups.single.rows.single;
+    expect((amf.id, amf.depth, amf.runsOn), ('hevc_amf', '8 or 10-bit', 'AMD Radeon(TM) 8060S Graphics'));
+    expect(find.textContaining('test encode passed on AMD Radeon(TM) 8060S Graphics'), findsOneWidget);
+    expect(find.text('10-bit works'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'AMF HEVC');
+    await tester.pumpAndSettle();
+    expect(row('hevc_amf'), findsOneWidget);
+    await tester.tap(find.text(other.label));
+    await tester.pumpAndSettle();
+    expect(row('hevc_amf'), findsNothing);
+  });
+
+  testWidgets('the FFmpeg page displays a saved AMF HEVC result on a fresh launch', (tester) async {
+    final full = (await tester.runAsync(() => fixture('gyan-8.1')))!;
+    const gpu = 'AMD Radeon(TM) 8060S Graphics';
+    const nvencFailure = 'Cannot load nvcuda.dll.';
+    final installation = withAmfHevcResult(
+      full.copyWith(
+        availability: {
+          ...full.availability,
+          'h264_amf': {'state': 'ok', 'note': gpu, 'tenBit': false},
+          'h264_nvenc': {'state': 'failed', 'reason': nvencFailure},
+        },
+      ),
+    );
+    final cached = FFmpegCapabilities(
+      installationId: full.id,
+      identityKey: full.identity.key,
+      version: full.version,
+      probedAt: full.probedAt!,
+    );
+    final probe = StalledProbe();
+    final hardware = StalledHardwareTests();
+    await open(
+      tester,
+      withDiscovery: FakeFFmpegDiscovery(installations: [installation]),
+      overrides: [
+        ffmpegProbeProvider.overrideWithValue(probe),
+        hardwareTestsProvider.overrideWithValue(hardware),
+        capabilityCacheProvider.overrideWithValue(FakeCapabilityCache(capabilities: [cached])),
+      ],
+    );
+    await tester.tap(find.text('Hardware'));
+    await tester.pumpAndSettle();
+    final table = tester.widget<CapabilityTable>(find.byType(CapabilityTable));
+    final rows = {
+      for (final group in table.groups)
+        for (final row in group.rows) row.id: row,
+    };
+    expect((rows['hevc_amf']?.depth, rows['hevc_amf']?.runsOn), ('8 or 10-bit', gpu));
+    expect((rows['h264_amf']?.depth, rows['h264_amf']?.runsOn), ('8-bit', gpu));
+    expect((rows['h264_nvenc']?.why, rows['h264_nvenc']?.runsOn), (nvencFailure, 'NVIDIA GPU'));
+    await tester.tap(row('hevc_amf'));
+    await tester.pumpAndSettle();
+    expect(detailTitle('AMF HEVC'), findsOneWidget);
+    expect(find.text('10-bit works'), findsOneWidget);
+    expect(find.textContaining('test encode passed on $gpu'), findsOneWidget);
+    expect(probe.started, isEmpty);
+    expect(hardware.calls, isEmpty);
   });
 
   testWidgets('Set as default saves machine settings; the Default mark moves', (tester) async {
@@ -164,7 +287,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(InstallationCard), findsNWidgets(4));
     expect(find.text('Added FFmpeg 8.1 portable'), findsOneWidget);
-    expect(find.text('FFmpeg 8.1 portable: 2 video and 1 audio encoders not ready'), findsOneWidget);
+    expect(find.text('FFmpeg 8.1 portable: 3 video and 1 audio encoders not ready'), findsOneWidget);
     final saved = await tester.runAsync(machine.read);
     expect(saved!.revision, 0, reason: 'discovery records the installation in C7 itself (B3)');
   });

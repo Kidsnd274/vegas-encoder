@@ -337,8 +337,12 @@ InstallationCardModel installationCard(
   );
 }
 
+// AMF HEVC is tested in the background and is available in the FFmpeg
+// inspector without being a curated preset encoder.
+const _amfHevc = (id: 'hevc_amf', label: 'AMF HEVC', codec: 'HEVC', vendor: 'AMD');
+
 String encoderLabel(ProfileCatalog catalog, String id) =>
-    catalog.videoEncoder(id)?.label ?? catalog.audioEncoder(id)?.label ?? id;
+    catalog.videoEncoder(id)?.label ?? catalog.audioEncoder(id)?.label ?? (id == _amfHevc.id ? _amfHevc.label : id);
 
 // ------------------------------------------------------------ capability list
 
@@ -348,22 +352,25 @@ class CapabilityRow {
   const CapabilityRow({
     required this.id,
     required this.label,
+    required this.codec,
     required this.depth,
-    required this.runsOn,
+    required this.vendor,
     required this.status,
-    required this.hardware,
   });
 
   final String id;
   final String label;
+  final String codec;
 
   /// "8 or 10-bit", "10-bit", "8-bit"; empty for audio.
   final String depth;
+  final String? vendor;
+  final EncoderStatus status;
+  bool get hardware => vendor != null;
 
   /// "CPU", "NVIDIA GPU", or the device a passed test ran on.
-  final String runsOn;
-  final EncoderStatus status;
-  final bool hardware;
+  String get runsOn =>
+      vendor == null ? 'CPU' : (status.state == VeAvailability.ready ? status.note : null) ?? '$vendor GPU';
 
   /// The reason column: what's running, or why it isn't ready.
   String get why => switch (status.state) {
@@ -374,15 +381,49 @@ class CapabilityRow {
   };
 }
 
+/// AMF HEVC is shown only when the selected build lists it.
+CapabilityRow? amfHevcRow(FFmpegInstallation installation, FFmpegState state) {
+  final id = installation.id;
+  final lastProbe = state.probed[id];
+  final probe = lastProbe?.identityKey == installation.identity.key ? lastProbe : null;
+  final recorded = installation.availability[_amfHevc.id];
+  if (!(probe?.encoders.containsKey(_amfHevc.id) ?? (recorded != null))) return null;
+
+  // Once the probe ends, discovery can have a newer background result than
+  // the probe snapshot. It also accounts for an expired GPU/driver result.
+  final test = state.testResults[id]?[_amfHevc.id];
+  final status = encoderStatus(
+    installation,
+    _amfHevc.id,
+    probed: state.probes.containsKey(id) || recorded == null ? probe : null,
+    test: test?.identityKey == installation.identity.key ? test : null,
+    testing: state.isTesting(id, _amfHevc.id),
+  );
+  if (status.state == VeAvailability.missing) return null;
+  return CapabilityRow(
+    id: _amfHevc.id,
+    label: _amfHevc.label,
+    codec: _amfHevc.codec,
+    depth: switch (status.tenBit) {
+      true when status.state == VeAvailability.ready => '8 or 10-bit',
+      false when status.state == VeAvailability.ready => '8-bit',
+      _ => '—',
+    },
+    vendor: _amfHevc.vendor,
+    status: status,
+  );
+}
+
 /// Rows under a codec heading ("H.264", "AAC audio").
 typedef CapabilityGroup = ({String name, List<CapabilityRow> rows});
 
-/// The encoders of [kind] the catalog knows, grouped by codec in catalog
-/// order, after the filter and search.
+/// Encoders of [kind], grouped by codec in catalog order after the filter
+/// and search. [amfHevc] comes from the selected installation.
 List<CapabilityGroup> capabilityGroups(
   ProfileCatalog catalog, {
   required EncoderKind kind,
   required EncoderStatus Function(String encoder) statusOf,
+  CapabilityRow? amfHevc,
   CapabilityFilter filter = CapabilityFilter.all,
   String query = '',
 }) {
@@ -391,8 +432,8 @@ List<CapabilityGroup> capabilityGroups(
   final words = query.trim().toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   return [
     for (final g in (order['groups'] as List? ?? const []).cast<Map>())
-      if (_groupRows(g, catalog, video: video, statusOf: statusOf, filter: filter, words: words) case final rows
-          when rows.isNotEmpty)
+      if (_groupRows(g, catalog, video: video, statusOf: statusOf, amfHevc: amfHevc, filter: filter, words: words)
+          case final rows when rows.isNotEmpty)
         (name: video ? g['group'] as String : '${g['group']} audio', rows: rows),
   ];
 }
@@ -402,40 +443,45 @@ List<CapabilityRow> _groupRows(
   ProfileCatalog catalog, {
   required bool video,
   required EncoderStatus Function(String) statusOf,
+  required CapabilityRow? amfHevc,
   required CapabilityFilter filter,
   required List<String> words,
-}) => [
-  for (final id in (g['ids'] as List).cast<String>())
-    if ((video ? catalog.videoEncoder(id) : catalog.audioEncoder(id)) case final p?)
-      if (_row(p, statusOf(id), video: video) case final row
-          when switch (filter) {
-                CapabilityFilter.all => true,
-                CapabilityFilter.problems => row.status.state.isProblem,
-                CapabilityFilter.hardware => row.hardware,
-              } &&
-              words.every(
-                [p.label, p.id, p.codec, g['group'], p.hw ?? 'cpu', row.runsOn].join(' ').toLowerCase().contains,
-              ))
+}) {
+  final group = g['group'] as String;
+  final ids = (g['ids'] as List).cast<String>();
+  final rows = [
+    for (final id in ids)
+      if ((video ? catalog.videoEncoder(id) : catalog.audioEncoder(id)) case final p?)
+        _row(p, statusOf(id), video: video),
+    if (video && group == _amfHevc.codec && amfHevc != null && !ids.contains(amfHevc.id)) amfHevc,
+  ];
+  return [
+    for (final row in rows)
+      if (switch (filter) {
+            CapabilityFilter.all => true,
+            CapabilityFilter.problems => row.status.state.isProblem,
+            CapabilityFilter.hardware => row.hardware,
+          } &&
+          words.every(
+            [row.label, row.id, row.codec, group, row.vendor ?? 'cpu', row.runsOn].join(' ').toLowerCase().contains,
+          ))
         row,
-];
+  ];
+}
 
 CapabilityRow _row(EncoderProfile p, EncoderStatus status, {required bool video}) {
   final depths = video ? (p.depths.keys.map(int.tryParse).whereType<int>().toSet()) : const <int>{};
   return CapabilityRow(
     id: p.id,
     label: p.label,
+    codec: p.codec,
     depth: !video
         ? ''
         : depths.contains(10)
         ? (depths.contains(8) ? '8 or 10-bit' : '10-bit')
         : '8-bit',
-    runsOn: p.hw == null
-        ? 'CPU'
-        : status.state == VeAvailability.ready && status.note != null
-        ? status.note!
-        : '${p.hw} GPU',
+    vendor: p.hw,
     status: status,
-    hardware: p.hw != null,
   );
 }
 
@@ -445,10 +491,14 @@ String problemSummary(
   String installationLabel,
   EncoderStatus Function(String encoder) statusOf, {
   bool checking = false,
+  CapabilityRow? amfHevc,
 }) {
   if (checking) return '$installationLabel: checking encoders…';
 
-  final video = catalog.video.map((p) => statusOf(p.id).state).toList();
+  final video = [
+    for (final p in catalog.video) statusOf(p.id).state,
+    if (amfHevc != null && catalog.videoEncoder(amfHevc.id) == null) amfHevc.status.state,
+  ];
   final audio = catalog.audio.map((p) => statusOf(p.id).state).toList();
   bool has(VeAvailability state) => video.contains(state) || audio.contains(state);
   if (has(VeAvailability.testing)) return '$installationLabel: checking encoders…';
@@ -516,9 +566,9 @@ EncoderDetailModel encoderDetail(
   required List<Preset> presets,
 }) {
   final profile = catalog.videoEncoder(id) ?? catalog.audioEncoder(id);
-  final video = catalog.videoEncoder(id) != null;
-  final hw = profile?.hw;
-  final label = profile?.label ?? id;
+  final video = catalog.videoEncoder(id) != null || id == _amfHevc.id;
+  final hw = profile?.hw ?? (id == _amfHevc.id ? _amfHevc.vendor : null);
+  final label = encoderLabel(catalog, id);
   final inst = installation.label;
   final (meaning, advice) = switch (status.state) {
     VeAvailability.ready => (

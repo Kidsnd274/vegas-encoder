@@ -7,6 +7,18 @@ the owner is managing shared-app/2026 reinstallation.
 
 ## Current progress
 
+**AMF HEVC on the FFmpeg page (2026-11-21, 0.2.3+3).** The page lists
+AMF HEVC when the selected build exposes it and shows the background hardware
+result. An isolated Windows x64 desktop run of 0.2.3+2 from the worktree based on
+`54acf19` passed check 7 with real FFmpeg N-128435 static, GYAN 9.0.2 Essentials
+and BtbN n8.1.3 shared on an AMD Radeon 8060S. The row became Ready, reported
+8 or 10-bit and showed the full Radeon device name and 10-bit result in its
+detail pane. All three results were visible after restart. AMF H.264 showed
+8-bit and NVENC showed NVIDIA GPU and the missing-driver reason. The BtbN
+per-row re-test also passed. Flutter analysis was clean and all 760 app tests
+passed, including the FFmpeg widget regressions and reviewed light and dark
+goldens using fakes. The desktop run used the standalone executable.
+
 **Settings > About shows the running app version (2026-11-21).** The App row
 uses the Windows runner's full version and build number. About also shows the
 Windows x64 target, executable path, core ABI and separate data folders for

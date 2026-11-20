@@ -565,7 +565,9 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
   only), a search over name, FFmpeg name, codec, group and device (Ctrl+F), and a
   summary ("FFmpeg 8.0 LGPL: 4 video and 1 audio encoders not ready"). It says
   "checking encoders…" while a check runs and reports readiness only after every
-  catalog encoder is confirmed ready. Columns: codec,
+  listed row is confirmed ready. If the selected FFmpeg lists AMF HEVC
+  (`hevc_amf`), the HEVC group includes it in All and Hardware. Its background
+  test supplies the GPU and tested bit depth. Columns: codec,
   encoder, FFmpeg name, bit depth, runs on (the GPU a passed test ran on, by name, from
   C3 `note`; otherwise "NVIDIA GPU" and so on; results saved by earlier builds name no
   device), state,
