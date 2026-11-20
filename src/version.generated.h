@@ -1,11 +1,11 @@
 // Generated from version.json by scripts/etc/Generate-Versions.py. Do not edit.
 #pragma once
-#define VE_RELEASE_VERSION "0.2.2"
-#define VE_APP_VERSION "0.2.2+1"
-#define VE_APP_FILE_VERSION_STRING "0.2.2.1"
-#define VE_EXPORTER_VERSION "0.2.2"
+#define VE_RELEASE_VERSION "0.2.3"
+#define VE_APP_VERSION "0.2.3+1"
+#define VE_APP_FILE_VERSION_STRING "0.2.3.1"
+#define VE_EXPORTER_VERSION "0.2.3"
 #define VE_CORE_VERSION "0.3.1"
-#define VE_APP_FILE_VERSION 0,2,2,1
+#define VE_APP_FILE_VERSION 0,2,3,1
 #define VE_FFMPEG_PARSER_VERSION 5u
 #define VE_CORE_ABI_VERSION 1u
 #define VE_CORE_SCHEMA_MAX 2u

@@ -3,16 +3,47 @@ import 'dart:async';
 import 'package:ve_services/ve_services.dart';
 
 /// A probe that reports one step and then waits, so a test can see the
-/// FFmpeg screen mid-check. [finish] completes every probe started.
+/// FFmpeg screen mid-check. [finish] completes every probe started. With
+/// [atHardware], the step is the hardware phase's first event: the encoder
+/// list (the fixture's, hardware rows not tested yet) is already in (F7).
 class StalledProbe implements FFmpegProbe {
+  StalledProbe({this.atHardware = false});
+  final bool atHardware;
   final FakeFFmpegProbe _fake = FakeFFmpegProbe();
   final List<StreamController<ProbeProgress>> _open = [];
   final List<String> cancelled = [];
 
+  /// The installation of each probe started, in order.
+  final List<String> started = [];
+
   @override
   Stream<ProbeProgress> probe(FFmpegInstallation installation) {
+    started.add(installation.id);
     final controller = StreamController<ProbeProgress>();
     _open.add(controller);
+    if (atHardware) {
+      () async {
+        final listed = (await _fake.probe(installation).last).capabilities!;
+        final hardware = {for (final p in FakeVeCore().profiles().video) if (p.hw != null) p.id};
+        final encoders = {
+          for (final MapEntry(:key, :value) in listed.encoders.entries)
+            key: hardware.contains(key)
+                ? {...value as Map, 'availability': {'state': 'unknown', 'reason': 'Listed; awaiting a test on this PC.'}}
+                : value,
+        };
+        if (controller.isClosed) return;
+        controller.add(
+          ProbeProgress(
+            installationId: installation.id,
+            phase: 'hardware',
+            total: hardware.where(encoders.containsKey).length,
+            message: 'Testing listed hardware encoders on this PC.',
+            capabilities: listed.copyWith(encoders: encoders),
+          ),
+        );
+      }();
+      return controller.stream;
+    }
     controller.add(
       ProbeProgress(
         installationId: installation.id,
@@ -46,9 +77,19 @@ class StalledProbe implements FFmpegProbe {
 class StalledHardwareTests implements HardwareTests {
   final List<String> cancelled = [];
 
+  /// What each test asked for, in order.
+  final List<({String installationId, List<String>? encoders, bool reuseIdentity})> calls = [];
+
   @override
-  Stream<HardwareTestResult> test(FFmpegInstallation installation, {List<String>? encoders, bool force = false}) =>
-      StreamController<HardwareTestResult>().stream;
+  Stream<HardwareTestResult> test(
+    FFmpegInstallation installation, {
+    List<String>? encoders,
+    bool force = false,
+    bool reuseIdentity = false,
+  }) {
+    calls.add((installationId: installation.id, encoders: encoders, reuseIdentity: reuseIdentity));
+    return StreamController<HardwareTestResult>().stream;
+  }
 
   @override
   Future<void> cancel(String installationId) async => cancelled.add(installationId);

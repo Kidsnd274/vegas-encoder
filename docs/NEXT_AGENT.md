@@ -11,6 +11,25 @@ No separate worktree or permanent ownership split was introduced. Read [AGENTS.m
 [status](STATUS.md) and relevant contracts/specs. Former workstream handoffs are
 history; their old locations, ownership splits and queues do not apply.
 
+## FFmpeg page fixes: done on `fix/ffmpeg-page`, awaiting the owner
+
+[FIX_PLAN_FFMPEG.md](FIX_PLAN_FFMPEG.md) F1 to F9 are implemented, one commit each, in
+the worktree `../vegas-encoder-ffmpeg-fixes` on branch `fix/ffmpeg-page` (from
+`2543714`). The branch is not merged or pushed, and nothing is installed. See
+[status](STATUS.md#current-progress) for the checks and numbers.
+
+The section 6 desktop checks, the readiness-summary fix and the lost-clicks fix
+(FIX_PLAN_0.2.1 C1: stray presses after the Open dialog) are recorded in
+[status](STATUS.md#current-progress). The owner decides whether to merge.
+`master` has moved on since the branch started; the owner will merge it, so
+don't rebase.
+
+Nothing on the branch is left to do. The owner accepted the real app's larger
+`machine.json` record (about 21.5 KB per installation, over the plan's 20 KB), so
+the record format stays. Next: the owner merges, then the queue below.
+
+The worktree stays until the owner removes it.
+
 ## Merged: FFmpeg parser compatibility and 0.2.1
 
 The FFmpeg-version parsing work (branch `ffmpeg-parser-compat`) and the 0.2.1

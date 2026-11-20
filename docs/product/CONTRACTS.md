@@ -571,10 +571,10 @@ the app explicitly injects them and keeps fakes in UI tests.
 
 | API | Operations | Fake |
 | --- | --- | --- |
-| FFmpegDiscovery | list/watch/scan/add(executablePath)/remove(id) | FakeFFmpegDiscovery |
+| FFmpegDiscovery | list/watch/scan/quickCheck(executablePath)/add(executablePath)/remove(id); scanProblems -> ScanProblem[] | FakeFFmpegDiscovery |
 | FFmpegProbe | probe(installation) -> Stream<ProbeProgress>; encoderDetails; cancel(id) | FakeFFmpegProbe |
 | FFmpegHelpParser | version; parseEncoderHelp/parseEncoders/parseMuxers(text) | FakeFFmpegHelpParser |
-| HardwareTests | test(installation,{encoders?,force}) -> Stream<HardwareTestResult>; cancel(id) | FakeHardwareTests |
+| HardwareTests | test(installation,{encoders?,force,reuseIdentity}) -> Stream<HardwareTestResult>; cancel(id) | FakeHardwareTests |
 | PresetTests | test(recipe,installation) -> Stream<PresetTestProgress>; cancel(testId) | FakePresetTests |
 | CapabilityCache | read(identityKey)/write(capabilities)/invalidate(identityKey) | FakeCapabilityCache |
 | PresetLibrary | list/watch/get(id,{revision?})/save({expectedRevision?})/delete(id,{expectedRevision})/importPreset(jsonText,{newId})/exportPreset(id) | FakePresetLibrary |
@@ -590,6 +590,8 @@ FFmpegInstallation {id,label,path,ffprobePath,source,version,build,license:strin
   counts:{video,audio,muxers:int},availability:{encoder:EncoderAvailability},isFixture:bool,
   health:"unknown"|"unchanged"|"changed"|"missing"|"ffprobe-missing",healthMessage:string}
 EncoderAvailability {state:"ok"|"missing"|"failed"|"unknown",reason,detail,note:string}
+  note: the device (DXGI adapter name) a passing hardware test ran on, empty otherwise
+ScanProblem {path,code,message:string}
 EncoderDetails {name:string,kind:"video"|"audio",pixelFormats,sampleFormats:string[],
   sampleRates:int[],options:EncoderOption[]}
 EncoderOption {name:string,aliases:string[],type,description:string,min,max,defaultValue:string|null,
@@ -601,7 +603,12 @@ FFmpegCapabilities {installationId,identityKey:string,parser:int,version:string,
   encoders:map as CoreCapabilities,muxers:map as CoreCapabilities,
   hardware:{encoder:EncoderAvailability},gpuFingerprint:string,probedAt:UTC}
 ProbeProgress {installationId:string,phase:"identity"|"lists"|"details"|"hardware"|"done"|"failed"|"cancelled",
-  completed,total:int,message:string,capabilities:FFmpegCapabilities|null}
+  completed,total:int,message:string,capabilities:FFmpegCapabilities|null,
+  hardwareResult?:HardwareTestResult}
+  capabilities: on the first "hardware" event (the lists just cached, hardware rows
+  "unknown"; total = the encoders the check will test) and on "done".
+  hardwareResult: one "hardware" event per tested encoder. "failed" carries the
+  service's message, not the exception's text.
 HardwareTestResult {encoder:string,state:"ok"|"missing"|"failed"|"unknown",tenBit:bool,
   failureClass:"runtime-missing"|"no-device"|"unsupported-format"|"timeout"|"unknown"|null,
   reason,stderr:string,testedAt:UTC,identityKey,gpuFingerprint:string}
@@ -627,8 +634,9 @@ LGPL shared (BtbN); identities/GPU results are deliberately synthetic and
 isFixture=true. They **do not describe this PC** or replace its gyan 5.1.2 PATH build.
 Probe details are the read-only prototype's captured option data, not B1 facts.
 
-Fakes accept replacement seed values/results. Discovery.add requires an injected
-path fixture; parser outputs are injected by exact text. Probe/hardware cancellation
+Fakes accept replacement seed values/results. Discovery.add and quickCheck require an injected
+path fixture (`addGate` holds add, `addFailure` fails it, `scanProblems` is settable);
+parser outputs are injected by exact text. Probe/hardware cancellation
 stops subsequent emitted events. Cache is keyed by identityKey. Watchable fakes have
 dispose(); cancel subscriptions before disposal. No timers or files are created.
 
@@ -830,7 +838,8 @@ paths/shims and Chocolatey package executables. Package walking is bounded to
 are never executed. Paths/symlinks are canonicalized and deduplicated; Windows
 environment names are case-insensitive. The default INI is beside the app;
 WindowsFFmpegCandidateFinder accepts explicit iniPaths/environment for other roots.
-Candidate failures are exposed through discovery.scanProblems. Nothing downloads
+Candidate failures are exposed through `FFmpegDiscovery.scanProblems` (path, code,
+message; a PATH entry with no ffmpeg.exe is none). Nothing downloads
 FFmpeg, edits PATH or chooses a default automatically.
 
 Identification requires Windows x64 PE executables, FFprobe beside FFmpeg,
@@ -839,8 +848,19 @@ matching full version/configuration/loaded-library facts, and FFmpeg 4.4 or newe
 command uses); older builds fail with `FFMPEG-UNSUPPORTED`. SHA-256 covers FFmpeg and
 sorted sibling av*/sw*/postproc* DLLs plus parser version; extensions retain their
 file stats and FFprobe hash/stats. Reads/list/watch use stats for health without
-executing FFmpeg or hashing entire binaries. Explicit probe/test operations rehash
-and refuse changed/incomplete installations. Installation IDs are stable per
+executing FFmpeg or hashing entire binaries. Identification hashes FFmpeg (and its
+DLLs) and FFprobe once each, concurrently; FFprobe is re-read after `-show_versions`
+only if its size or modified time changed. **D1 (2026-11-19):** the check that
+follows Add or a scan reuses that fingerprint (one shot per add or scan) when the
+files' stats still match it, and confirms it at the end by stats (`statsUnchanged`),
+rehashing only if they changed; `HardwareTests.test(reuseIdentity: true)` does the
+same, for the background tests that follow a check. Checks and tests the user
+starts later (Scan again, Test hardware encoders, Test again, Locate…) rehash and
+refuse changed/incomplete installations. The exporter verifies the hash before
+every render. `quickCheck` (Add's quick version check) resolves Scoop shims,
+requires x64 PE, FFprobe beside it and FFmpeg 4.4+, runs only `-version`, writes
+and hashes nothing, and returns a display-only installation (empty identity,
+health `unknown`) with the id `add` gives it. Installation IDs are stable per
 canonical path; capability identities change with bytes, libraries or parser.
 
 Probe streams identity, lists, curated details, hardware and a terminal phase.
@@ -862,13 +882,30 @@ Probe/hardware cancel uses installation ID; preset-test cancel uses testId.
 Await cancel/subscription cancellation before disposal. Failure/cancellation never
 emits probe done; a completed catalog or previous qualified result can remain cached.
 
+**D2 (2026-11-19):** the check test-encodes only the catalog's hardware encoders that
+FFmpeg lists; the app tests the other listed ones afterwards in the background, one at
+a time (cancelled by a check, a test or Remove on that installation, and by closing the
+app; never restarted by itself). Linux/macOS-only APIs (`vaapi`, `videotoolbox`,
+`v4l2m2m`, `mediacodec`, `rkmpp`, `omx`) are recorded `failed` ("Needs Linux or macOS;
+not available on Windows.") without running anything, and `qualify`'s default list
+excludes them.
+
 Hardware tests qualify listed **video** wrappers with one 320x192 frame, forced
 pixel format, and a second 10-bit input test when advertised. Media Foundation
 uses -hw_encoding 1 to prevent software fallback. Vulkan/D3D12-only surfaces use
 explicit device initialization and hwupload. A failed 10-bit test does not discard
 an 8-bit success; tenBit requires its own success. Results retain bounded stderr,
-failure class, binary identity, DXGI adapter/driver fingerprint and testedAt, and
-persist in cache/C7. Reuse requires exact identity/fingerprint and age <30 days;
+failure class, binary identity, DXGI adapter/driver fingerprint and testedAt in the
+capability cache. **D4 (2026-11-19):** the C7 installation record keeps, per
+encoder, only `state`, `reason` (at most 300 characters), a non-empty `note` and
+`extensions.{testedAt,tenBit}`; discovery's register, refresh and record updates slim
+every installation they write, so older large records shrink on the next write. The
+FFmpeg page still shows FFmpeg's stderr line, from the cache (`list()` overlays the
+cache's availability for unchanged installations). The exporter reads only `path`,
+`ffprobePath`, `identity` and `extensions` from the record. **D3:** a passing test's
+`note` is the adapter it ran on, from the GPU snapshot by vendor (NVENC 0x10DE, QSV
+0x8086, AMF 0x1002); Media Foundation, D3D12 and Vulkan name it only when there is
+one adapter (Microsoft's Basic Render Driver, vendor 0x1414, is never counted). Reuse requires exact identity/fingerprint and age <30 days;
 force bypasses reuse. Unknown driver identity is not reusable. GPU changes/expiry
 make availability unknown on reads without launching a test. These are smoke
 results for the tested default device/command, not HDR, resolution/performance or

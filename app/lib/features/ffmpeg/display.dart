@@ -17,7 +17,7 @@ import '../presets/library_model.dart';
 /// An encoder's state in one installation.
 @immutable
 class EncoderStatus {
-  const EncoderStatus(this.state, {this.reason, this.detail, this.note, this.test});
+  const EncoderStatus(this.state, {this.reason, this.detail, this.note, this.tenBit, this.test});
 
   final VeAvailability state;
 
@@ -30,11 +30,32 @@ class EncoderStatus {
   /// The device a hardware encoder ran on ("NVIDIA GeForce RTX 4070").
   final String? note;
 
+  /// Whether the recorded test's 10-bit encode passed; null if unknown.
+  final bool? tenBit;
+
   /// This session's test result, when there is one.
   final HardwareTestResult? test;
 }
 
 String? _text(Object? value) => value is String && value.isNotEmpty ? value : null;
+
+/// The device a recorded availability names (C3 `note`). Results saved by
+/// earlier builds put a sentence there instead (the reason, or a 10-bit
+/// sentence): those name no device.
+String? _device(Object? raw) {
+  if (raw is! Map) return null;
+  final note = _text(raw['note']);
+  if (note == null || note == raw['reason'] || note == '10-bit test passed.' || note == '10-bit has not passed.') {
+    return null;
+  }
+  return note;
+}
+
+/// The recorded 10-bit result: the record's `extensions.tenBit`, or the cache's `tenBit`.
+bool? _tenBit(Map raw) => switch (raw['extensions']) {
+  {'tenBit': final bool b} => b,
+  _ => raw['tenBit'] is bool ? raw['tenBit'] as bool : null,
+};
 
 /// The newest fact wins: a test running now, then this session's test result,
 /// then this session's probe, then the installation's recorded availability.
@@ -53,9 +74,8 @@ EncoderStatus encoderStatus(
       _state(test.state),
       reason: _text(test.reason),
       detail: _text(test.stderr),
-      note: _text(
-        installation.availability[encoder] is Map ? (installation.availability[encoder] as Map)['note'] : null,
-      ),
+      note: test.state == 'ok' ? _device(installation.availability[encoder]) : null,
+      tenBit: test.tenBit,
       test: test,
     );
   }
@@ -66,7 +86,8 @@ EncoderStatus encoderStatus(
       _state(raw['state']),
       reason: _text(raw['reason']),
       detail: _text(raw['detail']),
-      note: _text(raw['note']),
+      note: _device(raw),
+      tenBit: _tenBit(raw),
     );
   }
   if (probed == null && installation.probedAt == null) return const EncoderStatus(VeAvailability.unknown);
@@ -122,6 +143,7 @@ String probePhaseLabel(String phase) => switch (phase) {
   'done' => 'Finishing',
   'failed' => 'The check failed',
   'cancelled' => 'The check was cancelled',
+  'adding' => 'Checking the files',
   _ => 'Checking',
 };
 
@@ -206,11 +228,16 @@ class InstallationCardModel {
     this.blocked = const [],
     this.blockedNeeds = const [],
     this.health,
+    this.pending = false,
   });
 
   final String id;
   final String title;
   final bool isDefault;
+
+  /// Being added: its quick version check passed and discovery is still
+  /// identifying the files. Only Copy path is offered.
+  final bool pending;
 
   /// "gyan.dev full build, GPL v3. Installed with winget."
   final String line;
@@ -245,8 +272,11 @@ InstallationCardModel installationCard(
   required FFmpegState state,
   required List<Preset> presets,
   required ProfileCatalog catalog,
+  bool pending = false,
 }) {
-  final progress = state.probes[installation.id];
+  final progress = pending
+      ? ProbeProgress(installationId: installation.id, phase: 'adding')
+      : state.probes[installation.id];
   final probed = state.probed[installation.id];
   final status = statusLookup(installation, state);
   final blocked = <String>[];
@@ -260,7 +290,17 @@ InstallationCardModel installationCard(
     blocked.add(p.recipe.name);
     needs.addAll(missing.map((id) => encoderLabel(catalog, id)));
   }
-  final counts = installation.counts;
+  // This session's check counts as soon as its list arrives; the record's
+  // counts are written when the check ends (F7).
+  final counts = probed == null
+      ? installation.counts
+      : {
+          'video': probed.encoders.values.where((e) => e is Map && e['kind'] == 'video').length,
+          'audio': probed.encoders.values.where((e) => e is Map && e['kind'] == 'audio').length,
+          'muxers': {
+            for (final MapEntry(:key, :value) in probed.muxers.entries) (value is Map ? value['canonical'] : null) ?? key,
+          }.length,
+        };
   final video = counts['video'], audio = counts['audio'], muxers = counts['muxers'];
   final probedAt = probed?.probedAt ?? installation.probedAt;
   final when = probedAt == null ? null : DateTime.tryParse(probedAt);
@@ -292,7 +332,8 @@ InstallationCardModel installationCard(
     failure: state.probeFailures[installation.id],
     blocked: blocked,
     blockedNeeds: needs.toList(),
-    health: installationHealth(installation, isDefault: isDefault),
+    health: pending ? null : installationHealth(installation, isDefault: isDefault),
+    pending: pending,
   );
 }
 
@@ -398,15 +439,26 @@ CapabilityRow _row(EncoderProfile p, EncoderStatus status, {required bool video}
   );
 }
 
-/// "FFmpeg 8.1 full: 4 video and 1 audio encoders not ready".
+/// The status of the selected installation's encoders, across both lists.
 String problemSummary(
   ProfileCatalog catalog,
   String installationLabel,
-  EncoderStatus Function(String encoder) statusOf,
-) {
-  int count(List<EncoderProfile> list) => list.where((p) => statusOf(p.id).state.isProblem).length;
-  final v = count(catalog.video), a = count(catalog.audio);
-  if (v == 0 && a == 0) return '$installationLabel: every encoder is ready';
+  EncoderStatus Function(String encoder) statusOf, {
+  bool checking = false,
+}) {
+  if (checking) return '$installationLabel: checking encoders…';
+
+  final video = catalog.video.map((p) => statusOf(p.id).state).toList();
+  final audio = catalog.audio.map((p) => statusOf(p.id).state).toList();
+  bool has(VeAvailability state) => video.contains(state) || audio.contains(state);
+  if (has(VeAvailability.testing)) return '$installationLabel: checking encoders…';
+
+  int countProblems(List<VeAvailability> states) => states.where((state) => state.isProblem).length;
+  final v = countProblems(video), a = countProblems(audio);
+  if (v == 0 && a == 0) {
+    if (has(VeAvailability.unknown)) return '$installationLabel: encoder checks incomplete';
+    return '$installationLabel: every encoder is ready';
+  }
   return '$installationLabel: $v video and $a audio ${a == 1 && v <= 1 ? 'encoder' : 'encoders'} not ready';
 }
 
@@ -501,7 +553,8 @@ EncoderDetailModel encoderDetail(
     advice: advice,
     testFacts: [
       ?failureClassLabel(test?.failureClass),
-      if (test != null && test.state == 'ok' && video) test.tenBit ? '10-bit works' : '8-bit only on this PC',
+      if (status.state == VeAvailability.ready && video && hw != null && status.tenBit != null)
+        status.tenBit! ? '10-bit works' : '8-bit only on this PC',
       if (tested != null) 'Tested ${VeFormat.date(tested)}',
     ],
     usedBy: [

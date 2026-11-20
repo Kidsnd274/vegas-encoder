@@ -6,6 +6,7 @@ import 'package:ve_services/ve_services.dart' show MachineSettingsRepository;
 
 import 'app/app.dart';
 import 'app/launch.dart';
+import 'platform/pointer_guard.dart';
 import 'platform/window_channel.dart';
 import 'state/app_state.dart';
 import 'state/monitor.dart';
@@ -16,6 +17,7 @@ import 'state/services.dart';
 /// Mode dispatch: desktop, `--edit-session <dir>` or `--render-monitor <file>`.
 Future<void> main(List<String> args) async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
+  guardStrayPresses(binding.platformDispatcher);
   final mode = LaunchMode.fromArguments(args);
   final window = MethodChannelWindowController();
   unawaited(window.trace('dart_main'));

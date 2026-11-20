@@ -130,6 +130,103 @@ VEGAS window and a second process as the other app. The check failed on the
 previous Release build and passes on the rebuilt one (single 96 dpi monitor, so
 the other-monitor case was skipped). Not yet tried in real VEGAS.
 
+**FFmpeg page fixes (branch `fix/ffmpeg-page`, worktree `../vegas-encoder-ffmpeg-fixes`,
+2026-11-19; not merged, not installed).** Every item of
+[FIX_PLAN_FFMPEG.md](FIX_PLAN_FFMPEG.md) (F1 to F9) is implemented and committed one
+item at a time, following owner decisions D1 to D4. No native or exporter code changed
+and `ffmpegParserVersion` stays 5.
+- F1: cards keep their state across page rebuilds, so clicks are no longer lost.
+- F2: one check per installation. Presets and the editor wait for the running check,
+  hardware tests refuse during it (`CHECK-RUNNING`), and Remove… stops it.
+- F3 (D1): an add reads FFmpeg and FFprobe once each. The check that follows reuses
+  that fingerprint and confirms it by file stats. Checks started later rehash.
+- F4 (D2): the check tests only the catalog's listed hardware encoders. The others are
+  tested afterwards in the background. Linux/macOS-only APIs are never run.
+- F5 (D3): Runs on names the GPU a passing test ran on.
+- F6 (D4): `machine.json` keeps only state, reason, note, testedAt and tenBit per
+  encoder. stderr stays in the capability cache.
+- F7: the encoder list shows when it is read, and hardware results stream in.
+- F8: a quick version check (`quickCheck`) shows the new card at once.
+- F9: Presets shows a never-checked FFmpeg's encoders as unknown. Scan again names
+  candidates it couldn't use. Check failures read as plain sentences.
+
+Measured on this PC (AMD Radeon 8060S; NVENC and QSV unavailable) with the scratch
+services harness (AOT, real services, real FFmpeg), before and after:
+
+| Build | Card visible | Encoder list | Check (hardware phase) | Files read per add | `machine.json` |
+| --- | --- | --- | --- | --- | --- |
+| N-128435 static | 2.79 s (+ up to 1 s poll) → 0.03 s | ~15.4 s → 1.54 s | 12.6 s (9.4 s) → 1.6 s (1.2 s) | 8.04 → 2.02 × exe size | 67 → 19.3 KB |
+| gyan 9.0.2 essentials | 1.53 s → 0.04 s | ~10.8 s → 1.33 s | 9.3 s (7.4 s) → 1.6 s (1.2 s) | 8.08 → 2.03 × | 72 → 16.8 KB |
+| BtbN n8.1.3 shared | 1.04 s → 0.05 s | ~11.8 s → 2.09 s | 10.7 s (9.2 s) → 1.8 s (1.2 s) | 612 → 203 MB (DLLs) | 89 → 19.7 KB |
+
+The longest event-loop stall stayed at 22 to 25 ms before and after. The "after" check
+covers the catalog's hardware encoders; the app tests the rest afterwards, one at a
+time. The record is 16.8 to 19.7 KB, above the plan's 12 to 15 KB estimate. About
+85% of it is the per-encoder software entries.
+
+Checks run on the branch:
+
+| Check | Uses | Result |
+| --- | --- | --- |
+| App analyze and full `flutter test` | fakes, light and dark goldens | clean; 728 → 749 tests pass |
+| B3 services | fake FFmpeg processes, real Windows processes and DXGI | 4,515 → 4,547 checks |
+| B3 repositories | real files, native core | 189 → 190 checks |
+| B3 runtime, N-128435, gyan 9.0.2 essentials, BtbN n8.1.3 | real FFmpeg | 198 checks, before and after |
+| Render matrix `-Quick`, N-128435 | fake host (fiohost), real FFmpeg | 36 passed, 0 failed, 12 skipped (NVENC) |
+| Path checker | | 0 problem lines |
+| Real page on real services: Set as default mid-check, then Presets | real FFmpeg (N-128435), scratch | one check ran |
+
+Goldens: every `ffmpeg_*` image was reviewed and updated. The default card shows this
+session's fixture check (no duration, the fixture's counts). The probing images show
+the list with hardware rows Testing…. `ffmpeg_pending_{light,dark}` are new. Nothing
+was tried in real VEGAS.
+
+Section 6 desktop checks (2026-11-20, Release from `4cda1e2` with isolated data
+roots and real FFmpeg N-128435 static and gyan 9.0.2 essentials). Settings > About
+showed the isolated folders. The selected static card showed its version within
+0.5 s and the encoder list and partial hardware results were visible by 3.1 s.
+The other card could be selected and its Remove… prompt opened during a hardware
+test. Both builds remained listed after switching apps and restarting.
+Setting gyan as default at 3 of 5 hardware tests and opening Presets produced no
+duplicate hardware commands in Windows process samples. The earlier scratch test
+covered the cache-miss path. AMF H.264 passed at 8-bit and Runs on displayed
+AMD Radeon(TM) 8060S Graphics. At narrower widths the column truncates the name
+and the detail pane shows it in full. The initial desktop check caught the
+summary briefly claiming every encoder was ready during first registration.
+
+The summary now says “checking encoders…” during an active check and confirms
+readiness only when all encoder states are ready. The empty Only problems list
+reports that it has no missing or failed encoders. The regression failed before
+the fix. Flutter analysis was clean and all 750 app tests passed, including the
+pending and probing goldens on fakes in light and dark. The Windows Release build
+succeeded.
+
+Owner's section 6 run (2026-11-20, Release then debug builds of `3486822`, isolated
+data roots, real FFmpeg N-128435 static, gyan 9.0.2 essentials and BtbN n8.1.3
+shared; the static build's folder was removed from the app's `PATH` so it had to be
+added by hand). Checks 3 to 5 passed: a process watcher saw each hardware test run
+once per check (Set as default mid-check, then Presets), all three builds stayed
+listed across a restart, and Runs on showed the GPU name. Two findings:
+- **Lost clicks after Add FFmpeg… (FIX_PLAN_0.2.1 C1), fixed.** Closing the Open
+  dialog by double-clicking the file left two presses and no release on the card
+  under the cursor, which then ignored every click until the page was rebuilt.
+  `guardStrayPresses` cancels a device's open press before its next press. The new
+  tests replay the presses as raw pointer data and failed without it. App analyze
+  clean and 754 tests pass (fakes). The owner confirmed the fix on the debug build.
+- **`machine.json` over the plan's 20 KB in the real app, accepted.** One
+  static-build installation came to 21,458 bytes after the background tests. The
+  19 extra hardware results add about 3.6 KB. The services harness never runs that
+  background pass, so its 20 KB test doesn't see it. About 13 KB is ~220 software
+  entries repeating "Listed by this FFmpeg.". The owner accepts the larger record
+  (2026-11-20). The format stays as F6 left it, and the harness's 20 KB bound
+  still covers the check without the background pass.
+
+Background pass in the real app (same run, static build, the startup check on a
+fresh data root, from the record's `testedAt` times): the five catalog hardware
+tests ran in about 1.0 s, 10-bit retries included. The 19 other listed hardware
+encoders were then tested one at a time in about 6.3 s. Nothing on the card shows
+that pass.
+
 **0.2.1 fix pass (branch `fix/0.2.1`, version 0.2.1+1, 2026-11-08).** Every item
 of [FIX_PLAN_0.2.1.md](FIX_PLAN_0.2.1.md) except the owner's real-VEGAS checklist (L6)
 is implemented. Fixes and tests were committed one item at a time. No installer was

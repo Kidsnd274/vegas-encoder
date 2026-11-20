@@ -15,8 +15,26 @@ abstract interface class FFmpegDiscovery {
   Future<List<FFmpegInstallation>> list();
   Stream<List<FFmpegInstallation>> watch();
   Future<List<FFmpegInstallation>> scan();
+
+  /// A quick version check of the FFmpeg at [executablePath], for showing
+  /// its card at once while [add] identifies it: version, build and licence
+  /// from `-version` only. Hashes nothing, runs no FFprobe and records
+  /// nothing; the result is display-only (empty identity, health unknown),
+  /// with the id [add] gives it. Refuses what [add] would, with its codes.
+  Future<FFmpegInstallation> quickCheck(String executablePath);
   Future<FFmpegInstallation> add(String executablePath);
   Future<void> remove(String installationId);
+
+  /// The candidates the latest [scan] found but couldn't use (not x64, too
+  /// old, no FFprobe beside it…). A PATH entry with no ffmpeg.exe is none.
+  List<ScanProblem> get scanProblems;
+}
+
+/// A scan candidate that couldn't be used: where it is, and why ([code] is
+/// the service error code).
+class ScanProblem {
+  const ScanProblem({required this.path, required this.code, required this.message});
+  final String path, code, message;
 }
 
 abstract interface class FFmpegProbe {
@@ -38,10 +56,14 @@ abstract interface class FFmpegHelpParser {
 }
 
 abstract interface class HardwareTests {
+  /// [reuseIdentity]: confirm the installation's fingerprint by file stats
+  /// instead of reading the files again (only for tests that directly follow
+  /// a check of it).
   Stream<HardwareTestResult> test(
     FFmpegInstallation installation, {
     List<String>? encoders,
     bool force = false,
+    bool reuseIdentity = false,
   });
   Future<void> cancel(String installationId);
 }

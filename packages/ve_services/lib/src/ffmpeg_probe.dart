@@ -75,6 +75,7 @@ class WindowsFFmpegProbe implements FFmpegProbe {
             int total = 0,
             String message = '',
             FFmpegCapabilities? capabilities,
+            HardwareTestResult? hardwareResult,
           }) {
             if (!controller.isClosed)
               controller.add(
@@ -85,6 +86,7 @@ class WindowsFFmpegProbe implements FFmpegProbe {
                   total: total,
                   message: message,
                   capabilities: capabilities,
+                  hardwareResult: hardwareResult,
                 ),
               );
           }
@@ -94,7 +96,11 @@ class WindowsFFmpegProbe implements FFmpegProbe {
               'identity',
               message: 'Checking FFmpeg and FFprobe identities.',
             );
-            final checked = await discovery.refresh(installation, op.token);
+            // The check that follows Add or a scan reuses that fingerprint (D1).
+            final (installation: checked, :reused) = await discovery.refresh(
+              installation,
+              op.token,
+            );
             emit(
               'lists',
               message:
@@ -193,17 +199,23 @@ class WindowsFFmpegProbe implements FFmpegProbe {
             await Future.wait([for (var i = 0; i < 4; i++) worker()]);
             op.token.check();
             for (final entry in encoders.entries.toList()) {
+              final hardware =
+                  isHardwareEncoder(entry.key) &&
+                  jsonMap(entry.value)['kind'] == 'video';
+              // Linux/macOS-only APIs are refused without running anything (D2).
+              final impossible =
+                  hardware && windowsUnsupportedHardware(entry.key);
               encoders[entry.key] = {
                 ...jsonMap(entry.value),
                 'availability': EncoderAvailability(
-                  state:
-                      isHardwareEncoder(entry.key) &&
-                          jsonMap(entry.value)['kind'] == 'video'
+                  state: impossible
+                      ? 'failed'
+                      : hardware
                       ? 'unknown'
                       : 'ok',
-                  reason:
-                      isHardwareEncoder(entry.key) &&
-                          jsonMap(entry.value)['kind'] == 'video'
+                  reason: impossible
+                      ? windowsUnsupportedReason
+                      : hardware
                       ? 'Listed; awaiting a test on this PC.'
                       : 'Listed by this FFmpeg.',
                 ).data,
@@ -236,25 +248,52 @@ class WindowsFFmpegProbe implements FFmpegProbe {
                 gpuFingerprint: previous?.gpuFingerprint ?? '',
               ),
             );
+            // D2: the catalog's hardware encoders this FFmpeg lists; the app
+            // tests the other listed ones afterwards, in the background.
+            final catalogHardware = [
+              for (final p in profiles.video)
+                if (p.hw != null &&
+                    encoders[p.id] is Map &&
+                    jsonMap(encoders[p.id])['kind'] == 'video' &&
+                    !windowsUnsupportedHardware(p.id))
+                  p.id,
+            ];
+            // The encoder list shows now, hardware rows still unknown (F7);
+            // each test's result follows as it finishes.
             emit(
               'hardware',
+              total: catalogHardware.length,
               message: 'Testing listed hardware encoders on this PC.',
+              capabilities: await cache.read(checked.identity.key),
             );
-            await for (final result in hardware.qualify(checked, op.token)) {
+            var tested = 0;
+            await for (final result in hardware.qualify(
+              checked,
+              op.token,
+              encoders: catalogHardware,
+            )) {
               emit(
                 'hardware',
-                completed: ++completed,
+                completed: ++tested,
+                total: catalogHardware.length,
                 message: '${result.encoder}: ${result.state}',
+                hardwareResult: result,
               );
             }
             op.token.check();
-            await requireCurrentInstallation(checked, parser.version, op.token);
+            // A reused fingerprint is confirmed by file stats, and read again
+            // only if they changed; a fresh one is read again in full.
+            if (!reused || !await statsUnchanged(checked))
+              await requireCurrentInstallation(
+                checked,
+                parser.version,
+                op.token,
+              );
+            op.token.check();
             final finalCapabilities = (await cache.read(checked.identity.key))!;
             final availability = <String, Object?>{
               for (final e in finalCapabilities.encoders.entries)
-                e.key:
-                    jsonMap(e.value)['availability'] ??
-                    EncoderAvailability().data,
+                e.key: recordAvailability(jsonMap(e.value)['availability']),
             };
             for (final name in curated.keys) {
               availability.putIfAbsent(
@@ -295,13 +334,16 @@ class WindowsFFmpegProbe implements FFmpegProbe {
           } catch (e) {
             // A complete catalog can be cached for on-demand help, but a failed or
             // cancelled stream never claims a completed probe on the installation.
+            final error = failure ?? e;
             emit(
               failure != null
                   ? 'failed'
                   : op.token.cancelled
                   ? 'cancelled'
                   : 'failed',
-              message: (failure ?? e).toString(),
+              message: error is ServiceException
+                  ? error.message
+                  : error.toString(),
             );
           } finally {
             _operations.finish(installation.id, op);

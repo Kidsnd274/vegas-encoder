@@ -159,10 +159,12 @@ String containerShortName(core.ContainerProfile? c, String id) =>
 
 String runsOn(core.EncoderProfile? p) => p?.hw == null ? 'CPU' : '${p!.hw} GPU';
 
+/// Nothing is known about an FFmpeg that was never checked (just added, or
+/// its check still running): its encoders are unknown, not missing.
 VeAvailability availabilityOf(core.FFmpegInstallation? installation, String encoder) {
   if (installation == null) return VeAvailability.ready;
   final raw = installation.availability[encoder];
-  if (raw is! Map) return VeAvailability.missing;
+  if (raw is! Map) return installation.probedAt == null ? VeAvailability.unknown : VeAvailability.missing;
   return switch (raw['state']) {
     'ok' => VeAvailability.ready,
     'failed' => VeAvailability.failed,
@@ -173,7 +175,7 @@ VeAvailability availabilityOf(core.FFmpegInstallation? installation, String enco
 
 String? availabilityReason(core.FFmpegInstallation? installation, String encoder) {
   final raw = installation?.availability[encoder];
-  if (raw is! Map) return installation == null ? null : 'Not in ${installation.label}.';
+  if (raw is! Map) return installation == null || installation.probedAt == null ? null : 'Not in ${installation.label}.';
   final reason = raw['reason'] as String?;
   return reason == null || reason.isEmpty ? null : reason;
 }

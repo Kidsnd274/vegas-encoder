@@ -14,6 +14,41 @@ bool isHardwareEncoder(String name) => RegExp(
   r'_(?:nvenc|qsv|amf|mf|vaapi|v4l2m2m|videotoolbox|vulkan|d3d12va|rkmpp|mediacodec|omx)$',
 ).hasMatch(name);
 
+/// Hardware APIs that can't work on Windows (D2): never test-encoded.
+bool windowsUnsupportedHardware(String name) => RegExp(
+  r'_(?:vaapi|videotoolbox|v4l2m2m|mediacodec|rkmpp|omx)$',
+).hasMatch(name);
+
+const windowsUnsupportedReason =
+    'Needs Linux or macOS; not available on Windows.';
+
+/// The adapter a hardware encoder runs on (D3): the snapshot's adapter of
+/// its vendor (NVENC NVIDIA, QSV Intel, AMF AMD). Other APIs (Media
+/// Foundation, D3D12, Vulkan) name the adapter only when there is just one.
+/// Microsoft's Basic Render Driver is never a hardware encoder's device.
+/// Empty when it can't be told.
+String hardwareDevice(String encoder, GpuSnapshot snapshot) {
+  final adapters = [
+    for (final a in snapshot.adapters)
+      if (a['name'] is String &&
+          (a['name'] as String).isNotEmpty &&
+          a['vendorId'] != 0x1414)
+        a,
+  ];
+  final vendor = switch (encoder) {
+    _ when encoder.endsWith('_nvenc') => 0x10DE,
+    _ when encoder.endsWith('_qsv') => 0x8086,
+    _ when encoder.endsWith('_amf') => 0x1002,
+    _ => null,
+  };
+  if (vendor != null)
+    return adapters.where((a) => a['vendorId'] == vendor).firstOrNull?['name']
+            as String? ??
+        '';
+  final names = {for (final a in adapters) a['name'] as String};
+  return names.length == 1 ? names.single : '';
+}
+
 bool _fresh(
   Object? data,
   String fingerprint,
@@ -133,6 +168,7 @@ class WindowsHardwareTests implements HardwareTests {
     FFmpegInstallation installation, {
     List<String>? encoders,
     bool force = false,
+    bool reuseIdentity = false,
   }) {
     late StreamController<HardwareTestResult> stream;
     ServiceOperation? operation;
@@ -141,11 +177,15 @@ class WindowsHardwareTests implements HardwareTests {
         final op = operation = _operations.begin(installation.id);
         unawaited(() async {
           try {
-            await requireCurrentInstallation(
-              installation,
-              parser.version,
-              op.token,
-            );
+            // Tests right after a check (reuseIdentity) confirm its
+            // fingerprint by file stats; others read the files again.
+            if (!reuseIdentity || !await statsUnchanged(installation))
+              await requireCurrentInstallation(
+                installation,
+                parser.version,
+                op.token,
+              );
+            op.token.check();
             await for (final result in qualify(
               installation,
               op.token,
@@ -193,6 +233,7 @@ class WindowsHardwareTests implements HardwareTests {
             .where(
               (e) =>
                   isHardwareEncoder(e.key) &&
+                  !windowsUnsupportedHardware(e.key) &&
                   jsonMap(e.value)['kind'] == 'video',
             )
             .map((e) => e.key)
@@ -238,7 +279,10 @@ class WindowsHardwareTests implements HardwareTests {
           installation.id,
           installation.identity.key,
           (record) => record.copyWith(
-            availability: {...record.availability, encoder: old},
+            availability: {
+              ...record.availability,
+              encoder: recordAvailability(old),
+            },
           ),
         );
         yield cachedResult;
@@ -346,6 +390,10 @@ class WindowsHardwareTests implements HardwareTests {
         );
       }
       token.check();
+      // `note` is the device a passing test ran on, empty otherwise (D3).
+      final device = result.state == 'ok'
+          ? hardwareDevice(encoder, snapshot)
+          : '';
       await cache.update(installation.identity.key, (current) {
         if (current == null)
           throw const ServiceException(
@@ -356,7 +404,7 @@ class WindowsHardwareTests implements HardwareTests {
         hardware[encoder] = {
           ...result.data,
           'detail': result.stderr,
-          'note': result.reason,
+          'note': device,
         };
         final entries = current.encoders;
         if (entries[encoder] is Map)
@@ -376,19 +424,13 @@ class WindowsHardwareTests implements HardwareTests {
         (record) => record.copyWith(
           availability: {
             ...record.availability,
-            encoder: EncoderAvailability(
-              state: result.state,
-              reason: result.reason,
-              detail: result.stderr,
-              note: result.tenBit
-                  ? '10-bit test passed.'
-                  : '10-bit has not passed.',
-              extensions: {
-                'testedAt': result.testedAt,
-                'gpuFingerprint': snapshot.fingerprint,
-                'tenBit': result.tenBit,
-              },
-            ).data,
+            encoder: recordAvailability({
+              'state': result.state,
+              'reason': result.reason,
+              'note': device,
+              'testedAt': result.testedAt,
+              'tenBit': result.tenBit,
+            }),
           },
         ),
       );

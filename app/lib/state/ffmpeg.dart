@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ve_services/ve_services.dart';
@@ -26,6 +28,7 @@ class FFmpegState {
     this.testing = const {},
     this.testResults = const {},
     this.scanning = false,
+    this.pending = const {},
   });
 
   /// The installation shown below the cards; null is the default one.
@@ -55,6 +58,10 @@ class FFmpegState {
   /// Scan again is running.
   final bool scanning;
 
+  /// Installations being added: shown from their quick version check until
+  /// discovery has recorded them (app state only; nothing is written).
+  final Map<String, FFmpegInstallation> pending;
+
   FFmpegState copyWith({
     Object? selectedId = _keep,
     EncoderKind? kind,
@@ -67,6 +74,7 @@ class FFmpegState {
     Map<String, Set<String>>? testing,
     Map<String, Map<String, HardwareTestResult>>? testResults,
     bool? scanning,
+    Map<String, FFmpegInstallation>? pending,
   }) => FFmpegState(
     selectedId: identical(selectedId, _keep) ? this.selectedId : selectedId as String?,
     kind: kind ?? this.kind,
@@ -79,6 +87,7 @@ class FFmpegState {
     testing: testing ?? this.testing,
     testResults: testResults ?? this.testResults,
     scanning: scanning ?? this.scanning,
+    pending: pending ?? this.pending,
   );
 
   bool isTesting(String installationId, String encoder) => testing[installationId]?.contains(encoder) ?? false;
@@ -100,20 +109,46 @@ class FFmpegController extends Notifier<FFmpegState> {
     final tests = ref.watch(hardwareTestsProvider);
     ref.onDispose(() {
       // Stop work this screen started; results would have nowhere to go.
-      for (final id in _probing) {
+      for (final id in _checks.keys) {
         probes.cancel(id);
       }
-      for (final id in _testing) {
+      for (final id in {..._testing, ..._background.keys}) {
         tests.cancel(id);
+      }
+      for (final run in _background.values) {
+        run.cancel();
       }
     });
     return const FFmpegState();
   }
 
   // Running work by installation, for cancelling on dispose (ref and state
-  // can't be used while disposing).
-  final Set<String> _probing = {};
+  // can't be used while disposing). One check per installation at a time:
+  // asking again returns the running one.
+  final Map<String, Future<void>> _checks = {};
   final Set<String> _testing = {};
+
+  // D2: after a check, the listed hardware encoders the catalog doesn't
+  // know are tested in the background, one at a time, with nothing on the
+  // card. Stopped by a check, a hardware test or Remove on that
+  // installation, and by closing the app; never restarted by itself.
+  final Map<String, StreamSubscription<HardwareTestResult>> _background = {};
+
+
+  // capabilitiesProvider instances waiting on a check, which read the result
+  // themselves: invalidating one mid-load would leave its future unfinished.
+  final Map<String, int> _awaited = {};
+
+  /// [probe] for `capabilitiesProvider`, which reads the result itself.
+  Future<void> probeFor(FFmpegInstallation installation) async {
+    final id = installation.id;
+    _awaited[id] = (_awaited[id] ?? 0) + 1;
+    try {
+      await probe(installation);
+    } finally {
+      if ((_awaited[id] = _awaited[id]! - 1) == 0) _awaited.remove(id);
+    }
+  }
 
   FFmpegDiscovery get _discovery => ref.read(ffmpegDiscoveryProvider);
 
@@ -150,28 +185,84 @@ class FFmpegController extends Notifier<FFmpegState> {
   }
 
   /// Adds the FFmpeg at [executablePath] (from the Open dialog; discovery
-  /// records it), checks it and shows it. Discovery's failure (not FFmpeg, no
+  /// records it), checks it and shows it. Its quick version check shows it
+  /// at once, as [FFmpegState.pending]; [onRegistered] hears when discovery
+  /// has recorded it, before the check. Adding one already being added
+  /// selects it and returns that add. Discovery's failure (not FFmpeg, no
   /// ffprobe beside it…) reaches the caller as a [ServiceException].
-  Future<FFmpegInstallation> add(String executablePath) async {
+  Future<FFmpegInstallation> add(
+    String executablePath, {
+    ValueChanged<FFmpegInstallation>? onRegistered,
+  }) async {
     final before = _selections;
-    final installation = await _discovery.add(executablePath);
-    if (!ref.mounted) return installation;
-    // Show the new card only if the user hasn't picked another meanwhile.
-    if (_selections == before) select(installation.id);
-    await probe(installation);
-    return installation;
+    final quick = await _discovery.quickCheck(executablePath);
+    if (!ref.mounted) return quick;
+    if (_adds[quick.id] case final running?) {
+      select(quick.id);
+      return running;
+    }
+    final adding = _add(executablePath, quick, selectIt: _selections == before, onRegistered: onRegistered);
+    _adds[quick.id] = adding;
+    try {
+      return await adding;
+    } finally {
+      if (identical(_adds[quick.id], adding)) _adds.remove(quick.id);
+    }
   }
 
-  /// Forgets an installation. The files stay where they are. The default
-  /// can't be removed: renders would have no FFmpeg (choose another first).
+  // Adds running, by installation, so adding one twice gives one card.
+  final Map<String, Future<FFmpegInstallation>> _adds = {};
+
+  Future<FFmpegInstallation> _add(
+    String executablePath,
+    FFmpegInstallation quick, {
+    required bool selectIt,
+    ValueChanged<FFmpegInstallation>? onRegistered,
+  }) async {
+    final id = quick.id;
+    // Display-only until discovery records it: nothing checked yet.
+    final shown = quick.copyWith(probedAt: null, probeMs: null, counts: <String, Object?>{}, availability: <String, Object?>{});
+    state = state.copyWith(pending: {...state.pending, id: shown});
+    // Show the new card only if the user hasn't picked another meanwhile (C1).
+    if (selectIt) select(id);
+    try {
+      final installation = await _discovery.add(executablePath);
+      if (!ref.mounted) return installation;
+      // The recorded card now, not at the next discovery poll.
+      ref.invalidate(discoveredInstallationsProvider);
+      onRegistered?.call(installation);
+      await probe(installation);
+      return installation;
+    } finally {
+      if (ref.mounted) state = state.copyWith(pending: Map.of(state.pending)..remove(id));
+    }
+  }
+
+  /// Forgets an installation, first stopping its check and hardware tests.
+  /// The files stay where they are. The default can't be removed: renders
+  /// would have no FFmpeg (choose another first).
   Future<void> remove(String id) async {
     final settings = await ref.read(machineSettingsRepositoryProvider).read();
     if (settings.defaultFFmpegId == id) {
       throw const ServiceException('DEFAULT-IN-USE', 'Choose another default FFmpeg before removing this one.');
     }
+    await ref.read(ffmpegProbeProvider).cancel(id);
+    await _stopBackground(id);
+    await ref.read(hardwareTestsProvider).cancel(id);
     await _discovery.remove(id);
+    // A check still ending writes nothing for an installation that is gone.
+    _checks.remove(id);
     if (!ref.mounted) return;
-    if (state.selectedId == id) state = state.copyWith(selectedId: null, selectedEncoder: null);
+    Map<String, V> without<V>(Map<String, V> m) => Map.of(m)..remove(id);
+    state = state.copyWith(
+      selectedId: state.selectedId == id ? null : state.selectedId,
+      selectedEncoder: state.selectedId == id ? null : state.selectedEncoder,
+      probes: without(state.probes),
+      probeFailures: without(state.probeFailures),
+      probed: without(state.probed),
+      testing: without(state.testing),
+      testResults: without(state.testResults),
+    );
   }
 
   /// Makes [installation] the FFmpeg every render uses (C7 defaultFFmpegId).
@@ -182,7 +273,30 @@ class FFmpegController extends Notifier<FFmpegState> {
 
   /// Reads what [installation] can do, showing progress as it streams in.
   /// The probe caches its own result; the editor's checks then read it.
-  Future<void> probe(FFmpegInstallation installation) async {
+  /// While a check of [installation] runs, this returns that one instead of
+  /// starting another (two would hash and test-encode the same files twice).
+  Future<void> probe(FFmpegInstallation installation) {
+    final id = installation.id;
+    if (_checks[id] case final running?) return running;
+    unawaited(_stopBackground(id));
+    final done = Completer<void>();
+    final check = done.future;
+    _checks[id] = check;
+    () async {
+      try {
+        await _check(installation, current: () => identical(_checks[id], check));
+        done.complete();
+      } catch (e, stack) {
+        done.completeError(e, stack);
+      } finally {
+        if (identical(_checks[id], check)) _checks.remove(id);
+      }
+    }();
+    return check;
+  }
+
+  /// One check; [current] turns false once the installation is removed.
+  Future<void> _check(FFmpegInstallation installation, {required bool Function() current}) async {
     final id = installation.id;
     state = state.copyWith(
       probes: {
@@ -191,40 +305,126 @@ class FFmpegController extends Notifier<FFmpegState> {
       },
       probeFailures: Map.of(state.probeFailures)..remove(id),
     );
+    final before = state.probed[id];
     FFmpegCapabilities? found;
     String? failure;
-    _probing.add(id);
+    // The catalog's hardware encoders this check is testing (F7).
+    final testingNow = <String>{};
     try {
       await for (final progress in ref.read(ffmpegProbeProvider).probe(installation)) {
-        if (!ref.mounted) return;
-        if (progress.capabilities != null) found = progress.capabilities;
+        if (!ref.mounted || !current()) return;
+        final capabilities = progress.capabilities;
+        final result = progress.hardwareResult;
         if (progress.phase == 'failed' || progress.phase == 'cancelled') {
           failure = progress.message.isEmpty ? 'The check stopped (${progress.phase}).' : progress.message;
         }
-        state = state.copyWith(probes: {...state.probes, id: progress});
+        var testing = state.testing;
+        if (capabilities != null && progress.phase == 'hardware') {
+          // The list shows now; the hardware rows say Testing… until their result.
+          testingNow.addAll([
+            for (final p in ref.read(profilesProvider).video)
+              if (p.hw != null &&
+                  switch (capabilities.encoders[p.id]) {
+                    {'availability': {'state': 'unknown'}} => true,
+                    _ => false,
+                  })
+                p.id,
+          ]);
+          testing = {
+            ...testing,
+            id: {...?testing[id], ...testingNow},
+          };
+        }
+        if (result != null) {
+          testingNow.remove(result.encoder);
+          testing = {
+            ...testing,
+            id: {...?testing[id]}..remove(result.encoder),
+          }..removeWhere((_, v) => v.isEmpty);
+        }
+        state = state.copyWith(
+          probes: {...state.probes, id: progress},
+          probed: capabilities == null ? null : {...state.probed, id: capabilities},
+          testing: testing,
+          testResults: result == null
+              ? null
+              : {
+                  ...state.testResults,
+                  id: {...?state.testResults[id], result.encoder: result},
+                },
+        );
+        if (capabilities != null) {
+          found = capabilities;
+          if (!_awaited.containsKey(id)) ref.invalidate(capabilitiesProvider(id));
+        }
       }
     } on ServiceException catch (e) {
       failure = e.message;
-    } finally {
-      _probing.remove(id);
     }
-    if (!ref.mounted) return;
-    if (found != null) ref.invalidate(capabilitiesProvider(id));
+    if (!ref.mounted || !current()) return;
+    final left = {...?state.testing[id]}..removeAll(testingNow);
     state = state.copyWith(
       probes: Map.of(state.probes)..remove(id),
-      probed: found == null ? null : {...state.probed, id: found},
+      // A check that didn't finish claims no completed check for the card.
+      probed: failure == null || found == null
+          ? null
+          : (before == null ? (Map.of(state.probed)..remove(id)) : {...state.probed, id: before}),
+      testing: {...state.testing, id: left}..removeWhere((_, v) => v.isEmpty),
       probeFailures: failure == null ? null : {...state.probeFailures, id: failure},
     );
+    if (found != null && failure == null) _testTheRest(installation, found);
+  }
+
+  /// The hardware encoders [found] lists that the check left untested and
+  /// the catalog doesn't know (the check tests the catalog's; services refuse
+  /// Linux/macOS-only APIs as failed), tested now in the background.
+  void _testTheRest(FFmpegInstallation installation, FFmpegCapabilities found) {
+    final id = installation.id;
+    if (found.identityKey != installation.identity.key) return; // re-identified: the next check tests them
+    final catalog = {
+      for (final p in ref.read(profilesProvider).video)
+        if (p.hw != null) p.id,
+    };
+    final rest = [
+      for (final MapEntry(:key, :value) in found.encoders.entries)
+        if (value is Map &&
+            value['kind'] == 'video' &&
+            !catalog.contains(key) &&
+            (value['availability'] as Map?)?['state'] == 'unknown')
+          key,
+    ];
+    if (rest.isEmpty) return;
+    void finished() {
+      _background.remove(id);
+      if (ref.mounted) ref.invalidate(capabilitiesProvider(id));
+    }
+
+    _background[id] = ref
+        .read(hardwareTestsProvider)
+        .test(installation, encoders: rest, reuseIdentity: true)
+        .listen(null, onError: (Object _) => finished(), onDone: finished, cancelOnError: true);
+  }
+
+  Future<void> _stopBackground(String id) async {
+    final run = _background.remove(id);
+    if (run == null) return;
+    await run.cancel();
+    await ref.read(hardwareTestsProvider).cancel(id);
   }
 
   /// Test-encodes [encoders] on this PC (all of [hardwareEncoders] when
   /// null), even if they were tested before. Results stream into the list.
+  /// Refused while [installation] is being checked: the check tests them.
   Future<void> testHardware(
     FFmpegInstallation installation, {
     required Iterable<String> hardwareEncoders,
     List<String>? encoders,
   }) async {
     final id = installation.id;
+    if (_checks.containsKey(id)) {
+      throw ServiceException('CHECK-RUNNING', 'Wait until the check of ${installation.label} finishes.');
+    }
+    if (_background.containsKey(id)) await _stopBackground(id);
     final names = {...encoders ?? hardwareEncoders};
     state = state.copyWith(
       testing: {

@@ -132,6 +132,60 @@ void main() {
     });
   });
 
+  test('the summary reports incomplete and running encoder checks', () {
+    expect(
+      problemSummary(catalog, 'FFmpeg', (_) => const EncoderStatus(VeAvailability.unknown)),
+      'FFmpeg: encoder checks incomplete',
+    );
+    expect(
+      problemSummary(
+        catalog,
+        'FFmpeg',
+        (id) => EncoderStatus(id == 'h264_amf' ? VeAvailability.testing : VeAvailability.ready),
+      ),
+      'FFmpeg: checking encoders…',
+    );
+  });
+
+  group('runs on (F5, D3)', () {
+    FFmpegInstallation withAmf(Map<String, Object?> entry) => FFmpegInstallation.fromJson({
+      ...inst('gyan-8.1').toJson(),
+      'availability': {...inst('gyan-8.1').availability, 'h264_amf': entry},
+    });
+    CapabilityRow amfRow(FFmpegInstallation i) => capabilityGroups(
+      catalog,
+      kind: EncoderKind.video,
+      statusOf: statusLookup(i, const FFmpegState()),
+    ).expand((g) => g.rows).singleWhere((r) => r.id == 'h264_amf');
+    EncoderDetailModel amfDetail(FFmpegInstallation i) =>
+        encoderDetail(catalog, 'h264_amf', installation: i, status: encoderStatus(i, 'h264_amf'), presets: presets);
+
+    test('a note saved by earlier builds (a sentence, not a device) names no device', () {
+      for (final old in [
+        {'state': 'ok', 'reason': '8-bit test passed; 10-bit test failed.', 'note': '8-bit test passed; 10-bit test failed.'},
+        {'state': 'ok', 'reason': 'One-frame test passed on this GPU/driver.', 'note': '10-bit has not passed.'},
+        {'state': 'ok', 'reason': 'One-frame test passed on this GPU/driver.', 'note': '10-bit test passed.'},
+      ]) {
+        final i = withAmf(old);
+        expect(amfRow(i).runsOn, 'AMD GPU', reason: '${old['note']}');
+        expect(amfDetail(i).meaning, isNot(contains('passed on 8-bit')));
+        expect(amfDetail(i).meaning, isNot(contains('passed on 10-bit')));
+      }
+    });
+
+    test('a device note names the GPU; the recorded 10-bit result shows without a test this session', () {
+      final i = withAmf({
+        'state': 'ok',
+        'reason': 'One-frame test passed on this GPU/driver.',
+        'note': 'AMD Radeon(TM) 8060S Graphics',
+        'extensions': {'testedAt': '2026-11-19T00:00:00Z', 'tenBit': false},
+      });
+      expect(amfRow(i).runsOn, 'AMD Radeon(TM) 8060S Graphics');
+      expect(amfDetail(i).meaning, contains('a test encode passed on AMD Radeon(TM) 8060S Graphics.'));
+      expect(amfDetail(i).testFacts, contains('8-bit only on this PC'));
+    });
+  });
+
   group('installation card', () {
     test('says what it is, where it came from and when it was checked', () {
       final card = installationCard(
@@ -322,6 +376,160 @@ void main() {
       await running;
       expect(state().probes, isEmpty);
       expect(state().probeFailures['gyan-8.1'], 'ffmpeg.exe stopped responding.');
+    });
+
+    test('a check and the capabilities it feeds start one probe (F2)', () async {
+      final probe = StalledProbe();
+      start(probe: probe);
+      final full = inst('gyan-8.1');
+      final checking = controller().probe(full);
+      final capabilities = container.listen(capabilitiesProvider(full.id).future, (_, _) {}).read();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(probe.started, ['gyan-8.1'], reason: 'the capabilities wait for the running check');
+      await probe.finish(phase: 'done', message: '');
+      await checking;
+      expect(await capabilities, isNull, reason: 'the stalled probe cached nothing');
+      expect(probe.started, ['gyan-8.1']);
+    });
+
+    test('two checks of one installation start one probe; hardware tests wait for it (F2)', () async {
+      final probe = StalledProbe();
+      start(probe: probe);
+      final full = inst('gyan-8.1');
+      final first = controller().probe(full);
+      final second = controller().probe(full);
+      await Future<void>.delayed(Duration.zero);
+      expect(probe.started, ['gyan-8.1']);
+      await expectLater(
+        controller().testHardware(full, hardwareEncoders: const ['hevc_nvenc']),
+        throwsA(
+          isA<ServiceException>()
+              .having((e) => e.code, 'code', 'CHECK-RUNNING')
+              .having((e) => e.message, 'message', 'Wait until the check of FFmpeg 8.1 full finishes.'),
+        ),
+      );
+      await probe.finish();
+      await Future.wait([first, second]);
+      expect(state().probeFailures['gyan-8.1'], 'ffmpeg.exe stopped responding.');
+      unawaited(controller().probe(full));
+      await Future<void>.delayed(Duration.zero);
+      expect(probe.started, ['gyan-8.1', 'gyan-8.1'], reason: 'a finished check can run again');
+      await probe.finish();
+    });
+
+    test('after a check, the other listed hardware encoders are tested in the background (F4)', () async {
+      final tests = StalledHardwareTests();
+      final full = inst('gyan-8.1');
+      Map<String, Object?> listed(String kind, String state) => {
+        'kind': kind,
+        'availability': {'state': state},
+      };
+      final found = FFmpegCapabilities(
+        installationId: full.id,
+        identityKey: full.identity.key,
+        version: '8.1',
+        probedAt: '2026-11-19T00:00:00Z',
+        encoders: {
+          'libx264': listed('video', 'ok'),
+          'h264_nvenc': listed('video', 'ok'),
+          'hevc_qsv': listed('video', 'unknown'),
+          'hevc_amf': listed('video', 'unknown'),
+          'h264_vaapi': listed('video', 'failed'),
+          'aac': listed('audio', 'ok'),
+        },
+      );
+      start(
+        tests: tests,
+        probe: FakeFFmpegProbe(
+          progress: {
+            full.id: [ProbeProgress(installationId: full.id, phase: 'done', completed: 1, total: 1, capabilities: found)],
+          },
+        ),
+      );
+      await controller().probe(full);
+      expect(tests.calls.map((c) => '${c.installationId} ${c.encoders} reuse=${c.reuseIdentity}'), [
+        'gyan-8.1 [hevc_amf] reuse=true',
+      ], reason: 'not in the catalog, listed and untested; nothing shows on the card');
+      expect(state().testing, isEmpty);
+      unawaited(controller().testHardware(full, hardwareEncoders: const ['h264_nvenc']));
+      await Future<void>.delayed(Duration.zero);
+      expect(tests.cancelled, ['gyan-8.1'], reason: 'Test hardware encoders stops the background run first');
+      expect(tests.calls.last.encoders, isNull);
+    });
+
+    test('the encoder list shows from the first hardware event; hardware results stream in (F7)', () async {
+      final never = FFmpegInstallation.fromJson({
+        ...inst('gyan-8.1').toJson(),
+        'probedAt': null,
+        'probeMs': null,
+        'counts': <String, Object?>{},
+        'availability': <String, Object?>{},
+      });
+      Map<String, Object?> listed(String state, {String kind = 'video'}) => {
+        'kind': kind,
+        'availability': {'state': state},
+      };
+      FFmpegCapabilities caps(String nvenc) => FFmpegCapabilities(
+        installationId: never.id,
+        identityKey: never.identity.key,
+        version: '8.1',
+        probedAt: '2026-11-19T00:00:00Z',
+        encoders: {'libx264': listed('ok'), 'h264_nvenc': listed(nvenc), 'aac': listed('ok', kind: 'audio')},
+        muxers: {
+          'mp4': {'canonical': 'mp4'},
+          'mov': {'canonical': 'mov'},
+        },
+      );
+      final result = HardwareTestResult(
+        encoder: 'h264_nvenc',
+        state: 'ok',
+        reason: 'One-frame test passed on this GPU/driver.',
+        testedAt: '2026-11-19T00:00:01Z',
+        identityKey: never.identity.key,
+        gpuFingerprint: 'gpu',
+      );
+      ProbeProgress event(String phase, {FFmpegCapabilities? capabilities, HardwareTestResult? hardwareResult}) =>
+          ProbeProgress(
+            installationId: never.id,
+            phase: phase,
+            completed: hardwareResult == null ? 0 : 1,
+            total: phase == 'hardware' ? 1 : 0,
+            capabilities: capabilities,
+            hardwareResult: hardwareResult,
+          );
+      start(
+        probe: FakeFFmpegProbe(
+          progress: {
+            never.id: [
+              event('identity'),
+              event('lists'),
+              event('hardware', capabilities: caps('unknown')),
+              event('hardware', hardwareResult: result),
+              event('done', capabilities: caps('ok')),
+            ],
+          },
+        ),
+      );
+      final seen = <String>[];
+      container.listen(ffmpegControllerProvider, (_, s) {
+        final status = statusLookup(never, s);
+        final card = installationCard(never, isDefault: false, state: s, presets: const [], catalog: catalog);
+        final line =
+            '${s.probes[never.id]?.phase ?? 'ended'}: x264 ${status('libx264').state.name}, '
+            'nvenc ${status('h264_nvenc').state.name}, counts ${card.counts}';
+        if (seen.lastOrNull != line) seen.add(line);
+      });
+      await controller().probe(never);
+      expect(seen, [
+        'identity: x264 unknown, nvenc unknown, counts null',
+        'lists: x264 unknown, nvenc unknown, counts null',
+        'hardware: x264 ready, nvenc testing, counts (audio: 1, muxers: 2, video: 2)',
+        'hardware: x264 ready, nvenc ready, counts (audio: 1, muxers: 2, video: 2)',
+        'done: x264 ready, nvenc ready, counts (audio: 1, muxers: 2, video: 2)',
+        'ended: x264 ready, nvenc ready, counts (audio: 1, muxers: 2, video: 2)',
+      ]);
+      expect(state().testing, isEmpty);
+      expect(state().testResults[never.id]?['h264_nvenc']?.state, 'ok');
     });
 
     test('hardware tests stream in; the encoders show Testing until then', () async {

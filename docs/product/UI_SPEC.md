@@ -514,7 +514,8 @@ Lint errors turn Apply off.
 
 | State | Display |
 | --- | --- |
-| Probing | Per-installation progress ("Reading encoders… 18 of 25"); results stream in |
+| Probing | Per-installation progress ("Reading encoders… 18 of 25"). The encoder list and counts show as soon as the lists are read; the hardware encoders being tested say Testing… until their result arrives |
+| Adding | "Checking the files…" on the new card while discovery identifies them (see Cards) |
 | Ready | Version, build, license class, source, path (copyable), probe time, ffprobe present |
 | Changed on disk | "This FFmpeg changed since it was checked." **Scan again** |
 | Missing | "<folder>\ffmpeg.exe isn't there any more." **Remove** / **Locate…** |
@@ -527,10 +528,21 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
 **Built in F3** (`app/lib/features/ffmpeg/`, on the platform fakes):
 
 - **Header:** Run setup… (the first-run setup, §5a, whatever was chosen before), Add
-  FFmpeg… (the Windows Open dialog through the runner's `pickFile`; the
-  path goes to `FFmpegDiscovery.add`), Scan again (`scan`, then a probe of each
-  installation with no cached capabilities), Test hardware encoders (the selected
-  installation, `force: true`). A refusal shows as a toast with discovery's message.
+  FFmpeg… (the Windows Open dialog through the runner's `pickFile`; the path goes to
+  `FFmpegDiscovery.quickCheck`, then `add`), Scan again (`scan`, then a probe of each
+  installation with no cached capabilities; the toast adds "2 couldn’t be used:
+  <path>: <reason>", naming the first of `scanProblems`), Test hardware encoders (the
+  selected installation, `force: true`; disabled while that installation is being added
+  or checked, because the check tests them). A refusal shows as a toast with
+  discovery's message.
+- **Add FFmpeg… (F8, 2026-11-19):** the quick version check (`-version` only) shows the
+  new card at once, selected unless another card was chosen meanwhile, and scrolled
+  into view. "Added <name>" comes when discovery has recorded it, before the check;
+  re-adding a listed one says "<name> is already listed. Checking it again." Adding the
+  same file twice gives one card. A refusal or a failed add removes the card and says
+  "Couldn’t add <path>: <reason>".
+- **One check per installation (F2):** a check already running is never started again
+  (Scan again, Presets and the editor wait for it). Remove… stops its check and tests.
 - **Cards** on dotted paper, three across, more scroll sideways: name, Default, build,
   license and source ("Installed with winget"), the path (tooltip with ffmpeg.exe and
   ffprobe.exe), when it was checked, encoder and muxer counts, and "Can't render 1
@@ -538,7 +550,12 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
   checked line with its phase and count and a bar; a failed probe says why. Every card
   has Set as default (not on the default), Copy path and Remove… (not on the default:
   choose another default first); keeping them on every card keeps the strip's height
-  steady.
+  steady. A card being added (app state only; nothing is in `machine.json` until the
+  files are fingerprinted) shows its name, build/licence/source line, path and
+  "Checking the files…" with a bar, and offers only Copy path; its encoders show as Not
+  checked yet and can't be tested. The recorded card replaces it in place: one card
+  per installation at every moment. Cards keep their state across page rebuilds, so a
+  click is never lost to a progress update (F1).
 - **Installations and the default** live in C7: Scan again, Add and Remove write
   discovery's list to `machine.json` (skipped when unchanged), and a default that
   discovery no longer lists keeps its record rather than switching to another
@@ -546,15 +563,20 @@ The capability list is grouped by codec family, with a filter ("Only usable", "H
   `save(expectedRevision)`, reapplied on a revision conflict.
 - **Capability list:** Video / Audio encoders, All / Only problems / Hardware (video
   only), a search over name, FFmpeg name, codec, group and device (Ctrl+F), and a
-  summary ("FFmpeg 8.0 LGPL: 4 video and 1 audio encoders not ready"). Columns: codec,
-  encoder, FFmpeg name, bit depth, runs on (the device a passed test ran on), state,
+  summary ("FFmpeg 8.0 LGPL: 4 video and 1 audio encoders not ready"). It says
+  "checking encoders…" while a check runs and reports readiness only after every
+  catalog encoder is confirmed ready. Columns: codec,
+  encoder, FFmpeg name, bit depth, runs on (the GPU a passed test ran on, by name, from
+  C3 `note`; otherwise "NVIDIA GPU" and so on; results saved by earlier builds name no
+  device), state,
   reason; under 760 px the FFmpeg name and reason give way to the detail panel. A click
   or focus selects a row; Up and Down move.
 - **States:** Ready, Not in this FFmpeg, Failed test on this PC, Testing…, and Not
   checked yet (C3 `unknown`). The newest fact wins: a test running now, this session's
   test result, this session's probe, then the installation's recorded availability.
 - **Detail** (450 px, 380 px below 1240 px): name, state, what it means and what to do,
-  the test failure class and 10-bit result, the test-encode diagram (testsrc2 → encoder
+  the test failure class and 10-bit result (this session's test, else the recorded
+  `tenBit`), the test-encode diagram (testsrc2 → encoder
   → null, dashed past an encoder that can't run), FFmpeg's stderr line, the presets that
   use it (click opens the preset in Presets), and Test again for hardware encoders.
 - **Health** (C3 `health`, follow-ups 2026-10-15): Changed on disk, Missing and No ffprobe
@@ -582,9 +604,13 @@ steps 2–3 (PRODUCT_SPEC) as a modal over the desktop window.
   **Scan again**. A scan failure: "Couldn’t look for FFmpeg: …" and **Try again**.
   No download offer (decision 11).
 - **Check:** one row per installation: name, build/licence/source line, path, and the
-  probe's phase and bar while it runs. The probe tests the listed hardware encoders; after
-  the probes, hardware encoders still unknown on this PC (an expired or changed GPU
-  record) are test-encoded too. The work runs in `FFmpegController`, so the FFmpeg screen
+  probe's phase and bar while it runs. One being added shows from its quick version
+  check as a row that can't be chosen yet, with "Checking the files…". The probe
+  test-encodes the catalog's hardware encoders that FFmpeg lists (D2); the other listed
+  hardware encoders are tested afterwards in the background, one at a time, and APIs
+  that can't work on Windows (`vaapi`, `videotoolbox`, `v4l2m2m`, `mediacodec`, `rkmpp`,
+  `omx`) are never tested. After the probes, catalog hardware encoders still unknown on
+  this PC (an expired or changed GPU record) are test-encoded too. The work runs in `FFmpegController`, so the FFmpeg screen
   shows the same progress. **Choose without waiting** goes on while the checks run.
 - **Choose:** the same rows as radio choices, each with a hardware line ("Hardware ready:
   NVENC H.264, NVENC HEVC, NVENC AV1. 2 failed their test on this PC.", or none works,
@@ -868,4 +894,5 @@ is the only place the encode statistics show.
     - "FFmpeg finished before the end of the timeline, as the preset asked, so the output is shorter."
   - An unknown elapsed time (the clock stepped back) reads "after an unknown time".
 - **FFmpeg page.** After Add FFmpeg…, the new card is selected only if no other card was chosen while it was being added. Every card can be selected at any time.
+  - FFmpeg page fixes (branch `fix/ffmpeg-page`, 2026-11-19): cards survive page rebuilds, so clicks aren't lost; one check per installation; the new card shows at once from a quick version check and scrolls into view; the encoder list shows when read and hardware results stream in; only the catalog's hardware encoders are tested during the check (the rest afterwards, in the background); Runs on names the GPU; Presets shows a never-checked FFmpeg's encoders as unknown; Scan again names candidates it couldn't use; check failures read as plain sentences.
 - **Progress window countdown.** When the pointer leaves, the countdown resumes with at least 3 s left.

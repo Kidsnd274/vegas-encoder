@@ -6,6 +6,7 @@ import 'package:ve_services/ve_services.dart';
 
 import '../app/launch.dart';
 import 'app_state.dart';
+import 'ffmpeg.dart';
 
 export 'package:ve_services/ve_services.dart' show DesktopAppLauncher;
 
@@ -290,11 +291,12 @@ final machineSettingsProvider = StreamProvider<MachineSettings>(
 );
 
 /// What an installation can do, from the capability cache the probe writes.
-/// On the desktop an installation that was never checked is probed once (the
-/// probe caches its own result); the popup only reads the cache. Null while
-/// that is unknown, so checks fall back to the core's defaults. Callers take
-/// a recipe's view with `toCoreCapabilities(recipe: …)` (C3), which keeps
-/// Basic compiles small.
+/// On the desktop an installation that was never checked is checked once,
+/// through [FFmpegController.probe], so a check already running (an add's,
+/// a scan's) is awaited rather than started again; the probe caches its own
+/// result. The popup only reads the cache. Null while that is unknown, so
+/// checks fall back to the core's defaults. Callers take a recipe's view with
+/// `toCoreCapabilities(recipe: …)` (C3), which keeps Basic compiles small.
 final capabilitiesProvider = FutureProvider.family<FFmpegCapabilities?, String>((ref, installationId) async {
   FFmpegInstallation? find(MachineSettings s) => s.installations.where((i) => i.id == installationId).firstOrNull;
   // Only this installation's identity matters; other settings writes (the
@@ -305,11 +307,14 @@ final capabilitiesProvider = FutureProvider.family<FFmpegCapabilities?, String>(
   if (cached != null || ref.watch(launchModeProvider) is! DesktopLaunch) return cached;
   final installation = find(await ref.read(machineSettingsProvider.future));
   if (installation == null) return null;
-  FFmpegCapabilities? found;
-  await for (final progress in ref.watch(ffmpegProbeProvider).probe(installation)) {
-    if (progress.capabilities != null) found = progress.capabilities;
-  }
-  return found;
+  // This session's check, when the cache doesn't keep it (the fakes don't).
+  FFmpegCapabilities? checked() => switch (ref.read(ffmpegControllerProvider).probed[installationId]) {
+    final c? when c.identityKey == key => c,
+    _ => null,
+  };
+  if (checked() case final c?) return c;
+  await ref.read(ffmpegControllerProvider.notifier).probeFor(installation);
+  return await ref.read(capabilityCacheProvider).read(key) ?? checked();
 });
 
 /// [capabilities] as the core takes them for [recipe] (C3's reusable view):

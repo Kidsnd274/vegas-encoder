@@ -150,7 +150,7 @@ class InstallationCard extends StatelessWidget {
                         size: VeButtonSize.small,
                         onPressed: () => onHealthAction(h.action),
                       ),
-                    if (!m.isDefault)
+                    if (!m.isDefault && !m.pending)
                       VeButton(label: 'Set as default', size: VeButtonSize.small, onPressed: onSetDefault),
                     VeButton(
                       label: 'Copy path',
@@ -159,7 +159,7 @@ class InstallationCard extends StatelessWidget {
                       icon: VeIcons.copy,
                       onPressed: onCopyPath,
                     ),
-                    if (!m.isDefault)
+                    if (!m.isDefault && !m.pending)
                       VeButton(
                         label: 'Remove…',
                         size: VeButtonSize.small,

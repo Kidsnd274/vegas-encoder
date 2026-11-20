@@ -416,6 +416,7 @@ class ProbeProgress extends JsonModel {
     int total = 0,
     String message = '',
     FFmpegCapabilities? capabilities = null,
+    HardwareTestResult? hardwareResult = null,
     JsonMap extensions = const {},
   }) : super({
          'installationId': installationId,
@@ -424,6 +425,7 @@ class ProbeProgress extends JsonModel {
          'total': total,
          'message': message,
          'capabilities': capabilities?.toJson(),
+         if (hardwareResult != null) 'hardwareResult': hardwareResult.toJson(),
          'extensions': extensions,
        });
   ProbeProgress.fromJson(super.json);
@@ -435,6 +437,11 @@ class ProbeProgress extends JsonModel {
   FFmpegCapabilities? get capabilities => data['capabilities'] == null
       ? null
       : FFmpegCapabilities.fromJson(jsonMap(data['capabilities']));
+
+  /// One hardware encoder's test result during the check's hardware phase.
+  HardwareTestResult? get hardwareResult => data['hardwareResult'] == null
+      ? null
+      : HardwareTestResult.fromJson(jsonMap(data['hardwareResult']));
   ProbeProgress copyWith({
     Object? installationId = absent,
     Object? phase = absent,
@@ -442,6 +449,7 @@ class ProbeProgress extends JsonModel {
     Object? total = absent,
     Object? message = absent,
     Object? capabilities = absent,
+    Object? hardwareResult = absent,
     Object? extensions = absent,
   }) => ProbeProgress.fromJson(
     changed({
@@ -452,6 +460,8 @@ class ProbeProgress extends JsonModel {
       if (!identical(message, absent)) 'message': message,
       if (!identical(capabilities, absent))
         'capabilities': (capabilities as FFmpegCapabilities?)?.toJson(),
+      if (!identical(hardwareResult, absent))
+        'hardwareResult': (hardwareResult as HardwareTestResult?)?.toJson(),
       if (!identical(extensions, absent)) 'extensions': extensions,
     }),
   );

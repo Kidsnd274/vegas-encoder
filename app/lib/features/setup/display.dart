@@ -24,6 +24,7 @@ class SetupCandidate {
     this.progress,
     this.failure,
     this.health,
+    this.pending = false,
   });
 
   final String id;
@@ -52,8 +53,12 @@ class SetupCandidate {
   /// Changed on disk, missing, or no ffprobe.
   final InstallationHealth? health;
 
-  /// A missing ffmpeg.exe can't render, so it can't be the default.
-  bool get selectable => !(health?.error ?? false);
+  /// Being added: discovery is still identifying the files.
+  final bool pending;
+
+  /// A missing ffmpeg.exe can't render, so it can't be the default; one
+  /// being added can't be chosen until discovery has recorded it.
+  bool get selectable => !pending && !(health?.error ?? false);
 }
 
 SetupCandidate setupCandidate(
@@ -61,8 +66,16 @@ SetupCandidate setupCandidate(
   required bool isDefault,
   required FFmpegState state,
   required ProfileCatalog catalog,
+  bool pending = false,
 }) {
-  final card = installationCard(installation, isDefault: isDefault, state: state, presets: const [], catalog: catalog);
+  final card = installationCard(
+    installation,
+    isDefault: isDefault,
+    state: state,
+    presets: const [],
+    catalog: catalog,
+    pending: pending,
+  );
   final status = statusLookup(installation, state);
   final hardware = {for (final id in hardwareEncoderIds(catalog)) id: status(id).state};
   final ready = [
@@ -100,6 +113,7 @@ SetupCandidate setupCandidate(
     progress: card.progress,
     failure: card.failure,
     health: card.health,
+    pending: pending,
   );
 }
 

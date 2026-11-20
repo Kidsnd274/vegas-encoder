@@ -83,10 +83,23 @@ class _SetupWizardState extends ConsumerState<SetupWizard> {
     final wizard = ref.watch(setupWizardProvider);
     final ffmpeg = ref.watch(ffmpegControllerProvider);
     final catalog = ref.watch(profilesProvider);
-    final installations = ref.watch(discoveredInstallationsProvider).value ?? const <FFmpegInstallation>[];
+    final listed = ref.watch(discoveredInstallationsProvider).value ?? const <FFmpegInstallation>[];
+    // One being added shows from its quick check, as a row that can't be chosen yet (F8).
+    final pending = [
+      for (final p in ffmpeg.pending.values)
+        if (!listed.any((i) => i.id == p.id)) p,
+    ];
+    final installations = [...listed, ...pending];
     final defaultId = ref.watch(machineSettingsProvider.select((s) => s.value?.defaultFFmpegId));
     final candidates = [
-      for (final i in installations) setupCandidate(i, isDefault: i.id == defaultId, state: ffmpeg, catalog: catalog),
+      for (final i in installations)
+        setupCandidate(
+          i,
+          isDefault: i.id == defaultId,
+          state: ffmpeg,
+          catalog: catalog,
+          pending: pending.contains(i),
+        ),
     ];
     final recommended = recommendedCandidate(candidates);
     final selectedId = selectedCandidate(candidates, chosenId: wizard.chosenId);

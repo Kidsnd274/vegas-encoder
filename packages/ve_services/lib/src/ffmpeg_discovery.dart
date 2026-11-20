@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -175,6 +176,45 @@ Future<MachineSettings> updateMachine(
   );
 }
 
+/// One encoder's availability as machine.json keeps it (D4): state, reason
+/// (at most 300 characters), the short note (the device a passing hardware
+/// test ran on) and, for tests, when it ran and whether 10-bit passed.
+/// An empty note or extensions is left out. FFmpeg's stderr and other test
+/// details stay in the capability cache.
+JsonMap recordAvailability(Object? entry) {
+  final e = entry is Map ? jsonMap(entry) : <String, Object?>{};
+  final extensions = e['extensions'] is Map
+      ? jsonMap(e['extensions'])
+      : <String, Object?>{};
+  final testedAt = e['testedAt'] ?? extensions['testedAt'];
+  final tenBit = e['tenBit'] ?? extensions['tenBit'];
+  final reason = e['reason'] is String ? e['reason'] as String : '';
+  final note = e['note'] is String ? e['note'] as String : '';
+  return {
+    'state': e['state'] is String ? e['state'] : 'unknown',
+    'reason': reason.length > 300 ? reason.substring(0, 300) : reason,
+    if (note.isNotEmpty) 'note': note,
+    if (testedAt is String || tenBit is bool)
+      'extensions': {
+        if (testedAt is String) 'testedAt': testedAt,
+        if (tenBit is bool) 'tenBit': tenBit,
+      },
+  };
+}
+
+/// [installation] with every availability in its record form.
+FFmpegInstallation slimInstallation(FFmpegInstallation installation) =>
+    installation.copyWith(
+      availability: {
+        for (final e in installation.availability.entries)
+          e.key: recordAvailability(e.value),
+      },
+    );
+
+MachineSettings _slim(MachineSettings settings) => settings.copyWith(
+  installations: settings.installations.map(slimInstallation).toList(),
+);
+
 class WindowsFFmpegDiscovery implements FFmpegDiscovery {
   WindowsFFmpegDiscovery({
     required this.settings,
@@ -189,7 +229,9 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
   final FFmpegCandidateFinder finder;
   final WindowsFFmpegHelpParser parser;
   final CapabilityCache? capabilities;
-  final List<ServiceException> scanProblems = [];
+  final List<ScanProblem> _scanProblems = [];
+  @override
+  List<ScanProblem> get scanProblems => List.unmodifiable(_scanProblems);
   @override
   Future<List<FFmpegInstallation>> list() async => List.unmodifiable(
     await Future.wait(
@@ -236,6 +278,41 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
     return canonicalExecutable(path);
   }
 
+  /// Installation IDs are stable per canonical executable path.
+  static String installationIdFor(String resolved) =>
+      'ffmpeg-${sha256.convert(utf8.encode(resolved.toLowerCase())).toString().substring(0, 32)}';
+
+  @override
+  Future<FFmpegInstallation> quickCheck(String executablePath) async {
+    final resolved = await _resolve(executablePath);
+    await requireX64Pe(resolved);
+    final ffprobe = joinPath(File(resolved).parent.path, 'ffprobe.exe');
+    if (!await File(ffprobe).exists())
+      throw const ServiceException(
+        'FFPROBE-MISSING',
+        'FFprobe must be beside FFmpeg.',
+      );
+    final version = await runner.run(resolved, [
+      '-hide_banner',
+      '-version',
+    ], timeout: probeIdentityTimeout);
+    version.requireSuccess('FFmpeg identity');
+    final metadata = parser.parseVersion(version.stdout + version.stderr);
+    requireSupportedFFmpeg(metadata);
+    return FFmpegInstallation(
+      id: installationIdFor(resolved),
+      label: 'FFmpeg ${metadata['version']}',
+      path: resolved,
+      ffprobePath: ffprobe,
+      source: 'manual',
+      version: metadata['version'] as String,
+      build: metadata['build'] as String,
+      license: metadata['license'] as String,
+      identity: BinaryIdentity(sha256: '', key: ''),
+      health: 'unknown',
+    );
+  }
+
   Future<FFmpegInstallation> identify(
     String path, {
     String source = 'manual',
@@ -244,6 +321,13 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
     final token = cancellation ?? CancellationToken();
     token.check();
     final resolved = await _resolve(path);
+    final ffprobe = joinPath(File(resolved).parent.path, 'ffprobe.exe');
+    // FFprobe is hashed alongside FFmpeg (both off this isolate); its
+    // failures still surface after FFmpeg's own, as before.
+    final probeFacts = _ffprobeFacts(ffprobe).then<Object>(
+      (facts) => facts,
+      onError: (Object e, StackTrace s) => AsyncError(e, s),
+    );
     final identity = await binaryIdentity(resolved, parser.version);
     token.check();
     final version = await runner.run(resolved, [
@@ -253,15 +337,9 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
     version.requireSuccess('FFmpeg identity');
     final metadata = parser.parseVersion(version.stdout + version.stderr);
     requireSupportedFFmpeg(metadata);
-    final ffprobe = joinPath(File(resolved).parent.path, 'ffprobe.exe');
-    if (!await File(ffprobe).exists())
-      throw const ServiceException(
-        'FFPROBE-MISSING',
-        'FFprobe must be beside FFmpeg.',
-      );
-    await requireX64Pe(ffprobe);
-    final probeBefore = await File(ffprobe).stat();
-    final probeDigest = await IsolatedHash.file(ffprobe);
+    final facts = await probeFacts;
+    if (facts is AsyncError) Error.throwWithStackTrace(facts.error, facts.stackTrace);
+    final (probeBefore, probeDigest) = facts as (FileStat, String);
     final probe = await runner.run(ffprobe, [
       '-v',
       'error',
@@ -284,9 +362,11 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
         'FFMPEG-CHANGED',
         'FFmpeg changed during its identity check.',
       );
+    // Unchanged size and modified time confirm the hash; only a change reads
+    // FFprobe again, and then its bytes must be the ones hashed.
     final probeStat = await File(ffprobe).stat();
-    if (probeBefore.size != probeStat.size ||
-        probeBefore.modified != probeStat.modified ||
+    if ((probeBefore.size != probeStat.size ||
+            probeBefore.modified != probeStat.modified) &&
         probeDigest != await IsolatedHash.file(ffprobe))
       throw const ServiceException(
         'FFPROBE-CHANGED',
@@ -294,7 +374,7 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
       );
     token.check();
     return FFmpegInstallation(
-      id: 'ffmpeg-${sha256.convert(utf8.encode(resolved.toLowerCase())).toString().substring(0, 32)}',
+      id: installationIdFor(resolved),
       label: 'FFmpeg ${metadata['version']}',
       path: resolved,
       ffprobePath: ffprobe,
@@ -314,6 +394,17 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
         },
       },
     );
+  }
+
+  Future<(FileStat, String)> _ffprobeFacts(String ffprobe) async {
+    if (!await File(ffprobe).exists())
+      throw const ServiceException(
+        'FFPROBE-MISSING',
+        'FFprobe must be beside FFmpeg.',
+      );
+    await requireX64Pe(ffprobe);
+    final stat = await File(ffprobe).stat();
+    return (stat, await IsolatedHash.file(ffprobe));
   }
 
   FFmpegInstallation _combine(
@@ -340,21 +431,48 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
       final prior = current.installations
           .where((i) => i.id == found.id)
           .firstOrNull;
-      return current.copyWith(
-        installations: [
-          for (final i in current.installations)
-            if (i.id != found.id) i else _combine(prior, found),
-          if (prior == null) found,
-        ],
+      return _slim(
+        current.copyWith(
+          installations: [
+            for (final i in current.installations)
+              if (i.id != found.id) i else _combine(prior, found),
+            if (prior == null) found,
+          ],
+        ),
       );
     });
     return saved.installations.firstWhere((i) => i.id == found.id);
   }
 
-  Future<FFmpegInstallation> refresh(
+  // D1: the identity key each installation was fingerprinted with by the
+  // latest add or scan, until the check that follows takes it (one shot).
+  final Map<String, String> _fingerprinted = {};
+
+  /// The installation as the check starting now should use it. The check
+  /// that follows an add or a scan reuses that fingerprint when the files'
+  /// stats still match it ([reused]); any other check identifies the files
+  /// again and records what it found.
+  Future<({FFmpegInstallation installation, bool reused})> refresh(
     FFmpegInstallation installation,
     CancellationToken token,
   ) async {
+    final fingerprinted = _fingerprinted.remove(installation.id);
+    if (fingerprinted != null &&
+        fingerprinted == installation.identity.key &&
+        await statsUnchanged(installation)) {
+      token.check();
+      final recorded = (await settings.read()).installations
+          .where((i) => i.id == installation.id)
+          .firstOrNull;
+      if (recorded == null)
+        throw const ServiceException(
+          'NOT-FOUND',
+          'Installation was removed during its identity check.',
+        );
+      if (recorded.identity.key == fingerprinted &&
+          recorded.path.toLowerCase() == installation.path.toLowerCase())
+        return (installation: recorded, reused: true);
+    }
     final fresh = (await identify(
       installation.path,
       source: installation.source,
@@ -376,21 +494,37 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
           'FFMPEG-CHANGED',
           'Installation path changed during probing.',
         );
-      return current.copyWith(
-        installations: current.installations
-            .map((i) => i.id == installation.id ? _combine(i, fresh) : i)
-            .toList(),
+      return _slim(
+        current.copyWith(
+          installations: current.installations
+              .map((i) => i.id == installation.id ? _combine(i, fresh) : i)
+              .toList(),
+        ),
       );
     });
-    return updated.installations.firstWhere((i) => i.id == installation.id);
+    return (
+      installation: updated.installations.firstWhere(
+        (i) => i.id == installation.id,
+      ),
+      reused: false,
+    );
+  }
+
+  /// [register], remembering the fingerprint for the check that follows.
+  Future<FFmpegInstallation> _registerFingerprinted(
+    FFmpegInstallation found,
+  ) async {
+    final saved = await register(found);
+    _fingerprinted[saved.id] = saved.identity.key;
+    return saved;
   }
 
   @override
   Future<FFmpegInstallation> add(String executablePath) async =>
-      register(await identify(executablePath));
+      _registerFingerprinted(await identify(executablePath));
   @override
   Future<List<FFmpegInstallation>> scan() async {
-    scanProblems.clear();
+    _scanProblems.clear();
     final candidates = [
       for (final i in (await settings.read()).installations)
         FFmpegCandidate(i.path, i.source),
@@ -401,13 +535,24 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
       try {
         final resolved = await _resolve(candidate.path);
         if (!seen.add(resolved.toLowerCase())) continue;
-        await register(await identify(resolved, source: candidate.source));
+        await _registerFingerprinted(
+          await identify(resolved, source: candidate.source),
+        );
       } on ServiceException catch (e) {
         // Missing PATH entries are normal. Other candidate failures are explicit
         // diagnostics, never promoted into a usable installation.
-        if (e.code != 'FFMPEG-MISSING') scanProblems.add(e);
+        if (e.code != 'FFMPEG-MISSING')
+          _scanProblems.add(
+            ScanProblem(path: candidate.path, code: e.code, message: e.message),
+          );
       } on FileSystemException catch (e) {
-        scanProblems.add(ServiceException('DISCOVERY-READ', e.message));
+        _scanProblems.add(
+          ScanProblem(
+            path: candidate.path,
+            code: 'DISCOVERY-READ',
+            message: e.message,
+          ),
+        );
       }
     }
     return list(); // Keep vanished/manual/default records with current health.
@@ -415,6 +560,7 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
 
   @override
   Future<void> remove(String installationId) async {
+    _fingerprinted.remove(installationId);
     await updateMachine(settings, (current) {
       if (current.defaultFFmpegId == installationId)
         throw const ServiceException(
@@ -448,10 +594,12 @@ class WindowsFFmpegDiscovery implements FFmpegDiscovery {
           'FFMPEG-CHANGED',
           'Installation identity changed during probing.',
         );
-      return current.copyWith(
-        installations: current.installations
-            .map((i) => i.id == id ? change(i) : i)
-            .toList(),
+      return _slim(
+        current.copyWith(
+          installations: current.installations
+              .map((i) => i.id == id ? change(i) : i)
+              .toList(),
+        ),
       );
     });
   }

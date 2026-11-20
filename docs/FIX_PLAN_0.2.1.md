@@ -943,7 +943,20 @@ app goldens and Dart fixtures that `-nostats` will affect, for L3.
 
 - **Symptom**: after **Add FFmpeg…** adds a second installation, clicking the older
   card does nothing. Clicking away and coming back makes selection work.
-- **Status**: the root cause was not found by reading the code. Reproduce first.
+- **Status (2026-11-20): cause found and fixed on `fix/ffmpeg-page`.** Reproduced
+  by the owner on a debug build with an isolated data root and real FFmpeg. Closing
+  the Open dialog by double-clicking the file hands the Flutter view two presses
+  and no release, at the point under the cursor. The card there took the first
+  press (`VeInteractive` stuck at pressed) and waited for a release that never
+  came, so it ignored every later click until the page was rebuilt. Hover showed
+  nothing on it, and it happened after the check had finished too. A hit test at
+  the card reached its detector: nothing covered it. `guardStrayPresses`
+  (`app/lib/platform/pointer_guard.dart`, installed in `main`) cancels a device's
+  open press before its next press, so the next real click lands. The tests
+  (`pointer_guard_test.dart` and the FFmpeg page test) replay the two presses as raw
+  pointer data and failed without the guard. The owner confirmed the fix on the
+  debug build. Causes 2 and 3 below were already handled by F1 and the add-time
+  selection rule. The steps below are kept as the original plan.
 - **Step 1: reproduce on the real desktop app** (two real FFmpeg builds,
   `VEGAS_ENCODER_DATA_ROOT` pointed at an isolated folder). Record each answer:
   - [ ] Does it happen when the Open dialog is closed by double-clicking, by

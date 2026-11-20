@@ -75,6 +75,25 @@ class FakeFFmpegDiscovery implements FFmpegDiscovery {
   final _Store<List<FFmpegInstallation>> _store;
   final List<FFmpegInstallation>? _scanResults;
   final Map<String, FFmpegInstallation> _additions;
+
+  /// Tests hold [add] here until they complete it, to see a pending card.
+  Completer<void>? addGate;
+
+  /// When set, [add] fails with this after its quick check passed.
+  ServiceException? addFailure;
+
+  /// What [scan] reports it couldn't use; tests set these.
+  @override
+  List<ScanProblem> scanProblems = const [];
+
+  /// The addition fixture for [executablePath], as [add] will record it.
+  @override
+  Future<FFmpegInstallation> quickCheck(String executablePath) async =>
+      _additions[executablePath] ??
+      (throw const ServiceException(
+        'B0-FIXTURE-MISSING',
+        'Inject this executable as an addition fixture.',
+      ));
   @override
   Future<List<FFmpegInstallation>> list() async => _store.value;
   @override
@@ -87,6 +106,8 @@ class FakeFFmpegDiscovery implements FFmpegDiscovery {
 
   @override
   Future<FFmpegInstallation> add(String executablePath) async {
+    await addGate?.future;
+    if (addFailure case final failure?) throw failure;
     final installation = _additions[executablePath];
     if (installation == null)
       throw const ServiceException(
@@ -263,6 +284,7 @@ class FakeHardwareTests implements HardwareTests {
     FFmpegInstallation installation, {
     List<String>? encoders,
     bool force = false,
+    bool reuseIdentity = false,
   }) async* {
     final generation = (_generation[installation.id] ?? 0) + 1;
     _generation[installation.id] = generation;

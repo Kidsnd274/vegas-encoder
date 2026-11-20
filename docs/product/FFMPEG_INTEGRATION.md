@@ -33,6 +33,12 @@ The four-process pool, versioned parser, binary/library/FFprobe identity checks,
 DXGI GPU/driver expiry, lazy encoder help and synthetic preset-test stream are real.
 The design cost samples below remain historical and are not runtime promises.
 
+The check test-encodes the catalog's hardware encoders that the FFmpeg lists (owner
+decision D2, 2026-11-19). The other listed hardware encoders are tested afterwards in
+the background, one at a time; APIs that can't work on Windows (`vaapi`, `videotoolbox`,
+`v4l2m2m`, `mediacodec`, `rkmpp`, `omx`) are never tested and show as failed with
+"Needs Linux or macOS; not available on Windows."
+
 B3 qualifies video hardware at 320x192 with strict pixel format, explicitly forces
 Media Foundation hardware encoding, and uploads GPU-only surfaces for Vulkan/D3D12.
 Separate 10-bit input acceptance is recorded when advertised. Cache reuse needs
@@ -140,6 +146,11 @@ The local build lists `h264_nvenc`, `hevc_qsv` and others. On this machine they 
 with "Cannot load libcuda.so.1" (no NVIDIA driver) or "Error creating a MFX session: -9"
 (no Intel device). This is the normal case on Windows too: every FFmpeg build lists
 NVENC/QSV/AMF whether or not the hardware exists.
+
+**Which encoders:** during the check, the catalog's hardware encoders that the build
+lists (NVENC H.264/HEVC/AV1, Quick Sync HEVC, AMF H.264 today); the rest of the listed
+hardware encoders afterwards, in the background; never the Linux/macOS-only APIs above.
+A passing test records the GPU it ran on (the DXGI adapter of the encoder's vendor).
 
 **Test encode per hardware encoder:**
 

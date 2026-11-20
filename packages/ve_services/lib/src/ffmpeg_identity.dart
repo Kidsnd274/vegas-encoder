@@ -209,6 +209,28 @@ Future<FFmpegInstallation> installationHealth(
   }
 }
 
+/// Whether [installation]'s files still have the size and modified time its
+/// fingerprint recorded: FFmpeg and its sibling libraries (C3 `fileStats`)
+/// and FFprobe (`ffprobeIdentity`). Reads no file contents; false when the
+/// facts are missing or the files can't be read. A check that follows Add or
+/// a scan confirms the fingerprint this way (D1); other checks rehash.
+Future<bool> statsUnchanged(FFmpegInstallation installation) async {
+  final known = installation.identity.extensions['fileStats'];
+  final probe = installation.extensions['ffprobeIdentity'];
+  if (known == null || probe is! Map) return false;
+  try {
+    if (canonicalJson(await binaryStats(installation.path)) != canonicalJson(known)) return false;
+    final probeStats = await File(installation.ffprobePath).stat();
+    return probeStats.type == FileSystemEntityType.file &&
+        probe['size'] == probeStats.size &&
+        probe['mtime'] == probeStats.modified.toUtc().toIso8601String();
+  } on ServiceException {
+    return false;
+  } on FileSystemException {
+    return false;
+  }
+}
+
 Future<void> requireCurrentInstallation(
   FFmpegInstallation installation,
   int parser,

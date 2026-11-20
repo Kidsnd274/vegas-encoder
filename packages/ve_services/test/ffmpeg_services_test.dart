@@ -463,6 +463,7 @@ buffersink AVOptions:
     var failHelp = false;
     var blockProbeLists = false;
     var changeProbeDuringCheck = false;
+    Future<void> Function()? duringLists;
     final fake = FakeProcessExecutor((executable, arguments, token) async {
       token.check();
       if (arguments.contains('-version'))
@@ -487,6 +488,11 @@ buffersink AVOptions:
             ],
           }),
         );
+      }
+      if (arguments.contains('-encoders') && duringLists != null) {
+        final change = duringLists!;
+        duringLists = null;
+        await change();
       }
       if (blockProbeLists && arguments.contains('-encoders')) {
         await token.whenCancelled;
@@ -613,6 +619,32 @@ buffersink AVOptions:
           progress.any((p) => p.phase == 'details') &&
           progress.any((p) => p.phase == 'hardware'),
       'probe phases stream',
+    );
+    // F7: the encoder list arrives with the first hardware event; each tested
+    // hardware encoder's result streams in before done.
+    final hardwareEvents = progress.where((p) => p.phase == 'hardware').toList();
+    final streamed = [
+      for (final p in hardwareEvents)
+        if (p.hardwareResult case final r?) r.encoder,
+    ];
+    final firstHardware = hardwareEvents.first;
+    check(
+      firstHardware.capabilities != null &&
+          firstHardware.hardwareResult == null &&
+          jsonMap(
+                jsonMap(firstHardware.capabilities!.encoders['hevc_nvenc'])['availability'],
+              )['state'] ==
+              'unknown' &&
+          firstHardware.total == streamed.length &&
+          streamed.isNotEmpty &&
+          streamed.toSet().length == streamed.length &&
+          hardwareEvents.skip(1).every((p) => p.hardwareResult != null) &&
+          progress.indexOf(firstHardware) <
+              progress.indexWhere((p) => p.hardwareResult != null) &&
+          progress.last.phase == 'done' &&
+          progress.where((p) => p.phase == 'done').length == 1,
+      'capabilities on the first hardware event, one result per tested encoder, then done: '
+      '${[for (final p in progress) '${p.phase}${p.capabilities != null ? '+caps' : ''}${p.hardwareResult != null ? '+${p.hardwareResult!.encoder}' : ''}'].join(' ')}',
     );
     final capabilities = progress.last.capabilities!;
     check(
@@ -809,6 +841,10 @@ buffersink AVOptions:
       failedProbe.last.phase == 'failed',
       'unknown-name exit zero is a probe failure, not success/cancellation',
     );
+    check(
+      failedProbe.last.message == 'FFmpeg did not recognize this encoder.',
+      'a failed check says why in the service’s words, not the exception’s: ${failedProbe.last.message}',
+    );
     await ffprobe.delete();
     check(
       (await services.discovery.list()).single.health == 'ffprobe-missing',
@@ -817,12 +853,446 @@ buffersink AVOptions:
     await rejects(() => services.discovery.add(ffmpeg.path), 'FFPROBE-MISSING');
     await ffprobe.writeAsBytes(bytes);
     await ffmpeg.delete();
+    final notFFmpeg = File(joinPath(joinPath(root.path, 'not-ffmpeg'), 'ffmpeg.exe'));
+    await notFFmpeg.create(recursive: true);
+    await notFFmpeg.writeAsString('not a program');
+    final problemScan = WindowsServices(
+      core: compileCore,
+      paths: ServicePaths(
+        roaming: joinPath(root.path, 'problem-roaming'),
+        local: joinPath(root.path, 'problem-local'),
+      ),
+      executor: fake,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([
+        FFmpegCandidate(notFFmpeg.path, 'path'),
+        FFmpegCandidate(joinPath(joinPath(root.path, 'nowhere'), 'ffmpeg.exe'), 'path'),
+      ]),
+    );
+    final FFmpegDiscovery problemDiscovery = problemScan.discovery;
+    check(
+      (await problemDiscovery.scan()).isEmpty &&
+          problemDiscovery.scanProblems.length == 1 &&
+          problemDiscovery.scanProblems.single.path.toLowerCase().endsWith(
+            r'\not-ffmpeg\ffmpeg.exe',
+          ) &&
+          problemDiscovery.scanProblems.single.code == 'FFMPEG-ARCH' &&
+          problemDiscovery.scanProblems.single.message.isNotEmpty,
+      'scan problems name the candidate that couldn’t be used; a missing PATH entry is no problem',
+    );
     final missing = await services.discovery.scan();
     check(
       missing.single.health == 'missing' &&
           (await services.machineSettings.read()).defaultFFmpegId ==
               installation.id,
       'scan preserves vanished default with explicit health',
+    );
+
+    // D1 (F3): an add fingerprints the files once; the check that follows
+    // reuses that fingerprint and confirms it by file stats. Checks the user
+    // starts later read the files again.
+    failHelp = false;
+    final reuseBin = Directory(joinPath(root.path, 'reuse-bin'));
+    await reuseBin.create();
+    final reuseFFmpeg = File(joinPath(reuseBin.path, 'ffmpeg.exe'));
+    await reuseFFmpeg.writeAsBytes(bytes);
+    await File(joinPath(reuseBin.path, 'ffprobe.exe')).writeAsBytes(bytes);
+    final reuse = WindowsServices(
+      core: compileCore,
+      paths: ServicePaths(
+        roaming: joinPath(root.path, 'reuse-roaming'),
+        local: joinPath(root.path, 'reuse-local'),
+      ),
+      executor: fake,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final reused = await reuse.discovery.add(reuseFFmpeg.path);
+    int versionRuns() => fake.calls
+        .where(
+          (c) =>
+              c.$1.toLowerCase() == reused.path.toLowerCase() &&
+              c.$2.contains('-version'),
+        )
+        .length;
+    final versionsAfterAdd = versionRuns();
+    final reusedModified = await reuseFFmpeg.lastModified();
+    await reuseFFmpeg.writeAsBytes(Uint8List.fromList(bytes)..[200] = 1);
+    await reuseFFmpeg.setLastModified(reusedModified);
+    final afterAdd = await reuse.probe.probe(reused).toList();
+    check(
+      afterAdd.last.phase == 'done',
+      'the add’s own check completes on stats: ${afterAdd.last.message}',
+    );
+    check(
+      afterAdd.last.capabilities!.identityKey == reused.identity.key &&
+          versionRuns() == versionsAfterAdd,
+      'the check after add reuses the add’s fingerprint instead of reading the files again',
+    );
+    await rejects(
+      () => reuse.hardwareTests
+          .test(reused, encoders: ['hevc_nvenc'], force: true)
+          .toList(),
+      'FFMPEG-CHANGED',
+    );
+    final later = await reuse.probe.probe(reused).toList();
+    check(
+      later.last.phase == 'done' &&
+          later.last.capabilities!.identityKey != reused.identity.key &&
+          versionRuns() == versionsAfterAdd + 1,
+      'a check the user starts later reads the files again',
+    );
+    final duringAdd = await reuse.discovery.add(reuseFFmpeg.path);
+    duringLists = () => reuseFFmpeg.writeAsBytes([...bytes, 9]);
+    final grown = await reuse.probe.probe(duringAdd).toList();
+    check(
+      grown.last.phase == 'failed' &&
+          grown.last.message.contains('FFmpeg changed on disk'),
+      'a size change during the add’s check fails it: ${grown.last.message}',
+    );
+    final beforeCheck = await reuse.discovery.add(reuseFFmpeg.path);
+    await reuseFFmpeg.writeAsBytes([...bytes, 9, 9]);
+    final reidentified = await reuse.probe.probe(beforeCheck).toList();
+    check(
+      reidentified.last.phase == 'done' &&
+          reidentified.last.capabilities!.identityKey !=
+              beforeCheck.identity.key,
+      'a change before the add’s check is identified again',
+    );
+
+    // D2 (F4): the check test-encodes only the catalog's hardware encoders
+    // that FFmpeg lists; Linux/macOS-only APIs are refused without running.
+    final hardwareLines = RegExp(
+      r'^ V\S* (\w+_(?:nvenc|qsv|amf|mf|vaapi|v4l2m2m|videotoolbox|vulkan|d3d12va|rkmpp|mediacodec|omx)) ',
+    );
+    final catalogEncoders = [
+      for (final line in encoderText.split('\n'))
+        if (hardwareLines.firstMatch(line) case final m?)
+          if (m[1] == 'h264_nvenc' || m[1] == 'hevc_amf') line else null
+        else
+          line,
+    ].whereType<String>().join('\n');
+    final listing = FakeProcessExecutor(
+      (executable, arguments, token) async => arguments.contains('-encoders')
+          ? ProcessOutput(
+              exitCode: 0,
+              stdout:
+                  '$catalogEncoders\n V....D h264_vaapi           H.264/AVC (VAAPI) (codec h264)\n',
+            )
+          : fake.handler(executable, arguments, token),
+    );
+    final catalogBin = Directory(joinPath(root.path, 'catalog-bin'));
+    await catalogBin.create();
+    final catalogFFmpeg = File(joinPath(catalogBin.path, 'ffmpeg.exe'));
+    await catalogFFmpeg.writeAsBytes(bytes);
+    await File(joinPath(catalogBin.path, 'ffprobe.exe')).writeAsBytes(bytes);
+    final catalogServices = WindowsServices(
+      core: compileCore,
+      paths: ServicePaths(
+        roaming: joinPath(root.path, 'catalog-roaming'),
+        local: joinPath(root.path, 'catalog-local'),
+      ),
+      executor: listing,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final listed = await catalogServices.discovery.add(catalogFFmpeg.path);
+    final catalogCheck = await catalogServices.probe.probe(listed).toList();
+    check(
+      catalogCheck.last.phase == 'done',
+      'catalog check completes: ${catalogCheck.last.message}',
+    );
+    final encodes = [
+      for (final call in listing.calls)
+        if (call.$2.contains('-c:v')) call.$2[call.$2.indexOf('-c:v') + 1],
+    ].toSet();
+    check(
+      encodes.length == 1 && encodes.single == 'h264_nvenc',
+      'the check test-encodes only the catalog’s listed hardware encoders: $encodes',
+    );
+    final listedEncoders = catalogCheck.last.capabilities!.encoders;
+    final vaapi = jsonMap(jsonMap(listedEncoders['h264_vaapi'])['availability']);
+    check(
+      vaapi['state'] == 'failed' &&
+          vaapi['reason'] == 'Needs Linux or macOS; not available on Windows.' &&
+          !listing.calls.any((c) => c.$2.any((a) => a.contains('h264_vaapi'))),
+      'a Linux/macOS-only encoder is refused without running anything',
+    );
+    check(
+      jsonMap(jsonMap(listedEncoders['hevc_amf'])['availability'])['state'] ==
+          'unknown',
+      'a listed hardware encoder outside the catalog waits for its background test',
+    );
+    check(
+      windowsUnsupportedHardware('h264_vaapi') &&
+          windowsUnsupportedHardware('hevc_videotoolbox') &&
+          !windowsUnsupportedHardware('hevc_amf'),
+      'Windows-impossible hardware APIs',
+    );
+    final rest = await catalogServices.hardwareTests
+        .test(listed, encoders: ['hevc_amf'], reuseIdentity: true)
+        .toList();
+    check(
+      rest.single.encoder == 'hevc_amf' &&
+          (await catalogServices.discovery.list()).single.health == 'unchanged',
+      'the rest are tested afterwards on request',
+    );
+
+    // D3 (F5): a passing hardware test records the adapter it ran on as
+    // `note`, matched by vendor; a failure records none.
+    const nvidia = 'NVIDIA GeForce RTX 4070';
+    const amd = 'AMD Radeon(TM) 8060S Graphics';
+    final vendorGpu = FakeGpuIdentity(
+      GpuSnapshot(
+        fingerprint: 'gpu-two-vendors',
+        cacheable: true,
+        adapters: [
+          {'name': nvidia, 'vendorId': 4318, 'driver': '1'},
+          {'name': amd, 'vendorId': 4098, 'driver': '2'},
+          {'name': 'Microsoft Basic Render Driver', 'vendorId': 5140, 'driver': '3'},
+        ],
+      ),
+    );
+    final vendorRunner = FakeProcessExecutor(
+      (executable, arguments, token) async =>
+          arguments.contains('-c:v') &&
+              arguments[arguments.indexOf('-c:v') + 1] == 'h264_amf'
+          ? const ProcessOutput(exitCode: 0)
+          : fake.handler(executable, arguments, token),
+    );
+    final vendorBin = Directory(joinPath(root.path, 'vendor-bin'));
+    await vendorBin.create();
+    final vendorFFmpeg = File(joinPath(vendorBin.path, 'ffmpeg.exe'));
+    await vendorFFmpeg.writeAsBytes(bytes);
+    await File(joinPath(vendorBin.path, 'ffprobe.exe')).writeAsBytes(bytes);
+    final vendorServices = WindowsServices(
+      core: compileCore,
+      paths: ServicePaths(
+        roaming: joinPath(root.path, 'vendor-roaming'),
+        local: joinPath(root.path, 'vendor-local'),
+      ),
+      executor: vendorRunner,
+      gpuIdentity: vendorGpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final vendorAdded = await vendorServices.discovery.add(vendorFFmpeg.path);
+    final vendorCheck = await vendorServices.probe.probe(vendorAdded).toList();
+    check(
+      vendorCheck.last.phase == 'done',
+      'vendor check completes: ${vendorCheck.last.message}',
+    );
+    final vendorCache = (await vendorServices.rawCache.read(
+      vendorAdded.identity.key,
+    ))!;
+    final vendorRecord =
+        (await vendorServices.machineSettings.read()).installations.single;
+    String cacheNote(String encoder) =>
+        jsonMap(vendorCache.hardware[encoder])['note'] as String;
+    String recordNote(String encoder) =>
+        jsonMap(vendorRecord.availability[encoder])['note'] as String? ?? '';
+    check(
+      cacheNote('h264_nvenc') == nvidia && recordNote('h264_nvenc') == nvidia,
+      'a passing NVENC test runs on the NVIDIA adapter: ${cacheNote('h264_nvenc')} / ${recordNote('h264_nvenc')}',
+    );
+    check(
+      cacheNote('h264_amf') == amd && recordNote('h264_amf') == amd,
+      'a passing AMF test runs on the AMD adapter: ${cacheNote('h264_amf')}',
+    );
+    check(
+      jsonMap(vendorCache.hardware['hevc_qsv'])['state'] == 'failed' &&
+          cacheNote('hevc_qsv') == '' &&
+          recordNote('hevc_qsv') == '',
+      'a failed test names no device',
+    );
+
+    // D4 (F6): machine.json keeps state, reason and a short note per encoder;
+    // FFmpeg's stderr and other test details stay in the capability cache.
+    final noisyStderr = 'No device available.\n${'x' * 16384}';
+    final noisy = FakeProcessExecutor(
+      (executable, arguments, token) async => arguments.contains('-c:v')
+          ? ProcessOutput(exitCode: 1, stderr: noisyStderr)
+          : fake.handler(executable, arguments, token),
+    );
+    final slimBin = Directory(joinPath(root.path, 'slim-bin'));
+    await slimBin.create();
+    final slimFFmpeg = File(joinPath(slimBin.path, 'ffmpeg.exe'));
+    await slimFFmpeg.writeAsBytes(bytes);
+    await File(joinPath(slimBin.path, 'ffprobe.exe')).writeAsBytes(bytes);
+    final slimPaths = ServicePaths(
+      roaming: joinPath(root.path, 'slim-roaming'),
+      local: joinPath(root.path, 'slim-local'),
+    );
+    final slimServices = WindowsServices(
+      core: compileCore,
+      paths: slimPaths,
+      executor: noisy,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final slimAdded = await slimServices.discovery.add(slimFFmpeg.path);
+    final slimCheck = await slimServices.probe.probe(slimAdded).toList();
+    check(
+      slimCheck.last.phase == 'done',
+      'noisy check completes: ${slimCheck.last.message}',
+    );
+    final slimRecord =
+        (await slimServices.machineSettings.read()).installations.single;
+    final failedHardware = [
+      for (final e in slimRecord.availability.entries)
+        if (isHardwareEncoder(e.key) && jsonMap(e.value)['state'] == 'failed')
+          jsonMap(e.value),
+    ];
+    const bulky = ['detail', 'stderr', 'identityKey', 'gpuFingerprint'];
+    check(
+      failedHardware.isNotEmpty &&
+          slimRecord.availability.values.every(
+            (v) => !bulky.any(jsonMap(v).containsKey),
+          ),
+      'the record keeps no stderr, detail, identity key or GPU fingerprint',
+    );
+    check(
+      failedHardware.every((v) => (v['reason'] as String).length <= 300),
+      'the record’s reasons are capped',
+    );
+    final slimCache = (await slimServices.rawCache.read(
+      slimAdded.identity.key,
+    ))!;
+    check(
+      slimCache.hardware.values.any(
+        (v) => noisyStderr.endsWith(jsonMap(v)['detail'] as String) &&
+            (jsonMap(v)['detail'] as String).length == 16384,
+      ),
+      'the capability cache keeps FFmpeg’s stderr',
+    );
+    final machineBytes = await File(slimPaths.machine).length();
+    check(
+      machineBytes < 20 * 1024,
+      'machine.json stays under 20 KB for one full installation: $machineBytes bytes',
+    );
+    final fatSettings = await slimServices.machineSettings.read();
+    await slimServices.machineSettings.save(
+      fatSettings.copyWith(
+        installations: [
+          slimRecord.copyWith(
+            availability: {
+              ...slimRecord.availability,
+              'hevc_qsv': {
+                'state': 'failed',
+                'reason': noisyStderr,
+                'detail': noisyStderr,
+                'stderr': noisyStderr,
+                'identityKey': slimRecord.identity.key,
+                'gpuFingerprint': 'gpu-driver-2',
+                'note': '10-bit has not passed.',
+                'extensions': {
+                  'testedAt': '2026-11-19T01:00:00.000Z',
+                  'gpuFingerprint': 'gpu-driver-2',
+                  'tenBit': false,
+                },
+              },
+            },
+          ),
+        ],
+      ),
+      expectedRevision: fatSettings.revision,
+    );
+    await slimServices.discovery.updateRecord(
+      slimRecord.id,
+      slimRecord.identity.key,
+      (record) => record,
+    );
+    final legacy = jsonMap(
+      (await slimServices.machineSettings.read())
+          .installations
+          .single
+          .availability['hevc_qsv'],
+    );
+    check(
+      !bulky.any(legacy.containsKey) &&
+          (legacy['reason'] as String).length <= 300 &&
+          canonicalJson(legacy['extensions']) ==
+              canonicalJson({
+                'testedAt': '2026-11-19T01:00:00.000Z',
+                'tenBit': false,
+              }),
+      'a fat legacy record is slimmed by the next record update: ${jsonEncode(legacy).length} bytes',
+    );
+
+    // F8: Add's quick version check shows the card at once. It writes,
+    // hashes and runs nothing but `-version`, and refuses what identify does.
+    var oldVersion = false;
+    final quick = FakeProcessExecutor((executable, arguments, token) async {
+      if (arguments.contains('-version') && oldVersion)
+        return ProcessOutput(
+          exitCode: 0,
+          stdout: versionText.replaceFirst(
+            RegExp(r'libavformat\s+59\. 27\.100 / 59\. 27\.100'),
+            'libavformat    58. 45.100 / 58. 45.100',
+          ),
+        );
+      return fake.handler(executable, arguments, token);
+    });
+    final quickPaths = ServicePaths(
+      roaming: joinPath(root.path, 'quick-roaming'),
+      local: joinPath(root.path, 'quick-local'),
+    );
+    final quickServices = WindowsServices(
+      core: compileCore,
+      paths: quickPaths,
+      executor: quick,
+      gpuIdentity: gpu,
+      candidateFinder: FakeFFmpegCandidateFinder([]),
+    );
+    final quickBin = Directory(joinPath(root.path, 'quick-bin'));
+    await quickBin.create();
+    final quickFFmpeg = File(joinPath(quickBin.path, 'ffmpeg.exe'));
+    await quickFFmpeg.writeAsBytes(bytes);
+    final quickProbe = File(joinPath(quickBin.path, 'ffprobe.exe'));
+    await quickProbe.writeAsBytes(bytes);
+    final shown = await quickServices.discovery.quickCheck(quickFFmpeg.path);
+    check(
+      shown.version == metadata['version'] &&
+          shown.build == metadata['build'] &&
+          shown.license == metadata['license'] &&
+          shown.label == 'FFmpeg ${metadata['version']}' &&
+          shown.source == 'manual' &&
+          shown.identity.key.isEmpty &&
+          shown.health == 'unknown' &&
+          shown.ffprobePath.toLowerCase() ==
+              quickProbe.resolveSymbolicLinksSync().toLowerCase(),
+      'the quick check reads version, build and licence: ${jsonEncode(shown.data)}',
+    );
+    check(
+      quick.calls.length == 1 &&
+          quick.calls.single.$2.contains('-version') &&
+          !File(quickPaths.machine).existsSync(),
+      'the quick check runs -version once, never FFprobe, and writes nothing: ${quick.calls}',
+    );
+    final recordedQuick = await quickServices.discovery.add(quickFFmpeg.path);
+    check(
+      recordedQuick.id == shown.id,
+      'the quick check names the installation as identify does',
+    );
+    final x86 = File(joinPath(quickBin.path, 'x86.exe'));
+    await x86.writeAsBytes(Uint8List.fromList(bytes)..[68] = 0x4c..[69] = 0x01);
+    await rejects(
+      () => quickServices.discovery.quickCheck(x86.path),
+      'FFMPEG-ARCH',
+    );
+    await rejects(
+      () => quickServices.discovery.quickCheck(joinPath(quickBin.path, 'ffmpeg.txt')),
+      'FFMPEG-PATH',
+    );
+    oldVersion = true;
+    await rejects(
+      () => quickServices.discovery.quickCheck(quickFFmpeg.path),
+      'FFMPEG-UNSUPPORTED',
+    );
+    oldVersion = false;
+    await quickProbe.delete();
+    await rejects(
+      () => quickServices.discovery.quickCheck(quickFFmpeg.path),
+      'FFPROBE-MISSING',
     );
 
     await processTests();
